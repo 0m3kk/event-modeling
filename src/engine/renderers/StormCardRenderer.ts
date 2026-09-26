@@ -1,0 +1,612 @@
+import { Container, Graphics, Text } from "pixi.js";
+import type { CanvasObject, StormData, StormField, StormKind } from "@/types";
+import { APP_FONT_FAMILY } from "@/constants/canvas";
+import {
+  STORM_KIND_LABELS,
+  STORM_PHASE_COLORS,
+  STORM_PHASE_LABELS,
+  stormAccentColor,
+  stormHasFieldTypes,
+  stormHasAction,
+  stormHasParamsSection,
+  stormHasQueryItems,
+  stormHasResponseFields,
+  stormHasTags,
+} from "@/constants/storm";
+import type { CardHitZone, RenderResult } from "./types";
+import { drawActionIcon, drawHeaderKindIcon } from "./headerIcons";
+import { drawInfoBadge } from "./infoBadge";
+import { drawLinkBadge } from "./linkBadge";
+
+function truncateText(str: string, maxLen: number): string {
+  if (!str) return "";
+  if (maxLen <= 1) return str.slice(0, 1);
+  return str.length > maxLen ? str.slice(0, maxLen - 1) + "…" : str;
+}
+
+export class StormCardRenderer {
+  public static draw(
+    container: Container,
+    obj: CanvasObject,
+    textResolution: number,
+    isSelected: boolean = false,
+    selectedFieldId?: string,
+  ): RenderResult {
+    container.removeChildren();
+
+    const data: StormData = obj.stormData ?? {
+      kind: "command",
+      name: obj.text || "Untitled",
+      fields: [],
+    };
+
+    const kind: StormKind = data.kind;
+    // BDD cards take the color of their phase so Given/When/Then reads at a glance
+    const headerColor = parseInt(
+      stormAccentColor(kind, data.phase).replace("#", "0x"),
+      16,
+    );
+    const kindLabel = STORM_KIND_LABELS[kind] ?? kind;
+    const rawTitle = data.name || obj.text || kindLabel;
+    const isArray = Boolean(data.isArray);
+    const fullTitle = isArray && rawTitle ? `${rawTitle}[]` : rawTitle;
+
+    const w = obj.width || 260;
+    const r = 8;
+    const hitZones: CardHitZone[] = [];
+
+    const bgGraphics = new Graphics();
+    container.addChild(bgGraphics);
+
+    const g = new Graphics();
+    container.addChild(g);
+
+    // Header dimensions
+    const headerHeight = 36;
+    let currentY = 0;
+
+    // Header Hit Zone
+    hitZones.push({
+      type: "header",
+      bounds: { x: 0, y: 0, width: w, height: headerHeight },
+      currentText: data.name || "",
+    });
+
+    currentY += headerHeight;
+
+    // Authorization action (Command / Query) is surfaced as a header badge
+    // (left of the ⓘ description badge) instead of a dedicated row, so the
+    // body starts right below the header. The action value is revealed on
+    // hover by ActionTooltip.
+    const hasAction = Boolean(data.action && stormHasAction(kind));
+
+    // Measure body content
+    const fields = data.fields ?? [];
+    const responseFields = data.responseFields ?? [];
+    const queryItems = data.queryItems ?? [];
+    const constraints = data.constraints ?? [];
+    const permissions = data.permissions ?? [];
+
+    // BDD (Given/When/Then) cards render the same field list as Event/Command —
+    // types included — with the phase shown as their header badge.
+    const hasTypes = stormHasFieldTypes(kind);
+    const rowHeight = 26;
+    const sectionLabelHeight = 22;
+
+    const hasParams = stormHasParamsSection(kind);
+    const hasResponse = stormHasResponseFields(kind);
+    const isActor = kind === "actor";
+    const isConstraint = kind === "constraint";
+
+    // Draw Header
+    g.roundRect(0, 0, w, headerHeight, r).fill({ color: headerColor });
+    g.rect(0, headerHeight - r, w, r).fill({ color: headerColor });
+
+    // Header Right-edge elements: Kind Icon, BDD Badge, Description Icon
+    const iconCX = w - 18;
+    const iconCY = headerHeight / 2;
+    drawHeaderKindIcon(g, kind, iconCX, iconCY, 0xffffff);
+
+    let rightEdgeBoundary = iconCX - 12;
+
+    // Header BDD Phase badge (GIVEN / WHEN / THEN)
+    if (data.phase) {
+      const phase = data.phase;
+      const phaseLabel = STORM_PHASE_LABELS[phase] ?? phase.toUpperCase();
+      const phaseColorHex = STORM_PHASE_COLORS[phase] ?? "#000000";
+
+      const badgeWidth = phaseLabel.length * 6 + 12;
+      const badgeX = rightEdgeBoundary - badgeWidth;
+      const badgeY = 9;
+
+      g.roundRect(badgeX, badgeY, badgeWidth, 18, 9)
+        .fill({ color: 0xffffff })
+        .stroke({
+          color: parseInt(phaseColorHex.replace("#", "0x"), 16),
+          width: 1.5,
+        });
+
+      const phaseText = new Text({
+        text: phaseLabel,
+        style: {
+          fontSize: 9,
+          fontWeight: "bold",
+          fontFamily: APP_FONT_FAMILY,
+          fill: parseInt(phaseColorHex.replace("#", "0x"), 16),
+        },
+        resolution: textResolution,
+      });
+      phaseText.x = badgeX + 6;
+      phaseText.y = badgeY + 3;
+      container.addChild(phaseText);
+
+      rightEdgeBoundary = badgeX - 6;
+    }
+
+    if (data.description || isSelected) {
+      // Header ⓘ description indicator. Muted "add info" affordance on the
+      // selected card when no description exists yet.
+      const hasDesc = Boolean(data.description);
+      const infoX = rightEdgeBoundary - 18;
+      const infoY = 11;
+      drawInfoBadge(g, container, infoX + 7, infoY + 7, {
+        radius: 7,
+        stroke: 0xffffff,
+        strokeWidth: 1.2,
+        fill: 0xffffff,
+        fontSize: 9,
+        bold: true,
+        alpha: hasDesc ? 1 : 0.5,
+        textResolution,
+      });
+
+      hitZones.push({
+        type: "desc",
+        bounds: { x: infoX, y: infoY, width: 16, height: 16 },
+        currentText: data.description,
+      });
+
+      rightEdgeBoundary = infoX - 6;
+    }
+
+    // Header authorization-action indicator. Mirrors the ⓘ description badge:
+    // it sits to its left and reveals the action on hover rather than taking a
+    // row on the card. Setting the action stays in the options bar.
+    if (hasAction && data.action) {
+      const actionX = rightEdgeBoundary - 18;
+      const actionY = 11;
+      drawActionIcon(g, actionX + 7, actionY + 7, 0xffffff, 1);
+
+      hitZones.push({
+        type: "action",
+        bounds: { x: actionX, y: actionY, width: 16, height: 16 },
+        currentText: data.action,
+      });
+
+      rightEdgeBoundary = actionX - 6;
+    }
+
+    // Header Title on the left edge (vertically centered)
+    const maxTitleChars = Math.max(
+      8,
+      Math.floor((rightEdgeBoundary - 14) / 7.5),
+    );
+    const displayTitle = truncateText(fullTitle, maxTitleChars);
+
+    const titleText = new Text({
+      text: displayTitle,
+      style: {
+        fontSize: 13,
+        fontWeight: "bold",
+        fontFamily: APP_FONT_FAMILY,
+        fill: 0xffffff,
+      },
+      resolution: textResolution,
+    });
+    titleText.x = 12;
+    titleText.y = 9;
+    container.addChild(titleText);
+
+    // 4. Render Body Fields
+    let renderY = currentY + 6;
+
+    const renderFieldList = (
+      fieldList: StormField[],
+      section: "params" | "response",
+    ) => {
+      for (const field of fieldList) {
+        const rowY = renderY;
+
+        // Draw selection highlight for this row
+        if (selectedFieldId && field.id === selectedFieldId) {
+          g.roundRect(4, rowY + 1, w - 8, rowHeight - 2, 4).fill({
+            color: 0xdbeafe,
+          });
+        }
+
+        // Dynamic widths for type zone and tag pill
+        const rawType = field.fieldType || "string";
+        const typeZoneW = hasTypes
+          ? Math.min(88, Math.max(65, rawType.length * 6.5 + 14))
+          : 0;
+        const typeZoneX = w - typeZoneW - 8;
+
+        // Tag Pill (for event, state, constraint, bdd)
+        const hasTag = Boolean(field.tag && stormHasTags(kind));
+        const rawTag = field.tag || "";
+        const tagPillW = hasTag ? Math.min(70, rawTag.length * 6 + 10) : 0;
+        const tagPillX = hasTag
+          ? hasTypes
+            ? typeZoneX - tagPillW - 6
+            : w - tagPillW - 10
+          : w - 10;
+
+        // Calculate available space for field name
+        const availableNameWidth = hasTag
+          ? tagPillX - 22
+          : hasTypes
+            ? typeZoneX - 22
+            : w - 24;
+
+        const maxNameChars = Math.max(6, Math.floor(availableNameWidth / 7.2));
+        const displayName = truncateText(field.name, maxNameChars);
+
+        // Field Name Text
+        const nameText = new Text({
+          text: `• ${displayName}`,
+          style: {
+            fontSize: 11,
+            fontWeight: "500",
+            fontFamily: APP_FONT_FAMILY,
+            fill: 0x1e293b,
+          },
+          resolution: textResolution,
+        });
+        nameText.x = 10;
+        nameText.y = rowY + 5;
+        container.addChild(nameText);
+
+        const renderedNameWidth = displayName.length * 6.8 + 14;
+        // Full-row selection zone: clicking anywhere on the row selects the
+        // field (specific zones below — tag, type, ⓘ — are pushed later and
+        // therefore take priority in the reverse hit test).
+        hitZones.push({
+          type: "fieldName",
+          bounds: {
+            x: 0,
+            y: rowY,
+            width: w,
+            height: rowHeight,
+          },
+          fieldId: field.id,
+          section,
+          currentText: field.name,
+        });
+
+        // Required asterisk
+        if (field.required) {
+          const reqText = new Text({
+            text: "*",
+            style: {
+              fontSize: 12,
+              fontWeight: "bold",
+              fontFamily: APP_FONT_FAMILY,
+              fill: 0xef4444,
+            },
+            resolution: textResolution,
+          });
+          reqText.x = nameText.x + renderedNameWidth + 2;
+          reqText.y = rowY + 3;
+          container.addChild(reqText);
+        }
+
+        // Draw Tag Pill
+        if (hasTag) {
+          const displayTag = truncateText(rawTag, 9);
+          g.roundRect(tagPillX, rowY + 4, tagPillW, 18, 4)
+            .fill({ color: 0xf1f5f9 })
+            .stroke({ color: 0xcbd5e1, width: 1 });
+
+          const tagText = new Text({
+            text: displayTag,
+            style: {
+              fontSize: 9,
+              fontFamily: APP_FONT_FAMILY,
+              fill: 0x475569,
+            },
+            resolution: textResolution,
+          });
+          tagText.x = tagPillX + 5;
+          tagText.y = rowY + 6;
+          container.addChild(tagText);
+
+          hitZones.push({
+            type: "fieldTag",
+            bounds: {
+              x: tagPillX,
+              y: rowY,
+              width: tagPillW,
+              height: rowHeight,
+            },
+            fieldId: field.id,
+            section,
+            currentText: field.tag,
+          });
+        }
+
+        // Draw Type Zone
+        if (hasTypes) {
+          const maxTypeChars = Math.floor((typeZoneW - 12) / 6.2);
+          const displayType = truncateText(rawType, maxTypeChars);
+
+          g.roundRect(typeZoneX, rowY + 3, typeZoneW, 20, 3)
+            .fill({ color: 0xf8fafc })
+            .stroke({ color: 0xe2e8f0, width: 1 });
+
+          const typeText = new Text({
+            text: displayType,
+            style: {
+              fontSize: 10,
+              fontFamily: APP_FONT_FAMILY,
+              fill: 0x64748b,
+            },
+            resolution: textResolution,
+          });
+          typeText.x = typeZoneX + 6;
+          typeText.y = rowY + 6;
+          container.addChild(typeText);
+
+          hitZones.push({
+            type: "fieldType",
+            bounds: {
+              x: typeZoneX,
+              y: rowY,
+              width: typeZoneW,
+              height: rowHeight,
+            },
+            fieldId: field.id,
+            section,
+            currentText: field.fieldType,
+          });
+        }
+
+        // Description indicator for field row — muted "add info" affordance on
+        // the selected row when no description exists yet.
+        if (field.description || selectedFieldId === field.id) {
+          const hasDesc = Boolean(field.description);
+          const rowInfoX = (hasTag ? tagPillX : typeZoneX) - 14;
+          if (rowInfoX > 30) {
+            drawInfoBadge(g, container, rowInfoX, rowY + 13, {
+              radius: 5,
+              stroke: 0x94a3b8,
+              fill: 0x64748b,
+              fontSize: 7,
+              alpha: hasDesc ? 1 : 0.5,
+              textResolution,
+            });
+
+            hitZones.push({
+              type: "desc",
+              bounds: { x: rowInfoX - 8, y: rowY + 5, width: 16, height: 16 },
+              fieldId: field.id,
+              section,
+              currentText: field.description,
+            });
+          }
+        }
+
+        renderY += rowHeight;
+      }
+    };
+
+    // Render Params
+    if (hasParams && (fields.length > 0 || hasResponse)) {
+      const pLabel = new Text({
+        text: "PARAMS",
+        style: {
+          fontSize: 9,
+          fontWeight: "bold",
+          fontFamily: APP_FONT_FAMILY,
+          fill: 0x94a3b8,
+          letterSpacing: 0.5,
+        },
+        resolution: textResolution,
+      });
+      pLabel.x = 10;
+      pLabel.y = renderY + 2;
+      container.addChild(pLabel);
+      renderY += sectionLabelHeight;
+    }
+
+    renderFieldList(fields, "params");
+
+    // Render Response — the band is always present on Query cards, matching
+    // the Params band (the original keeps both sections visible even when empty).
+    if (hasResponse) {
+      const rLabel = new Text({
+        text: "RESPONSE",
+        style: {
+          fontSize: 9,
+          fontWeight: "bold",
+          fontFamily: APP_FONT_FAMILY,
+          fill: 0x94a3b8,
+          letterSpacing: 0.5,
+        },
+        resolution: textResolution,
+      });
+      rLabel.x = 10;
+      rLabel.y = renderY + 4;
+      container.addChild(rLabel);
+      renderY += sectionLabelHeight;
+
+      renderFieldList(responseFields, "response");
+    }
+
+    // Render Actor Permissions (if no fields)
+    if (isActor && permissions.length > 0 && fields.length === 0) {
+      const maxPermChars = Math.max(8, Math.floor((w - 32) / 6.5));
+      for (const perm of permissions) {
+        const rowY = renderY;
+        const displayPerm = truncateText(perm, maxPermChars);
+        const permText = new Text({
+          text: `🔑 ${displayPerm}`,
+          style: {
+            fontSize: 11,
+            fontFamily: APP_FONT_FAMILY,
+            fill: 0x334155,
+          },
+          resolution: textResolution,
+        });
+        permText.x = 10;
+        permText.y = rowY + 5;
+        container.addChild(permText);
+
+        hitZones.push({
+          type: "fieldName",
+          bounds: { x: 0, y: rowY, width: w, height: rowHeight },
+          currentText: perm,
+        });
+
+        renderY += rowHeight;
+      }
+    }
+
+    // Render DCB Query Items (State and Constraint cards — "Related Events")
+    if (stormHasQueryItems(kind) && queryItems.length > 0) {
+      const qLabel = new Text({
+        text: "QUERY ITEMS",
+        style: {
+          fontSize: 9,
+          fontWeight: "bold",
+          fontFamily: APP_FONT_FAMILY,
+          fill: 0x7c3aed,
+          letterSpacing: 0.5,
+        },
+        resolution: textResolution,
+      });
+      qLabel.x = 10;
+      qLabel.y = renderY + 4;
+      container.addChild(qLabel);
+      renderY += sectionLabelHeight;
+
+      const maxQueryChars = Math.max(10, Math.floor((w - 34) / 6.2));
+      for (const item of queryItems) {
+        const rowY = renderY;
+
+        // Draw selection highlight for this row
+        if (selectedFieldId && item.id === selectedFieldId) {
+          g.roundRect(4, rowY + 1, w - 8, rowHeight - 2, 4).fill({
+            color: 0xdbeafe,
+          });
+        }
+
+        const typesStr = item.types.length > 0 ? item.types.join(", ") : "*";
+        const displayQuery = truncateText(typesStr, maxQueryChars);
+
+        const qText = new Text({
+          text: `◒ [${displayQuery}]`,
+          style: {
+            fontSize: 10,
+            fontWeight: "bold",
+            fontFamily: APP_FONT_FAMILY,
+            fill: 0x6d28d9,
+          },
+          resolution: textResolution,
+        });
+        qText.x = 10;
+        qText.y = rowY + 5;
+        container.addChild(qText);
+
+        hitZones.push({
+          type: "queryItem",
+          bounds: { x: 0, y: rowY, width: w, height: rowHeight },
+          queryItemId: item.id,
+          currentText: typesStr,
+        });
+
+        renderY += rowHeight;
+      }
+    }
+
+    // Render Constraints
+    if (isConstraint && constraints.length > 0) {
+      const cLabel = new Text({
+        text: "CONSTRAINTS",
+        style: {
+          fontSize: 9,
+          fontWeight: "bold",
+          fontFamily: APP_FONT_FAMILY,
+          fill: 0x0f766e,
+          letterSpacing: 0.5,
+        },
+        resolution: textResolution,
+      });
+      cLabel.x = 10;
+      cLabel.y = renderY + 4;
+      container.addChild(cLabel);
+      renderY += sectionLabelHeight;
+
+      const maxConstraintChars = Math.max(10, Math.floor((w - 30) / 6.0));
+      for (const c of constraints) {
+        const rowY = renderY;
+
+        // Draw selection highlight for this row
+        if (selectedFieldId && c.id === selectedFieldId) {
+          g.roundRect(4, rowY + 1, w - 8, rowHeight - 2, 4).fill({
+            color: 0xdbeafe,
+          });
+        }
+
+        const displayConstraint = truncateText(c.text, maxConstraintChars);
+
+        const cText = new Text({
+          text: `• ${displayConstraint}`,
+          style: {
+            fontSize: 10,
+            fontFamily: APP_FONT_FAMILY,
+            fill: 0x134e4a,
+          },
+          resolution: textResolution,
+        });
+        cText.x = 10;
+        cText.y = rowY + 5;
+        container.addChild(cText);
+
+        hitZones.push({
+          type: "constraint",
+          bounds: { x: 0, y: rowY, width: w, height: rowHeight },
+          constraintId: c.id,
+          currentText: c.text,
+        });
+
+        renderY += rowHeight;
+      }
+    }
+
+    const finalHeight = Math.max(renderY + 10, 80);
+    bgGraphics
+      .roundRect(0, 0, w, finalHeight, r)
+      .fill({ color: 0xffffff })
+      .stroke({
+        color: isSelected ? 0x3b82f6 : 0xe2e8f0,
+        width: isSelected ? 2 : 1.5,
+      });
+
+    obj.height = finalHeight;
+
+    // Reference-copy badge — marks a card linked to a reference set (content
+    // stays in sync across copies). Drawn last so it sits above the header.
+    if (obj.referenceId) {
+      drawLinkBadge(g, w - 3, 3, {
+        radius: 9,
+        fill: 0x0d99ff,
+        glyph: 0xffffff,
+      });
+    }
+
+    return {
+      height: finalHeight,
+      hitZones,
+    };
+  }
+}

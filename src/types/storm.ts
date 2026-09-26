@@ -1,0 +1,113 @@
+/**
+ * Domain definitions for Event Storming cards
+ */
+
+/**
+ * Event storming card kind.
+ *
+ * `bdd` is the Given/When/Then scenario step card. Its `phase`
+ * (given/when/then) is its identity, so it is the only kind that exposes a
+ * step switcher in the options bar; every other kind is fixed at creation.
+ */
+export type StormKind =
+  | "command"
+  | "event"
+  | "actor"
+  | "state"
+  | "constraint"
+  | "notify"
+  | "query"
+  | "bdd";
+
+/** BDD Scenario Phase for Given-When-Then cards */
+export type BddPhase = "given" | "when" | "then";
+
+/**
+ * One DCB Query Item of a State (or Constraint) card.
+ *
+ * Semantics:
+ * - an Event matches this item when its type is in `types` (empty = matches all)
+ *   AND it carries all of the item's tags (empty = matches all)
+ * - Query Items on a State/Constraint card are combined with OR
+ */
+export interface StormQueryItem {
+  id: string; // unique identifier
+  /** Event type names — empty array = match all types */
+  types: string[];
+  /** State field IDs whose tags filter Events */
+  tagFieldIds: string[];
+}
+
+/**
+ * Free-text business rule / constraint line on a Constraint card
+ */
+export interface StormConstraint {
+  id: string;
+  text: string;
+}
+
+/**
+ * A single field row of an event storming card
+ */
+export interface StormField {
+  id: string;
+  name: string;
+  fieldType: string; // primitive or Model node reference
+  value?: string; // scenario / instance value (e.g. for BDD Given/When/Then)
+  required?: boolean;
+  description?: string;
+  tag?: string; // tag name (e.g. 'order') forming '{tag}:{name}'
+}
+
+/**
+ * Event storming card payload
+ */
+export interface StormData {
+  kind: StormKind;
+  name: string; // Card title
+  /**
+   * Given / When / Then step. Required on `bdd` cards (it drives their header
+   * color and phase switcher); undefined on every other kind.
+   */
+  phase?: BddPhase;
+  description?: string;
+  fields: StormField[]; // Primary fields (Params on Query cards)
+  responseFields?: StormField[]; // Query cards only (Response fields)
+  queryItems?: StormQueryItem[]; // State & Constraint cards (DCB Query)
+  constraints?: StormConstraint[]; // Constraint cards only
+  isArray?: boolean; // Collection indicator '[]'
+  action?: string; // Authorization action (resource:verb:scope)
+  permissions?: string[]; // Actor cards only (wildcard patterns)
+}
+
+/** Inline editing state for active text entry */
+export interface StormInlineEditState {
+  objectId: string;
+  fieldId?: string;
+  target?: "tag" | "queryTypes" | "queryTags" | "constraintText" | "value";
+}
+
+/** Single selected row */
+export interface StormFieldSelection {
+  objectId: string;
+  fieldId?: string;
+}
+
+/** Multi-selected field rows for copy/paste/reorder */
+export interface FieldMultiSelection {
+  objectId: string;
+  fieldIds: string[];
+}
+
+export interface FieldClipboardEntry {
+  name: string;
+  fieldType: string;
+  required?: boolean;
+  description?: string;
+  tag?: string;
+}
+
+export interface FieldClipboard {
+  sourceKind: "model-object" | "model-enum" | "storm";
+  entries: FieldClipboardEntry[];
+}

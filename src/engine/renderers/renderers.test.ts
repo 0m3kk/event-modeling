@@ -1,0 +1,507 @@
+import { describe, it, expect } from "vitest";
+import { Container } from "pixi.js";
+import { StormCardRenderer } from "./StormCardRenderer";
+import { ModelNodeRenderer } from "./ModelNodeRenderer";
+import { StickyNoteRenderer } from "./StickyNoteRenderer";
+import { TextBoxRenderer } from "./TextBoxRenderer";
+import type { CanvasObject } from "@/types";
+
+describe("Pixi Card Renderers", () => {
+  it("renders Storm command card with action and fields", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "cmd-1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 140,
+      stormData: {
+        kind: "command",
+        name: "CreateOrder",
+        action: "order:create:tenant",
+        fields: [
+          { id: "f1", name: "orderId", fieldType: "uuid", required: true },
+          { id: "f2", name: "amount", fieldType: "number" },
+        ],
+      },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+    // The action no longer occupies a row: only the header + two field rows.
+    expect(res.height).toBe(104);
+    expect(res.hitZones.length).toBeGreaterThan(0);
+
+    const headerZone = res.hitZones.find((z) => z.type === "header");
+    expect(headerZone).toBeDefined();
+    expect(headerZone?.currentText).toBe("CreateOrder");
+
+    // The action is a compact header badge (left of the ⓘ icon), not a row.
+    const actionZone = res.hitZones.find((z) => z.type === "action");
+    expect(actionZone).toBeDefined();
+    expect(actionZone?.currentText).toBe("order:create:tenant");
+    expect(actionZone?.bounds.y).toBeLessThan(36);
+    expect(actionZone?.bounds.height).toBeLessThanOrEqual(20);
+
+    const fieldNames = res.hitZones.filter((z) => z.type === "fieldName");
+    expect(fieldNames.length).toBe(2);
+
+    const fieldTypes = res.hitZones.filter((z) => z.type === "fieldType");
+    expect(fieldTypes.length).toBe(2);
+  });
+
+  it("shows the action badge only when the card has an action", () => {
+    const obj: CanvasObject = {
+      id: "cmd-2",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 120,
+      stormData: {
+        kind: "command",
+        name: "CreateOrder",
+        fields: [],
+      },
+    };
+
+    // No action → no badge, even when selected
+    const unselected = StormCardRenderer.draw(new Container(), obj, 1, false);
+    expect(unselected.hitZones.some((z) => z.type === "action")).toBe(false);
+
+    const selected = StormCardRenderer.draw(new Container(), obj, 1, true);
+    expect(selected.hitZones.some((z) => z.type === "action")).toBe(false);
+  });
+
+  it("renders Given/When/Then (BDD) card with phase badge, field types and tag", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "bdd-1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 120,
+      stormData: {
+        kind: "bdd",
+        name: "Given",
+        phase: "given",
+        fields: [
+          { id: "f1", name: "orderId", fieldType: "uuid", tag: "order" },
+        ],
+      },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+    expect(res.hitZones.some((z) => z.type === "header")).toBe(true);
+    expect(
+      res.hitZones.some(
+        (z) => z.type === "fieldTag" && z.currentText === "order",
+      ),
+    ).toBe(true);
+    // BDD cards carry a normal typed field list
+    expect(res.hitZones.some((z) => z.type === "fieldType")).toBe(true);
+  });
+
+  it("renders Storm query card with dual sections (params & response)", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "qry-1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 160,
+      stormData: {
+        kind: "query",
+        name: "GetOrder",
+        action: "order:read:tenant",
+        fields: [{ id: "p1", name: "orderId", fieldType: "uuid" }],
+        responseFields: [
+          { id: "r1", name: "order", fieldType: "OrderPayload" },
+        ],
+      },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+    expect(res.hitZones.filter((z) => z.type === "fieldName").length).toBe(2);
+    expect(res.hitZones.some((z) => z.section === "params")).toBe(true);
+    expect(res.hitZones.some((z) => z.section === "response")).toBe(true);
+  });
+
+  it("renders Storm state card with DCB query items", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "state-1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 140,
+      stormData: {
+        kind: "state",
+        name: "OrderState",
+        fields: [{ id: "f1", name: "status", fieldType: "string" }],
+        queryItems: [
+          {
+            id: "qi1",
+            types: ["OrderPlaced", "OrderCancelled"],
+            tagFieldIds: ["f1"],
+          },
+        ],
+      },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+    const qZone = res.hitZones.find((z) => z.type === "queryItem");
+    expect(qZone).toBeDefined();
+    expect(qZone?.queryItemId).toBe("qi1");
+  });
+
+  it("renders Storm constraint card with field rows, query items and constraint lines", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "c-1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 140,
+      stormData: {
+        kind: "constraint",
+        name: "OrderConstraints",
+        // Constraint shares the State body: field rows + Related Events,
+        // then the free-text Constraints section.
+        fields: [
+          { id: "cf1", name: "total", fieldType: "number", tag: "order" },
+        ],
+        queryItems: [
+          { id: "cqi1", types: ["OrderPlaced"], tagFieldIds: ["cf1"] },
+        ],
+        constraints: [
+          { id: "c1", text: "Total amount must be greater than zero" },
+        ],
+      },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+    // Field rows render for constraint cards (typed + taggable)
+    expect(res.hitZones.filter((z) => z.type === "fieldName").length).toBe(1);
+    expect(res.hitZones.some((z) => z.type === "fieldType")).toBe(true);
+    expect(
+      res.hitZones.some(
+        (z) => z.type === "fieldTag" && z.currentText === "order",
+      ),
+    ).toBe(true);
+    // Related Events (DCB Query Items) render for constraint cards too
+    const qZone = res.hitZones.find((z) => z.type === "queryItem");
+    expect(qZone).toBeDefined();
+    expect(qZone?.queryItemId).toBe("cqi1");
+    // And the free-text constraints section
+    const cZone = res.hitZones.find((z) => z.type === "constraint");
+    expect(cZone).toBeDefined();
+    expect(cZone?.currentText).toBe("Total amount must be greater than zero");
+  });
+
+  it("renders Storm actor card with permissions", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "act-1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+      stormData: {
+        kind: "actor",
+        name: "Admin",
+        fields: [],
+        permissions: ["order:*", "user:*"],
+      },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+    expect(res.hitZones.some((z) => z.currentText === "Admin")).toBe(true);
+    expect(res.hitZones.some((z) => z.currentText === "order:*")).toBe(true);
+  });
+
+  it("renders Data Model object node", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "model-obj",
+      type: "model",
+      x: 50,
+      y: 50,
+      width: 220,
+      height: 120,
+      modelData: {
+        kind: "object",
+        name: "UserProfile",
+        fields: [
+          { id: "mf1", name: "username", fieldType: "string", required: true },
+          { id: "mf2", name: "email", fieldType: "string" },
+        ],
+      },
+    };
+
+    const res = ModelNodeRenderer.draw(container, obj, 1, false);
+    expect(
+      res.hitZones.some(
+        (z) => z.type === "header" && z.currentText === "UserProfile",
+      ),
+    ).toBe(true);
+    expect(res.hitZones.filter((z) => z.type === "fieldName").length).toBe(2);
+    expect(res.hitZones.filter((z) => z.type === "fieldType").length).toBe(2);
+  });
+
+  it("renders Data Model enum, array, and wrap nodes", () => {
+    const enumContainer = new Container();
+    const enumObj: CanvasObject = {
+      id: "model-enum",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      modelData: {
+        kind: "enum",
+        name: "OrderStatus",
+        values: [
+          { id: "v1", name: "PENDING", value: "PENDING" },
+          { id: "v2", name: "CONFIRMED", value: "CONFIRMED" },
+        ],
+      },
+    };
+    const enumRes = ModelNodeRenderer.draw(enumContainer, enumObj, 1, false);
+    expect(enumRes.hitZones.filter((z) => z.type === "enumValue").length).toBe(
+      2,
+    );
+
+    const arrayContainer = new Container();
+    const arrayObj: CanvasObject = {
+      id: "model-arr",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 80,
+      modelData: {
+        kind: "array",
+        name: "OrderList",
+        itemType: "Order",
+      },
+    };
+    const arrRes = ModelNodeRenderer.draw(arrayContainer, arrayObj, 1, false);
+    expect(
+      arrRes.hitZones.some(
+        (z) => z.type === "itemType" && z.currentText === "Order",
+      ),
+    ).toBe(true);
+
+    const wrapContainer = new Container();
+    const wrapObj: CanvasObject = {
+      id: "model-wrap",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 80,
+      modelData: {
+        kind: "wrap",
+        name: "OptionalUser",
+        innerType: "UserProfile",
+      },
+    };
+    const wrapRes = ModelNodeRenderer.draw(wrapContainer, wrapObj, 1, false);
+    expect(
+      wrapRes.hitZones.some(
+        (z) => z.type === "innerType" && z.currentText === "UserProfile",
+      ),
+    ).toBe(true);
+  });
+
+  it("renders StickyNote and TextBox with text hit zones", () => {
+    const stickyContainer = new Container();
+    const stickyObj: CanvasObject = {
+      id: "sticky-1",
+      type: "stickyNote",
+      x: 0,
+      y: 0,
+      width: 180,
+      height: 140,
+      text: "Workshop feedback note",
+    };
+    const stickyRes = StickyNoteRenderer.draw(
+      stickyContainer,
+      stickyObj,
+      1,
+      false,
+    );
+    expect(
+      stickyRes.hitZones.some(
+        (z) =>
+          z.type === "stickyText" && z.currentText === "Workshop feedback note",
+      ),
+    ).toBe(true);
+
+    const textContainer = new Container();
+    const textObj: CanvasObject = {
+      id: "text-1",
+      type: "textBox",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 40,
+      text: "Lane Header: Checkout Process",
+    };
+    const textRes = TextBoxRenderer.draw(textContainer, textObj, 1, false);
+    expect(
+      textRes.hitZones.some(
+        (z) =>
+          z.type === "textBoxText" &&
+          z.currentText === "Lane Header: Checkout Process",
+      ),
+    ).toBe(true);
+  });
+
+  it("exposes info (desc) zones for card and field descriptions", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "cmd-info",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 140,
+      stormData: {
+        kind: "command",
+        name: "CreateOrder",
+        description: "Places an order",
+        fields: [
+          {
+            id: "f1",
+            name: "orderId",
+            fieldType: "uuid",
+            description: "The id",
+          },
+          { id: "f2", name: "amount", fieldType: "number" },
+        ],
+      },
+    };
+
+    // Card description → header desc zone even when not selected
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+    const headerDesc = res.hitZones.find(
+      (z) => z.type === "desc" && !z.fieldId,
+    );
+    expect(headerDesc).toBeDefined();
+    expect(headerDesc?.currentText).toBe("Places an order");
+
+    // Field description → row desc zone carrying the field id
+    const fieldDesc = res.hitZones.find(
+      (z) => z.type === "desc" && z.fieldId === "f1",
+    );
+    expect(fieldDesc).toBeDefined();
+    expect(fieldDesc?.currentText).toBe("The id");
+
+    // No description + not selected → no muted add affordances
+    const bare = new Container();
+    const bareObj: CanvasObject = {
+      ...obj,
+      stormData: { ...obj.stormData!, description: undefined, fields: [] },
+    };
+    const bareRes = StormCardRenderer.draw(bare, bareObj, 1, false);
+    expect(bareRes.hitZones.some((z) => z.type === "desc")).toBe(false);
+
+    // Selected with no description → muted header + selected row affordances
+    const selected = new Container();
+    const selectedObj: CanvasObject = {
+      ...obj,
+      stormData: {
+        ...obj.stormData!,
+        description: undefined,
+        fields: [
+          { id: "f1", name: "orderId", fieldType: "uuid" },
+          { id: "f2", name: "amount", fieldType: "number" },
+        ],
+      },
+    };
+    const selectedRes = StormCardRenderer.draw(
+      selected,
+      selectedObj,
+      1,
+      true,
+      "f1",
+    );
+    expect(
+      selectedRes.hitZones.some((z) => z.type === "desc" && !z.fieldId),
+    ).toBe(true);
+    expect(
+      selectedRes.hitZones.some((z) => z.type === "desc" && z.fieldId === "f1"),
+    ).toBe(true);
+    expect(
+      selectedRes.hitZones.some((z) => z.type === "desc" && z.fieldId === "f2"),
+    ).toBe(false);
+  });
+
+  it("exposes info (desc) zones on model nodes", () => {
+    const obj: CanvasObject = {
+      id: "model-info",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 120,
+      modelData: {
+        kind: "object",
+        name: "User",
+        description: "A user",
+        fields: [{ id: "mf1", name: "id", fieldType: "uuid" }],
+      },
+    };
+
+    const res = ModelNodeRenderer.draw(new Container(), obj, 1, false);
+    expect(res.hitZones.some((z) => z.type === "desc" && !z.fieldId)).toBe(
+      true,
+    );
+
+    // Selected row with no description gets a muted affordance
+    const selected = ModelNodeRenderer.draw(
+      new Container(),
+      obj,
+      1,
+      true,
+      "mf1",
+    );
+    expect(
+      selected.hitZones.some((z) => z.type === "desc" && z.fieldId === "mf1"),
+    ).toBe(true);
+  });
+
+  it("populates and queries hit zones via CardLayer", async () => {
+    const { CardLayer } = await import("../layers/CardLayer");
+    const cardLayer = new CardLayer();
+
+    const sampleCard: CanvasObject = {
+      id: "cmd-test",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 140,
+      stormData: {
+        kind: "command",
+        name: "PlaceOrder",
+        fields: [{ id: "f1", name: "orderId", fieldType: "uuid" }],
+      },
+    };
+
+    cardLayer.renderCards([sampleCard], 1, []);
+    const headerHit = cardLayer.getHitZoneAt("cmd-test", 50, 15);
+    expect(headerHit).toBeDefined();
+    expect(headerHit?.type).toBe("header");
+    expect(headerHit?.currentText).toBe("PlaceOrder");
+
+    cardLayer.destroy();
+  });
+});

@@ -1,0 +1,172 @@
+import type { BddPhase, StormKind } from "@/types";
+
+/**
+ * Event Storming (Command / Event / State / …) constants.
+ */
+
+/** Header/accent color per kind. BDD cards override this with their phase color. */
+export const STORM_KIND_COLORS: Record<StormKind, string> = {
+  command: "#1d4ed8", // blue
+  event: "#ea580c", // orange
+  actor: "#db2777", // pink
+  state: "#7c3aed", // violet
+  constraint: "#0f766e", // teal
+  notify: "#0369a1", // sky
+  query: "#4338ca", // indigo
+  bdd: "#0284c7", // sky (default Given) — replaced by the phase color
+};
+
+/** Display label per kind */
+export const STORM_KIND_LABELS: Record<StormKind, string> = {
+  command: "Command",
+  event: "Event",
+  actor: "Actor",
+  state: "State",
+  constraint: "Constraint",
+  notify: "Notify",
+  query: "Query",
+  bdd: "Given/When/Then",
+};
+
+/** BDD Phase badge colors (Given, When, Then) */
+export const STORM_PHASE_COLORS: Record<BddPhase, string> = {
+  given: "#0284c7", // Sky 600
+  when: "#d97706", // Amber 600
+  then: "#059669", // Emerald 600
+};
+
+export const STORM_PHASE_BG_COLORS: Record<BddPhase, string> = {
+  given: "rgba(224, 242, 254, 0.95)", // Sky 100
+  when: "rgba(254, 243, 199, 0.95)", // Amber 100
+  then: "rgba(209, 250, 229, 0.95)", // Emerald 100
+};
+
+export const STORM_PHASE_LABELS: Record<BddPhase, string> = {
+  given: "GIVEN",
+  when: "WHEN",
+  then: "THEN",
+};
+
+/**
+ * Default card title per BDD phase. BDD cards are titled by their step, so a
+ * freshly created / phase-switched card reads "Given", "When" or "Then".
+ */
+export const STORM_PHASE_TITLES: Record<BddPhase, string> = {
+  given: "Given",
+  when: "When",
+  then: "Then",
+};
+
+/**
+ * Kinds whose Given/When/Then step is their identity. BDD is the only such
+ * kind: it always carries a phase, and its options bar switches the phase
+ * instead of the (fixed) kind.
+ */
+export const STORM_PHASE_KINDS: readonly StormKind[] = ["bdd"];
+
+/** Whether a kind carries a Given/When/Then phase as its identity */
+export function stormHasPhase(kind: StormKind): boolean {
+  return STORM_PHASE_KINDS.includes(kind);
+}
+
+/**
+ * Header/accent color of a card.
+ *
+ * BDD cards take the color of their phase (Given sky / When amber / Then
+ * emerald) so the step is readable at a glance; every other kind uses its
+ * fixed kind color. Falls back to the kind color when a BDD card has no phase.
+ */
+export function stormAccentColor(kind: StormKind, phase?: BddPhase): string {
+  if (stormHasPhase(kind) && phase) {
+    return STORM_PHASE_COLORS[phase] ?? STORM_KIND_COLORS[kind];
+  }
+  return STORM_KIND_COLORS[kind];
+}
+
+/**
+ * Default card title for a storm card: BDD cards use their phase step, every
+ * other kind uses its kind label (e.g. "Command"). Used to seed a real,
+ * board-unique name on creation so two cards never share a visible title.
+ */
+export function stormDefaultTitle(kind: StormKind, phase?: BddPhase): string {
+  if (stormHasPhase(kind)) return STORM_PHASE_TITLES[phase ?? "given"];
+  return STORM_KIND_LABELS[kind];
+}
+
+/**
+ * Kinds whose field rows render a tag pill. Event, State and Constraint tags
+ * feed DCB matching; BDD (Given/When/Then) cards carry tags for scenario
+ * readability.
+ */
+export const STORM_TAGGABLE_KINDS: readonly StormKind[] = [
+  "event",
+  "state",
+  "constraint",
+  "bdd",
+];
+
+/** Whether a kind renders a tag pill on its field rows */
+export function stormHasTags(kind: StormKind): boolean {
+  return STORM_TAGGABLE_KINDS.includes(kind);
+}
+
+/** Kinds without type zones on field rows (Notify names what is notified; Actor names permissions) */
+export const STORM_TYPELESS_KINDS: readonly StormKind[] = ["notify", "actor"];
+
+export function stormHasFieldTypes(kind: StormKind): boolean {
+  return !STORM_TYPELESS_KINDS.includes(kind);
+}
+
+/**
+ * Kinds that render a field list. Only the Actor chip is fieldless (its rows
+ * are role permissions rendered by a dedicated path). Constraint carries
+ * fields too: it shares the State card body and stacks a free-text Constraints
+ * section below it.
+ */
+export function stormHasFields(kind: StormKind): boolean {
+  return kind !== "actor";
+}
+
+/**
+ * Kinds with DCB Query Items ("Related Events"): a State card builds its
+ * consistency boundary from events, and a Constraint card shares that body
+ * (field rows → Query Items → free-text Constraints).
+ */
+export const STORM_QUERY_ITEM_KINDS: readonly StormKind[] = [
+  "state",
+  "constraint",
+];
+
+/** Whether a kind renders the DCB Query Items section */
+export function stormHasQueryItems(kind: StormKind): boolean {
+  return STORM_QUERY_ITEM_KINDS.includes(kind);
+}
+
+/** Kinds with dual sections: Params and Response */
+export const STORM_DUAL_SECTION_KINDS: readonly StormKind[] = ["query"];
+
+export function stormHasResponseFields(kind: StormKind): boolean {
+  return STORM_DUAL_SECTION_KINDS.includes(kind);
+}
+
+export function stormHasParamsSection(kind: StormKind): boolean {
+  return STORM_DUAL_SECTION_KINDS.includes(kind);
+}
+
+/** Kinds that can carry an authorization action */
+export const STORM_ACTION_KINDS: readonly StormKind[] = ["command", "query"];
+
+export function stormHasAction(kind: StormKind): boolean {
+  return STORM_ACTION_KINDS.includes(kind);
+}
+
+export const STORM_LAYOUT = {
+  cardWidth: 260,
+  minWidth: 220,
+  headerHeight: 38,
+  rowHeight: 28,
+  padding: 12,
+  borderRadius: 8,
+  typeZoneGap: 6,
+  tagHeight: 18,
+};
