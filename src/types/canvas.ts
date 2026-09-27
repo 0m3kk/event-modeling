@@ -12,7 +12,6 @@ export type ObjectType =
 
 export type Tool =
   | "select"
-  | "hand"
   | "connector"
   | "storm"
   | "model"

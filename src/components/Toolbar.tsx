@@ -1,7 +1,6 @@
 import React from "react";
 import {
   MousePointer,
-  Hand,
   Terminal,
   Zap,
   User,
@@ -245,12 +244,6 @@ export function Toolbar() {
           icon={<MousePointer size={20} />}
           tooltip="Select Tool (V)"
           isActive={currentTool === "select"}
-        />
-        <ToolButton
-          onClick={() => setTool("hand")}
-          icon={<Hand size={20} />}
-          tooltip="Hand Tool (H)"
-          isActive={currentTool === "hand"}
         />
         <ToolButton
           onClick={() => setTool("connector")}

@@ -568,7 +568,7 @@ export const useCanvasStore = create<CanvasStore>()(
         set({
           isLocked: locked,
           selectedIds: locked ? [] : get().selectedIds,
-          tool: locked ? "hand" : "select",
+          tool: "select",
         });
       },
 

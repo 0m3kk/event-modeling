@@ -199,11 +199,6 @@ export function PixiCanvas() {
         return;
       }
 
-      if (e.code === "KeyH") {
-        useCanvasStore.getState().setTool("hand");
-        return;
-      }
-
       if (e.code === "KeyL") {
         useCanvasStore.getState().setTool("connector");
         return;

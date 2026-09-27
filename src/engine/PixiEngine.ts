@@ -62,6 +62,11 @@ export class PixiEngine {
   private isSpaceHeld: boolean = false;
   private isDraggingCards: boolean = false;
   private isMarqueeDragging: boolean = false;
+  private marqueeInitialSelectedIds: string[] = [];
+  private isPanningCanvas: boolean = false;
+  private hasPannedCanvas: boolean = false;
+  private panStartPointer: { x: number; y: number } = { x: 0, y: 0 };
+  private lastPanPointer: { x: number; y: number } = { x: 0, y: 0 };
   private dragStartWorld: { x: number; y: number } = { x: 0, y: 0 };
   private initialObjectPositions: Map<string, { x: number; y: number }> =
     new Map();
@@ -203,7 +208,7 @@ export class PixiEngine {
   }
 
   public updateToolMode(tool: string): void {
-    if (this.isSpaceHeld || tool === "hand") {
+    if (this.isSpaceHeld) {
       this.viewport.plugins.resume("drag");
       this.container.style.cursor = "grab";
       this.cardLayer.setCursor("grab");
@@ -360,7 +365,7 @@ export class PixiEngine {
     // Card pointerdown handler
     this.cardLayer.onCardPointerDown = (id: string, e: PointerEvent, zone) => {
       const state = useCanvasStore.getState();
-      if (this.isSpaceHeld || state.tool === "hand") return;
+      if (this.isSpaceHeld) return;
 
       // In connector tool mode, anchors handle connections
       if (state.tool === "connector") return;
@@ -481,7 +486,7 @@ export class PixiEngine {
     // enum value name, query item, constraint, sticky or text box).
     canvas.addEventListener("dblclick", (e: MouseEvent) => {
       const state = useCanvasStore.getState();
-      if (this.isSpaceHeld || state.tool === "hand") return;
+      if (this.isSpaceHeld) return;
       if (state.tool === "connector" || state.isLocked) return;
       if (e.target !== canvas) return;
 
@@ -523,7 +528,7 @@ export class PixiEngine {
 
     canvas.addEventListener("pointerdown", (e: PointerEvent) => {
       const state = useCanvasStore.getState();
-      if (this.isSpaceHeld || state.tool === "hand") {
+      if (this.isSpaceHeld) {
         this.container.style.cursor = "grabbing";
         this.cardLayer.setCursor("grabbing");
         return;
@@ -640,21 +645,33 @@ export class PixiEngine {
         return;
       }
 
-      // 4. Clicked on empty space (start marquee selection)
+      // 4. Clicked on empty space
       if (!this.isDraggingCards && state.tool === "select") {
-        const isMulti = e.shiftKey || e.metaKey || e.ctrlKey;
-        if (!isMulti) {
-          state.clearSelection();
-        }
+        const isControlOrMeta = e.ctrlKey || e.metaKey;
+        if (isControlOrMeta) {
+          // Multi-select mode: start marquee selection box
+          this.marqueeInitialSelectedIds = e.shiftKey
+            ? [...state.selectedIds]
+            : [];
+          if (!e.shiftKey) {
+            state.clearSelection();
+          }
 
-        this.isMarqueeDragging = true;
-        this.marqueeStartWorld = { x: worldPos.x, y: worldPos.y };
-        this.gizmoLayer.renderMarquee({
-          x: worldPos.x,
-          y: worldPos.y,
-          width: 0,
-          height: 0,
-        });
+          this.isMarqueeDragging = true;
+          this.marqueeStartWorld = { x: worldPos.x, y: worldPos.y };
+          this.gizmoLayer.renderMarquee({
+            x: worldPos.x,
+            y: worldPos.y,
+            width: 0,
+            height: 0,
+          });
+        } else {
+          // Hand tool behavior: dragging empty space pans the canvas
+          this.isPanningCanvas = true;
+          this.hasPannedCanvas = false;
+          this.panStartPointer = { x: e.clientX, y: e.clientY };
+          this.lastPanPointer = { x: e.clientX, y: e.clientY };
+        }
       }
     });
 
@@ -705,6 +722,31 @@ export class PixiEngine {
           })),
         );
         return;
+      }
+
+      // Handle Canvas Panning (empty space drag)
+      if (this.isPanningCanvas) {
+        const dx = e.clientX - this.panStartPointer.x;
+        const dy = e.clientY - this.panStartPointer.y;
+        if (!this.hasPannedCanvas && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+          this.hasPannedCanvas = true;
+          this.container.style.cursor = "grabbing";
+          this.cardLayer.setCursor("grabbing");
+        }
+        if (this.hasPannedCanvas) {
+          const moveX =
+            (e.clientX - this.lastPanPointer.x) / (this.viewport.scaled || 1);
+          const moveY =
+            (e.clientY - this.lastPanPointer.y) / (this.viewport.scaled || 1);
+          this.viewport.moveCorner(
+            this.viewport.corner.x - moveX,
+            this.viewport.corner.y - moveY,
+          );
+          this.lastPanPointer = { x: e.clientX, y: e.clientY };
+          this.syncViewportToStore();
+          this.render();
+          return;
+        }
       }
 
       // Handle Group Dragging
@@ -792,7 +834,14 @@ export class PixiEngine {
         const maxY = Math.max(my, my + mh);
 
         const hits = this.spatialIndex.search({ minX, minY, maxX, maxY });
-        useCanvasStore.getState().setSelectedIds(hits);
+        if (this.marqueeInitialSelectedIds.length > 0) {
+          const merged = Array.from(
+            new Set([...this.marqueeInitialSelectedIds, ...hits]),
+          );
+          useCanvasStore.getState().setSelectedIds(merged);
+        } else {
+          useCanvasStore.getState().setSelectedIds(hits);
+        }
       }
 
       // Description ⓘ / authorization-action hover tooltips — only while idle
@@ -801,7 +850,8 @@ export class PixiEngine {
         this.isDraggingCards ||
         this.isDraggingGroup ||
         this.isMarqueeDragging ||
-        this.isCreatingConnector;
+        this.isCreatingConnector ||
+        this.isPanningCanvas;
       let nextHover: DescTarget | null = null;
       let nextActionHover: ActionTarget | null = null;
       if (
@@ -855,9 +905,23 @@ export class PixiEngine {
     window.addEventListener("pointerup", () => {
       this.cardPointerDownHandled = false;
 
-      if (this.isSpaceHeld || useCanvasStore.getState().tool === "hand") {
+      if (this.isSpaceHeld) {
         this.container.style.cursor = "grab";
         this.cardLayer.setCursor("grab");
+      }
+
+      // Finish Canvas Panning
+      if (this.isPanningCanvas) {
+        if (!this.hasPannedCanvas) {
+          // User clicked on empty space without dragging -> clear selection
+          useCanvasStore.getState().clearSelection();
+        }
+        this.isPanningCanvas = false;
+        this.hasPannedCanvas = false;
+        if (!this.isSpaceHeld) {
+          this.container.style.cursor = "default";
+          this.cardLayer.setCursor("default");
+        }
       }
 
       // Connector creation is a two-click interaction finished on the next
@@ -886,6 +950,7 @@ export class PixiEngine {
       // Finish Marquee Dragging
       if (this.isMarqueeDragging) {
         this.isMarqueeDragging = false;
+        this.marqueeInitialSelectedIds = [];
         this.gizmoLayer.renderMarquee(null);
       }
     });
