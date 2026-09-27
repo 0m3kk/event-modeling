@@ -95,7 +95,7 @@ export function AlignOptionsBar() {
     <div
       className={`absolute z-40 flex -translate-x-1/2 ${
         isAbove ? "-translate-y-full" : ""
-      } items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md transition-all select-none`}
+      } items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none`}
       style={{
         left: screenX,
         top: barY,

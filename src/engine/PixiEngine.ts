@@ -978,6 +978,7 @@ export class PixiEngine {
     let prevGroups = useCanvasStore.getState().groups;
     let prevStormSelectedField = useCanvasStore.getState().stormSelectedField;
     let prevStormActionHover = useCanvasStore.getState().stormActionHover;
+    let prevViewport = useCanvasStore.getState().viewport;
 
     this.storeUnsubscribe = useCanvasStore.subscribe((state) => {
       let needsRender = false;
@@ -1014,6 +1015,31 @@ export class PixiEngine {
         this.updateToolMode(state.tool);
         if (state.tool !== "connector") {
           this.cancelConnectorCreation();
+        }
+      }
+
+      if (state.viewport !== prevViewport) {
+        const vp = state.viewport;
+        prevViewport = vp;
+
+        if (this.viewport) {
+          const corner = this.viewport.corner;
+          const currentZoom = this.viewport.scaled || 1;
+          const zoomDiff = Math.abs(currentZoom - vp.zoom);
+          const xDiff = Math.abs(corner.x - vp.x);
+          const yDiff = Math.abs(corner.y - vp.y);
+
+          if (zoomDiff > 0.001 || xDiff > 0.5 || yDiff > 0.5) {
+            if (xDiff > 0.5 || yDiff > 0.5) {
+              this.viewport.moveCorner(vp.x, vp.y);
+              this.viewport.setZoom(vp.zoom);
+            } else {
+              // Zoom changed only (e.g. Header Zoom buttons); keep center stable
+              this.viewport.setZoom(vp.zoom, true);
+              this.syncViewportToStore();
+            }
+            needsRender = true;
+          }
         }
       }
 

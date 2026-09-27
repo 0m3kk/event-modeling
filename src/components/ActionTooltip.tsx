@@ -53,15 +53,23 @@ export function ActionTooltip() {
   const iconScreenX = (target.obj.x + iconCx - viewport.x) * zoom;
   const iconScreenY = (target.obj.y + iconCy - viewport.y) * zoom;
 
-  const viewportWidth =
-    typeof window !== "undefined" ? window.innerWidth : 1200;
+  const containerWidth =
+    viewport.screenWidth > 0
+      ? viewport.screenWidth
+      : typeof window !== "undefined"
+        ? window.innerWidth
+        : 1200;
   const centerX = Math.min(
     Math.max(iconScreenX, TOOLTIP_MAX_WIDTH / 2 + 8),
-    viewportWidth - TOOLTIP_MAX_WIDTH / 2 - 8,
+    containerWidth - TOOLTIP_MAX_WIDTH / 2 - 8,
   );
-  const viewportHeight =
-    typeof window !== "undefined" ? window.innerHeight : 800;
-  const flip = iconScreenY + 80 > viewportHeight;
+  const containerHeight =
+    viewport.screenHeight > 0
+      ? viewport.screenHeight
+      : typeof window !== "undefined"
+        ? window.innerHeight
+        : 800;
+  const flip = iconScreenY + 80 > containerHeight;
 
   return (
     <div
