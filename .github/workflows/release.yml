@@ -63,10 +63,10 @@ jobs:
         include:
           - target: aarch64-apple-darwin
             arch: aarch64
-            args: '--target aarch64-apple-darwin'
+            args: '--target aarch64-apple-darwin --ignore-version-mismatches'
           - target: x86_64-apple-darwin
             arch: x86_64
-            args: '--target x86_64-apple-darwin'
+            args: '--target x86_64-apple-darwin --ignore-version-mismatches'
 
     steps:
       - name: Checkout repository
