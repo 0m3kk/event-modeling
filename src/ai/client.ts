@@ -120,9 +120,9 @@ async function aiFetch(url: string, init: RequestInit): Promise<Response> {
     ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
   ) {
     try {
-      // Dynamic import to avoid build errors if plugin is absent
-      // @ts-expect-error Optional Tauri plugin may not be installed in web environment
-      const tauriHttp = await import(/* @vite-ignore */ "@tauri-apps/plugin-http");
+      // Dynamic import to avoid build/dev errors if plugin is absent
+      const pluginName = "@tauri-apps/plugin-http";
+      const tauriHttp = await import(/* @vite-ignore */ pluginName);
       if (tauriHttp && typeof tauriHttp.fetch === "function") {
         return tauriHttp.fetch(url, init);
       }

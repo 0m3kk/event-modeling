@@ -3,6 +3,8 @@ node_modules/
 
 # Build
 dist/
+src-tauri/target/
+src-tauri/gen/schemas/
 
 # IDE
 .idea/
