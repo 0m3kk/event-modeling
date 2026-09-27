@@ -1,3 +1,5 @@
+import { isTauri } from "@tauri-apps/api/core";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import type { AISettings } from "@/types";
 
 // ============================================================================
@@ -113,22 +115,24 @@ export function createAbortError(message = "AI run aborted"): Error {
 // Transport
 // ============================================================================
 
-async function aiFetch(url: string, init: RequestInit): Promise<Response> {
-  // If running inside Tauri desktop with plugin-http available, it can be dynamically imported:
-  if (
-    typeof window !== "undefined" &&
-    ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
-  ) {
-    try {
-      // Dynamic import to avoid build/dev errors if plugin is absent
-      const pluginName = "@tauri-apps/plugin-http";
-      const tauriHttp = await import(/* @vite-ignore */ pluginName);
-      if (tauriHttp && typeof tauriHttp.fetch === "function") {
-        return tauriHttp.fetch(url, init);
-      }
-    } catch {
-      // Fallback to standard fetch
-    }
+export function isTauriApp(): boolean {
+  const g =
+    typeof window !== "undefined"
+      ? (window as unknown as Record<string, unknown>)
+      : typeof globalThis !== "undefined"
+        ? (globalThis as unknown as Record<string, unknown>)
+        : undefined;
+  if (!g) return false;
+  return Boolean(
+    isTauri() ||
+    Boolean(g.__TAURI_INTERNALS__) ||
+    Boolean(g.__TAURI__),
+  );
+}
+
+export async function aiFetch(url: string, init: RequestInit): Promise<Response> {
+  if (isTauriApp()) {
+    return tauriFetch(url, init);
   }
   return fetch(url, init);
 }

@@ -6,12 +6,18 @@ import {
   createAbortError,
   createSessionId,
   DEFAULT_AI_MAX_TOKENS,
+  isTauriApp,
   MAX_AI_MAX_TOKENS,
   MIN_AI_MAX_TOKENS,
   getStoredAISettings,
   storeAISettings,
   type OpenAITool,
 } from "./client";
+
+const tauriFetchMock = vi.fn();
+vi.mock("@tauri-apps/plugin-http", () => ({
+  fetch: (...args: unknown[]) => tauriFetchMock(...args),
+}));
 
 const SETTINGS = {
   baseUrl: "https://gateway.test/v1",
@@ -197,5 +203,44 @@ describe("chatCompletion transport", () => {
         maxTokens: 100,
       }),
     ).rejects.toThrow(/reasoning/);
+  });
+
+  it("detects Tauri desktop environment correctly", () => {
+    expect(isTauriApp()).toBe(false);
+
+    vi.stubGlobal("isTauri", true);
+    expect(isTauriApp()).toBe(true);
+
+    vi.unstubAllGlobals();
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
+    expect(isTauriApp()).toBe(true);
+
+    vi.unstubAllGlobals();
+    vi.stubGlobal("__TAURI__", {});
+    expect(isTauriApp()).toBe(true);
+  });
+
+  it("routes AI request through Tauri HTTP plugin when running inside Tauri to bypass CORS", async () => {
+    vi.stubGlobal("isTauri", true);
+    tauriFetchMock.mockReset();
+    tauriFetchMock.mockResolvedValue(okResponse({ content: "hello from tauri" }));
+
+    const standardFetchMock = vi.fn();
+    vi.stubGlobal("fetch", standardFetchMock);
+
+    const result = await chatCompletion(
+      SETTINGS,
+      [{ role: "user", content: "hi" }],
+      { sessionId: "session-tauri", maxTokens: 128 },
+    );
+
+    expect(result.content).toBe("hello from tauri");
+    expect(tauriFetchMock).toHaveBeenCalledTimes(1);
+    expect(standardFetchMock).not.toHaveBeenCalled();
+
+    const [url, init] = tauriFetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://gateway.test/v1/chat/completions");
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer test-key");
   });
 });
