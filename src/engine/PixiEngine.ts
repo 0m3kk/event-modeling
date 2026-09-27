@@ -84,6 +84,7 @@ export class PixiEngine {
   private draggedGroupId: string | null = null;
   private lastGroupClickTime: number = 0;
   private lastGroupClickId: string | null = null;
+  private hadPopoverOnPointerDown: boolean = false;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -386,17 +387,20 @@ export class PixiEngine {
       const accurateZone =
         this.cardLayer.getHitZoneAt(id, localX, localY) || zone;
 
-      // Click on type zone opens type selector
+      // Clicking on the type zone opens type selector IF the row is already selected.
+      // If the row was not selected yet, the click selects the row/card first so the user
+      // can drag, delete, copy, or move the field without an unwanted popover opening.
+      const currentSelectedField = state.stormSelectedField;
+      const isFieldAlreadySelected =
+        currentSelectedField?.objectId === id &&
+        currentSelectedField?.fieldId === accurateZone?.fieldId;
+
       if (
-        accurateZone?.type === "fieldType" ||
-        accurateZone?.type === "itemType" ||
-        accurateZone?.type === "innerType"
+        (accurateZone?.type === "fieldType" ||
+          accurateZone?.type === "itemType" ||
+          accurateZone?.type === "innerType") &&
+        isFieldAlreadySelected
       ) {
-        state.selectObject(id);
-        state.setStormSelectedField({
-          objectId: id,
-          fieldId: accurateZone.fieldId,
-        });
         state.setTypeSelect({
           objectId: id,
           fieldId: accurateZone.fieldId,
@@ -428,10 +432,14 @@ export class PixiEngine {
         return;
       }
 
-      // Single-click row selection
+      // Single-click row selection: clicking anywhere on a field row (name, tag, type,
+      // enum value, query item, constraint) selects and highlights that row.
       if (
         accurateZone?.type === "fieldName" ||
         accurateZone?.type === "fieldTag" ||
+        accurateZone?.type === "fieldType" ||
+        accurateZone?.type === "itemType" ||
+        accurateZone?.type === "innerType" ||
         accurateZone?.type === "enumValue" ||
         accurateZone?.type === "queryItem" ||
         accurateZone?.type === "constraint"
@@ -499,16 +507,37 @@ export class PixiEngine {
       if (!hit) return;
       const { obj, zone } = hit;
 
-      // Description ⓘ icons are not edited inline — the options-bar panel
-      // handles both the card and the selected row. Type zones and the action
-      // badge are also not edited here.
+      // Double-click on type zone directly opens type selector
       if (
-        zone?.type === "desc" ||
         zone?.type === "fieldType" ||
         zone?.type === "itemType" ||
-        zone?.type === "innerType" ||
-        zone?.type === "action"
+        zone?.type === "innerType"
       ) {
+        state.selectObject(obj.id);
+        state.setStormSelectedField({
+          objectId: obj.id,
+          fieldId: zone.fieldId,
+        });
+        state.setTypeSelect({
+          objectId: obj.id,
+          fieldId: zone.fieldId,
+          section: zone.section,
+          isModel: obj.type === "model",
+          kind: zone.type,
+          anchor: {
+            x: zone.bounds.x,
+            y: zone.bounds.y,
+            width: zone.bounds.width,
+            height: zone.bounds.height,
+          },
+        });
+        return;
+      }
+
+      // Description ⓘ icons are not edited inline — the options-bar panel
+      // handles both the card and the selected row. The action badge is also
+      // not edited here.
+      if (zone?.type === "desc" || zone?.type === "action") {
         return;
       }
 
@@ -528,6 +557,9 @@ export class PixiEngine {
 
     canvas.addEventListener("pointerdown", (e: PointerEvent) => {
       const state = useCanvasStore.getState();
+      this.hadPopoverOnPointerDown = Boolean(
+        state.typeSelect || state.inlineEdit,
+      );
       if (this.isSpaceHeld) {
         this.container.style.cursor = "grabbing";
         this.cardLayer.setCursor("grabbing");
@@ -912,10 +944,11 @@ export class PixiEngine {
 
       // Finish Canvas Panning
       if (this.isPanningCanvas) {
-        if (!this.hasPannedCanvas) {
+        if (!this.hasPannedCanvas && !this.hadPopoverOnPointerDown) {
           // User clicked on empty space without dragging -> clear selection
           useCanvasStore.getState().clearSelection();
         }
+        this.hadPopoverOnPointerDown = false;
         this.isPanningCanvas = false;
         this.hasPannedCanvas = false;
         if (!this.isSpaceHeld) {
@@ -1091,7 +1124,7 @@ export class PixiEngine {
       visibleObjects,
       zoom,
       selectedIds,
-      stormSelectedField?.fieldId,
+      stormSelectedField,
     );
 
     // 4. Render Connectors & Groups

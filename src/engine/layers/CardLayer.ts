@@ -43,7 +43,7 @@ export class CardLayer extends Container {
     objects: CanvasObject[],
     zoom: number = 1,
     selectedIds: string[] = [],
-    selectedFieldId?: string,
+    selectedField?: string | { objectId: string; fieldId?: string } | null,
   ): void {
     const currentIds = new Set(objects.map((o) => o.id));
 
@@ -90,6 +90,12 @@ export class CardLayer extends Container {
       card.y = obj.y;
 
       const isSelected = selectedIds.includes(obj.id);
+      const cardSelectedFieldId =
+        typeof selectedField === "string"
+          ? selectedField
+          : selectedField?.objectId === obj.id
+            ? selectedField.fieldId
+            : undefined;
 
       // Delegate drawing to specialized renderers
       let result;
@@ -99,7 +105,7 @@ export class CardLayer extends Container {
           obj,
           textResolution,
           isSelected,
-          selectedFieldId,
+          cardSelectedFieldId,
         );
       } else if (obj.type === "model") {
         result = ModelNodeRenderer.draw(
@@ -107,7 +113,7 @@ export class CardLayer extends Container {
           obj,
           textResolution,
           isSelected,
-          selectedFieldId,
+          cardSelectedFieldId,
         );
       } else if (obj.type === "stickyNote") {
         result = StickyNoteRenderer.draw(card, obj, textResolution, isSelected);

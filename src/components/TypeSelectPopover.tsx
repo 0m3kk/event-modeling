@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCanvasStore } from "@/store";
+import { MODEL_KIND_LABELS } from "@/constants/model";
 import { Check, Plus, Search, X } from "lucide-react";
 
 const PRIMITIVES = [
@@ -29,8 +30,14 @@ export function TypeSelectPopover() {
   // Model node names on the canvas
   const modelNames = useMemo(() => {
     return objects
-      .filter((o) => o.type === "model" && o.modelData?.name)
-      .map((o) => o.modelData!.name)
+      .filter((o) => o.type === "model" && o.modelData)
+      .map(
+        (o) =>
+          o.modelData?.name?.trim() ||
+          o.text?.trim() ||
+          (o.modelData?.kind ? MODEL_KIND_LABELS[o.modelData.kind] : "Model"),
+      )
+      .filter(Boolean)
       .filter((name, idx, arr) => arr.indexOf(name) === idx);
   }, [objects]);
 

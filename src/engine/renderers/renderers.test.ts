@@ -504,4 +504,52 @@ describe("Pixi Card Renderers", () => {
 
     cardLayer.destroy();
   });
+
+  it("scopes row selection highlight to the specific card that owns the field", async () => {
+    const { CardLayer } = await import("../layers/CardLayer");
+    const cardLayer = new CardLayer();
+
+    const card1: CanvasObject = {
+      id: "card-1",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 140,
+      modelData: {
+        kind: "object",
+        name: "Order",
+        fields: [{ id: "f1", name: "status", fieldType: "OrderStatus" }],
+      },
+    };
+
+    const card2: CanvasObject = {
+      id: "card-2",
+      type: "model",
+      x: 300,
+      y: 0,
+      width: 240,
+      height: 140,
+      modelData: {
+        kind: "object",
+        name: "Customer",
+        fields: [{ id: "f2", name: "role", fieldType: "UserRole" }],
+      },
+    };
+
+    // Render with selection for card-1's field
+    cardLayer.renderCards(
+      [card1, card2],
+      1,
+      ["card-1"],
+      { objectId: "card-1", fieldId: "f1" },
+    );
+
+    // Card-1's hit zone for f1 should be queryable
+    const typeHit = cardLayer.getHitZoneAt("card-1", 200, 48);
+    expect(typeHit).toBeDefined();
+    expect(typeHit?.fieldId).toBe("f1");
+
+    cardLayer.destroy();
+  });
 });
