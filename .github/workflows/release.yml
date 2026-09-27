@@ -1,21 +1,9 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
   workflow_dispatch:
-    inputs:
-      releaseDraft:
-        description: 'Create draft release'
-        required: false
-        type: boolean
-        default: false
-      prerelease:
-        description: 'Mark as prerelease'
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,19 +42,15 @@ jobs:
         run: pnpm run test
 
   release-macos:
-    name: Build macOS (${{ matrix.arch }})
+    name: Build macOS (ARM64)
     needs: test
     runs-on: macos-latest
     strategy:
-      fail-fast: false
       matrix:
         include:
           - target: aarch64-apple-darwin
             arch: aarch64
             args: '--target aarch64-apple-darwin --ignore-version-mismatches'
-          - target: x86_64-apple-darwin
-            arch: x86_64
-            args: '--target x86_64-apple-darwin --ignore-version-mismatches'
 
     steps:
       - name: Checkout repository
@@ -94,31 +78,33 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Tauri app and publish release
+      # When triggered by manual dispatch: build Tauri app without creating/updating a GitHub release
+      - name: Build Tauri app (Manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: true
         with:
-          tagName: v__VERSION__
-          releaseName: 'Event Modeling v__VERSION__'
-          releaseBody: |
-            ### Event Modeling v__VERSION__
-            
-            Download the appropriate `.dmg` for your Mac:
-            - **Apple Silicon (M1/M2/M3/M4)**: `*aarch64.dmg`
-            - **Intel Macs**: `*x64.dmg`
-            
-            > **macOS Note (Unsigned App)**:
-            > Because this release is not signed with an Apple Developer certificate, macOS Gatekeeper may show a warning on first launch.
-            > - To open: Right-click (or Control-click) the app in your Applications folder and select **Open**.
-            > - Or run in Terminal: `xattr -cr /Applications/"Event Modeling.app"`
-          releaseDraft: ${{ github.event_name == 'workflow_dispatch' && inputs.releaseDraft || false }}
-          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
           args: ${{ matrix.args }}
           tauriScript: 'pnpm tauri'
 
+      # When triggered by a GitHub Release: build Tauri app and upload assets directly to that release
+      - name: Build Tauri app and upload to release
+        if: github.event_name == 'release'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI: true
+        with:
+          releaseId: ${{ github.event.release.id }}
+          tagName: ${{ github.event.release.tag_name }}
+          args: ${{ matrix.args }}
+          tauriScript: 'pnpm tauri'
+
+      # Upload artifacts to GitHub Actions run summary (workflow_dispatch only)
       - name: Upload build artifacts
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: event-modeling-macos-${{ matrix.arch }}
@@ -127,3 +113,37 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
           if-no-files-found: warn
           retention-days: 14
+
+      # Add artifact info to Job Summary (workflow_dispatch only)
+      - name: Add build artifact to summary
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "## 📦 Build Artifacts (${{ matrix.arch }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Architecture:** \`${{ matrix.arch }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target:** \`${{ matrix.target }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact Name:** \`event-modeling-macos-${{ matrix.arch }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Generated Files:" >> $GITHUB_STEP_SUMMARY
+          for file in src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              size=$(ls -lh "$file" | awk '{print $5}')
+              echo "- 💿 \`$filename\` ($size)" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 💡 You can download the artifact package in the **Artifacts** section at the bottom of this summary." >> $GITHUB_STEP_SUMMARY
+
+      # Add release confirmation to Job Summary (release event only)
+      - name: Add release info to summary
+        if: github.event_name == 'release'
+        run: |
+          echo "## 🚀 Released to GitHub" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release:** [${{ github.event.release.name || github.event.release.tag_name }}](${{ github.event.release.html_url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** \`${{ github.event.release.tag_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Architecture:** \`${{ matrix.arch }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target:** \`${{ matrix.target }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts have been uploaded directly to the GitHub Release." >> $GITHUB_STEP_SUMMARY
