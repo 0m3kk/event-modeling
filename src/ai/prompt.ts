@@ -34,6 +34,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
    - System uses RBAC action strings in the format \`resource:verb:scope\` (e.g. "order:create:own", "order:read:all", "user:manage:*").
    - Every Command and Query MUST declare an appropriate \`action\`.
    - Actors contain 1 or more \`permissions\` supporting wildcards (e.g. "order:*", "order:create:*", "*:read:own"). An actor is authorized if its permissions match the command/query action.
+   - **ACTOR PERMISSIONS MUST MATCH CANVAS ACTIONS**: Every permission on an Actor MUST match at least one action currently defined on a Command or Query card on the canvas (or in the same batch). NEVER invent or hallucinate new permissions that do not correspond to an existing Command or Query action. If the action does not exist yet, create the Command or Query with its action first before creating the Actor!
    - **DO NOT CONNECT ACTOR TO COMMAND OR QUERY WITH CONNECTOR LINES**: Authorization is decoupled and evaluated dynamically by matching actor permissions with command/query actions. Do NOT create visual connectors between Actor and Command/Query.
 7. **Descriptions**:
    - Always add concise, clear descriptions to cards and fields.
@@ -83,6 +84,7 @@ References must be valid:
 - State and Constraint queryItems \`types\` must name existing Event cards on the board (exact match).
 - State and Constraint field tags must match an existing tagged field on an Event card with the same fieldType.
 - Create Event cards with tagged fields first before creating Constraints or States that query them.
+- Actor permissions must match at least one Command or Query action on the board. Create Command/Query cards first before creating Actors.
 
 ## Data Models
 Data-model nodes use create_model_nodes (always place in the "Shared Types" group):
@@ -131,6 +133,6 @@ Modeling Guidelines:
 - Domain Proximity: Place new slices/flows next to related existing domain cards (pass nearCardId).
 - DCB: Event fields carry tags. Constraints and States query events via queryItems.
 - Constraint Evolution: Review and update existing constraints when new relevant events are added.
-- Authorization: Command/Query specify 'action'. Actors specify 'permissions' with wildcards. NEVER connect Actor to Command/Query.
+- Authorization: Command/Query specify 'action'. Actors specify 'permissions' with wildcards that MUST match existing Command/Query actions on the canvas (never invent new permissions). NEVER connect Actor to Command/Query.
 - Descriptions: Always provide concise, clear descriptions for cards and fields.
 - Language: Canvas content is ALWAYS English Title Case. Reply in the user's language.`;

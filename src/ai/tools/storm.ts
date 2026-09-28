@@ -6,6 +6,7 @@ import {
   computeOptimalStormCardWidth,
 } from "@/utils/cardDimensions";
 import { toDisplayName } from "@/utils/naming";
+import { getActorPermissions } from "@/utils/stormAuth";
 import {
   arrangeStormLanes,
   arrangeVerticalSlice,
@@ -111,7 +112,7 @@ function assertValidStormWrite(input: StormValidationInput): void {
   throw new Error(
     `Rejected: invalid event-storming references. Fix these and retry:\n${issues
       .map((issue) => `- ${issue}`)
-      .join("\n")}\n${describeStormOptions(input)} Create the missing Event cards (with their field tags) first.`,
+      .join("\n")}\n${describeStormOptions(input)} Create the missing Event cards (with their field tags) or Command/Query cards (with their actions) first.`,
   );
 }
 
@@ -203,7 +204,7 @@ function layoutSize(
 export const createStormCardsTool = defineTool({
   name: "create_storm_cards",
   description:
-    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (Decision Model with queryItems) -> Event (past fact with field tags). For Read Slices: Query (params + responseFields + action) -> State (projection with queryItems) <- Event. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field.",
+    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (Decision Model with queryItems) -> Event (past fact with field tags). For Read Slices: Query (params + responseFields + action) -> State (projection with queryItems) <- Event. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
   schema: z.object({
     cards: z
       .array(
@@ -325,6 +326,11 @@ export const createStormCardsTool = defineTool({
         name: obj.stormData?.name ?? toDisplayName(spec.name),
         fields: obj.stormData?.fields ?? [],
         queryItems: spec.queryItems,
+        action: obj.stormData?.action,
+        permissions:
+          obj.stormData?.kind === "actor"
+            ? getActorPermissions(obj.stormData)
+            : undefined,
       })),
     });
 
@@ -526,8 +532,15 @@ export const updateStormCardTool = defineTool({
         ? buildFields(args.responseFields, existing.kind)
         : undefined;
 
+    const writtenPermissions =
+      args.permissions !== undefined
+        ? args.permissions
+        : args.fields !== undefined && existing.kind === "actor"
+          ? fields.map((f) => f.name)
+          : undefined;
+
     assertValidStormWrite({
-      existing: state.objects,
+      existing: state.objects.filter((o) => o.id !== args.id),
       cards: [
         {
           kind: existing.kind,
@@ -536,6 +549,19 @@ export const updateStormCardTool = defineTool({
           fields,
           writtenFields: args.fields !== undefined ? fields : [],
           queryItems: args.queryItems,
+          action: args.action ?? existing.action,
+          permissions:
+            existing.kind === "actor"
+              ? getActorPermissions({
+                  ...existing,
+                  permissions: args.permissions ?? existing.permissions,
+                  fields,
+                })
+              : undefined,
+          writtenPermissions:
+            existing.kind === "actor"
+              ? (writtenPermissions ?? [])
+              : undefined,
         },
       ],
     });

@@ -287,6 +287,90 @@ describe("AI Storm Tools", () => {
     expect(fake.objects).toHaveLength(0);
   });
 
+  it("rejects actor card whose permissions do not match any action on canvas", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "cmd-1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 80,
+      stormData: {
+        kind: "command",
+        name: "Place Order",
+        action: "order:create:own",
+        fields: [],
+      },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "actor",
+              name: "Customer",
+              permissions: ["unrelated:fake:perm"],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBe(true);
+    const parsed = JSON.parse(res.content);
+    expect(parsed.error).toContain("invalid event-storming references");
+    expect(parsed.error).toContain('permission "unrelated:fake:perm" does not match any action on the canvas');
+  });
+
+  it("accepts actor card whose permissions match an existing action", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "cmd-1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 80,
+      stormData: {
+        kind: "command",
+        name: "Place Order",
+        action: "order:create:own",
+        fields: [],
+      },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "actor",
+              name: "Customer",
+              permissions: ["order:*"],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const data = JSON.parse(res.content);
+    expect(data.count).toBe(1);
+    const actorObj = fake.objects.find((o) => o.stormData?.kind === "actor");
+    expect(actorObj).toBeDefined();
+    expect(actorObj?.stormData?.permissions).toEqual(["order:*"]);
+  });
+
   it("update_storm_card updates fields and recalculates height", async () => {
     const fake = createFakeStore();
     fake.objects.push({

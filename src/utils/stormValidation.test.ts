@@ -145,22 +145,199 @@ describe("validateStormWrite", () => {
     };
     expect(validateStormWrite(input)).toEqual([]);
   });
+
+  it("passes an actor with permissions matching an existing command action", () => {
+    const input: StormValidationInput = {
+      existing: [
+        {
+          id: "cmd-1",
+          type: "storm",
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          stormData: {
+            kind: "command",
+            name: "Place Order",
+            action: "order:create:own",
+            fields: [],
+          },
+        },
+      ],
+      cards: [
+        card("actor", "Customer", [], {
+          permissions: ["order:create:own"],
+        }),
+      ],
+    };
+    expect(validateStormWrite(input)).toEqual([]);
+  });
+
+  it("passes an actor with wildcard permissions matching an action", () => {
+    const input: StormValidationInput = {
+      existing: [
+        {
+          id: "query-1",
+          type: "storm",
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          stormData: {
+            kind: "query",
+            name: "Get Order",
+            action: "order:read:own",
+            fields: [],
+          },
+        },
+      ],
+      cards: [
+        card("actor", "Customer", [], {
+          permissions: ["order:*"],
+        }),
+      ],
+    };
+    expect(validateStormWrite(input)).toEqual([]);
+  });
+
+  it("flags an actor permission that does not match any action on canvas", () => {
+    const input: StormValidationInput = {
+      existing: [
+        {
+          id: "cmd-1",
+          type: "storm",
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          stormData: {
+            kind: "command",
+            name: "Place Order",
+            action: "order:create:own",
+            fields: [],
+          },
+        },
+      ],
+      cards: [
+        card("actor", "Customer", [], {
+          permissions: ["user:manage:all"],
+        }),
+      ],
+    };
+    expect(validateStormWrite(input)).toEqual([
+      '"Customer" (actor) permission "user:manage:all" does not match any action on the canvas.',
+    ]);
+  });
+
+  it("flags actor permission when no actions exist on canvas at all", () => {
+    const input: StormValidationInput = {
+      existing: [],
+      cards: [
+        card("actor", "Customer", [], {
+          permissions: ["order:*"],
+        }),
+      ],
+    };
+    expect(validateStormWrite(input)).toEqual([
+      '"Customer" (actor) permission "order:*" does not match any action on the canvas.',
+    ]);
+  });
+
+  it("accepts an actor permission matching an action defined in the same batch", () => {
+    const input: StormValidationInput = {
+      existing: [],
+      cards: [
+        card("command", "Cancel Order", [], {
+          action: "order:cancel:own",
+        }),
+        card("actor", "Customer", [], {
+          permissions: ["order:cancel:own"],
+        }),
+      ],
+    };
+    expect(validateStormWrite(input)).toEqual([]);
+  });
+
+  it("flags only non-matching permissions when an actor specifies multiple permissions", () => {
+    const input: StormValidationInput = {
+      existing: [
+        {
+          id: "cmd-1",
+          type: "storm",
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          stormData: {
+            kind: "command",
+            name: "Place Order",
+            action: "order:create:own",
+            fields: [],
+          },
+        },
+      ],
+      cards: [
+        card("actor", "Customer", [], {
+          permissions: ["order:*", "billing:invoice:pay"],
+        }),
+      ],
+    };
+    expect(validateStormWrite(input)).toEqual([
+      '"Customer" (actor) permission "billing:invoice:pay" does not match any action on the canvas.',
+    ]);
+  });
+
+  it("passes an actor with no permissions specified", () => {
+    const input: StormValidationInput = {
+      existing: [],
+      cards: [card("actor", "Customer", [])],
+    };
+    expect(validateStormWrite(input)).toEqual([]);
+  });
+
+  it("skips permission check when update does not write permissions", () => {
+    const input: StormValidationInput = {
+      existing: [],
+      cards: [
+        card("actor", "Customer", [field("order:create:own", "")], {
+          writtenPermissions: [],
+        }),
+      ],
+    };
+    expect(validateStormWrite(input)).toEqual([]);
+  });
 });
 
 describe("describeStormOptions", () => {
-  it("lists the available Event types and tags", () => {
+  it("lists the available Event types, tags, and Actions", () => {
     const input: StormValidationInput = {
-      existing: [orderEvent],
+      existing: [
+        orderEvent,
+        {
+          id: "cmd-1",
+          type: "storm",
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          stormData: {
+            kind: "command",
+            name: "Place Order",
+            action: "order:create:own",
+            fields: [],
+          },
+        },
+      ],
       cards: [],
     };
     expect(describeStormOptions(input)).toBe(
-      'Event types available: "Order Placed". Event tags available: "order (uuid)".',
+      'Event types available: "Order Placed". Event tags available: "order (uuid)". Actions available: "order:create:own".',
     );
   });
 
-  it("says none when the board has no Event cards", () => {
+  it("says none when the board has no Event cards and no actions", () => {
     expect(describeStormOptions({ existing: [], cards: [] })).toBe(
-      "Event types available: (none yet). Event tags available: (none yet).",
+      "Event types available: (none yet). Event tags available: (none yet). Actions available: (none yet).",
     );
   });
 });
