@@ -13,9 +13,10 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "tauri": "tauri",
-    "bump:patch": "npm version patch --no-git-tag-version && sed -i '' \"s/\\\"version\\\": \\\".*\\\"/\\\"version\\\": \\\"$(node -p \"require('./package.json').version\")\\\"/\" src-tauri/tauri.conf.json",
-    "bump:minor": "npm version minor --no-git-tag-version && sed -i '' \"s/\\\"version\\\": \\\".*\\\"/\\\"version\\\": \\\"$(node -p \"require('./package.json').version\")\\\"/\" src-tauri/tauri.conf.json",
-    "bump:major": "npm version major --no-git-tag-version && sed -i '' \"s/\\\"version\\\": \\\".*\\\"/\\\"version\\\": \\\"$(node -p \"require('./package.json').version\")\\\"/\" src-tauri/tauri.conf.json"
+    "bump": "./scripts/bump-version.sh",
+    "bump:patch": "./scripts/bump-version.sh patch",
+    "bump:minor": "./scripts/bump-version.sh minor",
+    "bump:major": "./scripts/bump-version.sh major"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",
