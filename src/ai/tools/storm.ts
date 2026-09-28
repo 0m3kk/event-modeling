@@ -192,6 +192,10 @@ export const createStormCardsTool = defineTool({
           permissions: z.array(z.string()).optional(),
           x: z.number().optional(),
           y: z.number().optional(),
+          groupId: z
+            .string()
+            .optional()
+            .describe("Group ID or Section name to add this card to."),
         }),
       )
       .min(1)
@@ -201,6 +205,16 @@ export const createStormCardsTool = defineTool({
   execute: (args, ctx) => {
     const state = ctx.getState();
     const center = getViewportCenter(state);
+
+    const resolveGroupId = (groupIdOrName?: string): string | undefined => {
+      if (!groupIdOrName) return undefined;
+      const direct = state.groups.find((g) => g.id === groupIdOrName);
+      if (direct) return direct.id;
+      const byName = state.groups.find(
+        (g) => g.name.toLowerCase() === groupIdOrName.trim().toLowerCase(),
+      );
+      return byName?.id;
+    };
 
     const built = args.cards.map((spec) => {
       const data = buildStormData({
@@ -221,6 +235,7 @@ export const createStormCardsTool = defineTool({
 
       const height = computeStormCardHeight(data);
       const width = computeOptimalStormCardWidth(data);
+      const resolvedGroupId = resolveGroupId(spec.groupId);
       const obj: CanvasObject = {
         id: `storm-${nanoid()}`,
         type: "storm",
@@ -229,6 +244,7 @@ export const createStormCardsTool = defineTool({
         width,
         height,
         stormData: data,
+        ...(resolvedGroupId ? { groupId: resolvedGroupId } : {}),
       };
       return { spec, obj };
     });
@@ -252,18 +268,55 @@ export const createStormCardsTool = defineTool({
       }));
       const probe = arrangeStormLanes(layoutCards, { origin: { x: 0, y: 0 } });
       const size = layoutSize(probe, layoutCards);
-      const origin = findFreeSpot(state.objects, size, {
+
+      // If all cards belong to the same group, place them relative to that group
+      const commonGroupId = built.every(
+        (b) => b.obj.groupId && b.obj.groupId === built[0]?.obj.groupId,
+      )
+        ? built[0]?.obj.groupId
+        : undefined;
+      const targetGroup = commonGroupId
+        ? state.groups.find((g) => g.id === commonGroupId)
+        : undefined;
+
+      let groupOriginCenter = {
         x: center.x - size.width / 2,
         y: center.y - size.height / 2,
-      });
+      };
+      if (targetGroup) {
+        const members = state.objects.filter(
+          (o) => o.groupId === targetGroup.id && o.type !== "connector",
+        );
+        if (members.length > 0) {
+          let maxX = -Infinity;
+          let minY = Infinity;
+          for (const m of members) {
+            maxX = Math.max(maxX, m.x + m.width);
+            minY = Math.min(minY, m.y);
+          }
+          groupOriginCenter = { x: maxX + 40, y: minY };
+        } else if (targetGroup.customBounds) {
+          groupOriginCenter = {
+            x: targetGroup.customBounds.x + 24,
+            y: targetGroup.customBounds.y + 24,
+          };
+        }
+      }
+
+      const origin = findFreeSpot(state.objects, size, groupOriginCenter);
       const byId = new Map(
         arrangeStormLanes(layoutCards, { origin }).map((pos) => [pos.id, pos]),
       );
-      for (const { obj } of built) {
-        const pos = byId.get(obj.id);
-        if (pos) {
-          obj.x = pos.x;
-          obj.y = pos.y;
+      for (const { spec, obj } of built) {
+        if (spec.x !== undefined && spec.y !== undefined) {
+          obj.x = spec.x;
+          obj.y = spec.y;
+        } else {
+          const pos = byId.get(obj.id);
+          if (pos) {
+            obj.x = pos.x;
+            obj.y = pos.y;
+          }
         }
       }
     } else {
@@ -273,10 +326,33 @@ export const createStormCardsTool = defineTool({
           obj.x = spec.x;
           obj.y = spec.y;
         } else {
+          let searchCenter = center;
+          if (obj.groupId) {
+            const targetGroup = state.groups.find((g) => g.id === obj.groupId);
+            if (targetGroup) {
+              const members = [...state.objects, ...placed].filter(
+                (o) => o.groupId === targetGroup.id && o.type !== "connector",
+              );
+              if (members.length > 0) {
+                let maxX = -Infinity;
+                let minY = Infinity;
+                for (const m of members) {
+                  maxX = Math.max(maxX, m.x + m.width);
+                  minY = Math.min(minY, m.y);
+                }
+                searchCenter = { x: maxX + 40, y: minY };
+              } else if (targetGroup.customBounds) {
+                searchCenter = {
+                  x: targetGroup.customBounds.x + 24,
+                  y: targetGroup.customBounds.y + 24,
+                };
+              }
+            }
+          }
           const spot = findFreeSpot(
             [...state.objects, ...placed],
             { width: obj.width ?? 200, height: obj.height ?? 120 },
-            center,
+            searchCenter,
           );
           obj.x = spot.x;
           obj.y = spot.y;

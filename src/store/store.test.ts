@@ -945,5 +945,129 @@ describe("useCanvasStore", () => {
       height: 324 - 50 + 48,
     });
   });
+
+  it("recomputes and shrinks group bounds when a member is deleted via deleteObjects", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 500,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2]);
+    const gid = useCanvasStore.getState().groupObjects(["c1", "c2"], "Group A")!;
+
+    // Initial bounds enclose both c1 (100..200) and c2 (500..600)
+    let group = useCanvasStore.getState().groups.find((g) => g.id === gid)!;
+    expect(group.customBounds).toEqual({
+      x: 100 - 24,
+      y: 100 - 24,
+      width: 600 - 100 + 48,
+      height: 200 - 100 + 48,
+    });
+
+    // Delete c2 (the rightmost member) -> group boundary should shrink to enclose only c1
+    useCanvasStore.getState().deleteObjects(["c2"]);
+
+    group = useCanvasStore.getState().groups.find((g) => g.id === gid)!;
+    expect(group).toBeDefined();
+    expect(group.customBounds).toEqual({
+      x: 100 - 24,
+      y: 100 - 24,
+      width: 100 + 48,
+      height: 100 + 48,
+    });
+  });
+
+  it("automatically removes empty group when all member objects are deleted via deleteObjects", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1]);
+    const gid = useCanvasStore.getState().groupObjects(["c1"], "Solitary Group")!;
+
+    expect(useCanvasStore.getState().groups.some((g) => g.id === gid)).toBe(true);
+
+    // Delete the only member
+    useCanvasStore.getState().deleteObjects(["c1"]);
+
+    // Group should be removed
+    expect(useCanvasStore.getState().groups.some((g) => g.id === gid)).toBe(false);
+  });
+
+  it("recomputes group bounds when an object is added with groupId via addObject or addObjects", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1]);
+    const gid = useCanvasStore.getState().groupObjects(["c1"], "My Section")!;
+
+    let group = useCanvasStore.getState().groups.find((g) => g.id === gid)!;
+    expect(group.customBounds).toEqual({
+      x: 100 - 24,
+      y: 100 - 24,
+      width: 100 + 48,
+      height: 100 + 48,
+    });
+
+    // Add a new object via addObject with groupId
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 300,
+      y: 100,
+      width: 100,
+      height: 100,
+      groupId: gid,
+    };
+    useCanvasStore.getState().addObject(c2);
+
+    group = useCanvasStore.getState().groups.find((g) => g.id === gid)!;
+    expect(group.customBounds).toEqual({
+      x: 100 - 24,
+      y: 100 - 24,
+      width: 400 - 100 + 48,
+      height: 100 + 48,
+    });
+
+    // Add another object via addObjects with groupId
+    const c3: CanvasObject = {
+      id: "c3",
+      type: "storm",
+      x: 500,
+      y: 100,
+      width: 100,
+      height: 100,
+      groupId: gid,
+    };
+    useCanvasStore.getState().addObjects([c3]);
+
+    group = useCanvasStore.getState().groups.find((g) => g.id === gid)!;
+    expect(group.customBounds).toEqual({
+      x: 100 - 24,
+      y: 100 - 24,
+      width: 600 - 100 + 48,
+      height: 100 + 48,
+    });
+  });
 });
 

@@ -22,6 +22,7 @@ const objectSpecs = z.discriminatedUnion("type", [
     width: z.number().positive().optional(),
     height: z.number().positive().optional(),
     fill: z.string().optional().describe("Background color."),
+    groupId: z.string().optional().describe("Group ID or Section name to add this sticky note to."),
   }),
   z.object({
     type: z.literal("textBox"),
@@ -30,6 +31,7 @@ const objectSpecs = z.discriminatedUnion("type", [
     y: z.number().optional(),
     width: z.number().positive().optional(),
     height: z.number().positive().optional(),
+    groupId: z.string().optional().describe("Group ID or Section name to add this text box to."),
   }),
   z.object({
     type: z.literal("connector"),
@@ -57,6 +59,18 @@ export const createObjectsTool = defineTool({
     const created: Array<{ index: number; id: string; type: string }> = [];
     const idsByIndex: string[] = [];
 
+    const resolveGroupId = (groupIdOrName?: string): string | undefined => {
+      if (!groupIdOrName) return undefined;
+      const direct = state.groups.find((g) => g.id === groupIdOrName);
+      if (direct) return direct.id;
+      const byName = state.groups.find(
+        (g) => g.name.toLowerCase() === groupIdOrName.trim().toLowerCase(),
+      );
+      return byName?.id;
+    };
+
+    const placed: CanvasObject[] = [];
+
     // Pass 1: non-connectors
     args.objects.forEach((spec, index) => {
       if (spec.type === "connector") return;
@@ -64,9 +78,35 @@ export const createObjectsTool = defineTool({
       const width = spec.width ?? (spec.type === "stickyNote" ? 180 : 200);
       const height = spec.height ?? (spec.type === "stickyNote" ? 140 : 40);
       const hasPos = spec.x !== undefined && spec.y !== undefined;
+      const resolvedGroupId = resolveGroupId(spec.groupId);
+
+      let searchCenter = center;
+      if (!hasPos && resolvedGroupId) {
+        const targetGroup = state.groups.find((g) => g.id === resolvedGroupId);
+        if (targetGroup) {
+          const members = [...state.objects, ...placed].filter(
+            (o) => o.groupId === targetGroup.id && o.type !== "connector",
+          );
+          if (members.length > 0) {
+            let maxX = -Infinity;
+            let minY = Infinity;
+            for (const m of members) {
+              maxX = Math.max(maxX, m.x + m.width);
+              minY = Math.min(minY, m.y);
+            }
+            searchCenter = { x: maxX + 40, y: minY };
+          } else if (targetGroup.customBounds) {
+            searchCenter = {
+              x: targetGroup.customBounds.x + 24,
+              y: targetGroup.customBounds.y + 24,
+            };
+          }
+        }
+      }
+
       const pos = hasPos
         ? { x: spec.x!, y: spec.y! }
-        : findFreeSpot(state.objects, { width, height }, center);
+        : findFreeSpot([...state.objects, ...placed], { width, height }, searchCenter);
 
       const obj: CanvasObject = {
         id: `${spec.type}-${nanoid()}`,
@@ -77,9 +117,11 @@ export const createObjectsTool = defineTool({
         height,
         text: spec.text,
         ...(spec.type === "stickyNote" && spec.fill ? { fill: spec.fill } : {}),
+        ...(resolvedGroupId ? { groupId: resolvedGroupId } : {}),
       };
 
       state.addObject(obj);
+      placed.push(obj);
       idsByIndex[index] = obj.id;
       created.push({ index, id: obj.id, type: obj.type });
     });
@@ -279,10 +321,14 @@ export const createReferenceCopiesTool = defineTool({
 export const groupObjectsTool = defineTool({
   name: "group_objects",
   description:
-    "Group two or more objects into a Section frame so they move together.",
+    "Group objects into a Section frame so they move together, or add objects to an existing group by specifying groupId or matching name.",
   schema: z.object({
-    ids: z.array(z.string()).min(2),
+    ids: z.array(z.string()).min(1),
     name: z.string().optional().describe("Section name."),
+    groupId: z
+      .string()
+      .optional()
+      .describe("Existing target group ID or name to add objects to."),
   }),
   execute: (args, ctx) => {
     const state = ctx.getState();
@@ -291,10 +337,50 @@ export const groupObjectsTool = defineTool({
     );
     const notFound = args.ids.filter((id) => !existing.includes(id));
 
+    if (existing.length === 0) {
+      return {
+        grouped: false,
+        error: "No matching objects found to group.",
+        notFound,
+      };
+    }
+
+    // Check if target group is specified via groupId or existing name
+    const resolveTargetGroup = () => {
+      if (args.groupId) {
+        const direct = state.groups.find((g) => g.id === args.groupId);
+        if (direct) return direct;
+        const byName = state.groups.find(
+          (g) => g.name.toLowerCase() === args.groupId!.trim().toLowerCase(),
+        );
+        if (byName) return byName;
+      }
+      if (args.name) {
+        const byName = state.groups.find(
+          (g) => g.name.toLowerCase() === args.name!.trim().toLowerCase(),
+        );
+        if (byName) return byName;
+      }
+      return undefined;
+    };
+
+    const targetGroup = resolveTargetGroup();
+    if (targetGroup) {
+      state.addToGroup(targetGroup.id, existing);
+      return {
+        grouped: true,
+        groupId: targetGroup.id,
+        name: targetGroup.name,
+        memberIds: existing,
+        count: existing.length,
+        notFound,
+      };
+    }
+
     if (existing.length < 2) {
       return {
         grouped: false,
-        error: "Need at least two existing objects to group.",
+        error: "Need at least two existing objects to create a new group.",
         notFound,
       };
     }

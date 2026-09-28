@@ -42,6 +42,10 @@ export const createModelNodesTool = defineTool({
               }),
             )
             .optional(),
+          groupId: z
+            .string()
+            .optional()
+            .describe("Group ID or Section name to add this model node to."),
         }),
       )
       .min(1)
@@ -51,6 +55,18 @@ export const createModelNodesTool = defineTool({
     const state = ctx.getState();
     const center = getViewportCenter(state);
     const created: Array<{ id: string; name: string; kind: string }> = [];
+
+    const resolveGroupId = (groupIdOrName?: string): string | undefined => {
+      if (!groupIdOrName) return undefined;
+      const direct = state.groups.find((g) => g.id === groupIdOrName);
+      if (direct) return direct.id;
+      const byName = state.groups.find(
+        (g) => g.name.toLowerCase() === groupIdOrName.trim().toLowerCase(),
+      );
+      return byName?.id;
+    };
+
+    const placed: CanvasObject[] = [];
 
     for (const spec of args.nodes) {
       const hasPosition = spec.x !== undefined && spec.y !== undefined;
@@ -85,10 +101,38 @@ export const createModelNodesTool = defineTool({
 
       const height = computeModelNodeHeight(data);
       const width = computeOptimalModelNodeWidth(data);
+      const resolvedGroupId = resolveGroupId(spec.groupId);
 
       let pos = { x: spec.x ?? 0, y: spec.y ?? 0 };
       if (!hasPosition) {
-        pos = findFreeSpot(state.objects, { width, height }, center);
+        let searchCenter = center;
+        if (resolvedGroupId) {
+          const targetGroup = state.groups.find((g) => g.id === resolvedGroupId);
+          if (targetGroup) {
+            const members = [...state.objects, ...placed].filter(
+              (o) => o.groupId === targetGroup.id && o.type !== "connector",
+            );
+            if (members.length > 0) {
+              let maxX = -Infinity;
+              let minY = Infinity;
+              for (const m of members) {
+                maxX = Math.max(maxX, m.x + m.width);
+                minY = Math.min(minY, m.y);
+              }
+              searchCenter = { x: maxX + 40, y: minY };
+            } else if (targetGroup.customBounds) {
+              searchCenter = {
+                x: targetGroup.customBounds.x + 24,
+                y: targetGroup.customBounds.y + 24,
+              };
+            }
+          }
+        }
+        pos = findFreeSpot(
+          [...state.objects, ...placed],
+          { width, height },
+          searchCenter,
+        );
       }
 
       const obj: CanvasObject = {
@@ -99,9 +143,11 @@ export const createModelNodesTool = defineTool({
         width,
         height,
         modelData: data,
+        ...(resolvedGroupId ? { groupId: resolvedGroupId } : {}),
       };
 
       state.addObject(obj);
+      placed.push(obj);
       created.push({
         id: obj.id,
         name: displayName,

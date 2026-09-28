@@ -87,6 +87,14 @@ function createFakeStore(): FakeStore {
       }
       return groupId;
     },
+    addToGroup: (groupId: string, ids: string[]) => {
+      const wanted = new Set(ids);
+      for (let i = 0; i < objects.length; i++) {
+        if (wanted.has(objects[i]!.id)) {
+          objects[i] = { ...objects[i]!, groupId };
+        }
+      }
+    },
     deleteGroup: (groupId: string) => {
       const idx = groups.findIndex((g) => g.id === groupId);
       if (idx >= 0) groups.splice(idx, 1);
@@ -440,5 +448,67 @@ describe("AI Model & Write Tools", () => {
     expect(plan).toHaveLength(3);
     expect(plan[0]!.status).toBe("done");
     expect(plan[1]!.status).toBe("in_progress");
+  });
+
+  it("create_storm_cards assigns groupId to created cards and places near group", async () => {
+    const fake = createFakeStore();
+    fake.groups.push({
+      id: "group-orders",
+      name: "Orders",
+      customBounds: { x: 500, y: 500, width: 300, height: 200 },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "event",
+              name: "Order Placed",
+              groupId: "Orders",
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+    expect(res.isError).toBeFalsy();
+    const created = fake.objects.find((o) => o.stormData?.name === "Order Placed");
+    expect(created).toBeDefined();
+    expect(created?.groupId).toBe("group-orders");
+  });
+
+  it("group_objects can add single object to an existing group by groupId or name", async () => {
+    const fake = createFakeStore();
+    fake.groups.push({
+      id: "group-1",
+      name: "Billing",
+    });
+    fake.objects.push({
+      id: "o1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "group_objects",
+        arguments: JSON.stringify({
+          ids: ["o1"],
+          groupId: "Billing",
+        }),
+      },
+      ctx,
+    );
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects[0]!.groupId).toBe("group-1");
   });
 });

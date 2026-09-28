@@ -8,7 +8,10 @@ import { buildFieldClipboard, canPasteFields } from "@/utils/fieldClipboard";
 import { alignObjects, distributeObjects } from "@/utils/align";
 import { componentNameOf, ensureUniqueComponentName } from "@/utils/naming";
 import { arrangeStormLanes, type StormLaneCard } from "@/utils/stormLayout";
-import { recomputeGroupBoundsForObjects } from "@/utils/groupBounds";
+import {
+  recomputeGroupBoundsForObjects,
+  recomputeGroupBoundsForGroupIds,
+} from "@/utils/groupBounds";
 import {
   computeStormCardHeight,
   computeModelNodeHeight,
@@ -37,13 +40,14 @@ import {
   storeAISettings,
 } from "@/ai";
 
-/** True when a patch changes an object's placement or size. */
+/** True when a patch changes an object's placement, size, or group. */
 function patchTouchesGeometry(patch: Partial<CanvasObject>): boolean {
   return (
     patch.x !== undefined ||
     patch.y !== undefined ||
     patch.width !== undefined ||
-    patch.height !== undefined
+    patch.height !== undefined ||
+    patch.groupId !== undefined
   );
 }
 
@@ -156,8 +160,15 @@ export const useCanvasStore = create<CanvasStore>()(
       addObject: (object) => {
         set((state) => {
           const next = ensureUniqueComponentName(object, state.objects);
+          const objects = [...state.objects, next];
+          const groups = next.groupId
+            ? recomputeGroupBoundsForGroupIds(objects, state.groups, [
+                next.groupId,
+              ])
+            : state.groups;
           return {
-            objects: [...state.objects, next],
+            objects,
+            groups,
             selectedIds: [next.id],
           };
         });
@@ -167,27 +178,44 @@ export const useCanvasStore = create<CanvasStore>()(
         if (newObjects.length === 0) return;
         set((state) => {
           const existing = [...state.objects];
+          const affectedGroupIds = new Set<string>();
           const added = newObjects.map((obj) => {
             // Dedupe within the batch too: each accepted name joins `existing`
             // before the next object is checked.
             const next = ensureUniqueComponentName(obj, existing);
             existing.push(next);
+            if (next.groupId) {
+              affectedGroupIds.add(next.groupId);
+            }
             return next;
           });
+          const objects = [...state.objects, ...added];
+          const groups =
+            affectedGroupIds.size > 0
+              ? recomputeGroupBoundsForGroupIds(
+                  objects,
+                  state.groups,
+                  affectedGroupIds,
+                )
+              : state.groups;
           return {
-            objects: [...state.objects, ...added],
+            objects,
+            groups,
             selectedIds: added.map((o) => o.id),
           };
         });
       },
 
       updateObject: (id, patch) => {
-        const touchesGeometry = patchTouchesGeometry(patch);
+        const patchTouchesGeom = patchTouchesGeometry(patch);
         set((state) => {
           let found = false;
+          let oldGroupId: string | undefined;
+          let dimsChanged = false;
           const patched = state.objects.map((obj) => {
             if (obj.id !== id) return obj;
             found = true;
+            oldGroupId = obj.groupId;
             const updated = { ...obj, ...patch };
             if (
               updated.type === "storm" &&
@@ -204,6 +232,9 @@ export const useCanvasStore = create<CanvasStore>()(
             ) {
               updated.height = computeModelNodeHeight(updated.modelData);
             }
+            if (updated.height !== obj.height || updated.width !== obj.width) {
+              dimsChanged = true;
+            }
             // Only chase uniqueness when the title itself changed, so editing
             // an unrelated property never renames a card.
             return componentNameOf(updated) !== componentNameOf(obj)
@@ -214,11 +245,22 @@ export const useCanvasStore = create<CanvasStore>()(
           // Propagate synced fields (content/style/size) to linked reference
           // copies inside the same set() so undo reverts the whole thing.
           const objects = syncReferenceAfterChange(patched, id);
+          const touchesGeometry = patchTouchesGeom || dimsChanged;
           if (!touchesGeometry) return { objects };
-          // Keep group boundaries enclosing their members as they resize.
+          const updatedObj = objects.find((o) => o.id === id);
+          const affectedGroupIds = new Set<string>();
+          if (oldGroupId) affectedGroupIds.add(oldGroupId);
+          if (updatedObj?.groupId) affectedGroupIds.add(updatedObj.groupId);
           return {
             objects,
-            groups: recomputeGroupBoundsForObjects(objects, state.groups, [id]),
+            groups:
+              affectedGroupIds.size > 0
+                ? recomputeGroupBoundsForGroupIds(
+                    objects,
+                    state.groups,
+                    affectedGroupIds,
+                  )
+                : state.groups,
           };
         });
       },
@@ -240,22 +282,30 @@ export const useCanvasStore = create<CanvasStore>()(
         if (!touchesNames) {
           const patchMap = new Map(updates.map((u) => [u.id, u.patch]));
           set((state) => {
+            const affectedGroupIds = new Set<string>();
             const mapped = state.objects.map((obj) => {
               const patch = patchMap.get(obj.id);
-              return patch ? { ...obj, ...patch } : obj;
+              if (!patch) return obj;
+              if (obj.groupId) affectedGroupIds.add(obj.groupId);
+              if (patch.groupId) affectedGroupIds.add(patch.groupId);
+              return { ...obj, ...patch };
             });
             let objects = mapped;
             for (const id of syncIds) {
               objects = syncReferenceSet(objects, id) ?? objects;
             }
-            if (geometryIds.length === 0) return { objects };
+            for (const gid of geometryIds) {
+              const o = objects.find((x) => x.id === gid);
+              if (o?.groupId) affectedGroupIds.add(o.groupId);
+            }
+            if (affectedGroupIds.size === 0) return { objects };
             // Keep group boundaries enclosing their members while dragging.
             return {
               objects,
-              groups: recomputeGroupBoundsForObjects(
+              groups: recomputeGroupBoundsForGroupIds(
                 objects,
                 state.groups,
-                geometryIds,
+                affectedGroupIds,
               ),
             };
           });
@@ -266,10 +316,13 @@ export const useCanvasStore = create<CanvasStore>()(
         // end up sharing a name.
         set((state) => {
           let objects = state.objects;
+          const affectedGroupIds = new Set<string>();
           for (const { id, patch } of updates) {
             const index = objects.findIndex((o) => o.id === id);
             if (index === -1) continue;
             const current = objects[index];
+            if (current.groupId) affectedGroupIds.add(current.groupId);
+            if (patch.groupId) affectedGroupIds.add(patch.groupId);
             const updated = { ...current, ...patch };
             const next =
               componentNameOf(updated) !== componentNameOf(current)
@@ -283,13 +336,17 @@ export const useCanvasStore = create<CanvasStore>()(
             objects = syncReferenceSet(objects, id) ?? objects;
           }
           if (objects === state.objects) return {};
-          if (geometryIds.length === 0) return { objects };
+          for (const gid of geometryIds) {
+            const o = objects.find((x) => x.id === gid);
+            if (o?.groupId) affectedGroupIds.add(o.groupId);
+          }
+          if (affectedGroupIds.size === 0) return { objects };
           return {
             objects,
-            groups: recomputeGroupBoundsForObjects(
+            groups: recomputeGroupBoundsForGroupIds(
               objects,
               state.groups,
-              geometryIds,
+              affectedGroupIds,
             ),
           };
         });
@@ -345,14 +402,15 @@ export const useCanvasStore = create<CanvasStore>()(
             .filter((id) => get().groups.some((g) => g.id === id)),
         );
 
-        set((state) => ({
-          groups:
-            groupIdsToDelete.size > 0
-              ? state.groups.filter((g) => !groupIdsToDelete.has(g.id))
-              : state.groups,
-          // A lone survivor of a reference set is no longer linked — drop its
-          // referenceId so the badge disappears with the last sibling.
-          objects: pruneDanglingReferences(
+        set((state) => {
+          const affectedGroupIds = new Set<string>();
+          for (const obj of state.objects) {
+            if (idSet.has(obj.id) && obj.groupId) {
+              affectedGroupIds.add(obj.groupId);
+            }
+          }
+
+          const nextObjects = pruneDanglingReferences(
             state.objects
               .filter((obj) => {
                 if (idSet.has(obj.id)) return false;
@@ -372,15 +430,37 @@ export const useCanvasStore = create<CanvasStore>()(
                   ? { ...obj, groupId: undefined }
                   : obj,
               ),
-          ),
-          selectedIds: state.selectedIds.filter(
-            (id) =>
-              !idSet.has(id) &&
-              !groupIdsToDelete.has(
-                id.startsWith("__group:") ? id.replace("__group:", "") : id,
-              ),
-          ),
-        }));
+          );
+
+          // Retain groups that were not explicitly deleted and still have members or child groups
+          const survivingGroups = state.groups.filter((g) => {
+            if (groupIdsToDelete.has(g.id)) return false;
+            const hasMembers = nextObjects.some((o) => o.groupId === g.id);
+            const hasChildren = state.groups.some(
+              (child) =>
+                child.parentId === g.id && !groupIdsToDelete.has(child.id),
+            );
+            return hasMembers || hasChildren;
+          });
+
+          const nextGroups = recomputeGroupBoundsForGroupIds(
+            nextObjects,
+            survivingGroups,
+            affectedGroupIds,
+          );
+
+          return {
+            groups: nextGroups,
+            objects: nextObjects,
+            selectedIds: state.selectedIds.filter(
+              (id) =>
+                !idSet.has(id) &&
+                !groupIdsToDelete.has(
+                  id.startsWith("__group:") ? id.replace("__group:", "") : id,
+                ),
+            ),
+          };
+        });
       },
 
       moveObjects: (ids, dx, dy, snapToGrid = false) => {
@@ -449,12 +529,24 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       deleteGroup: (id) => {
-        set((state) => ({
-          groups: state.groups.filter((g) => g.id !== id),
-          objects: state.objects.map((obj) =>
+        set((state) => {
+          const target = state.groups.find((g) => g.id === id);
+          const remainingGroups = state.groups.filter((g) => g.id !== id);
+          const nextObjects = state.objects.map((obj) =>
             obj.groupId === id ? { ...obj, groupId: undefined } : obj,
-          ),
-        }));
+          );
+          const nextGroups = target?.parentId
+            ? recomputeGroupBoundsForGroupIds(
+                nextObjects,
+                remainingGroups,
+                [target.parentId],
+              )
+            : remainingGroups;
+          return {
+            groups: nextGroups,
+            objects: nextObjects,
+          };
+        });
       },
 
       selectGroup: (groupId, multi = false) => {
@@ -488,38 +580,15 @@ export const useCanvasStore = create<CanvasStore>()(
         if (validObjects.length === 0) return;
 
         const nextObjects = state.objects.map((obj) =>
-          targetIdSet.has(obj.id) ? { ...obj, groupId } : obj,
+          targetIdSet.has(obj.id) && obj.type !== "connector"
+            ? { ...obj, groupId }
+            : obj,
         );
 
-        // Recalculate group bounds to enclose all members + padding (min 24)
-        const allMembers = nextObjects.filter((o) => o.groupId === groupId);
-        const padding = 24;
-
-        let minX = group.customBounds ? group.customBounds.x : Infinity;
-        let minY = group.customBounds ? group.customBounds.y : Infinity;
-        let maxX = group.customBounds
-          ? group.customBounds.x + group.customBounds.width
-          : -Infinity;
-        let maxY = group.customBounds
-          ? group.customBounds.y + group.customBounds.height
-          : -Infinity;
-
-        for (const obj of allMembers) {
-          minX = Math.min(minX, obj.x - padding);
-          minY = Math.min(minY, obj.y - padding);
-          maxX = Math.max(maxX, obj.x + obj.width + padding);
-          maxY = Math.max(maxY, obj.y + obj.height + padding);
-        }
-
-        const nextCustomBounds = {
-          x: minX,
-          y: minY,
-          width: maxX - minX,
-          height: maxY - minY,
-        };
-
-        const nextGroups = state.groups.map((g) =>
-          g.id === groupId ? { ...g, customBounds: nextCustomBounds } : g,
+        const nextGroups = recomputeGroupBoundsForGroupIds(
+          nextObjects,
+          state.groups,
+          [groupId],
         );
 
         set({
@@ -546,38 +615,23 @@ export const useCanvasStore = create<CanvasStore>()(
           targetIdSet.has(obj.id) ? { ...obj, groupId: undefined } : obj,
         );
 
-        const padding = 24;
-        const remainingGroups = state.groups
-          .filter((g) => {
-            if (!affectedGroupIds.has(g.id)) return true;
-            return nextObjects.some((o) => o.groupId === g.id);
-          })
-          .map((g) => {
-            if (!affectedGroupIds.has(g.id)) return g;
-            const members = nextObjects.filter((o) => o.groupId === g.id);
-            let minX = Infinity;
-            let minY = Infinity;
-            let maxX = -Infinity;
-            let maxY = -Infinity;
-            for (const m of members) {
-              minX = Math.min(minX, m.x - padding);
-              minY = Math.min(minY, m.y - padding);
-              maxX = Math.max(maxX, m.x + m.width + padding);
-              maxY = Math.max(maxY, m.y + m.height + padding);
-            }
-            return {
-              ...g,
-              customBounds: {
-                x: minX,
-                y: minY,
-                width: maxX - minX,
-                height: maxY - minY,
-              },
-            };
-          });
+        const remainingGroups = state.groups.filter((g) => {
+          if (!affectedGroupIds.has(g.id)) return true;
+          const hasMembers = nextObjects.some((o) => o.groupId === g.id);
+          const hasChildren = state.groups.some(
+            (child) => child.parentId === g.id,
+          );
+          return hasMembers || hasChildren;
+        });
+
+        const nextGroups = recomputeGroupBoundsForGroupIds(
+          nextObjects,
+          remainingGroups,
+          affectedGroupIds,
+        );
 
         set({
-          groups: remainingGroups,
+          groups: nextGroups,
           objects: nextObjects,
         });
       },
@@ -628,17 +682,36 @@ export const useCanvasStore = create<CanvasStore>()(
           }
         }
 
+        // Also check if `name` matches an existing group
+        if (!targetGroupId && name) {
+          const matchedByName = state.groups.find(
+            (g) => g.name.toLowerCase() === name.trim().toLowerCase(),
+          );
+          if (matchedByName) {
+            targetGroupId = matchedByName.id;
+          }
+        }
+
+        const targetGroup = targetGroupId
+          ? state.groups.find((g) => g.id === targetGroupId)
+          : undefined;
+
         // If a target group is found and not overridden by an explicit new group name
-        if (targetGroupId && !name) {
+        if (
+          targetGroupId &&
+          (!name ||
+            (targetGroup &&
+              targetGroup.name.toLowerCase() === name.trim().toLowerCase()))
+        ) {
           const unassignedIds = candidateObjectIds.filter(
             (id) =>
               state.objects.find((o) => o.id === id)?.groupId !== targetGroupId,
           );
           if (unassignedIds.length > 0) {
             get().addToGroup(targetGroupId, unassignedIds);
-            set({ selectedIds: [`__group:${targetGroupId}`] });
-            return targetGroupId;
           }
+          set({ selectedIds: [`__group:${targetGroupId}`] });
+          return targetGroupId;
         }
 
         // Otherwise create a new group from candidate objects
@@ -647,21 +720,13 @@ export const useCanvasStore = create<CanvasStore>()(
         );
         if (targetObjects.length === 0) return;
 
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-
-        for (const obj of targetObjects) {
-          minX = Math.min(minX, obj.x);
-          minY = Math.min(minY, obj.y);
-          maxX = Math.max(maxX, obj.x + obj.width);
-          maxY = Math.max(maxY, obj.y + obj.height);
-        }
-
-        const padding = 24;
         const groupId = `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-        const newGroup: import("@/types").GroupInfo = {
+        const targetIdSet = new Set(targetObjects.map((o) => o.id));
+        const nextObjects = state.objects.map((obj) =>
+          targetIdSet.has(obj.id) ? { ...obj, groupId } : obj,
+        );
+
+        const newGroupBase: import("@/types").GroupInfo = {
           id: groupId,
           name: name || "Group",
           stroke: "#6366f1",
@@ -669,20 +734,17 @@ export const useCanvasStore = create<CanvasStore>()(
           strokeWidth: 2,
           lineStyle: "dashed",
           tagColor: "#6366f1",
-          customBounds: {
-            x: minX - padding,
-            y: minY - padding,
-            width: maxX - minX + padding * 2,
-            height: maxY - minY + padding * 2,
-          },
         };
 
-        const targetIdSet = new Set(targetObjects.map((o) => o.id));
+        const updatedGroups = recomputeGroupBoundsForGroupIds(
+          nextObjects,
+          [...state.groups, newGroupBase],
+          [groupId],
+        );
+
         set({
-          groups: [...state.groups, newGroup],
-          objects: state.objects.map((obj) =>
-            targetIdSet.has(obj.id) ? { ...obj, groupId } : obj,
-          ),
+          groups: updatedGroups,
+          objects: nextObjects,
           selectedIds: [`__group:${groupId}`],
         });
 

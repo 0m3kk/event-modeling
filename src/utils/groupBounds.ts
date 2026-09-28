@@ -65,6 +65,66 @@ export function computeGroupContentBounds(
 }
 
 /**
+ * Recomputes `customBounds` for a set of affected groups and their ancestors,
+ * so boundaries keep enclosing all of their members.
+ *
+ * Groups are processed deepest-first, letting a parent pick up the freshly
+ * recomputed bounds of its child groups. Returns the original array when no
+ * group is affected.
+ */
+export function recomputeGroupBoundsForGroupIds(
+  objects: CanvasObject[],
+  groups: GroupInfo[],
+  affectedGroupIds: Iterable<string>,
+): GroupInfo[] {
+  if (groups.length === 0) return groups;
+
+  const targetGroupIds = new Set(affectedGroupIds);
+  if (targetGroupIds.size === 0) return groups;
+
+  const groupsById = new Map(groups.map((g) => [g.id, g]));
+
+  // Walk each affected group up through its ancestors.
+  const allAffectedGroupIds = new Set<string>();
+  for (const id of targetGroupIds) {
+    let currentId: string | undefined = id;
+    while (currentId && !allAffectedGroupIds.has(currentId)) {
+      allAffectedGroupIds.add(currentId);
+      currentId = groupsById.get(currentId)?.parentId;
+    }
+  }
+  if (allAffectedGroupIds.size === 0) return groups;
+
+  const depthOf = (group: GroupInfo): number => {
+    let depth = 0;
+    let current: GroupInfo | undefined = group;
+    const guard = new Set<string>();
+    while (current?.parentId && !guard.has(current.id)) {
+      guard.add(current.id);
+      current = groupsById.get(current.parentId);
+      depth += 1;
+    }
+    return depth;
+  };
+
+  const nextGroups = new Map(groupsById);
+  const ordered = [...allAffectedGroupIds]
+    .map((id) => groupsById.get(id))
+    .filter((g): g is GroupInfo => Boolean(g))
+    .sort((a, b) => depthOf(b) - depthOf(a));
+
+  for (const group of ordered) {
+    const bounds = computeGroupContentBounds(group, objects, [
+      ...nextGroups.values(),
+    ]);
+    if (!bounds) continue;
+    nextGroups.set(group.id, { ...group, customBounds: bounds });
+  }
+
+  return groups.map((g) => nextGroups.get(g.id) ?? g);
+}
+
+/**
  * Recomputes `customBounds` for every group that directly or transitively
  * contains one of the affected objects, so boundaries keep enclosing all of
  * their members after those objects move or resize.
@@ -83,45 +143,12 @@ export function recomputeGroupBoundsForObjects(
   const affectedObjectIdSet = new Set(affectedObjectIds);
   if (affectedObjectIdSet.size === 0) return groups;
 
-  const groupsById = new Map(groups.map((g) => [g.id, g]));
-
-  // Walk each affected object's group up through its ancestors.
   const affectedGroupIds = new Set<string>();
   for (const obj of objects) {
-    if (!affectedObjectIdSet.has(obj.id) || !obj.groupId) continue;
-    let currentId: string | undefined = obj.groupId;
-    while (currentId && !affectedGroupIds.has(currentId)) {
-      affectedGroupIds.add(currentId);
-      currentId = groupsById.get(currentId)?.parentId;
+    if (affectedObjectIdSet.has(obj.id) && obj.groupId) {
+      affectedGroupIds.add(obj.groupId);
     }
   }
-  if (affectedGroupIds.size === 0) return groups;
 
-  const depthOf = (group: GroupInfo): number => {
-    let depth = 0;
-    let current: GroupInfo | undefined = group;
-    const guard = new Set<string>();
-    while (current?.parentId && !guard.has(current.id)) {
-      guard.add(current.id);
-      current = groupsById.get(current.parentId);
-      depth += 1;
-    }
-    return depth;
-  };
-
-  const nextGroups = new Map(groupsById);
-  const ordered = [...affectedGroupIds]
-    .map((id) => groupsById.get(id))
-    .filter((g): g is GroupInfo => Boolean(g))
-    .sort((a, b) => depthOf(b) - depthOf(a));
-
-  for (const group of ordered) {
-    const bounds = computeGroupContentBounds(group, objects, [
-      ...nextGroups.values(),
-    ]);
-    if (!bounds) continue;
-    nextGroups.set(group.id, { ...group, customBounds: bounds });
-  }
-
-  return groups.map((g) => nextGroups.get(g.id) ?? g);
+  return recomputeGroupBoundsForGroupIds(objects, groups, affectedGroupIds);
 }
