@@ -1280,12 +1280,24 @@ export class PixiEngine {
             minWidth: minDims.minWidth,
             minHeight: minDims.minHeight,
           });
-          useCanvasStore.getState().updateObject(this.resizingObjectId, {
+          // Horizontal-only handles must not pin the height. A storm card's
+          // height is content-driven and reflows with the new width, so
+          // committing the pre-drag height here would freeze the card's
+          // selection gizmo at the old size while the card itself shrinks or
+          // grows. Omitting height lets updateObject re-derive it for the new
+          // width. Vertical handles (none exposed today) still commit theirs.
+          const patch: Partial<CanvasObject> = {
             x: newBounds.x,
             y: newBounds.y,
             width: newBounds.width,
-            height: newBounds.height,
-          });
+          };
+          if (
+            this.resizingHandle.includes("n") ||
+            this.resizingHandle.includes("s")
+          ) {
+            patch.height = newBounds.height;
+          }
+          useCanvasStore.getState().updateObject(this.resizingObjectId, patch);
         }
         return;
       }
