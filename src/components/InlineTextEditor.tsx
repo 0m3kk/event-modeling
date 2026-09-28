@@ -186,8 +186,9 @@ function applyUpdate(
     const list = isResponse
       ? obj.stormData.responseFields ?? []
       : obj.stormData.fields;
+    const cleanTag = newValue.trim().replace(/^#+/, "");
     const nextList = list.map((f) =>
-      f.id === zone.fieldId ? { ...f, tag: newValue || undefined } : f,
+      f.id === zone.fieldId ? { ...f, tag: cleanTag || undefined } : f,
     );
     updateObject(obj.id, {
       stormData: isResponse

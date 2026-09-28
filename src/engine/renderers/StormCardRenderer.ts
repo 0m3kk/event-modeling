@@ -242,7 +242,9 @@ export class StormCardRenderer {
         // Tag Pill (for event, state, constraint, bdd)
         const hasTag = Boolean(field.tag && stormHasTags(kind));
         const rawTag = field.tag || "";
-        const tagPillW = hasTag ? Math.min(70, rawTag.length * 6 + 10) : 0;
+        const tagPillW = hasTag
+          ? Math.min(80, Math.max(36, (rawTag.length + 1) * 6 + 14))
+          : 0;
         const tagPillX = hasTag
           ? hasTypes
             ? typeZoneX - tagPillW - 6
@@ -308,24 +310,29 @@ export class StormCardRenderer {
           container.addChild(reqText);
         }
 
-        // Draw Tag Pill
+        // Draw Tag Pill (distinctive capsule badge with warm orange tint & # prefix)
         if (hasTag) {
-          const displayTag = truncateText(rawTag, 9);
-          g.roundRect(tagPillX, rowY + 4, tagPillW, 18, 4)
-            .fill({ color: 0xf1f5f9 })
-            .stroke({ color: 0xcbd5e1, width: 1 });
+          const displayTag = truncateText(rawTag, 8);
+          const tagPillH = 18;
+          const tagPillY = rowY + Math.round((rowHeight - tagPillH) / 2);
+
+          g.roundRect(tagPillX, tagPillY, tagPillW, tagPillH, tagPillH / 2)
+            .fill({ color: 0xffedd5 })
+            .stroke({ color: 0xfdba74, width: 1 });
 
           const tagText = new Text({
-            text: displayTag,
+            text: `#${displayTag}`,
             style: {
-              fontSize: 9,
+              fontSize: 9.5,
+              fontWeight: "600",
               fontFamily: APP_FONT_FAMILY,
-              fill: 0x475569,
+              fill: 0x9a3412,
             },
             resolution: textResolution,
           });
-          tagText.x = tagPillX + 5;
-          tagText.y = rowY + 6;
+          tagText.anchor.set(0.5, 0.5);
+          tagText.x = tagPillX + tagPillW / 2;
+          tagText.y = tagPillY + tagPillH / 2;
           container.addChild(tagText);
 
           hitZones.push({
