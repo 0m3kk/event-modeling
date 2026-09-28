@@ -57,7 +57,7 @@ const ACRONYMS = new Set([
   "b2c",
 ]);
 
-function splitWords(input: string): string[] {
+export function splitWords(input: string): string[] {
   return input
     .replace(/[_-]+/g, " ")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")

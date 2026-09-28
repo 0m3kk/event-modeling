@@ -306,6 +306,111 @@ describe("validateStormWrite", () => {
     };
     expect(validateStormWrite(input)).toEqual([]);
   });
+
+  describe("event field origin & tag validation", () => {
+    it("passes an event whose fields exist in the associated command", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("command", "Place Order", [
+            field("Order ID", "uuid"),
+            field("Total Amount", "number"),
+          ]),
+          card("event", "Order Placed", [
+            field("Order ID", "uuid", "order"),
+            field("Total Amount", "number"),
+          ]),
+        ],
+      };
+      expect(validateStormWrite(input)).toEqual([]);
+    });
+
+    it("passes an event whose fields come from both command and constraint", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("command", "Place Order", [field("Order ID", "uuid")]),
+          card("constraint", "Inventory Reserved", [field("Warehouse ID", "uuid")]),
+          card("event", "Order Placed", [
+            field("Order ID", "uuid", "order"),
+            field("Warehouse ID", "uuid"),
+          ]),
+        ],
+      };
+      expect(validateStormWrite(input)).toEqual([]);
+    });
+
+    it("flags an event field that does not exist in command or constraint", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("command", "Place Order", [field("Order ID", "uuid")]),
+          card("event", "Order Placed", [
+            field("Order ID", "uuid", "order"),
+            field("Unauthorized Discount", "number"),
+          ]),
+        ],
+      };
+      expect(validateStormWrite(input)).toEqual([
+        '"Order Placed" (event) field "Unauthorized Discount" does not exist in associated Command or Constraint ("Place Order"). Every event field must originate from a Command or Constraint payload.',
+      ]);
+    });
+
+    it("flags a tag placed on a non-key event field", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("command", "Place Order", [
+            field("Order ID", "uuid"),
+            field("Total Amount", "number"),
+          ]),
+          card("event", "Order Placed", [
+            field("Order ID", "uuid", "order"),
+            field("Total Amount", "number", "order"),
+          ]),
+        ],
+      };
+      expect(validateStormWrite(input)).toEqual([
+        '"Order Placed" (event) field "Total Amount" carries tag "order", but tags must only be applied to key/identifier fields (e.g. ID, unique email, code). Non-key fields should not be tagged.',
+      ]);
+    });
+
+    it("accepts tags on key/unique fields (id, email, code)", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("command", "Register User", [
+            field("User ID", "uuid"),
+            field("User Email", "email"),
+            field("Promo Code", "string"),
+          ]),
+          card("event", "User Registered", [
+            field("User ID", "uuid", "user"),
+            field("User Email", "email", "user"),
+            field("Promo Code", "string", "promo"),
+          ]),
+        ],
+      };
+      expect(validateStormWrite(input)).toEqual([]);
+    });
+
+    it("flags constraint rules that perform command input validation", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("constraint", "User Exists", [], {
+            constraints: [
+              "User must not be deleted",
+              "Email cannot be empty",
+            ],
+          }),
+        ],
+      };
+      expect(validateStormWrite(input)).toEqual([
+        '"User Exists" (constraint) rule "Email cannot be empty" appears to perform command input validation. Constraints are reusable Decision Models that check business logic invariants against historical events, not command input validation.',
+      ]);
+    });
+  });
 });
 
 describe("describeStormOptions", () => {

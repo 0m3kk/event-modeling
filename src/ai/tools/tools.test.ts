@@ -234,7 +234,10 @@ describe("AI Storm Tools", () => {
             {
               kind: "command",
               name: "Place Order",
-              fields: [{ name: "amount", fieldType: "number" }],
+              fields: [
+                { name: "orderId", fieldType: "string" },
+                { name: "amount", fieldType: "number" },
+              ],
             },
             {
               kind: "event",

@@ -1,8 +1,182 @@
 import type { CanvasObject, StormField, StormKind } from "@/types";
-import { toDisplayName } from "./naming";
+import { nameKey, splitWords, toDisplayName } from "./naming";
 import { matchesPermission } from "./stormAuth";
 
 const TAG_KINDS: readonly StormKind[] = ["event", "state", "constraint", "bdd"];
+
+const KEY_WORDS = new Set([
+  "id",
+  "uuid",
+  "guid",
+  "code",
+  "email",
+  "slug",
+  "token",
+  "key",
+  "no",
+  "number",
+  "ref",
+  "reference",
+  "hash",
+  "username",
+  "handle",
+  "sku",
+]);
+
+export function isKeyField(name: string, fieldType?: string): boolean {
+  const normType = (fieldType ?? "").trim().toLowerCase();
+  if (normType === "uuid" || normType === "id" || normType === "email") {
+    return true;
+  }
+  const clean = name.replace(/[_\-\s]+/g, " ").trim().toLowerCase();
+  if (!clean) return false;
+  const words = clean.split(" ");
+  const lastWord = words[words.length - 1] ?? "";
+
+  if (KEY_WORDS.has(clean) || KEY_WORDS.has(lastWord)) {
+    return true;
+  }
+  if (
+    clean.endsWith("id") ||
+    clean.endsWith("uuid") ||
+    clean.endsWith("code") ||
+    clean.endsWith("email") ||
+    clean.endsWith("key") ||
+    clean.endsWith("ref") ||
+    clean.endsWith("token")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+const NOISE_WORDS = new Set([
+  "create",
+  "created",
+  "place",
+  "placed",
+  "make",
+  "made",
+  "update",
+  "updated",
+  "delete",
+  "deleted",
+  "remove",
+  "removed",
+  "add",
+  "added",
+  "cancel",
+  "cancelled",
+  "send",
+  "sent",
+  "submit",
+  "submitted",
+  "process",
+  "processed",
+  "event",
+  "command",
+  "to",
+  "for",
+  "on",
+  "in",
+  "by",
+  "a",
+  "an",
+  "the",
+  "new",
+  "old",
+  "set",
+]);
+
+function extractDomainWords(name: string): string[] {
+  return splitWords(name)
+    .map((w) => w.toLowerCase())
+    .filter((w) => !NOISE_WORDS.has(w) && w.length > 1);
+}
+
+function getCardOrObjectFields(
+  source: StormValidationCard | CanvasObject,
+): StormField[] {
+  if ("stormData" in source) {
+    return source.stormData?.fields ?? [];
+  }
+  return (
+    (source as StormValidationCard).writtenFields ??
+    (source as StormValidationCard).fields
+  );
+}
+
+function getCardOrObjectName(
+  source: StormValidationCard | CanvasObject,
+): string {
+  if ("stormData" in source) {
+    return source.stormData?.name ?? "";
+  }
+  return (source as StormValidationCard).name;
+}
+
+function findCandidateSourcesForEvent(
+  eventCard: StormValidationCard,
+  input: StormValidationInput,
+): (StormValidationCard | CanvasObject)[] {
+  const batchCommands = input.cards.filter((c) => c.kind === "command");
+  const batchConstraints = input.cards.filter((c) => c.kind === "constraint");
+
+  if (batchCommands.length === 1) {
+    return [...batchCommands, ...batchConstraints];
+  }
+
+  if (batchCommands.length > 1) {
+    const eventWords = extractDomainWords(eventCard.name);
+    const matchedCmds = batchCommands.filter((cmd) => {
+      const cmdWords = extractDomainWords(cmd.name);
+      return eventWords.some((w) => cmdWords.includes(w));
+    });
+    const matchedConstraints = batchConstraints.filter((c) => {
+      const cWords = extractDomainWords(c.name);
+      return eventWords.some((w) => cWords.includes(w));
+    });
+    if (matchedCmds.length > 0 || matchedConstraints.length > 0) {
+      return [...matchedCmds, ...matchedConstraints];
+    }
+    return [...batchCommands, ...batchConstraints];
+  }
+
+  if (batchConstraints.length > 0) {
+    return batchConstraints;
+  }
+
+  const existingCommands = input.existing.filter(
+    (o) => o.type === "storm" && o.stormData?.kind === "command",
+  );
+  const existingConstraints = input.existing.filter(
+    (o) => o.type === "storm" && o.stormData?.kind === "constraint",
+  );
+
+  if (existingCommands.length === 0 && existingConstraints.length === 0) {
+    return [];
+  }
+
+  const eventWords = extractDomainWords(eventCard.name);
+  const matchedExisting = [
+    ...existingCommands,
+    ...existingConstraints,
+  ].filter((obj) => {
+    const name = obj.stormData?.name ?? "";
+    const objWords = extractDomainWords(name);
+    return eventWords.some((w) => objWords.includes(w));
+  });
+
+  if (matchedExisting.length > 0) {
+    return matchedExisting;
+  }
+
+  if (existingCommands.length === 1 && existingConstraints.length === 0) {
+    return existingCommands;
+  }
+
+  return [];
+}
 
 export interface StormValidationCard {
   kind: StormKind;
@@ -10,6 +184,7 @@ export interface StormValidationCard {
   fields: StormField[];
   writtenFields?: StormField[];
   queryItems?: { types?: string[]; tagFields?: string[] }[];
+  constraints?: (string | { id?: string; text: string })[];
   action?: string;
   permissions?: string[];
   writtenPermissions?: string[];
@@ -131,6 +306,53 @@ export function validateStormWrite(input: StormValidationInput): string[] {
         if (!eventTags.get(field.fieldType)?.has(tag)) {
           issues.push(
             `${label} field "${field.name}" has tag "${tag}", but no Event field of type "${field.fieldType}" carries that tag.`,
+          );
+        }
+      }
+    }
+
+    if (card.kind === "event") {
+      for (const field of writtenFields) {
+        const tag = (field.tag ?? "").trim();
+        if (tag && !isKeyField(field.name, field.fieldType)) {
+          issues.push(
+            `${label} field "${field.name}" carries tag "${tag}", but tags must only be applied to key/identifier fields (e.g. ID, unique email, code). Non-key fields should not be tagged.`,
+          );
+        }
+      }
+
+      if (writtenFields.length > 0) {
+        const candidateSources = findCandidateSourcesForEvent(card, input);
+        if (candidateSources.length > 0) {
+          const allowedFieldKeys = new Set<string>();
+          for (const src of candidateSources) {
+            for (const f of getCardOrObjectFields(src)) {
+              allowedFieldKeys.add(nameKey(f.name));
+            }
+          }
+          for (const field of writtenFields) {
+            const key = nameKey(field.name);
+            if (!allowedFieldKeys.has(key)) {
+              const srcNames = candidateSources
+                .map((s) => `"${getCardOrObjectName(s)}"`)
+                .join(", ");
+              issues.push(
+                `${label} field "${field.name}" does not exist in associated Command or Constraint (${srcNames}). Every event field must originate from a Command or Constraint payload.`,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    if (card.kind === "constraint" && card.constraints) {
+      const COMMAND_VALIDATION_REGEX =
+        /\b(cannot be (empty|blank|null)|must not be (empty|blank|null)|is required|valid email format|characters long)\b/i;
+      for (const rule of card.constraints) {
+        const text = typeof rule === "string" ? rule : rule.text;
+        if (text && COMMAND_VALIDATION_REGEX.test(text)) {
+          issues.push(
+            `${label} rule "${text}" appears to perform command input validation. Constraints are reusable Decision Models that check business logic invariants against historical events, not command input validation.`,
           );
         }
       }

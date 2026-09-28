@@ -49,7 +49,7 @@ const fieldSpec = z.object({
     .string()
     .optional()
     .describe(
-      "Tag name on Event field for DCB dynamic consistency boundary (e.g. 'Order').",
+      "Tag name on Event field for DCB dynamic consistency boundary (e.g. 'Order'). Tag ONLY key/unique identifier fields (IDs, unique email, code); never tag non-key fields or all fields.",
     ),
 });
 
@@ -204,7 +204,7 @@ function layoutSize(
 export const createStormCardsTool = defineTool({
   name: "create_storm_cards",
   description:
-    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (Decision Model with queryItems) -> Event (past fact with field tags). For Read Slices: Query (params + responseFields + action) -> State (projection with queryItems) <- Event. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
+    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; all event fields must originate from Command or Constraint). For Read Slices: Query (params + responseFields + action) -> State (projection with queryItems) <- Event. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
   schema: z.object({
     cards: z
       .array(
@@ -231,7 +231,7 @@ export const createStormCardsTool = defineTool({
             .array(z.string())
             .optional()
             .describe(
-              "Constraint cards only: business invariant rules / policies.",
+              "Constraint cards only: domain business logic invariants evaluated against historical events (not command input validation). Constraints are reusable and independent.",
             ),
           action: z
             .string()
@@ -326,6 +326,7 @@ export const createStormCardsTool = defineTool({
         name: obj.stormData?.name ?? toDisplayName(spec.name),
         fields: obj.stormData?.fields ?? [],
         queryItems: spec.queryItems,
+        constraints: spec.constraints,
         action: obj.stormData?.action,
         permissions:
           obj.stormData?.kind === "actor"
@@ -549,6 +550,7 @@ export const updateStormCardTool = defineTool({
           fields,
           writtenFields: args.fields !== undefined ? fields : [],
           queryItems: args.queryItems,
+          constraints: args.constraints ?? existing.constraints,
           action: args.action ?? existing.action,
           permissions:
             existing.kind === "actor"
