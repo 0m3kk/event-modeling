@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "@/store";
 import type { CanvasObject } from "@/types";
+import { getActorPermissions } from "@/utils/stormAuth";
 
 export function InlineTextEditor() {
   const inlineEdit = useCanvasStore((s) => s.inlineEdit);
@@ -158,18 +159,45 @@ function applyUpdate(
     }
   } else if (zone.type === "fieldName") {
     if (obj.type === "storm" && obj.stormData) {
-      const isResponse = zone.section === "response";
-      const list = isResponse
-        ? obj.stormData.responseFields ?? []
-        : obj.stormData.fields;
-      const nextList = list.map((f) =>
-        f.id === zone.fieldId ? { ...f, name: newValue } : f,
-      );
-      updateObject(obj.id, {
-        stormData: isResponse
-          ? { ...obj.stormData, responseFields: nextList }
-          : { ...obj.stormData, fields: nextList },
-      });
+      if (obj.stormData.kind === "actor") {
+        const perms = getActorPermissions(obj.stormData);
+        const index = zone.fieldId
+          ? parseInt(zone.fieldId.replace("perm-", ""), 10)
+          : -1;
+        let nextPerms: string[];
+        if (index >= 0 && index < perms.length) {
+          nextPerms = [...perms];
+          if (newValue.trim()) {
+            nextPerms[index] = newValue.trim();
+          } else {
+            nextPerms.splice(index, 1);
+          }
+        } else {
+          nextPerms = perms
+            .map((p) => (p === zone.currentText ? newValue.trim() : p))
+            .filter(Boolean);
+        }
+        updateObject(obj.id, {
+          stormData: {
+            ...obj.stormData,
+            permissions: nextPerms,
+            fields: [],
+          },
+        });
+      } else {
+        const isResponse = zone.section === "response";
+        const list = isResponse
+          ? obj.stormData.responseFields ?? []
+          : obj.stormData.fields;
+        const nextList = list.map((f) =>
+          f.id === zone.fieldId ? { ...f, name: newValue } : f,
+        );
+        updateObject(obj.id, {
+          stormData: isResponse
+            ? { ...obj.stormData, responseFields: nextList }
+            : { ...obj.stormData, fields: nextList },
+        });
+      }
     } else if (obj.type === "model" && obj.modelData) {
       const list = obj.modelData.fields ?? [];
       const nextList = list.map((f) =>

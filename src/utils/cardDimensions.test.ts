@@ -172,6 +172,25 @@ describe("cardDimensions", () => {
     expect(hNarrow).toBeGreaterThan(hWide);
   });
 
+  it("computes actor card height strictly from its permissions", () => {
+    const emptyActor: StormData = {
+      kind: "actor",
+      name: "Guest",
+      fields: [],
+      permissions: [],
+    };
+    expect(computeStormCardHeight(emptyActor)).toBe(80);
+
+    const withPerms: StormData = {
+      kind: "actor",
+      name: "Guest",
+      fields: [],
+      permissions: ["*:register:public", "profile:read:public"],
+    };
+    // header (36 + 6) + 2 * 26 = 94
+    expect(computeStormCardHeight(withPerms)).toBe(94);
+  });
+
   it("expands model node height as fields are added", () => {
     const model: ModelData = {
       kind: "object",

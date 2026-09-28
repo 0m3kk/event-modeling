@@ -26,6 +26,7 @@ import {
   computeStormQueryItemHeight,
   computeStormConstraintItemLines,
 } from "@/utils/cardDimensions";
+import { getActorPermissions } from "@/utils/stormAuth";
 
 function truncateText(str: string, maxLen: number): string {
   if (!str) return "";
@@ -95,7 +96,6 @@ export class StormCardRenderer {
     const responseFields = data.responseFields ?? [];
     const queryItems = data.queryItems ?? [];
     const constraints = data.constraints ?? [];
-    const permissions = data.permissions ?? [];
 
     // BDD (Given/When/Then) cards render the same field list as Event/Command —
     // types included — with the phase shown as their header badge.
@@ -410,53 +410,11 @@ export class StormCardRenderer {
       }
     };
 
-    // Render Params
-    if (hasParams && (fields.length > 0 || hasResponse)) {
-      const pLabel = new Text({
-        text: "PARAMS",
-        style: {
-          fontSize: 9,
-          fontWeight: "bold",
-          fontFamily: APP_FONT_FAMILY,
-          fill: 0x94a3b8,
-          letterSpacing: 0.5,
-        },
-        resolution: textResolution,
-      });
-      pLabel.x = 10;
-      pLabel.y = renderY + 2;
-      container.addChild(pLabel);
-      renderY += sectionLabelHeight;
-    }
-
-    renderFieldList(fields, "params");
-
-    // Render Response — the band is always present on Query cards, matching
-    // the Params band (the original keeps both sections visible even when empty).
-    if (hasResponse) {
-      const rLabel = new Text({
-        text: "RESPONSE",
-        style: {
-          fontSize: 9,
-          fontWeight: "bold",
-          fontFamily: APP_FONT_FAMILY,
-          fill: 0x94a3b8,
-          letterSpacing: 0.5,
-        },
-        resolution: textResolution,
-      });
-      rLabel.x = 10;
-      rLabel.y = renderY + 4;
-      container.addChild(rLabel);
-      renderY += sectionLabelHeight;
-
-      renderFieldList(responseFields, "response");
-    }
-
-    // Render Actor Permissions (if no fields)
-    if (isActor && permissions.length > 0 && fields.length === 0) {
+    if (isActor) {
+      const actorPerms = getActorPermissions(data);
       const maxPermChars = Math.max(8, Math.floor((w - 32) / 6.5));
-      for (const perm of permissions) {
+      for (let pIdx = 0; pIdx < actorPerms.length; pIdx++) {
+        const perm = actorPerms[pIdx];
         const rowY = renderY;
         const displayPerm = truncateText(perm, maxPermChars);
         const permText = new Text({
@@ -475,10 +433,54 @@ export class StormCardRenderer {
         hitZones.push({
           type: "fieldName",
           bounds: { x: 0, y: rowY, width: w, height: rowHeight },
+          fieldId: `perm-${pIdx}`,
           currentText: perm,
         });
 
         renderY += rowHeight;
+      }
+    } else {
+      // Render Params
+      if (hasParams && (fields.length > 0 || hasResponse)) {
+        const pLabel = new Text({
+          text: "PARAMS",
+          style: {
+            fontSize: 9,
+            fontWeight: "bold",
+            fontFamily: APP_FONT_FAMILY,
+            fill: 0x94a3b8,
+            letterSpacing: 0.5,
+          },
+          resolution: textResolution,
+        });
+        pLabel.x = 10;
+        pLabel.y = renderY + 2;
+        container.addChild(pLabel);
+        renderY += sectionLabelHeight;
+      }
+
+      renderFieldList(fields, "params");
+
+      // Render Response — the band is always present on Query cards, matching
+      // the Params band (the original keeps both sections visible even when empty).
+      if (hasResponse) {
+        const rLabel = new Text({
+          text: "RESPONSE",
+          style: {
+            fontSize: 9,
+            fontWeight: "bold",
+            fontFamily: APP_FONT_FAMILY,
+            fill: 0x94a3b8,
+            letterSpacing: 0.5,
+          },
+          resolution: textResolution,
+        });
+        rLabel.x = 10;
+        rLabel.y = renderY + 4;
+        container.addChild(rLabel);
+        renderY += sectionLabelHeight;
+
+        renderFieldList(responseFields, "response");
       }
     }
 

@@ -337,4 +337,35 @@ describe("stormAuth", () => {
       );
     });
   });
+
+  describe("getActorPermissions precedence", () => {
+    it("uses permissions array and ignores legacy fields if permissions is defined", () => {
+      expect(
+        getActorPermissions({
+          kind: "actor",
+          name: "Guest",
+          permissions: ["*:register:public"],
+          fields: [{ id: "f1", name: "*", fieldType: "" }],
+        }),
+      ).toEqual(["*:register:public"]);
+
+      expect(
+        getActorPermissions({
+          kind: "actor",
+          name: "Guest",
+          permissions: [],
+          fields: [{ id: "f1", name: "*", fieldType: "" }],
+        }),
+      ).toEqual([]);
+    });
+
+    it("does not match *:register:public or *:*:public with profile:update:own", () => {
+      expect(
+        matchesPermission("*:register:public", "profile:update:own"),
+      ).toBe(false);
+      expect(
+        matchesPermission("*:*:public", "profile:update:own"),
+      ).toBe(false);
+    });
+  });
 });

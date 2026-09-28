@@ -16,6 +16,7 @@ import { PermissionsPopover } from "./PermissionsPopover";
 import { TagPopover } from "./TagPopover";
 import { QueryItemPopover } from "./QueryItemPopover";
 import { findDescriptionText } from "@/utils/description";
+import { getActorPermissions } from "@/utils/stormAuth";
 import {
   Shield,
   Trash2,
@@ -333,7 +334,7 @@ export function StormOptionsBar() {
           <button
             ref={permissionsButtonRef}
             onClick={() => setShowPermissionsPopover((v) => !v)}
-            title={`Permissions (${data.permissions?.length ?? 0})`}
+            title={`Permissions (${getActorPermissions(data).length})`}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-pink-200 bg-pink-50 text-pink-700 hover:bg-pink-100"
           >
             <Shield size={16} className="text-pink-600" />

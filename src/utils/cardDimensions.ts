@@ -16,6 +16,7 @@ import {
 import { GRID_SIZE } from "@/constants/canvas";
 import { snapToGrid } from "./snapping";
 import { resolveTargetModel } from "./modelResolution";
+import { getActorPermissions } from "./stormAuth";
 
 /**
  * Computes how many vertical lines a Query Item row requires based on its
@@ -98,7 +99,12 @@ export function computeStormCardHeight(
   const responseFields = data.responseFields ?? [];
   const queryItems = data.queryItems ?? [];
   const constraints = data.constraints ?? [];
-  const permissions = data.permissions ?? [];
+
+  if (kind === "actor") {
+    const actorPerms = getActorPermissions(data);
+    h += actorPerms.length * rowHeight;
+    return Math.max(h, 80);
+  }
 
   if (hasParams && (fields.length > 0 || hasResponse)) {
     h += sectionLabelHeight;
@@ -107,10 +113,6 @@ export function computeStormCardHeight(
 
   if (hasResponse) {
     h += sectionLabelHeight + responseFields.length * rowHeight;
-  }
-
-  if (kind === "actor" && permissions.length > 0 && fields.length === 0) {
-    h += permissions.length * rowHeight;
   }
 
   if (stormHasQueryItems(kind) && queryItems.length > 0) {
@@ -350,7 +352,7 @@ export function computeOptimalStormCardWidth(
 
   // 5. Actor permissions
   if (kind === "actor") {
-    for (const p of data.permissions ?? []) {
+    for (const p of getActorPermissions(data)) {
       const pWidth = p.length * 6.5 + 44;
       requiredWidth = Math.max(requiredWidth, pWidth);
     }

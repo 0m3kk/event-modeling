@@ -151,10 +151,10 @@ function buildStormData(input: {
   if (input.action && (input.kind === "command" || input.kind === "query")) {
     data.action = input.action.trim();
   }
-  if (input.permissions && input.kind === "actor") {
-    data.permissions = input.permissions.map((p) => p.trim()).filter(Boolean);
-    if (!input.fields || input.fields.length === 0) {
-      data.fields = data.permissions.map((p) => createStormField(p, ""));
+  if (input.kind === "actor") {
+    data.fields = [];
+    if (input.permissions) {
+      data.permissions = input.permissions.map((p) => p.trim()).filter(Boolean);
     }
   }
   if (input.responseFields && input.kind === "query") {

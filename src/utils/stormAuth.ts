@@ -99,11 +99,12 @@ export function formatAction(
 export function getActorPermissions(data?: StormData): string[] {
   if (!data) return [];
   const set = new Set<string>();
-  if (data.permissions) {
+  if (data.permissions !== undefined) {
     for (const p of data.permissions) {
       const clean = p.trim();
       if (clean) set.add(clean);
     }
+    return Array.from(set);
   }
   if (data.fields) {
     for (const f of data.fields) {
