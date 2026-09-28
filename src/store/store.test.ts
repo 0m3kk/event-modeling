@@ -469,6 +469,142 @@ describe("useCanvasStore", () => {
     );
   });
 
+  it("adds objects to an existing group and expands bounds (addToGroup)", () => {
+    const card1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    };
+    const card2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 400,
+      y: 200,
+      width: 150,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([card1, card2]);
+    const gid = useCanvasStore.getState().groupObjects(["c1"], "My Group");
+    expect(gid).toBeDefined();
+
+    const groupBefore = useCanvasStore.getState().groups[0];
+    expect(groupBefore.name).toBe("My Group");
+    expect(groupBefore.customBounds?.width).toBe(200 + 48);
+
+    // Add card2 to the existing group
+    useCanvasStore.getState().addToGroup(gid!, ["c2"]);
+
+    const state = useCanvasStore.getState();
+    const groupAfter = state.groups.find((g) => g.id === gid);
+    expect(groupAfter?.name).toBe("My Group");
+    expect(state.objects.find((o) => o.id === "c2")?.groupId).toBe(gid);
+
+    // Bounds should now envelope both c1 (100..300, 100..200) and c2 (400..550, 200..300) with 24 padding
+    // minX = 100-24=76, maxX = 550+24=574 => width = 498
+    expect(groupAfter?.customBounds?.x).toBe(76);
+    expect(groupAfter?.customBounds?.width).toBe(574 - 76);
+  });
+
+  it("removes objects from a group without destroying the group (removeFromGroup)", () => {
+    const card1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    };
+    const card2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 350,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([card1, card2]);
+    const gid = useCanvasStore.getState().groupObjects(["c1", "c2"], "Keep Group");
+
+    // Remove card2 from group
+    useCanvasStore.getState().removeFromGroup(["c2"]);
+
+    const state = useCanvasStore.getState();
+    expect(state.objects.find((o) => o.id === "c2")?.groupId).toBeUndefined();
+    expect(state.objects.find((o) => o.id === "c1")?.groupId).toBe(gid);
+    expect(state.groups).toHaveLength(1);
+    expect(state.groups[0].name).toBe("Keep Group");
+
+    // Removing remaining member dissolves the group
+    useCanvasStore.getState().removeFromGroup(["c1"]);
+    expect(useCanvasStore.getState().groups).toHaveLength(0);
+  });
+
+  it("smart groupObjects: merges unassigned card when group is selected along with card", () => {
+    const card1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    };
+    const card2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 350,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([card1, card2]);
+    const gid = useCanvasStore.getState().groupObjects(["c1"], "Existing Service");
+
+    // User selects the group AND card2, then presses Cmd+G (groupObjects())
+    useCanvasStore.getState().setSelectedIds([`__group:${gid}`, "c2"]);
+    const returnedGid = useCanvasStore.getState().groupObjects();
+
+    expect(returnedGid).toBe(gid);
+    const state = useCanvasStore.getState();
+    expect(state.groups).toHaveLength(1);
+    expect(state.groups[0].name).toBe("Existing Service");
+    expect(state.objects.find((o) => o.id === "c2")?.groupId).toBe(gid);
+    expect(state.selectedIds).toEqual([`__group:${gid}`]);
+  });
+
+  it("smart groupObjects: merges unassigned card when card in group is selected with unassigned card", () => {
+    const card1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    };
+    const card2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 350,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([card1, card2]);
+    const gid = useCanvasStore.getState().groupObjects(["c1"], "Payment Group");
+
+    // User selects card1 (in group) AND card2 (unassigned), then triggers groupObjects()
+    useCanvasStore.getState().setSelectedIds(["c1", "c2"]);
+    const returnedGid = useCanvasStore.getState().groupObjects();
+
+    expect(returnedGid).toBe(gid);
+    const state = useCanvasStore.getState();
+    expect(state.groups).toHaveLength(1);
+    expect(state.groups[0].name).toBe("Payment Group");
+    expect(state.objects.find((o) => o.id === "c2")?.groupId).toBe(gid);
+  });
+
   it("handles moveRow and deleteSelectedRow", () => {
     const card: CanvasObject = {
       id: "storm-1",

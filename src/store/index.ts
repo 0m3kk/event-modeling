@@ -396,22 +396,193 @@ export const useCanvasStore = create<CanvasStore>()(
         }));
       },
 
-      selectGroup: (groupId) => {
-        const { isLocked } = get();
+      selectGroup: (groupId, multi = false) => {
+        const { selectedIds, isLocked } = get();
         if (isLocked) return;
-        set({ selectedIds: [`__group:${groupId}`], stormSelectedField: null });
+        const gid = `__group:${groupId}`;
+        if (multi) {
+          if (selectedIds.includes(gid)) {
+            set({ selectedIds: selectedIds.filter((item) => item !== gid) });
+          } else {
+            set({
+              selectedIds: [...selectedIds, gid],
+              stormSelectedField: null,
+            });
+          }
+        } else {
+          set({ selectedIds: [gid], stormSelectedField: null });
+        }
+      },
+
+      addToGroup: (groupId, objectIds) => {
+        const state = get();
+        if (state.isLocked) return;
+        const group = state.groups.find((g) => g.id === groupId);
+        if (!group || group.locked || objectIds.length === 0) return;
+
+        const targetIdSet = new Set(objectIds);
+        const validObjects = state.objects.filter(
+          (o) => targetIdSet.has(o.id) && o.type !== "connector",
+        );
+        if (validObjects.length === 0) return;
+
+        const nextObjects = state.objects.map((obj) =>
+          targetIdSet.has(obj.id) ? { ...obj, groupId } : obj,
+        );
+
+        // Recalculate group bounds to enclose all members + padding (min 24)
+        const allMembers = nextObjects.filter((o) => o.groupId === groupId);
+        const padding = 24;
+
+        let minX = group.customBounds ? group.customBounds.x : Infinity;
+        let minY = group.customBounds ? group.customBounds.y : Infinity;
+        let maxX = group.customBounds
+          ? group.customBounds.x + group.customBounds.width
+          : -Infinity;
+        let maxY = group.customBounds
+          ? group.customBounds.y + group.customBounds.height
+          : -Infinity;
+
+        for (const obj of allMembers) {
+          minX = Math.min(minX, obj.x - padding);
+          minY = Math.min(minY, obj.y - padding);
+          maxX = Math.max(maxX, obj.x + obj.width + padding);
+          maxY = Math.max(maxY, obj.y + obj.height + padding);
+        }
+
+        const nextCustomBounds = {
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+        };
+
+        const nextGroups = state.groups.map((g) =>
+          g.id === groupId ? { ...g, customBounds: nextCustomBounds } : g,
+        );
+
+        set({
+          groups: nextGroups,
+          objects: nextObjects,
+        });
+      },
+
+      removeFromGroup: (objectIds) => {
+        const state = get();
+        if (state.isLocked || objectIds.length === 0) return;
+
+        const targetIdSet = new Set(objectIds);
+        const affectedGroupIds = new Set<string>();
+
+        for (const obj of state.objects) {
+          if (targetIdSet.has(obj.id) && obj.groupId) {
+            affectedGroupIds.add(obj.groupId);
+          }
+        }
+        if (affectedGroupIds.size === 0) return;
+
+        const nextObjects = state.objects.map((obj) =>
+          targetIdSet.has(obj.id) ? { ...obj, groupId: undefined } : obj,
+        );
+
+        const padding = 24;
+        const remainingGroups = state.groups
+          .filter((g) => {
+            if (!affectedGroupIds.has(g.id)) return true;
+            return nextObjects.some((o) => o.groupId === g.id);
+          })
+          .map((g) => {
+            if (!affectedGroupIds.has(g.id)) return g;
+            const members = nextObjects.filter((o) => o.groupId === g.id);
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            for (const m of members) {
+              minX = Math.min(minX, m.x - padding);
+              minY = Math.min(minY, m.y - padding);
+              maxX = Math.max(maxX, m.x + m.width + padding);
+              maxY = Math.max(maxY, m.y + m.height + padding);
+            }
+            return {
+              ...g,
+              customBounds: {
+                x: minX,
+                y: minY,
+                width: maxX - minX,
+                height: maxY - minY,
+              },
+            };
+          });
+
+        set({
+          groups: remainingGroups,
+          objects: nextObjects,
+        });
       },
 
       groupObjects: (objectIds, name) => {
         const state = get();
         if (state.isLocked) return;
-        const targetIds =
-          objectIds && objectIds.length > 0
-            ? objectIds
-            : state.selectedIds.filter((id) => !id.startsWith("__group:"));
 
+        const rawIds =
+          objectIds && objectIds.length > 0 ? objectIds : state.selectedIds;
+
+        // 1. Identify any explicitly selected groups (__group:...)
+        const explicitGroupIds = new Set<string>();
+        // 2. Identify candidate object IDs
+        const candidateObjectIds: string[] = [];
+
+        for (const id of rawIds) {
+          if (id.startsWith("__group:")) {
+            const gid = id.replace("__group:", "");
+            if (state.groups.some((g) => g.id === gid)) {
+              explicitGroupIds.add(gid);
+            }
+          } else {
+            const obj = state.objects.find((o) => o.id === id);
+            if (obj && obj.type !== "connector") {
+              candidateObjectIds.push(obj.id);
+            }
+          }
+        }
+
+        // Check if there is an existing target group to add to
+        let targetGroupId: string | undefined;
+
+        if (explicitGroupIds.size === 1) {
+          // Explicit group selected along with cards
+          targetGroupId = Array.from(explicitGroupIds)[0];
+        } else if (explicitGroupIds.size === 0 && candidateObjectIds.length > 0) {
+          // Check if exactly one existing group is represented among the candidate objects
+          const memberGroupIds = new Set<string>();
+          for (const id of candidateObjectIds) {
+            const obj = state.objects.find((o) => o.id === id);
+            if (obj?.groupId && state.groups.some((g) => g.id === obj.groupId)) {
+              memberGroupIds.add(obj.groupId);
+            }
+          }
+          if (memberGroupIds.size === 1) {
+            targetGroupId = Array.from(memberGroupIds)[0];
+          }
+        }
+
+        // If a target group is found and not overridden by an explicit new group name
+        if (targetGroupId && !name) {
+          const unassignedIds = candidateObjectIds.filter(
+            (id) =>
+              state.objects.find((o) => o.id === id)?.groupId !== targetGroupId,
+          );
+          if (unassignedIds.length > 0) {
+            get().addToGroup(targetGroupId, unassignedIds);
+            set({ selectedIds: [`__group:${targetGroupId}`] });
+            return targetGroupId;
+          }
+        }
+
+        // Otherwise create a new group from candidate objects
         const targetObjects = state.objects.filter(
-          (o) => targetIds.includes(o.id) && o.type !== "connector",
+          (o) => candidateObjectIds.includes(o.id) && o.type !== "connector",
         );
         if (targetObjects.length === 0) return;
 

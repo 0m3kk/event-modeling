@@ -162,13 +162,15 @@ export interface CanvasStoreActions {
   deleteGroup: (id: string) => void;
   groupObjects: (objectIds?: string[], name?: string) => string | undefined;
   ungroupObjects: (targetIds?: string[]) => void;
+  addToGroup: (groupId: string, objectIds: string[]) => void;
+  removeFromGroup: (objectIds: string[]) => void;
   moveGroupObjects: (
     groupId: string,
     dx: number,
     dy: number,
     snapToGrid?: boolean,
   ) => void;
-  selectGroup: (groupId: string) => void;
+  selectGroup: (groupId: string, multi?: boolean) => void;
 
   // Lock & Canvas settings
   setLocked: (locked: boolean) => void;

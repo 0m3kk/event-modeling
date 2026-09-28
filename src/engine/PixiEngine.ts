@@ -732,8 +732,15 @@ export class PixiEngine {
         this.lastGroupClickTime = now;
         this.lastGroupClickId = hitGroup.group.id;
 
-        // Select and prepare to drag the group
-        state.selectGroup(hitGroup.group.id);
+        const isMulti = e.shiftKey || e.metaKey || e.ctrlKey;
+        const gid = `__group:${hitGroup.group.id}`;
+        const wasSelected = state.selectedIds.includes(gid);
+        state.selectGroup(hitGroup.group.id, isMulti);
+        if (isMulti && wasSelected) {
+          return;
+        }
+
+        // Prepare to drag the group
         this.isDraggingGroup = true;
         this.draggedGroupId = hitGroup.group.id;
         this.dragStartWorld = { x: worldPos.x, y: worldPos.y };

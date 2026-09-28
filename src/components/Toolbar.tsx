@@ -87,6 +87,27 @@ function ToolButton({
 export function Toolbar() {
   const currentTool = useCanvasStore((state) => state.tool);
   const setTool = useCanvasStore((state) => state.setTool);
+  const selectedIds = useCanvasStore((state) => state.selectedIds);
+  const objects = useCanvasStore((state) => state.objects);
+  const groups = useCanvasStore((state) => state.groups);
+
+  const groupTooltip = React.useMemo(() => {
+    const explicitGroup = selectedIds.some((id) => id.startsWith("__group:"));
+    const memberGroup = selectedIds.some((id) => {
+      const obj = objects.find((o) => o.id === id);
+      return obj?.groupId && groups.some((g) => g.id === obj.groupId);
+    });
+    const hasUnassigned = selectedIds.some((id) => {
+      if (id.startsWith("__group:")) return false;
+      const obj = objects.find((o) => o.id === id);
+      return obj && !obj.groupId;
+    });
+
+    if ((explicitGroup || memberGroup) && hasUnassigned) {
+      return "Add to Group (Cmd+G)";
+    }
+    return "Group (Cmd+G)";
+  }, [selectedIds, objects, groups]);
 
   // Add specific Storm Card
   //
@@ -314,7 +335,7 @@ export function Toolbar() {
         <ToolButton
           onClick={() => useCanvasStore.getState().groupObjects()}
           icon={<FolderPlus size={20} />}
-          tooltip="Group (Cmd+G)"
+          tooltip={groupTooltip}
           color="#6366f1"
         />
       </div>
