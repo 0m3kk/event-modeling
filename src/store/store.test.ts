@@ -814,5 +814,136 @@ describe("useCanvasStore", () => {
     useCanvasStore.getState().clearModelPopups();
     expect(useCanvasStore.getState().modelPopupChain).toHaveLength(0);
   });
+
+  it("expands and shrinks a group's bounds when a member moves (moveObjects)", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 300,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2]);
+    const gid = useCanvasStore.getState().groupObjects(["c1", "c2"], "G")!;
+
+    // Content spans x 100..400 with 24 padding on each side.
+    expect(useCanvasStore.getState().groups[0].customBounds).toEqual({
+      x: 76,
+      y: 76,
+      width: 400 - 100 + 48,
+      height: 200 - 100 + 48,
+    });
+
+    // Drag a member far to the right -> boundary grows to keep enclosing it.
+    useCanvasStore.getState().moveObjects(["c2"], 300, 0, false);
+    let group = useCanvasStore.getState().groups.find((g) => g.id === gid)!;
+    expect(group.customBounds?.x).toBe(76);
+    expect(group.customBounds?.width).toBe(700 - 100 + 48);
+
+    // Drag it back inward -> boundary shrinks again.
+    useCanvasStore.getState().moveObjects(["c2"], -300, 0, false);
+    group = useCanvasStore.getState().groups.find((g) => g.id === gid)!;
+    expect(group.customBounds?.width).toBe(400 - 100 + 48);
+  });
+
+  it("updates group bounds when a member is dragged via updateObjects", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 300,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2]);
+    const gid = useCanvasStore.getState().groupObjects(["c1", "c2"], "G")!;
+
+    // Dragging c1 up/left to (0, 50) must grow the boundary upward and leftward.
+    useCanvasStore.getState().updateObjects([
+      { id: "c1", patch: { x: 0, y: 50 } },
+    ]);
+
+    const group = useCanvasStore.getState().groups.find((g) => g.id === gid)!;
+    expect(group.customBounds).toEqual({
+      x: 0 - 24,
+      y: 50 - 24,
+      width: 400 - 0 + 48,
+      height: 200 - 50 + 48,
+    });
+  });
+
+  it("recomputes nested child and parent bounds when a nested member moves", () => {
+    useCanvasStore.getState().addObjects([
+      {
+        id: "pc",
+        type: "storm",
+        x: 50,
+        y: 50,
+        width: 100,
+        height: 100,
+        groupId: "parent-g",
+      },
+      {
+        id: "cc",
+        type: "storm",
+        x: 200,
+        y: 200,
+        width: 100,
+        height: 100,
+        groupId: "child-g",
+      },
+    ]);
+    useCanvasStore.getState().setGroups([
+      {
+        id: "parent-g",
+        name: "Parent",
+        customBounds: { x: 26, y: 26, width: 422, height: 322 },
+      },
+      {
+        id: "child-g",
+        name: "Child",
+        parentId: "parent-g",
+        customBounds: { x: 176, y: 176, width: 148, height: 148 },
+      },
+    ]);
+
+    // Move the child's member right by 100 -> child grows, parent follows.
+    useCanvasStore.getState().moveObjects(["cc"], 100, 0, false);
+
+    const state = useCanvasStore.getState();
+    const child = state.groups.find((g) => g.id === "child-g")!;
+    const parent = state.groups.find((g) => g.id === "parent-g")!;
+
+    expect(child.customBounds).toEqual({
+      x: 300 - 24,
+      y: 200 - 24,
+      width: 100 + 48,
+      height: 100 + 48,
+    });
+    // Parent encloses its member (50..150) and the child (276..424).
+    expect(parent.customBounds).toEqual({
+      x: 50 - 24,
+      y: 50 - 24,
+      width: 424 - 50 + 48,
+      height: 324 - 50 + 48,
+    });
+  });
 });
 

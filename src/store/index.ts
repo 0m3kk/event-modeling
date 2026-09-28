@@ -8,6 +8,7 @@ import { buildFieldClipboard, canPasteFields } from "@/utils/fieldClipboard";
 import { alignObjects, distributeObjects } from "@/utils/align";
 import { componentNameOf, ensureUniqueComponentName } from "@/utils/naming";
 import { arrangeStormLanes, type StormLaneCard } from "@/utils/stormLayout";
+import { recomputeGroupBoundsForObjects } from "@/utils/groupBounds";
 import {
   computeStormCardHeight,
   computeModelNodeHeight,
@@ -35,6 +36,16 @@ import {
   runAgent,
   storeAISettings,
 } from "@/ai";
+
+/** True when a patch changes an object's placement or size. */
+function patchTouchesGeometry(patch: Partial<CanvasObject>): boolean {
+  return (
+    patch.x !== undefined ||
+    patch.y !== undefined ||
+    patch.width !== undefined ||
+    patch.height !== undefined
+  );
+}
 
 export const initialCanvasState: CanvasStoreState = {
   projectName: "Untitled",
@@ -171,6 +182,7 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       updateObject: (id, patch) => {
+        const touchesGeometry = patchTouchesGeometry(patch);
         set((state) => {
           let found = false;
           const patched = state.objects.map((obj) => {
@@ -201,7 +213,13 @@ export const useCanvasStore = create<CanvasStore>()(
           if (!found) return {};
           // Propagate synced fields (content/style/size) to linked reference
           // copies inside the same set() so undo reverts the whole thing.
-          return { objects: syncReferenceAfterChange(patched, id) };
+          const objects = syncReferenceAfterChange(patched, id);
+          if (!touchesGeometry) return { objects };
+          // Keep group boundaries enclosing their members as they resize.
+          return {
+            objects,
+            groups: recomputeGroupBoundsForObjects(objects, state.groups, [id]),
+          };
         });
       },
 
@@ -216,6 +234,9 @@ export const useCanvasStore = create<CanvasStore>()(
         const syncIds = updates
           .filter((u) => touchesSyncedReferenceField(u.patch))
           .map((u) => u.id);
+        const geometryIds = updates
+          .filter((u) => patchTouchesGeometry(u.patch))
+          .map((u) => u.id);
         if (!touchesNames) {
           const patchMap = new Map(updates.map((u) => [u.id, u.patch]));
           set((state) => {
@@ -227,7 +248,16 @@ export const useCanvasStore = create<CanvasStore>()(
             for (const id of syncIds) {
               objects = syncReferenceSet(objects, id) ?? objects;
             }
-            return { objects };
+            if (geometryIds.length === 0) return { objects };
+            // Keep group boundaries enclosing their members while dragging.
+            return {
+              objects,
+              groups: recomputeGroupBoundsForObjects(
+                objects,
+                state.groups,
+                geometryIds,
+              ),
+            };
           });
           return;
         }
@@ -252,7 +282,16 @@ export const useCanvasStore = create<CanvasStore>()(
           for (const id of syncIds) {
             objects = syncReferenceSet(objects, id) ?? objects;
           }
-          return objects === state.objects ? {} : { objects };
+          if (objects === state.objects) return {};
+          if (geometryIds.length === 0) return { objects };
+          return {
+            objects,
+            groups: recomputeGroupBoundsForObjects(
+              objects,
+              state.groups,
+              geometryIds,
+            ),
+          };
         });
       },
 
@@ -347,8 +386,8 @@ export const useCanvasStore = create<CanvasStore>()(
       moveObjects: (ids, dx, dy, snapToGrid = false) => {
         if (ids.length === 0 || (!snapToGrid && dx === 0 && dy === 0)) return;
         const idSet = new Set(ids);
-        set((state) => ({
-          objects: state.objects.map((obj) => {
+        set((state) => {
+          const objects = state.objects.map((obj) => {
             if (!idSet.has(obj.id) || obj.locked) return obj;
             let nextX = obj.x + dx;
             let nextY = obj.y + dy;
@@ -361,8 +400,17 @@ export const useCanvasStore = create<CanvasStore>()(
               x: nextX,
               y: nextY,
             };
-          }),
-        }));
+          });
+          return {
+            objects,
+            // Keep group boundaries enclosing their members as they move.
+            groups: recomputeGroupBoundsForObjects(
+              objects,
+              state.groups,
+              idSet,
+            ),
+          };
+        });
       },
 
       setViewport: (viewportPatch) => {
