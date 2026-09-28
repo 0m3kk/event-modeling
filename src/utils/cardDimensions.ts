@@ -44,11 +44,48 @@ export function computeStormQueryItemHeight(
 }
 
 /**
+ * Computes how many lines a constraint free-text rule requires based on card width.
+ */
+export function computeStormConstraintItemLines(
+  text: string,
+  cardWidth: number = 200,
+): number {
+  const textX = 22;
+  const wrapWidth = Math.max(40, cardWidth - textX - 10);
+  const charsPerLine = Math.max(10, Math.floor(wrapWidth / 6.0));
+  const rawText = text || "";
+  const displayText = rawText.startsWith("•")
+    ? rawText.replace(/^•\s*/, "")
+    : rawText;
+  const rawLines = displayText.split("\n");
+  let totalLines = 0;
+  for (let i = 0; i < rawLines.length; i++) {
+    const lineLen = rawLines[i].length;
+    totalLines += Math.max(1, Math.ceil(lineLen / charsPerLine));
+  }
+  return Math.max(1, totalLines);
+}
+
+/**
+ * Calculates the exact pixel height for a constraint rule row based on card width.
+ */
+export function computeStormConstraintItemHeight(
+  text: string,
+  cardWidth: number = 200,
+): number {
+  const lines = computeStormConstraintItemLines(text, cardWidth);
+  return Math.max(26, lines * 14 + 12);
+}
+
+/**
  * Calculates the exact pixel height required to display all fields,
  * query items, constraints, and section headers of a Storm card. The
  * authorization action is a header badge, so it adds no height.
  */
-export function computeStormCardHeight(data: StormData): number {
+export function computeStormCardHeight(
+  data: StormData,
+  cardWidth: number = 200,
+): number {
   const kind = data.kind;
   const headerHeight = 36;
   let h = headerHeight + 6;
@@ -85,7 +122,11 @@ export function computeStormCardHeight(data: StormData): number {
   }
 
   if (kind === "constraint" && constraints.length > 0) {
-    h += sectionLabelHeight + constraints.length * rowHeight;
+    let constraintsTotalHeight = 0;
+    for (const c of constraints) {
+      constraintsTotalHeight += computeStormConstraintItemHeight(c.text, cardWidth);
+    }
+    h += sectionLabelHeight + constraintsTotalHeight;
   }
 
   h += 10; // bottom padding
@@ -147,7 +188,7 @@ export function getCardMinDimensions(obj: CanvasObject): {
   if (obj.type === "storm" && obj.stormData) {
     return {
       minWidth: MIN_CARD_WIDTH.storm,
-      minHeight: computeStormCardHeight(obj.stormData),
+      minHeight: computeStormCardHeight(obj.stormData, obj.width),
     };
   }
   if (obj.type === "model" && obj.modelData) {

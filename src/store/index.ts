@@ -220,10 +220,13 @@ export const useCanvasStore = create<CanvasStore>()(
             if (
               updated.type === "storm" &&
               updated.stormData &&
-              patch.stormData &&
+              (patch.stormData || patch.width !== undefined) &&
               !patch.height
             ) {
-              updated.height = computeStormCardHeight(updated.stormData);
+              updated.height = computeStormCardHeight(
+                updated.stormData,
+                updated.width,
+              );
             } else if (
               updated.type === "model" &&
               updated.modelData &&
@@ -963,7 +966,7 @@ export const useCanvasStore = create<CanvasStore>()(
             constraints: nextConstraints,
           };
 
-          const newHeight = computeStormCardHeight(nextData);
+          const newHeight = computeStormCardHeight(nextData, obj.width);
           set({
             objects: syncReferenceAfterChange(
               state.objects.map((o) =>
@@ -1103,7 +1106,7 @@ export const useCanvasStore = create<CanvasStore>()(
             ...data.fields.slice(at),
           ];
           const nextData = { ...data, fields: nextFields };
-          const newHeight = computeStormCardHeight(nextData);
+          const newHeight = computeStormCardHeight(nextData, obj.width);
           set({
             objects: syncReferenceAfterChange(
               objects.map((o) =>
@@ -1138,7 +1141,7 @@ export const useCanvasStore = create<CanvasStore>()(
             newField,
           ];
           const nextData = { ...obj.stormData, responseFields: nextResponse };
-          const newHeight = computeStormCardHeight(nextData);
+          const newHeight = computeStormCardHeight(nextData, obj.width);
           set({
             objects: syncReferenceAfterChange(
               objects.map((o) =>
@@ -1156,7 +1159,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
         const nextFields = [...obj.stormData.fields, newField];
         const nextData = { ...obj.stormData, fields: nextFields };
-        const newHeight = computeStormCardHeight(nextData);
+        const newHeight = computeStormCardHeight(nextData, obj.width);
         set({
           objects: syncReferenceAfterChange(
             objects.map((o) =>
@@ -1186,7 +1189,7 @@ export const useCanvasStore = create<CanvasStore>()(
         const newItem = { id: newId, types: [], tagFieldIds: [] };
         const nextQueryItems = [...(obj.stormData.queryItems ?? []), newItem];
         const nextData = { ...obj.stormData, queryItems: nextQueryItems };
-        const newHeight = computeStormCardHeight(nextData);
+        const newHeight = computeStormCardHeight(nextData, obj.width);
         set({
           objects: syncReferenceAfterChange(
             objects.map((o) =>
@@ -1218,7 +1221,7 @@ export const useCanvasStore = create<CanvasStore>()(
           newConstraint,
         ];
         const nextData = { ...obj.stormData, constraints: nextConstraints };
-        const newHeight = computeStormCardHeight(nextData);
+        const newHeight = computeStormCardHeight(nextData, obj.width);
         set({
           objects: syncReferenceAfterChange(
             objects.map((o) =>

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   computeStormCardHeight,
+  computeStormConstraintItemLines,
+  computeStormConstraintItemHeight,
   computeModelNodeHeight,
   calculateResizedBounds,
   getCardMinDimensions,
@@ -132,6 +134,42 @@ describe("cardDimensions", () => {
     const h = computeStormCardHeight(base);
     // header (36+6) + fields (1*26) + query label (22) + query item (70) + bottom padding (10)
     expect(h).toBe(42 + 26 + 22 + expectedQueryHeight + 10);
+  });
+
+  it("calculates constraint lines and height based on text and card width", () => {
+    const shortText = "total > 0";
+    expect(computeStormConstraintItemLines(shortText, 200)).toBe(1);
+    expect(computeStormConstraintItemHeight(shortText, 200)).toBe(26);
+
+    const longText =
+      "Total amount must be greater than zero and customer account must be in verified status before placing order";
+    // At width 200, available wrapWidth is 180 (30 chars/line) -> ~106 chars takes 4 lines
+    const linesNarrow = computeStormConstraintItemLines(longText, 200);
+    expect(linesNarrow).toBeGreaterThan(1);
+    const heightNarrow = computeStormConstraintItemHeight(longText, 200);
+    expect(heightNarrow).toBe(linesNarrow * 14 + 12);
+
+    // At wider card width (e.g. 800), lines count decreases
+    const linesWide = computeStormConstraintItemLines(longText, 800);
+    expect(linesWide).toBeLessThan(linesNarrow);
+    expect(computeStormConstraintItemHeight(longText, 800)).toBeLessThan(heightNarrow);
+  });
+
+  it("expands constraint card height vertically when free text wraps based on card width", () => {
+    const base: StormData = {
+      kind: "constraint",
+      name: "OrderConstraints",
+      fields: [],
+      constraints: [
+        {
+          id: "c1",
+          text: "Total amount must be greater than zero and customer account must be in verified status before placing order",
+        },
+      ],
+    };
+    const hNarrow = computeStormCardHeight(base, 200);
+    const hWide = computeStormCardHeight(base, 800);
+    expect(hNarrow).toBeGreaterThan(hWide);
   });
 
   it("expands model node height as fields are added", () => {

@@ -22,7 +22,10 @@ import {
   drawFieldTypePill,
 } from "./fieldTypePill";
 import { resolveTargetModel } from "@/utils/modelResolution";
-import { computeStormQueryItemHeight } from "@/utils/cardDimensions";
+import {
+  computeStormQueryItemHeight,
+  computeStormConstraintItemLines,
+} from "@/utils/cardDimensions";
 
 function truncateText(str: string, maxLen: number): string {
   if (!str) return "";
@@ -602,21 +605,17 @@ export class StormCardRenderer {
       container.addChild(cLabel);
       renderY += sectionLabelHeight;
 
-      const maxConstraintChars = Math.max(10, Math.floor((w - 30) / 6.0));
+      const textX = 22;
+      const wrapWidth = Math.max(40, w - textX - 10);
       for (const c of constraints) {
         const rowY = renderY;
+        const rawText = c.text || "";
+        const displayText = rawText.startsWith("•")
+          ? rawText.replace(/^•\s*/, "")
+          : rawText;
 
-        // Draw selection highlight for this row
-        if (selectedFieldId && c.id === selectedFieldId) {
-          g.roundRect(4, rowY + 1, w - 8, rowHeight - 2, 4).fill({
-            color: 0xdbeafe,
-          });
-        }
-
-        const displayConstraint = truncateText(c.text, maxConstraintChars);
-
-        const cText = new Text({
-          text: `• ${displayConstraint}`,
+        const bullet = new Text({
+          text: "•",
           style: {
             fontSize: 10,
             fontFamily: APP_FONT_FAMILY,
@@ -624,18 +623,56 @@ export class StormCardRenderer {
           },
           resolution: textResolution,
         });
-        cText.x = 10;
+        bullet.x = 10;
+        bullet.y = rowY + 5;
+
+        const cText = new Text({
+          text: displayText,
+          style: {
+            fontSize: 10,
+            fontFamily: APP_FONT_FAMILY,
+            fill: 0x134e4a,
+            wordWrap: true,
+            wordWrapWidth: wrapWidth,
+            lineHeight: 14,
+            breakWords: true,
+          },
+          resolution: textResolution,
+        });
+
+        const textHeight =
+          typeof document !== "undefined"
+            ? (() => {
+                try {
+                  return cText.height || 14;
+                } catch {
+                  return computeStormConstraintItemLines(displayText, w) * 14;
+                }
+              })()
+            : computeStormConstraintItemLines(displayText, w) * 14;
+
+        const itemHeight = Math.max(rowHeight, Math.ceil(textHeight) + 12);
+
+        // Draw selection highlight for this row
+        if (selectedFieldId && c.id === selectedFieldId) {
+          g.roundRect(4, rowY + 1, w - 8, itemHeight - 2, 4).fill({
+            color: 0xdbeafe,
+          });
+        }
+
+        cText.x = textX;
         cText.y = rowY + 5;
+        container.addChild(bullet);
         container.addChild(cText);
 
         hitZones.push({
           type: "constraint",
-          bounds: { x: 0, y: rowY, width: w, height: rowHeight },
+          bounds: { x: 0, y: rowY, width: w, height: itemHeight },
           constraintId: c.id,
           currentText: c.text,
         });
 
-        renderY += rowHeight;
+        renderY += itemHeight;
       }
     }
 

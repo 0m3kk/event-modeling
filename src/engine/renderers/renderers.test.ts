@@ -239,6 +239,50 @@ describe("Pixi Card Renderers", () => {
     const cZone = res.hitZones.find((z) => z.type === "constraint");
     expect(cZone).toBeDefined();
     expect(cZone?.currentText).toBe("Total amount must be greater than zero");
+
+    // Verify Pixi Text was configured with wordWrap according to node width
+    const cTextChild = container.children.find(
+      (c) => (c as Text).text === "Total amount must be greater than zero",
+    ) as Text | undefined;
+    expect(cTextChild).toBeDefined();
+    expect(cTextChild?.style.wordWrap).toBe(true);
+    expect(cTextChild?.style.wordWrapWidth).toBe(240 - 22 - 10);
+
+    const bulletChild = container.children.find(
+      (c) => (c as Text).text === "•",
+    ) as Text | undefined;
+    expect(bulletChild).toBeDefined();
+  });
+
+  it("renders constraint card with wrapped text and expanded height for long rules", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "c-long",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+      stormData: {
+        kind: "constraint",
+        name: "OrderConstraints",
+        fields: [],
+        constraints: [
+          {
+            id: "c1",
+            text: "Total amount must be greater than zero and customer account must be in verified status before placing order",
+          },
+        ],
+      },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+    const cZone = res.hitZones.find((z) => z.type === "constraint");
+    expect(cZone).toBeDefined();
+    // The hit zone height should be taller than single-row height (26)
+    expect(cZone!.bounds.height).toBeGreaterThan(26);
+    // Card height should accommodate the wrapped text
+    expect(res.height).toBeGreaterThan(100);
   });
 
   it("renders Storm actor card with permissions", () => {

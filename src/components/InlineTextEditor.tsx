@@ -51,6 +51,7 @@ export function InlineTextEditor() {
 
   const isMultiLine =
     zone.type === "stickyText" ||
+    zone.type === "constraint" ||
     (zone.type === "textBoxText" && value.includes("\n"));
 
   const commit = () => {
@@ -109,7 +110,7 @@ export function InlineTextEditor() {
           onKeyDown={handleKeyDown}
           className="h-full w-full resize-none rounded border border-blue-500 bg-white/95 p-1.5 font-mono text-xs text-gray-900 shadow-md outline-none focus:ring-1 focus:ring-blue-500"
           style={{
-            fontSize: `${Math.max(11, 13 * zoom)}px`,
+            fontSize: `${Math.max(10, (zone.type === "constraint" ? 10 : 13) * zoom)}px`,
             lineHeight: "1.3",
           }}
         />

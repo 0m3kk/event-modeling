@@ -95,7 +95,7 @@ export function ModelOptionsBar() {
         (kind === "enum" && data.values?.some((v) => v.id === sf.fieldId))),
   );
 
-  const selectedModelRow = useMemo(() => {
+  const selectedModelRow = (() => {
     if (!isRowSelected || !sf?.fieldId) return null;
     if (kind === "object") {
       return data.fields?.find((f) => f.id === sf.fieldId) ?? null;
@@ -104,7 +104,7 @@ export function ModelOptionsBar() {
       return data.values?.find((v) => v.id === sf.fieldId) ?? null;
     }
     return null;
-  }, [isRowSelected, sf, kind, data.fields, data.values]);
+  })();
 
   const currentDescription =
     isRowSelected && sf?.fieldId
