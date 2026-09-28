@@ -110,7 +110,6 @@ jobs:
           name: event-modeling-macos-${{ matrix.arch }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
-            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
           if-no-files-found: warn
           retention-days: 14
 

@@ -341,7 +341,7 @@ function SingleModelPopupCard({
                           className="flex items-center gap-1 rounded border border-blue-200 bg-blue-50/90 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors shadow-xs"
                           title={`Click to preview model ${field.fieldType}`}
                         >
-                          <span className="truncate max-w-[90px]">
+                          <span className="truncate max-w-22.5">
                             {field.fieldType}
                           </span>
                           <ChevronRight className="h-3 w-3 shrink-0 text-blue-500" />

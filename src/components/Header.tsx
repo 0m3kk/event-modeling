@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Undo2,
   Redo2,
@@ -125,7 +125,7 @@ export function Header() {
     clearHistory();
   };
 
-  const handleSaveFile = () => {
+  const handleSaveFile = useCallback(() => {
     setIsFileMenuOpen(false);
     const saveName =
       (isEditingTitle ? titleInput : projectName).trim() || "Untitled";
@@ -141,7 +141,7 @@ export function Header() {
       name: saveName,
     });
     downloadStormFile(JSON.parse(serialized), saveName);
-  };
+  }, [isEditingTitle, titleInput, projectName, objects, groups, viewport, setProjectName]);
 
   // Keyboard shortcut Cmd+S / Ctrl+S to save
   useEffect(() => {
@@ -154,7 +154,7 @@ export function Header() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [projectName, objects, groups, viewport]);
+  }, [handleSaveFile]);
 
   const handleOpenFileClick = () => {
     setIsFileMenuOpen(false);
@@ -243,7 +243,7 @@ export function Header() {
                     setIsEditingTitle(false);
                   }
                 }}
-                className="h-7 max-w-[200px] sm:max-w-[280px] md:max-w-[360px] rounded px-1.5 text-sm font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 border border-blue-500 transition-colors"
+                className="h-7 max-w-50 sm:max-w-70 md:max-w-90 rounded px-1.5 text-sm font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 border border-blue-500 transition-colors"
                 title="Project name"
                 placeholder="Untitled"
               />
@@ -254,7 +254,7 @@ export function Header() {
                 className="group flex items-center gap-1.5 h-7 rounded px-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer text-left shrink-0"
                 title="Click to rename project"
               >
-                <span className="truncate max-w-[200px] sm:max-w-[280px] md:max-w-[360px]">
+                <span className="truncate max-w-50 sm:max-w-70 md:max-w-90">
                   {projectName || "Untitled"}
                 </span>
                 <Pencil
