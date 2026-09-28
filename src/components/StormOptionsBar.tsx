@@ -8,10 +8,12 @@ import {
   stormHasAction,
   stormHasPhase,
   stormHasQueryItems,
+  stormHasTags,
 } from "@/constants/storm";
 import { ActionPopover } from "./ActionPopover";
 import { DescriptionPopover } from "./DescriptionPopover";
 import { PermissionsPopover } from "./PermissionsPopover";
+import { TagPopover } from "./TagPopover";
 import {
   Shield,
   Trash2,
@@ -21,6 +23,7 @@ import {
   Ban,
   Info,
   Link2,
+  Tag,
 } from "lucide-react";
 
 export function StormOptionsBar() {
@@ -34,10 +37,12 @@ export function StormOptionsBar() {
   const addStormConstraint = useCanvasStore((s) => s.addStormConstraint);
   const createReferenceCopy = useCanvasStore((s) => s.createReferenceCopy);
   const isLocked = useCanvasStore((s) => s.isLocked);
+  const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
 
   const [showActionPopover, setShowActionPopover] = useState(false);
   const [showDescriptionPopover, setShowDescriptionPopover] = useState(false);
   const [showPermissionsPopover, setShowPermissionsPopover] = useState(false);
+  const [showTagPopover, setShowTagPopover] = useState(false);
 
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const permissionsButtonRef = useRef<HTMLButtonElement>(null);
@@ -55,6 +60,22 @@ export function StormOptionsBar() {
   const kind = data.kind;
   const isArray = Boolean(data.isArray);
   const phase = data.phase;
+
+  const sf = stormSelectedField;
+  const selectedField =
+    sf && sf.objectId === selectedStorm.id && sf.fieldId
+      ? (data.fields.find((f) => f.id === sf.fieldId) ??
+        data.responseFields?.find((f) => f.id === sf.fieldId) ??
+        null)
+      : null;
+
+  const hasTagActive = Boolean(selectedField?.tag || showTagPopover);
+
+  const tagButtonTitle = selectedField
+    ? selectedField.tag
+      ? `Tag: "${selectedField.tag}" (${selectedField.name})`
+      : `Set Tag for "${selectedField.name}"`
+    : "Set Field Tag";
 
   // Calculate screen position
   const zoom = viewport.zoom;
@@ -191,6 +212,24 @@ export function StormOptionsBar() {
           <Info size={16} className="text-sky-600" />
         </button>
 
+        {/* Set Field Tag Button — only visible when a field is selected */}
+        {stormHasTags(kind) && Boolean(selectedField) && (
+          <button
+            onClick={() => setShowTagPopover((v) => !v)}
+            title={tagButtonTitle}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+              hasTagActive
+                ? "border border-orange-200 bg-orange-50 text-orange-700"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <Tag
+              size={16}
+              className={hasTagActive ? "text-orange-600" : "text-gray-600"}
+            />
+          </button>
+        )}
+
         {/* Permissions Button (Actor) */}
         {kind === "actor" && (
           <button
@@ -291,6 +330,15 @@ export function StormOptionsBar() {
         <PermissionsPopover
           actor={selectedStorm}
           onClose={() => setShowPermissionsPopover(false)}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 }}
+        />
+      )}
+
+      {/* Tag Popover */}
+      {showTagPopover && selectedField && (
+        <TagPopover
+          card={selectedStorm}
+          onClose={() => setShowTagPopover(false)}
           anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 }}
         />
       )}
