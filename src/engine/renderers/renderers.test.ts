@@ -590,4 +590,82 @@ describe("Pixi Card Renderers", () => {
 
     cardLayer.destroy();
   });
+
+  it("renders model field types with model kind color and styling", () => {
+    const addressModel: CanvasObject = {
+      id: "m-addr",
+      type: "model",
+      x: 300,
+      y: 0,
+      width: 240,
+      height: 120,
+      modelData: {
+        kind: "object",
+        name: "Address",
+        fields: [{ id: "f-street", name: "street", fieldType: "string" }],
+      },
+    };
+
+    const statusModel: CanvasObject = {
+      id: "m-status",
+      type: "model",
+      x: 600,
+      y: 0,
+      width: 240,
+      height: 120,
+      modelData: {
+        kind: "enum",
+        name: "OrderStatus",
+        values: [{ id: "v1", name: "PENDING" }, { id: "v2", name: "PAID" }],
+      },
+    };
+
+    const customerCard: CanvasObject = {
+      id: "card-cust",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 140,
+      stormData: {
+        kind: "command",
+        name: "PlaceOrder",
+        fields: [
+          { id: "f-addr", name: "shippingAddress", fieldType: "Address" },
+          { id: "f-status", name: "status", fieldType: "OrderStatus" },
+          { id: "f-note", name: "note", fieldType: "string" },
+        ],
+      },
+    };
+
+    const allObjects = [customerCard, addressModel, statusModel];
+    const container = new Container();
+    const res = StormCardRenderer.draw(container, customerCard, 1, false, undefined, allObjects);
+
+    const typeZones = res.hitZones.filter((z) => z.type === "fieldType");
+    expect(typeZones).toHaveLength(3);
+    expect(typeZones[0].currentText).toBe("Address");
+    expect(typeZones[1].currentText).toBe("OrderStatus");
+    expect(typeZones[2].currentText).toBe("string");
+
+    // The model type zone should be wider than the primitive type zone to accommodate the icon
+    expect(typeZones[0].bounds.width).toBeGreaterThanOrEqual(72);
+
+    // Find the text elements inside container
+    const textChildren = container.children.filter((c) => c instanceof Text) as Text[];
+    const addressText = textChildren.find((t) => t.text === "Address");
+    const statusText = textChildren.find((t) => t.text === "OrderStatus");
+    const noteText = textChildren.find((t) => t.text === "string");
+
+    expect(addressText).toBeDefined();
+    expect(statusText).toBeDefined();
+    expect(noteText).toBeDefined();
+
+    // Model type texts use bold/semibold font weight and model kind color
+    expect(addressText?.style.fontWeight).toBe("600");
+    expect(statusText?.style.fontWeight).toBe("600");
+    // Primitive type text uses normal weight and slate color (0x64748b)
+    expect(noteText?.style.fill).toBe(0x64748b);
+  });
 });
+

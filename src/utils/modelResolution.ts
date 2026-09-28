@@ -43,3 +43,43 @@ export function isModelType(
 ): boolean {
   return findModelByName(objects, typeName) !== null;
 }
+
+/**
+ * Builds a fast lookup map for models by lowercase trimmed name.
+ */
+export function buildModelMap(objects: CanvasObject[]): Map<string, CanvasObject> {
+  const map = new Map<string, CanvasObject>();
+  for (const o of objects) {
+    if (o.type === "model" && o.modelData) {
+      const name = (o.modelData.name || o.text || "").trim().toLowerCase();
+      if (name) {
+        map.set(name, o);
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * Resolves a model CanvasObject from either an array of CanvasObjects or a prebuilt Map.
+ */
+export function resolveTargetModel(
+  allObjectsOrMap?: CanvasObject[] | Map<string, CanvasObject>,
+  typeName?: string,
+): CanvasObject | null {
+  if (!allObjectsOrMap || !typeName) return null;
+  const base = getBaseModelType(typeName);
+  if (!base) return null;
+  const key = base.toLowerCase();
+  if (allObjectsOrMap instanceof Map) {
+    return allObjectsOrMap.get(key) || null;
+  }
+  return (
+    allObjectsOrMap.find((o) => {
+      if (o.type !== "model" || !o.modelData) return false;
+      const name = (o.modelData.name || o.text || "").trim().toLowerCase();
+      return name === key;
+    }) || null
+  );
+}
+

@@ -11,6 +11,7 @@ import {
   stormAccentColor,
 } from "@/constants/storm";
 import { MODEL_KIND_COLORS } from "@/constants/model";
+import { findModelByName } from "./modelResolution";
 
 export function escapeXml(str: string): string {
   if (!str) return "";
@@ -197,11 +198,21 @@ export function exportCanvasToSvg(
           : "";
         const nameX = f.tag ? x + Math.max(28, f.tag.length * 6 + 10) + 18 : x + 14;
 
+        const rawType = f.fieldType || "string";
+        const targetModel = findModelByName(objects, rawType);
+        const isModel = Boolean(targetModel && targetModel.modelData);
+        const targetKind = targetModel?.modelData?.kind;
+        const kindColor = targetKind ? (MODEL_KIND_COLORS[targetKind] || "#0891b2") : "#64748b";
+        const typePill = isModel
+          ? `<rect x="${x + w - Math.min(108, Math.max(72, rawType.length * 6.5 + 20)) - 10}" y="${rowY - 11}" width="${Math.min(108, Math.max(72, rawType.length * 6.5 + 20))}" height="17" rx="3" fill="${kindColor}18" stroke="${kindColor}60" stroke-width="0.8"/>
+             <text x="${x + w - 14}" y="${rowY + 2}" text-anchor="end" font-size="10" font-family="monospace" font-weight="600" fill="${kindColor}">${escapeXml(rawType)}</text>`
+          : `<text x="${x + w - 14}" y="${rowY + 2}" text-anchor="end" font-size="10" font-family="monospace" fill="#64748b">${escapeXml(rawType)}</text>`;
+
         fieldElements.push(`
         <g>
           ${tagPill}
           <text x="${nameX}" y="${rowY + 2}" font-size="11" font-family="sans-serif" font-weight="500" fill="#1e293b">${escapeXml(f.name)}${requiredMark}</text>
-          <text x="${x + w - 14}" y="${rowY + 2}" text-anchor="end" font-size="10" font-family="monospace" fill="#64748b">${escapeXml(f.fieldType || "string")}</text>
+          ${typePill}
         </g>`);
         rowY += 22;
       }
@@ -248,10 +259,20 @@ export function exportCanvasToSvg(
       if (model.kind === "object") {
         for (const f of model.fields ?? []) {
           const req = f.required ? `<tspan fill="#ef4444">*</tspan>` : "";
+          const rawType = f.fieldType || "string";
+          const targetModel = findModelByName(objects, rawType);
+          const isModel = Boolean(targetModel && targetModel.modelData);
+          const targetKind = targetModel?.modelData?.kind;
+          const kindColor = targetKind ? (MODEL_KIND_COLORS[targetKind] || "#0891b2") : "#64748b";
+          const typePill = isModel
+            ? `<rect x="${x + w - Math.min(108, Math.max(72, rawType.length * 6.5 + 20)) - 10}" y="${rowY - 11}" width="${Math.min(108, Math.max(72, rawType.length * 6.5 + 20))}" height="17" rx="3" fill="${kindColor}18" stroke="${kindColor}60" stroke-width="0.8"/>
+               <text x="${x + w - 14}" y="${rowY + 2}" text-anchor="end" font-size="10" font-family="monospace" font-weight="600" fill="${kindColor}">${escapeXml(rawType)}</text>`
+            : `<text x="${x + w - 14}" y="${rowY + 2}" text-anchor="end" font-size="10" font-family="monospace" fill="#64748b">${escapeXml(rawType)}</text>`;
+
           fieldElements.push(`
           <g>
             <text x="${x + 14}" y="${rowY + 2}" font-size="11" font-family="sans-serif" font-weight="500" fill="#1e293b">${escapeXml(f.name)}${req}</text>
-            <text x="${x + w - 14}" y="${rowY + 2}" text-anchor="end" font-size="10" font-family="monospace" fill="#64748b">${escapeXml(f.fieldType || "string")}</text>
+            ${typePill}
           </g>`);
           rowY += 22;
         }

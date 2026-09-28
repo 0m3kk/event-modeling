@@ -1,0 +1,217 @@
+import type { Container, Graphics } from "pixi.js";
+import { Text } from "pixi.js";
+import { APP_FONT_FAMILY } from "@/constants/canvas";
+import { MODEL_KIND_COLORS } from "@/constants/model";
+import type { CanvasObject, ModelNodeKind } from "@/types";
+
+export function truncateText(str: string, maxLen: number): string {
+  if (!str) return "";
+  if (maxLen <= 1) return str.slice(0, 1);
+  return str.length > maxLen ? str.slice(0, maxLen - 1) + "…" : str;
+}
+
+/**
+ * Returns numeric hex color for a given model kind.
+ */
+export function getModelKindHex(kind?: string): number {
+  if (!kind || !(kind in MODEL_KIND_COLORS)) return 0x0891b2;
+  const hex = MODEL_KIND_COLORS[kind as ModelNodeKind];
+  return parseInt(hex.replace("#", ""), 16);
+}
+
+/**
+ * Computes optimal width for the type pill on a field row.
+ * Adds extra width for model nodes to display the kind icon gracefully.
+ */
+export function computeTypeZoneWidth(rawType: string, isModel: boolean): number {
+  if (isModel) {
+    return Math.min(108, Math.max(72, rawType.length * 6.5 + 24));
+  }
+  return Math.min(88, Math.max(60, rawType.length * 6.5 + 14));
+}
+
+/**
+ * Draws a sharp, vector micro-icon representing the model kind (object, enum, array, wrap)
+ * inside a field type pill, centered at (cx, cy).
+ */
+export function drawFieldKindIcon(
+  g: Graphics,
+  kind: string,
+  cx: number,
+  cy: number,
+  color: number,
+): void {
+  switch (kind) {
+    case "object": {
+      // 3D Isometric Cube (approx 8.5x9 px)
+      const topY = cy - 4.5;
+      const botY = cy + 4.5;
+      const leftX = cx - 4.2;
+      const rightX = cx + 4.2;
+      const leftMidY = cy - 2.2;
+      const rightMidY = cy - 2.2;
+      const leftBotY = cy + 2.2;
+      const rightBotY = cy + 2.2;
+
+      g.poly([
+        cx, topY,
+        rightX, rightMidY,
+        rightX, rightBotY,
+        cx, botY,
+        leftX, leftBotY,
+        leftX, leftMidY,
+      ]).stroke({ color, width: 1.1, join: "round" });
+
+      g.moveTo(cx, cy).lineTo(cx, botY).stroke({ color, width: 1.1 });
+      g.moveTo(cx, cy).lineTo(leftX, leftMidY).stroke({ color, width: 1.1 });
+      g.moveTo(cx, cy).lineTo(rightX, rightMidY).stroke({ color, width: 1.1 });
+      break;
+    }
+
+    case "enum": {
+      // ListTree / bullet list
+      const y1 = cy - 3.5;
+      const y2 = cy;
+      const y3 = cy + 3.5;
+      const dotX = cx - 3.5;
+      const lineStartX = cx - 1;
+      const lineEndX = cx + 4.5;
+
+      g.circle(dotX, y1, 1).fill({ color });
+      g.moveTo(lineStartX, y1).lineTo(lineEndX, y1).stroke({ color, width: 1.1, cap: "round" });
+
+      g.circle(dotX, y2, 1).fill({ color });
+      g.moveTo(lineStartX, y2).lineTo(lineEndX, y2).stroke({ color, width: 1.1, cap: "round" });
+
+      g.circle(dotX, y3, 1).fill({ color });
+      g.moveTo(lineStartX, y3).lineTo(lineEndX, y3).stroke({ color, width: 1.1, cap: "round" });
+      break;
+    }
+
+    case "array": {
+      // Square Brackets [ ]
+      const topY = cy - 4;
+      const botY = cy + 4;
+
+      // Left bracket [
+      g.moveTo(cx - 1.2, topY)
+        .lineTo(cx - 3.8, topY)
+        .lineTo(cx - 3.8, botY)
+        .lineTo(cx - 1.2, botY)
+        .stroke({ color, width: 1.2, cap: "square" });
+
+      // Right bracket ]
+      g.moveTo(cx + 1.2, topY)
+        .lineTo(cx + 3.8, topY)
+        .lineTo(cx + 3.8, botY)
+        .lineTo(cx + 1.2, botY)
+        .stroke({ color, width: 1.2, cap: "square" });
+      break;
+    }
+
+    case "wrap": {
+      // Link2 / linked chain
+      g.moveTo(cx - 3.5, cy + 3.5)
+        .lineTo(cx - 1, cy + 1)
+        .stroke({ color, width: 1.3, cap: "round" });
+
+      g.moveTo(cx + 1, cy - 1)
+        .lineTo(cx + 3.5, cy - 3.5)
+        .stroke({ color, width: 1.3, cap: "round" });
+
+      g.moveTo(cx - 1.8, cy + 1.8)
+        .lineTo(cx + 1.8, cy - 1.8)
+        .stroke({ color, width: 1.3, cap: "round" });
+      break;
+    }
+  }
+}
+
+export interface DrawFieldTypePillOptions {
+  g: Graphics;
+  container: Container;
+  rawType: string;
+  x: number;
+  y: number;
+  w: number;
+  h?: number;
+  targetModel?: CanvasObject | null;
+  textResolution?: number;
+}
+
+/**
+ * Draws the field type badge on a card row.
+ * - Primitive types render as neutral slate pills.
+ * - Model types render with model kind tint, border, kind micro-icon, and kind-colored text.
+ */
+export function drawFieldTypePill(options: DrawFieldTypePillOptions): void {
+  const {
+    g,
+    container,
+    rawType,
+    x,
+    y,
+    w,
+    h = 20,
+    targetModel,
+    textResolution = 2,
+  } = options;
+
+  const isModel = Boolean(targetModel && targetModel.modelData);
+  const targetKind = targetModel?.modelData?.kind || "object";
+
+  if (isModel) {
+    const kindHex = getModelKindHex(targetKind);
+
+    // Pill background & border with model kind tint
+    g.roundRect(x, y, w, h, 3)
+      .fill({ color: kindHex, alpha: 0.12 })
+      .stroke({ color: kindHex, alpha: 0.45, width: 1 });
+
+    // Kind icon
+    const iconCX = x + 9;
+    const iconCY = y + h / 2;
+    drawFieldKindIcon(g, targetKind, iconCX, iconCY, kindHex);
+
+    // Text with kind color and semibold weight
+    const availableTextWidth = Math.max(16, w - 24);
+    const maxTypeChars = Math.max(3, Math.floor(availableTextWidth / 6.2));
+    const displayType = truncateText(rawType, maxTypeChars);
+
+    const typeText = new Text({
+      text: displayType,
+      style: {
+        fontSize: 10,
+        fontWeight: "600",
+        fontFamily: APP_FONT_FAMILY,
+        fill: kindHex,
+      },
+      resolution: textResolution,
+    });
+    typeText.x = x + 18;
+    typeText.y = y + 3;
+    container.addChild(typeText);
+  } else {
+    // Primitive type: neutral slate pill
+    g.roundRect(x, y, w, h, 3)
+      .fill({ color: 0xf8fafc })
+      .stroke({ color: 0xe2e8f0, width: 1 });
+
+    const availableTextWidth = Math.max(16, w - 12);
+    const maxTypeChars = Math.max(3, Math.floor(availableTextWidth / 6.2));
+    const displayType = truncateText(rawType, maxTypeChars);
+
+    const typeText = new Text({
+      text: displayType,
+      style: {
+        fontSize: 10,
+        fontFamily: APP_FONT_FAMILY,
+        fill: 0x64748b,
+      },
+      resolution: textResolution,
+    });
+    typeText.x = x + 6;
+    typeText.y = y + 3;
+    container.addChild(typeText);
+  }
+}

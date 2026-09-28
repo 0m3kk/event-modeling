@@ -17,6 +17,11 @@ import type { CardHitZone, RenderResult } from "./types";
 import { drawActionIcon, drawHeaderKindIcon } from "./headerIcons";
 import { drawInfoBadge } from "./infoBadge";
 import { drawLinkBadge } from "./linkBadge";
+import {
+  computeTypeZoneWidth,
+  drawFieldTypePill,
+} from "./fieldTypePill";
+import { resolveTargetModel } from "@/utils/modelResolution";
 
 function truncateText(str: string, maxLen: number): string {
   if (!str) return "";
@@ -31,6 +36,7 @@ export class StormCardRenderer {
     textResolution: number,
     isSelected: boolean = false,
     selectedFieldId?: string,
+    allObjects?: CanvasObject[] | Map<string, CanvasObject>,
   ): RenderResult {
     container.removeChildren();
 
@@ -226,8 +232,10 @@ export class StormCardRenderer {
 
         // Dynamic widths for type zone and tag pill
         const rawType = field.fieldType || "string";
+        const targetModel = resolveTargetModel(allObjects, rawType);
+        const isModel = Boolean(targetModel && targetModel.modelData);
         const typeZoneW = hasTypes
-          ? Math.min(88, Math.max(65, rawType.length * 6.5 + 14))
+          ? computeTypeZoneWidth(rawType, isModel)
           : 0;
         const typeZoneX = w - typeZoneW - 8;
 
@@ -336,25 +344,17 @@ export class StormCardRenderer {
 
         // Draw Type Zone
         if (hasTypes) {
-          const maxTypeChars = Math.floor((typeZoneW - 12) / 6.2);
-          const displayType = truncateText(rawType, maxTypeChars);
-
-          g.roundRect(typeZoneX, rowY + 3, typeZoneW, 20, 3)
-            .fill({ color: 0xf8fafc })
-            .stroke({ color: 0xe2e8f0, width: 1 });
-
-          const typeText = new Text({
-            text: displayType,
-            style: {
-              fontSize: 10,
-              fontFamily: APP_FONT_FAMILY,
-              fill: 0x64748b,
-            },
-            resolution: textResolution,
+          drawFieldTypePill({
+            g,
+            container,
+            rawType,
+            x: typeZoneX,
+            y: rowY + 3,
+            w: typeZoneW,
+            h: 20,
+            targetModel,
+            textResolution,
           });
-          typeText.x = typeZoneX + 6;
-          typeText.y = rowY + 6;
-          container.addChild(typeText);
 
           hitZones.push({
             type: "fieldType",

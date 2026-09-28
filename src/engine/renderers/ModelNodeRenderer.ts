@@ -6,6 +6,13 @@ import type { CardHitZone, RenderResult } from "./types";
 import { drawHeaderKindIcon } from "./headerIcons";
 import { drawInfoBadge } from "./infoBadge";
 import { drawLinkBadge } from "./linkBadge";
+import {
+  computeTypeZoneWidth,
+  drawFieldKindIcon,
+  drawFieldTypePill,
+  getModelKindHex,
+} from "./fieldTypePill";
+import { resolveTargetModel } from "@/utils/modelResolution";
 
 function truncateText(str: string, maxLen: number): string {
   if (!str) return "";
@@ -20,6 +27,7 @@ export class ModelNodeRenderer {
     textResolution: number,
     isSelected: boolean = false,
     selectedFieldId?: string,
+    allObjects?: CanvasObject[] | Map<string, CanvasObject>,
   ): RenderResult {
     container.removeChildren();
 
@@ -132,7 +140,9 @@ export class ModelNodeRenderer {
 
         // Dynamic width for type zone
         const rawType = field.fieldType || "string";
-        const typeZoneW = Math.min(88, Math.max(65, rawType.length * 6.5 + 14));
+        const targetModel = resolveTargetModel(allObjects, rawType);
+        const isModel = Boolean(targetModel && targetModel.modelData);
+        const typeZoneW = computeTypeZoneWidth(rawType, isModel);
         const typeZoneX = w - typeZoneW - 8;
 
         // Available space for field name
@@ -187,25 +197,17 @@ export class ModelNodeRenderer {
         }
 
         // Field Type zone
-        const maxTypeChars = Math.floor((typeZoneW - 12) / 6.2);
-        const displayType = truncateText(rawType, maxTypeChars);
-
-        g.roundRect(typeZoneX, rowY + 3, typeZoneW, 20, 3)
-          .fill({ color: 0xf8fafc })
-          .stroke({ color: 0xe2e8f0, width: 1 });
-
-        const typeText = new Text({
-          text: displayType,
-          style: {
-            fontSize: 10,
-            fontFamily: APP_FONT_FAMILY,
-            fill: 0x475569,
-          },
-          resolution: textResolution,
+        drawFieldTypePill({
+          g,
+          container,
+          rawType,
+          x: typeZoneX,
+          y: rowY + 3,
+          w: typeZoneW,
+          h: 20,
+          targetModel,
+          textResolution,
         });
-        typeText.x = typeZoneX + 6;
-        typeText.y = rowY + 6;
-        container.addChild(typeText);
 
         hitZones.push({
           type: "fieldType",
@@ -306,12 +308,24 @@ export class ModelNodeRenderer {
     } else if (kind === "array") {
       const rowY = renderY;
       const itemType = data.itemType || "any";
-      const maxItemChars = Math.max(6, Math.floor((w - 80) / 6.5));
+      const targetModel = resolveTargetModel(allObjects, itemType);
+      const isModel = Boolean(targetModel && targetModel.modelData);
+      const targetKind = targetModel?.modelData?.kind || "object";
+      const kindHex = isModel ? getModelKindHex(targetKind) : 0xb91c1c;
+      const bgHex = isModel ? kindHex : 0xfef2f2;
+      const strokeHex = isModel ? kindHex : 0xfecaca;
+      const maxItemChars = Math.max(6, Math.floor((w - (isModel ? 96 : 80)) / 6.5));
       const displayType = `${truncateText(itemType, maxItemChars)}[]`;
 
       g.roundRect(10, rowY + 3, w - 20, 24, 4)
-        .fill({ color: 0xfef2f2 })
-        .stroke({ color: 0xfecaca, width: 1 });
+        .fill({ color: bgHex, alpha: isModel ? 0.12 : 1 })
+        .stroke({ color: strokeHex, alpha: isModel ? 0.45 : 1, width: 1 });
+
+      let textStartX = 18;
+      if (isModel) {
+        drawFieldKindIcon(g, targetKind, 20, rowY + 15, kindHex);
+        textStartX = 32;
+      }
 
       const arrayText = new Text({
         text: `Array of: ${displayType}`,
@@ -319,11 +333,11 @@ export class ModelNodeRenderer {
           fontSize: 11,
           fontWeight: "bold",
           fontFamily: APP_FONT_FAMILY,
-          fill: 0xb91c1c,
+          fill: kindHex,
         },
         resolution: textResolution,
       });
-      arrayText.x = 18;
+      arrayText.x = textStartX;
       arrayText.y = rowY + 7;
       container.addChild(arrayText);
 
@@ -335,12 +349,24 @@ export class ModelNodeRenderer {
     } else if (kind === "wrap") {
       const rowY = renderY;
       const innerType = data.innerType || "any";
-      const maxInnerChars = Math.max(6, Math.floor((w - 60) / 6.5));
+      const targetModel = resolveTargetModel(allObjects, innerType);
+      const isModel = Boolean(targetModel && targetModel.modelData);
+      const targetKind = targetModel?.modelData?.kind || "object";
+      const kindHex = isModel ? getModelKindHex(targetKind) : 0xa16207;
+      const bgHex = isModel ? kindHex : 0xfefce8;
+      const strokeHex = isModel ? kindHex : 0xfef08a;
+      const maxInnerChars = Math.max(6, Math.floor((w - (isModel ? 76 : 60)) / 6.5));
       const displayInner = truncateText(innerType, maxInnerChars);
 
       g.roundRect(10, rowY + 3, w - 20, 24, 4)
-        .fill({ color: 0xfefce8 })
-        .stroke({ color: 0xfef08a, width: 1 });
+        .fill({ color: bgHex, alpha: isModel ? 0.12 : 1 })
+        .stroke({ color: strokeHex, alpha: isModel ? 0.45 : 1, width: 1 });
+
+      let textStartX = 18;
+      if (isModel) {
+        drawFieldKindIcon(g, targetKind, 20, rowY + 15, kindHex);
+        textStartX = 32;
+      }
 
       const wrapText = new Text({
         text: `Wrap: ${displayInner}`,
@@ -348,11 +374,11 @@ export class ModelNodeRenderer {
           fontSize: 11,
           fontWeight: "bold",
           fontFamily: APP_FONT_FAMILY,
-          fill: 0xa16207,
+          fill: kindHex,
         },
         resolution: textResolution,
       });
-      wrapText.x = 18;
+      wrapText.x = textStartX;
       wrapText.y = rowY + 7;
       container.addChild(wrapText);
 

@@ -2,6 +2,7 @@ import { Container } from "pixi.js";
 import type { CanvasObject } from "@/types";
 import { Z_INDICES } from "@/constants/canvas";
 import { computeTextResolution } from "../textResolution";
+import { buildModelMap } from "@/utils/modelResolution";
 import {
   StormCardRenderer,
   ModelNodeRenderer,
@@ -61,6 +62,9 @@ export class CardLayer extends Container {
       }
     }
 
+    // Build model lookup map for resolving model types and styling field pills
+    const modelsMap = buildModelMap(objects);
+
     // Render or update each card
     for (const obj of objects) {
       if (obj.type === "connector") continue;
@@ -106,6 +110,7 @@ export class CardLayer extends Container {
           textResolution,
           isSelected,
           cardSelectedFieldId,
+          modelsMap,
         );
       } else if (obj.type === "model") {
         result = ModelNodeRenderer.draw(
@@ -114,6 +119,7 @@ export class CardLayer extends Container {
           textResolution,
           isSelected,
           cardSelectedFieldId,
+          modelsMap,
         );
       } else if (obj.type === "stickyNote") {
         result = StickyNoteRenderer.draw(card, obj, textResolution, isSelected);

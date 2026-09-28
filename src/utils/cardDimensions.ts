@@ -9,6 +9,7 @@ import {
 } from "@/constants/storm";
 import { GRID_SIZE } from "@/constants/canvas";
 import { snapToGrid } from "./snapping";
+import { resolveTargetModel } from "./modelResolution";
 
 /**
  * Calculates the exact pixel height required to display all fields,
@@ -198,6 +199,7 @@ export function computeOptimalStormCardWidth(
   data: StormData,
   minWidth: number = 220,
   maxWidth: number = 700,
+  objects?: CanvasObject[],
 ): number {
   const kind = data.kind;
   let requiredWidth = minWidth;
@@ -220,8 +222,10 @@ export function computeOptimalStormCardWidth(
 
   for (const f of allFields) {
     const rawType = f.fieldType || "string";
+    const targetModel = objects ? resolveTargetModel(objects, rawType) : null;
+    const isModel = Boolean(targetModel && targetModel.modelData);
     const typeZoneW = hasTypes
-      ? Math.min(88, Math.max(65, rawType.length * 6.5 + 14))
+      ? Math.min(108, Math.max(isModel ? 72 : 65, rawType.length * 6.5 + (isModel ? 24 : 14)))
       : 0;
     const rawTag = f.tag || "";
     const hasTag = Boolean(f.tag && hasTags);
@@ -270,6 +274,7 @@ export function computeOptimalModelNodeWidth(
   data: ModelData,
   minWidth: number = 200,
   maxWidth: number = 700,
+  objects?: CanvasObject[],
 ): number {
   let requiredWidth = minWidth;
 
@@ -281,7 +286,9 @@ export function computeOptimalModelNodeWidth(
 
   for (const f of data.fields ?? []) {
     const rawType = f.fieldType || "string";
-    const typeZoneW = Math.min(90, Math.max(65, rawType.length * 6.5 + 14));
+    const targetModel = objects ? resolveTargetModel(objects, rawType) : null;
+    const isModel = Boolean(targetModel && targetModel.modelData);
+    const typeZoneW = Math.min(108, Math.max(isModel ? 72 : 65, rawType.length * 6.5 + (isModel ? 24 : 14)));
     const nameWidth = f.name.length * 7.2 + 20 + (f.description ? 20 : 0);
     const rowWidth = nameWidth + typeZoneW + 24;
     requiredWidth = Math.max(requiredWidth, rowWidth);
@@ -311,12 +318,13 @@ export function computeOptimalCardWidth(
   obj: CanvasObject,
   minWidth?: number,
   maxWidth?: number,
+  objects?: CanvasObject[],
 ): number {
   if (obj.type === "storm" && obj.stormData) {
-    return computeOptimalStormCardWidth(obj.stormData, minWidth, maxWidth);
+    return computeOptimalStormCardWidth(obj.stormData, minWidth, maxWidth, objects);
   }
   if (obj.type === "model" && obj.modelData) {
-    return computeOptimalModelNodeWidth(obj.modelData, minWidth, maxWidth);
+    return computeOptimalModelNodeWidth(obj.modelData, minWidth, maxWidth, objects);
   }
   return obj.width || 200;
 }
