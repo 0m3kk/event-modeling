@@ -18,8 +18,19 @@ export function useAutoSave() {
       const currentObjects = useCanvasStore.getState().objects;
       if (currentObjects.length === 0) {
         const autoSaved = loadAutoSave();
-        if (autoSaved && (autoSaved.objects.length > 0 || autoSaved.groups.length > 0)) {
-          useCanvasStore.getState().resetBoard(autoSaved.objects, autoSaved.groups);
+        if (
+          autoSaved &&
+          (autoSaved.objects.length > 0 ||
+            autoSaved.groups.length > 0 ||
+            Boolean(autoSaved.name))
+        ) {
+          useCanvasStore
+            .getState()
+            .resetBoard(
+              autoSaved.objects,
+              autoSaved.groups,
+              autoSaved.name || "Untitled",
+            );
           if (autoSaved.viewport) {
             useCanvasStore.getState().setViewport(autoSaved.viewport);
           }
@@ -33,6 +44,7 @@ export function useAutoSave() {
   useEffect(() => {
     const unsub = useCanvasStore.subscribe((state, prevState) => {
       if (
+        state.projectName === prevState.projectName &&
         state.objects === prevState.objects &&
         state.groups === prevState.groups &&
         state.viewport.x === prevState.viewport.x &&
@@ -49,8 +61,9 @@ export function useAutoSave() {
       }
 
       debounceTimerRef.current = setTimeout(() => {
-        const { objects, groups, viewport } = useCanvasStore.getState();
-        saveAutoSave({ objects, groups, viewport });
+        const { objects, groups, viewport, projectName } =
+          useCanvasStore.getState();
+        saveAutoSave({ objects, groups, viewport, name: projectName });
         setSaveStatus("saved");
         setLastSaved(new Date());
       }, 800);

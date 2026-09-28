@@ -22,6 +22,7 @@ export function ExportImageModal({
 }: ExportImageModalProps) {
   const objects = useCanvasStore((s) => s.objects);
   const groups = useCanvasStore((s) => s.groups);
+  const projectName = useCanvasStore((s) => s.projectName);
 
   const [tab, setTab] = useState<"png" | "svg">("png");
   const [scale, setScale] = useState<number>(2);
@@ -52,7 +53,7 @@ export function ExportImageModal({
         return;
       }
       const blob = await engine.exportPng({ scale, padding: 40 });
-      downloadBlob(blob, "event-storming-board");
+      downloadBlob(blob, projectName || "event-storming-board");
       onClose();
     } catch (err) {
       console.error("Failed to export PNG:", err);
@@ -64,7 +65,7 @@ export function ExportImageModal({
 
   const handleDownloadSvg = () => {
     const svg = exportCanvasToSvg(objects, groups, { padding: 40 });
-    downloadSvg(svg, "event-storming-board");
+    downloadSvg(svg, projectName || "event-storming-board");
     onClose();
   };
 

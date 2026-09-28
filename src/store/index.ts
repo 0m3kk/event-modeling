@@ -37,6 +37,7 @@ import {
 } from "@/ai";
 
 export const initialCanvasState: CanvasStoreState = {
+  projectName: "Untitled",
   objects: [],
   groups: [],
   selectedIds: [],
@@ -1060,8 +1061,15 @@ export const useCanvasStore = create<CanvasStore>()(
 
       setSearchOpen: (isSearchOpen) => set({ isSearchOpen }),
 
-      resetBoard: (objects = [], groups = []) => {
+      setProjectName: (projectName) => set({ projectName }),
+
+      resetBoard: (
+        objects = [],
+        groups = [],
+        projectName = "Untitled",
+      ) => {
         set((state) => ({
+          projectName,
           objects,
           groups,
           selectedIds: [],

@@ -57,6 +57,7 @@ export interface ActionTarget {
 }
 
 export interface CanvasStoreState {
+  projectName: string;
   objects: CanvasObject[];
   groups: GroupInfo[];
   selectedIds: string[];
@@ -166,8 +167,15 @@ export interface CanvasStoreActions {
   // Search
   setSearchOpen: (open: boolean) => void;
 
+  // Project metadata
+  setProjectName: (name: string) => void;
+
   // Whole board reset / load
-  resetBoard: (objects?: CanvasObject[], groups?: GroupInfo[]) => void;
+  resetBoard: (
+    objects?: CanvasObject[],
+    groups?: GroupInfo[],
+    projectName?: string,
+  ) => void;
 
   // AI Assistant Actions
   setAISettings: (settings: Partial<AISettings>) => void;

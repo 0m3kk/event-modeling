@@ -11,6 +11,7 @@ import {
   restoreBackup,
   setStorageForTesting,
   StormFileError,
+  sanitizeFilename,
 } from "./fileIO";
 import type { CanvasObject, GroupInfo } from "@/types";
 
@@ -183,5 +184,23 @@ describe("fileIO", () => {
     const currentBackup = getBackup();
     expect(currentBackup?.name).toBe("Second State");
     expect(currentBackup?.objects).toHaveLength(1);
+  });
+
+  describe("sanitizeFilename", () => {
+    it("sanitizes forbidden characters across operating systems", () => {
+      expect(sanitizeFilename("my/project:name*test")).toBe("my_project_name_test");
+      expect(sanitizeFilename("user<file>name|pipe?quote\"")).toBe("user_file_name_pipe_quote_");
+    });
+
+    it("preserves spaces and unicode letters", () => {
+      expect(sanitizeFilename("Hệ thống đặt vé")).toBe("Hệ thống đặt vé");
+      expect(sanitizeFilename("Event Storming Board 2026")).toBe("Event Storming Board 2026");
+    });
+
+    it("falls back to 'project' if the input is blank or all invalid", () => {
+      expect(sanitizeFilename("")).toBe("project");
+      expect(sanitizeFilename("   ")).toBe("project");
+      expect(sanitizeFilename(":::***")).toBe("project");
+    });
   });
 });

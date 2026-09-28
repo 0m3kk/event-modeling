@@ -61,7 +61,7 @@ export function serializeStormFile(data: {
 }): string {
   const file: StormProjectFile = {
     version: STORM_FILE_VERSION,
-    name: data.name || "Untitled Project",
+    name: data.name || "Untitled",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     objects: data.objects,
@@ -140,6 +140,18 @@ export function parseAndValidateStormFile(json: string): StormProjectFile {
   };
 }
 
+export function sanitizeFilename(name: string): string {
+  const trimmed = (name || "").trim();
+  const sanitized = trimmed
+    .replace(/[/\\?%*:|"<>'\x00-\x1f]/g, "_")
+    .replace(/\.+$/, "")
+    .trim();
+  if (!sanitized || /^_+$/.test(sanitized)) {
+    return "project";
+  }
+  return sanitized;
+}
+
 export function downloadStormFile(
   file: StormProjectFile,
   filename?: string,
@@ -148,9 +160,8 @@ export function downloadStormFile(
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const baseName = (filename || file.name || "project")
-    .trim()
-    .replace(/[^A-Za-z0-9_-]/g, "_");
+  const rawName = filename || file.name || "project";
+  const baseName = sanitizeFilename(rawName);
   a.href = url;
   a.download = `${baseName}.storm`;
   document.body.appendChild(a);

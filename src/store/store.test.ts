@@ -8,12 +8,26 @@ describe("useCanvasStore", () => {
     clearHistory();
   });
 
-  it("initializes with empty objects and default viewport", () => {
+  it("initializes with empty objects, default viewport and default projectName", () => {
     const state = useCanvasStore.getState();
     expect(state.objects).toHaveLength(0);
     expect(state.selectedIds).toHaveLength(0);
     expect(state.tool).toBe("select");
     expect(state.viewport.zoom).toBe(1);
+    expect(state.projectName).toBe("Untitled");
+  });
+
+  it("updates projectName and preserves it across object edits", () => {
+    useCanvasStore.getState().setProjectName("My Architecture Board");
+    expect(useCanvasStore.getState().projectName).toBe("My Architecture Board");
+
+    // Resetting board with a new project name updates it
+    useCanvasStore.getState().resetBoard([], [], "Loaded Project");
+    expect(useCanvasStore.getState().projectName).toBe("Loaded Project");
+
+    // Resetting board without project name defaults to Untitled
+    useCanvasStore.getState().resetBoard();
+    expect(useCanvasStore.getState().projectName).toBe("Untitled");
   });
 
   it("adds objects and auto-selects them", () => {

@@ -14,6 +14,7 @@ import {
   FileCode2,
   ChevronDown,
   CloudCheck,
+  Pencil,
 } from "lucide-react";
 import { useCanvasStore, undo, redo, canUndo, canRedo, clearHistory } from "@/store";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -37,6 +38,34 @@ export function Header() {
   const viewport = useCanvasStore((state) => state.viewport);
   const isSearchOpen = useCanvasStore((state) => state.isSearchOpen);
   const setSearchOpen = useCanvasStore((state) => state.setSearchOpen);
+
+  const projectName = useCanvasStore((state) => state.projectName);
+  const setProjectName = useCanvasStore((state) => state.setProjectName);
+
+  const [titleInput, setTitleInput] = useState(projectName);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setTitleInput(projectName);
+  }, [projectName]);
+
+  useEffect(() => {
+    if (isEditingTitle) {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    }
+  }, [isEditingTitle]);
+
+  const handleTitleSubmit = () => {
+    setIsEditingTitle(false);
+    const trimmed = titleInput.trim();
+    const finalName = trimmed || "Untitled";
+    setTitleInput(finalName);
+    if (finalName !== projectName) {
+      setProjectName(finalName);
+    }
+  };
 
   const { saveStatus } = useAutoSave();
 
@@ -90,17 +119,42 @@ export function Header() {
         "Start a new board? Current board will be backed up.",
       );
       if (!confirm) return;
-      createBackup({ objects, groups, viewport });
+      createBackup({ objects, groups, viewport, name: projectName });
     }
-    useCanvasStore.getState().resetBoard();
+    useCanvasStore.getState().resetBoard([], [], "Untitled");
     clearHistory();
   };
 
   const handleSaveFile = () => {
     setIsFileMenuOpen(false);
-    const serialized = serializeStormFile({ objects, groups, viewport });
-    downloadStormFile(JSON.parse(serialized), "event-storming-board");
+    const saveName =
+      (isEditingTitle ? titleInput : projectName).trim() || "Untitled";
+    if (isEditingTitle && saveName !== projectName) {
+      setProjectName(saveName);
+      setTitleInput(saveName);
+      setIsEditingTitle(false);
+    }
+    const serialized = serializeStormFile({
+      objects,
+      groups,
+      viewport,
+      name: saveName,
+    });
+    downloadStormFile(JSON.parse(serialized), saveName);
   };
+
+  // Keyboard shortcut Cmd+S / Ctrl+S to save
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (isCmdOrCtrl && e.code === "KeyS") {
+        e.preventDefault();
+        handleSaveFile();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [projectName, objects, groups, viewport]);
 
   const handleOpenFileClick = () => {
     setIsFileMenuOpen(false);
@@ -114,8 +168,14 @@ export function Header() {
     try {
       const project = await readStormFile(file);
       // Create backup before applying
-      createBackup({ objects, groups, viewport });
-      useCanvasStore.getState().resetBoard(project.objects, project.groups);
+      createBackup({ objects, groups, viewport, name: projectName });
+      const loadedName =
+        project.name?.trim() ||
+        file.name.replace(/\.(storm|json)$/i, "").trim() ||
+        "Untitled";
+      useCanvasStore
+        .getState()
+        .resetBoard(project.objects, project.groups, loadedName);
       if (project.viewport) {
         useCanvasStore.getState().setViewport(project.viewport);
       }
@@ -137,8 +197,19 @@ export function Header() {
     }
 
     try {
-      const restored = restoreBackup({ objects, groups, viewport });
-      useCanvasStore.getState().resetBoard(restored.objects, restored.groups);
+      const restored = restoreBackup({
+        objects,
+        groups,
+        viewport,
+        name: projectName,
+      });
+      useCanvasStore
+        .getState()
+        .resetBoard(
+          restored.objects,
+          restored.groups,
+          restored.name || "Restored Project",
+        );
       if (restored.viewport) {
         useCanvasStore.getState().setViewport(restored.viewport);
       }
@@ -155,7 +226,44 @@ export function Header() {
         {/* Left Side: Logo & File Menus */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-gray-800">Model Studio</span>
+            {/* Editable Project Name */}
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={titleInput}
+                style={{ width: `${Math.max(titleInput.length + 1, 8)}ch` }}
+                onChange={(e) => setTitleInput(e.target.value)}
+                onBlur={handleTitleSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  } else if (e.key === "Escape") {
+                    setTitleInput(projectName);
+                    setIsEditingTitle(false);
+                  }
+                }}
+                className="h-7 max-w-[200px] sm:max-w-[280px] md:max-w-[360px] rounded px-1.5 text-sm font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 border border-blue-500 transition-colors"
+                title="Project name"
+                placeholder="Untitled"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditingTitle(true)}
+                className="group flex items-center gap-1.5 h-7 rounded px-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer text-left shrink-0"
+                title="Click to rename project"
+              >
+                <span className="truncate max-w-[200px] sm:max-w-[280px] md:max-w-[360px]">
+                  {projectName || "Untitled"}
+                </span>
+                <Pencil
+                  size={11}
+                  className="text-gray-400 hidden group-hover:inline-block shrink-0"
+                />
+              </button>
+            )}
+
             <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
               <CloudCheck size={12} className="text-emerald-600" />
               <span>{saveStatus === "saving" ? "Saving..." : "Saved"}</span>
