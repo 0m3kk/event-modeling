@@ -8,10 +8,10 @@ import {
   Search,
   Ban,
   Mail,
-  Boxes,
-  ListTree,
+  Box,
+  List,
   Brackets,
-  Link2,
+  Parentheses,
   StickyNote as StickyIcon,
   Type,
   Trash2,
@@ -238,10 +238,10 @@ export function Toolbar() {
   };
 
   const modelIcons: Record<ModelNodeKind, React.ReactNode> = {
-    object: <Boxes size={20} />,
-    enum: <ListTree size={20} />,
+    object: <Box size={20} />,
+    enum: <List size={20} />,
     array: <Brackets size={20} />,
-    wrap: <Link2 size={20} />,
+    wrap: <Parentheses size={20} />,
   };
 
   const stormKinds: StormKind[] = [

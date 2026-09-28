@@ -110,18 +110,16 @@ export function drawFieldKindIcon(
     }
 
     case "wrap": {
-      // Link2 / linked chain
-      g.moveTo(cx - 3.5, cy + 3.5)
-        .lineTo(cx - 1, cy + 1)
-        .stroke({ color, width: 1.3, cap: "round" });
+      // Parentheses () (matching Lucide Parentheses icon)
+      // Left parenthesis (
+      g.moveTo(cx - 1.5, cy - 3.8)
+        .bezierCurveTo(cx - 4.2, cy - 1.8, cx - 4.2, cy + 1.8, cx - 1.5, cy + 3.8)
+        .stroke({ color, width: 1.2, cap: "round" });
 
-      g.moveTo(cx + 1, cy - 1)
-        .lineTo(cx + 3.5, cy - 3.5)
-        .stroke({ color, width: 1.3, cap: "round" });
-
-      g.moveTo(cx - 1.8, cy + 1.8)
-        .lineTo(cx + 1.8, cy - 1.8)
-        .stroke({ color, width: 1.3, cap: "round" });
+      // Right parenthesis )
+      g.moveTo(cx + 1.5, cy - 3.8)
+        .bezierCurveTo(cx + 4.2, cy - 1.8, cx + 4.2, cy + 1.8, cx + 1.5, cy + 3.8)
+        .stroke({ color, width: 1.2, cap: "round" });
       break;
     }
   }

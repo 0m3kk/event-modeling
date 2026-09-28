@@ -3,11 +3,11 @@ import { useCanvasStore } from "@/store";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
 import { findModelByName } from "@/utils/modelResolution";
 import {
-  Boxes,
+  Box,
   Brackets,
   Check,
-  Link2,
-  ListTree,
+  Parentheses,
+  List,
   Plus,
   Search,
   X,
@@ -411,16 +411,16 @@ export function TypeSelectPopover() {
                   >
                     <span className="flex items-center gap-1.5 truncate">
                       {kind === "object" && (
-                        <Boxes size={13} style={{ color: kindColor }} className="shrink-0" />
+                        <Box size={13} style={{ color: kindColor }} className="shrink-0" />
                       )}
                       {kind === "enum" && (
-                        <ListTree size={13} style={{ color: kindColor }} className="shrink-0" />
+                        <List size={13} style={{ color: kindColor }} className="shrink-0" />
                       )}
                       {kind === "array" && (
                         <Brackets size={13} style={{ color: kindColor }} className="shrink-0" />
                       )}
                       {kind === "wrap" && (
-                        <Link2 size={13} style={{ color: kindColor }} className="shrink-0" />
+                        <Parentheses size={13} style={{ color: kindColor }} className="shrink-0" />
                       )}
                       <span className="truncate" style={{ color: isSelected ? kindColor : "#1e293b" }}>
                         {modelName}

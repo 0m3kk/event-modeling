@@ -5,9 +5,10 @@ import type { ModelNodeKind } from "@/types";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
 import { DescriptionPopover } from "./DescriptionPopover";
 import {
-  Boxes,
-  ListTree,
+  Box,
+  List,
   Brackets,
+  Parentheses,
   Link2,
   ChevronDown,
   Plus,
@@ -16,10 +17,10 @@ import {
 } from "lucide-react";
 
 const MODEL_KIND_ICONS: Record<ModelNodeKind, ReactNode> = {
-  object: <Boxes size={16} />,
-  enum: <ListTree size={16} />,
+  object: <Box size={16} />,
+  enum: <List size={16} />,
   array: <Brackets size={16} />,
-  wrap: <Link2 size={16} />,
+  wrap: <Parentheses size={16} />,
 };
 
 export function ModelOptionsBar() {
@@ -117,10 +118,7 @@ export function ModelOptionsBar() {
                   }`}
                   style={{ color: MODEL_KIND_COLORS[k] }}
                 >
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: MODEL_KIND_COLORS[k] }}
-                  />
+                  <span className="shrink-0">{MODEL_KIND_ICONS[k]}</span>
                   <span>{MODEL_KIND_LABELS[k]}</span>
                 </button>
               ))}

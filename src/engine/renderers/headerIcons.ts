@@ -105,13 +105,31 @@ export function drawHeaderKindIcon(
     }
 
     case "bdd": {
-      // Given/When/Then: flag on a pole
-      g.moveTo(x0 + 3.5, y0 + 1.5)
-        .lineTo(x0 + 3.5, y0 + 14.5)
-        .stroke({ color, width: 1.6, cap: "round" });
-      g.poly([x0 + 3.5, y0 + 2.5, x0 + 13, y0 + 5, x0 + 3.5, y0 + 8])
-        .fill({ color, alpha: 0.9 })
-        .stroke({ color, width: 0.8 });
+      // Given/When/Then: ListChecks icon (matching toolbar ListChecks)
+      // Checkmark 1 (top)
+      g.moveTo(x0 + 2.5, y0 + 4.5)
+        .lineTo(x0 + 4.5, y0 + 6.8)
+        .lineTo(x0 + 7.5, y0 + 3.2)
+        .stroke({ color, width: 1.4, cap: "round", join: "round" });
+
+      // Checkmark 2 (bottom)
+      g.moveTo(x0 + 2.5, y0 + 11.5)
+        .lineTo(x0 + 4.5, y0 + 13.8)
+        .lineTo(x0 + 7.5, y0 + 10.2)
+        .stroke({ color, width: 1.4, cap: "round", join: "round" });
+
+      // Horizontal lines on the right
+      g.moveTo(x0 + 9.5, y0 + 4.5)
+        .lineTo(x0 + 14, y0 + 4.5)
+        .stroke({ color, width: 1.4, cap: "round" });
+
+      g.moveTo(x0 + 9.5, y0 + 8.5)
+        .lineTo(x0 + 14, y0 + 8.5)
+        .stroke({ color, width: 1.4, cap: "round" });
+
+      g.moveTo(x0 + 9.5, y0 + 12.5)
+        .lineTo(x0 + 14, y0 + 12.5)
+        .stroke({ color, width: 1.4, cap: "round" });
       break;
     }
 
@@ -133,15 +151,20 @@ export function drawHeaderKindIcon(
     }
 
     case "enum": {
-      // Bullet list with lines
-      g.circle(x0 + 4, y0 + 4.5, 1.3).fill({ color });
-      g.moveTo(x0 + 7.5, y0 + 4.5).lineTo(x0 + 13.5, y0 + 4.5).stroke({ color, width: 1.2, cap: "round" });
+      // Bullet list with lines (matching Lucide List icon)
+      const dotR = 1.25;
+      const xDot = x0 + 3.5;
+      const xLineStart = x0 + 7;
+      const xLineEnd = x0 + 13.5;
 
-      g.circle(x0 + 4, y0 + 8, 1.3).fill({ color });
-      g.moveTo(x0 + 7.5, y0 + 8).lineTo(x0 + 13.5, y0 + 8).stroke({ color, width: 1.2, cap: "round" });
+      g.circle(xDot, y0 + 4.5, dotR).fill({ color });
+      g.moveTo(xLineStart, y0 + 4.5).lineTo(xLineEnd, y0 + 4.5).stroke({ color, width: 1.3, cap: "round" });
 
-      g.circle(x0 + 4, y0 + 11.5, 1.3).fill({ color });
-      g.moveTo(x0 + 7.5, y0 + 11.5).lineTo(x0 + 13.5, y0 + 11.5).stroke({ color, width: 1.2, cap: "round" });
+      g.circle(xDot, y0 + 8.5, dotR).fill({ color });
+      g.moveTo(xLineStart, y0 + 8.5).lineTo(xLineEnd, y0 + 8.5).stroke({ color, width: 1.3, cap: "round" });
+
+      g.circle(xDot, y0 + 12.5, dotR).fill({ color });
+      g.moveTo(xLineStart, y0 + 12.5).lineTo(xLineEnd, y0 + 12.5).stroke({ color, width: 1.3, cap: "round" });
       break;
     }
 
@@ -162,16 +185,16 @@ export function drawHeaderKindIcon(
     }
 
     case "wrap": {
-      // Interlocking link
-      g.moveTo(x0 + 4, y0 + 12)
-        .lineTo(x0 + 7.5, y0 + 8.5)
-        .stroke({ color, width: 1.5, cap: "round" });
-      g.moveTo(x0 + 8.5, y0 + 7.5)
-        .lineTo(x0 + 12, y0 + 4)
-        .stroke({ color, width: 1.5, cap: "round" });
-      g.moveTo(x0 + 6, y0 + 10)
-        .lineTo(x0 + 10, y0 + 6)
-        .stroke({ color, width: 1.5, cap: "round" });
+      // Parentheses () (matching Lucide Parentheses icon)
+      // Left parenthesis (
+      g.moveTo(cx - 2, cy - 5)
+        .bezierCurveTo(cx - 5.8, cy - 2.5, cx - 5.8, cy + 2.5, cx - 2, cy + 5)
+        .stroke({ color, width: 1.4, cap: "round" });
+
+      // Right parenthesis )
+      g.moveTo(cx + 2, cy - 5)
+        .bezierCurveTo(cx + 5.8, cy - 2.5, cx + 5.8, cy + 2.5, cx + 2, cy + 5)
+        .stroke({ color, width: 1.4, cap: "round" });
       break;
     }
   }

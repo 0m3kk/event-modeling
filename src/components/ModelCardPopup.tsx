@@ -7,12 +7,12 @@ import { getActivePixiEngine } from "@/engine/PixiEngine";
 import type { CanvasObject, ModelField } from "@/types";
 import {
   ArrowRight,
-  Boxes,
+  Box,
   Brackets,
   ChevronRight,
   Crosshair,
-  Link2,
-  ListTree,
+  Parentheses,
+  List,
   X,
 } from "lucide-react";
 
@@ -338,10 +338,10 @@ function SingleModelPopupCard({
         style={{ backgroundColor: kindColor }}
       >
         <div className="flex min-w-0 items-center gap-2">
-          {kind === "object" && <Boxes className="h-4 w-4 shrink-0 opacity-90" />}
-          {kind === "enum" && <ListTree className="h-4 w-4 shrink-0 opacity-90" />}
+          {kind === "object" && <Box className="h-4 w-4 shrink-0 opacity-90" />}
+          {kind === "enum" && <List className="h-4 w-4 shrink-0 opacity-90" />}
           {kind === "array" && <Brackets className="h-4 w-4 shrink-0 opacity-90" />}
-          {kind === "wrap" && <Link2 className="h-4 w-4 shrink-0 opacity-90" />}
+          {kind === "wrap" && <Parentheses className="h-4 w-4 shrink-0 opacity-90" />}
           <span className="truncate text-xs font-bold leading-tight" title={modelName}>
             {modelName}
           </span>
@@ -440,10 +440,10 @@ function SingleModelPopupCard({
                           }}
                           title={`Click to preview ${targetKind} ${field.fieldType}`}
                         >
-                          {targetKind === "object" && <Boxes className="h-3 w-3 shrink-0" />}
-                          {targetKind === "enum" && <ListTree className="h-3 w-3 shrink-0" />}
+                          {targetKind === "object" && <Box className="h-3 w-3 shrink-0" />}
+                          {targetKind === "enum" && <List className="h-3 w-3 shrink-0" />}
                           {targetKind === "array" && <Brackets className="h-3 w-3 shrink-0" />}
-                          {targetKind === "wrap" && <Link2 className="h-3 w-3 shrink-0" />}
+                          {targetKind === "wrap" && <Parentheses className="h-3 w-3 shrink-0" />}
                           <span className="truncate max-w-44">
                             {field.fieldType}
                           </span>
@@ -526,10 +526,10 @@ function SingleModelPopupCard({
                       className="font-bold flex items-center gap-1.5"
                       style={{ color: isModel ? targetColor : kindColor }}
                     >
-                      {isModel && targetKind === "object" && <Boxes className="h-3.5 w-3.5 shrink-0" />}
-                      {isModel && targetKind === "enum" && <ListTree className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "object" && <Box className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "enum" && <List className="h-3.5 w-3.5 shrink-0" />}
                       {isModel && targetKind === "array" && <Brackets className="h-3.5 w-3.5 shrink-0" />}
-                      {isModel && targetKind === "wrap" && <Link2 className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "wrap" && <Parentheses className="h-3.5 w-3.5 shrink-0" />}
                       <span>{itemType}[]</span>
                     </span>
                     {isModel && (
@@ -589,10 +589,10 @@ function SingleModelPopupCard({
                       className="font-bold flex items-center gap-1.5"
                       style={{ color: isModel ? targetColor : kindColor }}
                     >
-                      {isModel && targetKind === "object" && <Boxes className="h-3.5 w-3.5 shrink-0" />}
-                      {isModel && targetKind === "enum" && <ListTree className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "object" && <Box className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "enum" && <List className="h-3.5 w-3.5 shrink-0" />}
                       {isModel && targetKind === "array" && <Brackets className="h-3.5 w-3.5 shrink-0" />}
-                      {isModel && targetKind === "wrap" && <Link2 className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "wrap" && <Parentheses className="h-3.5 w-3.5 shrink-0" />}
                       <span>{innerType}</span>
                     </span>
                     {isModel && (
