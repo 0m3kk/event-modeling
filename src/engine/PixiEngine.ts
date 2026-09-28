@@ -25,6 +25,7 @@ import {
 import { collectMatchingEventIds } from "@/utils/stormQuery";
 import { getAuthorizedActors } from "@/utils/stormAuth";
 import { computeCanvasBounds } from "@/utils/imageExport";
+import { findModelByName } from "@/utils/modelResolution";
 import type { CardHitZone } from "./renderers";
 import type { CanvasObject } from "@/types";
 
@@ -387,9 +388,41 @@ export class PixiEngine {
       const accurateZone =
         this.cardLayer.getHitZoneAt(id, localX, localY) || zone;
 
-      // Clicking on the type zone opens type selector IF the row is already selected.
-      // If the row was not selected yet, the click selects the row/card first so the user
-      // can drag, delete, copy, or move the field without an unwanted popover opening.
+      // Check if this field points to a Model
+      let fieldType: string | undefined;
+      let fieldName: string | undefined;
+      if (obj.type === "model" && obj.modelData) {
+        if (obj.modelData.kind === "object") {
+          const f = obj.modelData.fields?.find(
+            (field) => field.id === accurateZone?.fieldId,
+          );
+          fieldType = f?.fieldType;
+          fieldName = f?.name;
+        } else if (obj.modelData.kind === "array") {
+          fieldType = obj.modelData.itemType;
+          fieldName = "item";
+        } else if (obj.modelData.kind === "wrap") {
+          fieldType = obj.modelData.innerType;
+          fieldName = "inner";
+        }
+      } else if (obj.type === "storm" && obj.stormData) {
+        const f =
+          obj.stormData.fields?.find(
+            (field) => field.id === accurateZone?.fieldId,
+          ) ||
+          obj.stormData.responseFields?.find(
+            (field) => field.id === accurateZone?.fieldId,
+          );
+        fieldType = f?.fieldType;
+        fieldName = f?.name;
+      }
+
+      const targetModel = fieldType
+        ? findModelByName(state.objects, fieldType)
+        : null;
+
+      // Clicking on the type zone opens type selector IF the row is already selected
+      // and it's not a model field.
       const currentSelectedField = state.stormSelectedField;
       const isFieldAlreadySelected =
         currentSelectedField?.objectId === id &&
@@ -399,8 +432,10 @@ export class PixiEngine {
         (accurateZone?.type === "fieldType" ||
           accurateZone?.type === "itemType" ||
           accurateZone?.type === "innerType") &&
-        isFieldAlreadySelected
+        isFieldAlreadySelected &&
+        !targetModel
       ) {
+        state.clearModelPopups();
         state.setTypeSelect({
           objectId: id,
           fieldId: accurateZone.fieldId,
@@ -420,6 +455,7 @@ export class PixiEngine {
       // Click on the ⓘ description icon opens the info panel — card info when
       // the header icon was hit (no fieldId), field info for a row icon.
       if (accurateZone?.type === "desc") {
+        state.clearModelPopups();
         state.selectObject(id, e.shiftKey || e.metaKey || e.ctrlKey);
         state.setStormSelectedField({
           objectId: id,
@@ -452,8 +488,31 @@ export class PixiEngine {
             accurateZone.queryItemId ||
             accurateZone.constraintId,
         });
+
+        if (targetModel) {
+          const worldRightX = obj.x + (obj.width || 240);
+          const worldRowY = obj.y + (accurateZone.bounds?.y ?? 0);
+          const rowH = accurateZone.bounds?.height ?? 26;
+
+          state.openModelPopup({
+            modelId: targetModel.id,
+            sourceObjectId: obj.id,
+            sourceFieldId: accurateZone.fieldId,
+            sourceFieldName: fieldName,
+            sourceFieldType: fieldType,
+            worldAnchor: {
+              x: worldRightX,
+              y: worldRowY,
+              height: rowH,
+            },
+            level: 0,
+          });
+        } else {
+          state.clearModelPopups();
+        }
       } else {
         state.setStormSelectedField(null);
+        state.clearModelPopups();
       }
 
       const isMulti = e.shiftKey || e.metaKey || e.ctrlKey;
@@ -497,6 +556,10 @@ export class PixiEngine {
       if (this.isSpaceHeld) return;
       if (state.tool === "connector" || state.isLocked) return;
       if (e.target !== canvas) return;
+
+      if (state.modelPopupChain.length > 0) {
+        state.clearModelPopups();
+      }
 
       const rect = this.container.getBoundingClientRect();
       const worldPos = this.viewport.toWorld(
@@ -679,6 +742,9 @@ export class PixiEngine {
 
       // 4. Clicked on empty space
       if (!this.isDraggingCards && state.tool === "select") {
+        if (state.modelPopupChain.length > 0) {
+          state.clearModelPopups();
+        }
         const isControlOrMeta = e.ctrlKey || e.metaKey;
         if (isControlOrMeta) {
           // Multi-select mode: start marquee selection box
@@ -794,6 +860,13 @@ export class PixiEngine {
       if (this.isDraggingCards && this.primaryDragId) {
         const totalDx = worldPos.x - this.dragStartWorld.x;
         const totalDy = worldPos.y - this.dragStartWorld.y;
+
+        if (
+          Math.hypot(totalDx, totalDy) > 5 &&
+          useCanvasStore.getState().modelPopupChain.length > 0
+        ) {
+          useCanvasStore.getState().clearModelPopups();
+        }
 
         const primaryInit = this.initialObjectPositions.get(this.primaryDragId);
         const primaryObj = useCanvasStore
@@ -1131,8 +1204,9 @@ export class PixiEngine {
     this.connectorLayer.renderConnectors(objects, groups, selectedIds);
     this.groupLayer.renderGroups(groups, objects, zoom, selectedIds);
 
-    // 5. Visual Link Layer (Real-time DCB highlights or Actor Hover highlights)
+    // 5. Visual Link Layer (Real-time DCB highlights, Actor Hover highlights, or Model Popup highlights)
     const stormActionHover = useCanvasStore.getState().stormActionHover;
+    const modelPopupChain = useCanvasStore.getState().modelPopupChain;
     const selectedStateCard = objects.find(
       (o) =>
         selectedIds.includes(o.id) &&
@@ -1143,6 +1217,11 @@ export class PixiEngine {
     if (stormActionHover) {
       const authorizedActors = getAuthorizedActors(objects, stormActionHover);
       this.visualLinkLayer.renderHighlights(authorizedActors);
+    } else if (modelPopupChain.length > 0) {
+      const popupModels = objects.filter((o) =>
+        modelPopupChain.some((p) => p.modelId === o.id),
+      );
+      this.visualLinkLayer.renderHighlights(popupModels);
     } else if (selectedStateCard) {
       const matchingIds = collectMatchingEventIds(objects, selectedStateCard);
       const matchingEvents = objects.filter((o) => matchingIds.includes(o.id));

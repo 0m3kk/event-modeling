@@ -53,6 +53,7 @@ export const initialCanvasState: CanvasStoreState = {
   isSearchOpen: false,
   descHover: null,
   actionHover: null,
+  modelPopupChain: [],
 
   // AI Assistant State
   aiSettings: getStoredAISettings(),
@@ -118,11 +119,19 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       clearSelection: () => {
-        const { selectedIds, stormSelectedField } = get();
-        if (selectedIds.length > 0 || stormSelectedField) {
+        const { selectedIds, stormSelectedField, modelPopupChain } = get();
+        if (
+          selectedIds.length > 0 ||
+          stormSelectedField ||
+          modelPopupChain.length > 0
+        ) {
           // A storm field selection only makes sense while its card is
-          // selected, so clear both together.
-          set({ selectedIds: [], stormSelectedField: null });
+          // selected, so clear both together. Also clear active model popups.
+          set({
+            selectedIds: [],
+            stormSelectedField: null,
+            modelPopupChain: [],
+          });
         }
       },
 
@@ -1061,6 +1070,29 @@ export const useCanvasStore = create<CanvasStore>()(
 
       setSearchOpen: (isSearchOpen) => set({ isSearchOpen }),
 
+      openModelPopup: (entry) => {
+        const id = `popup-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const fullEntry = { ...entry, id };
+        set((state) => {
+          if (entry.level === 0) {
+            return { modelPopupChain: [fullEntry] };
+          }
+          const prevChain = state.modelPopupChain.slice(0, entry.level);
+          return { modelPopupChain: [...prevChain, fullEntry] };
+        });
+      },
+
+      closeModelPopup: (level) => {
+        set((state) => {
+          if (level === undefined || level === 0) {
+            return { modelPopupChain: [] };
+          }
+          return { modelPopupChain: state.modelPopupChain.slice(0, level) };
+        });
+      },
+
+      clearModelPopups: () => set({ modelPopupChain: [] }),
+
       setProjectName: (projectName) => set({ projectName }),
 
       resetBoard: (
@@ -1081,6 +1113,7 @@ export const useCanvasStore = create<CanvasStore>()(
           isSearchOpen: false,
           descHover: null,
           actionHover: null,
+          modelPopupChain: [],
           viewport: {
             ...DEFAULT_VIEWPORT,
             // Keep the live canvas size — the engine owns it and only resyncs

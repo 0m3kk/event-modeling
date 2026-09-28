@@ -612,4 +612,71 @@ describe("useCanvasStore", () => {
     expect(actorObj!.x).toBeLessThan(cmdObj!.x);
     expect(cmdObj!.x).toBeLessThan(evtObj!.x);
   });
+
+  it("handles cascading model popups correctly", () => {
+    // Level 0: open popup for Model A
+    useCanvasStore.getState().openModelPopup({
+      modelId: "model-a",
+      level: 0,
+      anchorRect: { x: 200, y: 100, width: 0, height: 26 },
+      sourceFieldName: "user",
+      sourceFieldType: "User",
+    });
+
+    let chain = useCanvasStore.getState().modelPopupChain;
+    expect(chain).toHaveLength(1);
+    expect(chain[0].modelId).toBe("model-a");
+    expect(chain[0].level).toBe(0);
+
+    // Level 1: open popup for Model B from Model A
+    useCanvasStore.getState().openModelPopup({
+      modelId: "model-b",
+      level: 1,
+      anchorRect: { x: 450, y: 130, width: 0, height: 26 },
+      sourceFieldName: "address",
+      sourceFieldType: "Address",
+    });
+
+    chain = useCanvasStore.getState().modelPopupChain;
+    expect(chain).toHaveLength(2);
+    expect(chain[1].modelId).toBe("model-b");
+    expect(chain[1].level).toBe(1);
+
+    // Level 2: open popup for Model C from Model B
+    useCanvasStore.getState().openModelPopup({
+      modelId: "model-c",
+      level: 2,
+      anchorRect: { x: 700, y: 160, width: 0, height: 26 },
+      sourceFieldName: "city",
+      sourceFieldType: "City",
+    });
+
+    chain = useCanvasStore.getState().modelPopupChain;
+    expect(chain).toHaveLength(3);
+
+    // Opening another Level 1 popup replaces level 1 & 2
+    useCanvasStore.getState().openModelPopup({
+      modelId: "model-d",
+      level: 1,
+      anchorRect: { x: 450, y: 180, width: 0, height: 26 },
+      sourceFieldName: "profile",
+      sourceFieldType: "Profile",
+    });
+
+    chain = useCanvasStore.getState().modelPopupChain;
+    expect(chain).toHaveLength(2);
+    expect(chain[0].modelId).toBe("model-a");
+    expect(chain[1].modelId).toBe("model-d");
+
+    // Close level 1 closes level 1
+    useCanvasStore.getState().closeModelPopup(1);
+    chain = useCanvasStore.getState().modelPopupChain;
+    expect(chain).toHaveLength(1);
+    expect(chain[0].modelId).toBe("model-a");
+
+    // Clear all popups
+    useCanvasStore.getState().clearModelPopups();
+    expect(useCanvasStore.getState().modelPopupChain).toHaveLength(0);
+  });
 });
+

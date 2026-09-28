@@ -9,6 +9,7 @@ import { StormOptionsBar } from "@/components/StormOptionsBar";
 import { ModelOptionsBar } from "@/components/ModelOptionsBar";
 import { GroupOptionsBar } from "@/components/GroupOptionsBar";
 import { AlignOptionsBar } from "@/components/AlignOptionsBar";
+import { ModelCardPopup } from "@/components/ModelCardPopup";
 import { SearchModal } from "@/components/SearchModal";
 import { AIPanel } from "@/components/AIPanel";
 import { useCanvasStore } from "@/store";
@@ -24,6 +25,7 @@ export function App() {
         <PixiCanvas />
         <InlineTextEditor />
         <TypeSelectPopover />
+        <ModelCardPopup />
         <DescTooltip />
         <ActionTooltip />
         <StormOptionsBar />

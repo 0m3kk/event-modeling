@@ -56,6 +56,28 @@ export interface ActionTarget {
   iconBounds: { x: number; y: number; width: number; height: number };
 }
 
+export interface ModelPopupEntry {
+  id: string;
+  modelId: string;
+  sourceObjectId?: string;
+  sourceFieldId?: string;
+  sourceFieldName?: string;
+  sourceFieldType?: string;
+  worldAnchor?: {
+    x: number;
+    y: number;
+    height: number;
+  };
+  rowOffsetFromParent?: number;
+  anchorRect?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  level: number;
+}
+
 export interface CanvasStoreState {
   projectName: string;
   objects: CanvasObject[];
@@ -73,6 +95,7 @@ export interface CanvasStoreState {
   isSearchOpen: boolean;
   descHover: DescTarget | null;
   actionHover: ActionTarget | null;
+  modelPopupChain: ModelPopupEntry[];
 
   // AI Assistant State
   aiSettings: AISettings;
@@ -166,6 +189,11 @@ export interface CanvasStoreActions {
 
   // Search
   setSearchOpen: (open: boolean) => void;
+
+  // Cascading Model Popups
+  openModelPopup: (entry: Omit<ModelPopupEntry, "id">) => void;
+  closeModelPopup: (level?: number) => void;
+  clearModelPopups: () => void;
 
   // Project metadata
   setProjectName: (name: string) => void;

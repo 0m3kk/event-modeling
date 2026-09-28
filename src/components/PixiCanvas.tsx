@@ -330,6 +330,7 @@ export function PixiCanvas() {
         useCanvasStore.getState().setSearchOpen(false);
         useCanvasStore.getState().clearSelection();
         useCanvasStore.getState().setStormSelectedField(null);
+        useCanvasStore.getState().clearModelPopups();
         return;
       }
     };
