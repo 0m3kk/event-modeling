@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasObject, StormField, StormKind } from "@/types";
 import {
+  collectStormWarnings,
   describeStormOptions,
   validateStormWrite,
   type StormValidationCard,
@@ -340,7 +341,7 @@ describe("validateStormWrite", () => {
       expect(validateStormWrite(input)).toEqual([]);
     });
 
-    it("flags an event field that does not exist in command or constraint", () => {
+    it("no longer rejects an event field that does not exist in command or constraint", () => {
       const input: StormValidationInput = {
         existing: [],
         cards: [
@@ -351,9 +352,8 @@ describe("validateStormWrite", () => {
           ]),
         ],
       };
-      expect(validateStormWrite(input)).toEqual([
-        '"Order Placed" (event) field "Unauthorized Discount" does not exist in associated Command or Constraint ("Place Order"). Every event field must originate from a Command or Constraint payload.',
-      ]);
+      // Field origin is a "nice to have" convention, not a hard requirement.
+      expect(validateStormWrite(input)).toEqual([]);
     });
 
     it("flags a tag placed on a non-key event field", () => {
@@ -410,6 +410,60 @@ describe("validateStormWrite", () => {
         '"User Exists" (constraint) rule "Email cannot be empty" appears to perform command input validation. Constraints are reusable Decision Models that check business logic invariants against historical events, not command input validation.',
       ]);
     });
+  });
+});
+
+describe("collectStormWarnings", () => {
+  it("warns when an event field is not declared in the command or constraint", () => {
+    const input: StormValidationInput = {
+      existing: [],
+      cards: [
+        card("command", "Place Order", [field("Order ID", "uuid")]),
+        card("event", "Order Placed", [
+          field("Order ID", "uuid", "order"),
+          field("Unauthorized Discount", "number"),
+        ]),
+      ],
+    };
+    expect(collectStormWarnings(input)).toEqual([
+      '"Order Placed" (event) field "Unauthorized Discount" is not declared in the associated Command or Constraint ("Place Order"). Prefer fields that originate from those payloads; timestamp/audit fields (e.g. Created At, Updated At) are exempt.',
+    ]);
+  });
+
+  it("does not warn when every event field exists in the command or constraint", () => {
+    const input: StormValidationInput = {
+      existing: [],
+      cards: [
+        card("command", "Place Order", [
+          field("Order ID", "uuid"),
+          field("Total Amount", "number"),
+        ]),
+        card("constraint", "Inventory Reserved", [
+          field("Warehouse ID", "uuid"),
+        ]),
+        card("event", "Order Placed", [
+          field("Order ID", "uuid", "order"),
+          field("Total Amount", "number"),
+          field("Warehouse ID", "uuid"),
+        ]),
+      ],
+    };
+    expect(collectStormWarnings(input)).toEqual([]);
+  });
+
+  it("exempts timestamp/audit fields like Created At and Updated At", () => {
+    const input: StormValidationInput = {
+      existing: [],
+      cards: [
+        card("command", "Place Order", [field("Order ID", "uuid")]),
+        card("event", "Order Placed", [
+          field("Order ID", "uuid", "order"),
+          field("Created At", "datetime"),
+          field("Updated At", "datetime"),
+        ]),
+      ],
+    };
+    expect(collectStormWarnings(input)).toEqual([]);
   });
 });
 

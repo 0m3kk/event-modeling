@@ -14,6 +14,7 @@ import {
   type StormLanePosition,
 } from "@/utils/stormLayout";
 import {
+  collectStormWarnings,
   describeStormOptions,
   validateStormWrite,
   type StormValidationCard,
@@ -204,7 +205,7 @@ function layoutSize(
 export const createStormCardsTool = defineTool({
   name: "create_storm_cards",
   description:
-    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; all event fields must originate from Command or Constraint). For Read Slices: Query (params + responseFields + action) -> State (projection with queryItems) <- Event. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
+    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; prefer event fields that also appear in the Command or Constraint payload, though timestamp/audit fields like Created At/Updated At are exempt). For Read Slices: Query (params + responseFields + action) -> State (projection with queryItems) <- Event. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
   schema: z.object({
     cards: z
       .array(
@@ -319,7 +320,7 @@ export const createStormCardsTool = defineTool({
       return { spec, obj };
     });
 
-    assertValidStormWrite({
+    const validationInput: StormValidationInput = {
       existing: state.objects,
       cards: built.map(({ spec, obj }): StormValidationCard => ({
         kind: spec.kind,
@@ -333,7 +334,9 @@ export const createStormCardsTool = defineTool({
             ? getActorPermissions(obj.stormData)
             : undefined,
       })),
-    });
+    };
+    assertValidStormWrite(validationInput);
+    const warnings = collectStormWarnings(validationInput);
 
     const layoutMode =
       args.layout ??
@@ -481,6 +484,7 @@ export const createStormCardsTool = defineTool({
     return {
       created: created.map(({ id, name, kind }) => ({ id, name, kind })),
       count: created.length,
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
   },
 });
@@ -540,7 +544,7 @@ export const updateStormCardTool = defineTool({
           ? fields.map((f) => f.name)
           : undefined;
 
-    assertValidStormWrite({
+    const validationInput: StormValidationInput = {
       existing: state.objects.filter((o) => o.id !== args.id),
       cards: [
         {
@@ -566,7 +570,9 @@ export const updateStormCardTool = defineTool({
               : undefined,
         },
       ],
-    });
+    };
+    assertValidStormWrite(validationInput);
+    const warnings = collectStormWarnings(validationInput);
 
     const data = buildStormData({
       kind: existing.kind,
@@ -596,7 +602,11 @@ export const updateStormCardTool = defineTool({
       width: newWidth,
       height: newHeight,
     });
-    return { updated: true, id: args.id };
+    return {
+      updated: true,
+      id: args.id,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
   },
 });
 
