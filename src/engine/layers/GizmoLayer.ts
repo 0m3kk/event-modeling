@@ -2,6 +2,7 @@ import { Container, Graphics } from "pixi.js";
 import type { CanvasObject } from "@/types";
 import type { AlignmentGuide } from "@/store/types";
 import { Z_INDICES } from "@/constants/canvas";
+import type { ResizeHandle } from "@/utils/cardDimensions";
 import type { VisibleBounds } from "./GridLayer";
 
 export interface MarqueeBox {
@@ -11,10 +12,35 @@ export interface MarqueeBox {
   height: number;
 }
 
+export function getCursorForHandle(handle: ResizeHandle): string {
+  switch (handle) {
+    case "nw":
+    case "se":
+      return "nwse-resize";
+    case "ne":
+    case "sw":
+      return "nesw-resize";
+    case "e":
+    case "w":
+      return "ew-resize";
+    case "n":
+    case "s":
+      return "ns-resize";
+  }
+}
+
+interface ActiveHandleInfo {
+  handle: ResizeHandle;
+  cx: number;
+  cy: number;
+  objectId: string;
+}
+
 export class GizmoLayer extends Container {
   private selectionGraphics: Graphics;
   private marqueeGraphics: Graphics;
   private guidesGraphics: Graphics;
+  private activeHandles: ActiveHandleInfo[] = [];
 
   constructor() {
     super();
@@ -28,11 +54,16 @@ export class GizmoLayer extends Container {
     this.addChild(this.guidesGraphics);
   }
 
-  public renderSelection(selectedObjects: CanvasObject[]): void {
+  public renderSelection(
+    selectedObjects: CanvasObject[],
+    zoom: number = 1,
+  ): void {
     this.selectionGraphics.clear();
+    this.activeHandles = [];
 
-    const handleSize = 6;
     const padding = 2;
+    const strokeWidth = Math.max(1.5, 2 / zoom);
+    const handleStrokeWidth = Math.max(1, 1.5 / zoom);
 
     for (const obj of selectedObjects) {
       // Connectors have no box of their own — their selected state is drawn by
@@ -47,29 +78,70 @@ export class GizmoLayer extends Container {
       // Selection bounding box
       this.selectionGraphics
         .roundRect(x, y, w, h, 8)
-        .stroke({ color: 0x2563eb, width: 2, alpha: 0.9 });
+        .stroke({ color: 0x2563eb, width: strokeWidth, alpha: 0.9 });
+    }
 
-      // Corner handles
-      const corners = [
-        { cx: x, cy: y },
-        { cx: x + w, cy: y },
-        { cx: x, cy: y + h },
-        { cx: x + w, cy: y + h },
+    // Only render interactive resize handles when a single, unlocked object is selected
+    const resizable =
+      selectedObjects.length === 1 &&
+      !selectedObjects[0].locked &&
+      selectedObjects[0].type !== "connector"
+        ? selectedObjects[0]
+        : null;
+
+    if (resizable) {
+      const rx = resizable.x - padding;
+      const ry = resizable.y - padding;
+      const rw = resizable.width + padding * 2;
+      const rh = resizable.height + padding * 2;
+
+      // Only left & right handles are shown since card height is content-driven
+      const handles: { handle: ResizeHandle; cx: number; cy: number }[] = [
+        { handle: "w", cx: rx, cy: ry + rh / 2 },
+        { handle: "e", cx: rx + rw, cy: ry + rh / 2 },
       ];
 
-      for (const corner of corners) {
+      const handleWidth = 6 / zoom;
+      const handleHeight = 16 / zoom;
+      const handleRadius = 2.5 / zoom;
+
+      for (const h of handles) {
+        this.activeHandles.push({ ...h, objectId: resizable.id });
         this.selectionGraphics
-          .rect(
-            corner.cx - handleSize / 2,
-            corner.cy - handleSize / 2,
-            handleSize,
-            handleSize,
+          .roundRect(
+            h.cx - handleWidth / 2,
+            h.cy - handleHeight / 2,
+            handleWidth,
+            handleHeight,
+            handleRadius,
           )
           .fill({ color: 0xffffff })
-          .stroke({ color: 0x2563eb, width: 1.5 });
+          .stroke({ color: 0x2563eb, width: handleStrokeWidth });
       }
     }
   }
+
+  public getHandleAt(
+    worldX: number,
+    worldY: number,
+    zoom: number,
+  ): { handle: ResizeHandle; objectId: string } | null {
+    if (this.activeHandles.length === 0) return null;
+
+    // Hit tolerance in screen pixels converted to world units
+    const hitToleranceX = 10 / zoom;
+    const hitToleranceY = 12 / zoom;
+
+    for (const h of this.activeHandles) {
+      const dx = Math.abs(worldX - h.cx);
+      const dy = Math.abs(worldY - h.cy);
+      if (dx <= hitToleranceX && dy <= hitToleranceY) {
+        return { handle: h.handle, objectId: h.objectId };
+      }
+    }
+    return null;
+  }
+
 
   public renderMarquee(marquee: MarqueeBox | null): void {
     this.marqueeGraphics.clear();

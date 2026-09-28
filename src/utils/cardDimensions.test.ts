@@ -2,8 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   computeStormCardHeight,
   computeModelNodeHeight,
+  calculateResizedBounds,
+  getCardMinDimensions,
+  computeOptimalStormCardWidth,
+  computeOptimalModelNodeWidth,
+  computeOptimalCardWidth,
 } from "./cardDimensions";
-import type { StormData, ModelData } from "@/types";
+import type { CanvasObject, StormData, ModelData } from "@/types";
 
 describe("cardDimensions", () => {
   it("expands storm card height as fields are added", () => {
@@ -130,4 +135,248 @@ describe("cardDimensions", () => {
     const h4 = computeModelNodeHeight(with4Fields);
     expect(h4).toBe(h2 + 2 * 26);
   });
+
+  describe("getCardMinDimensions", () => {
+    it("returns computed min dimensions for storm card", () => {
+      const obj: CanvasObject = {
+        id: "s1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 260,
+        height: 100,
+        stormData: { kind: "command", name: "Cmd", fields: [] },
+      };
+      const min = getCardMinDimensions(obj);
+      expect(min.minWidth).toBe(180);
+      expect(min.minHeight).toBe(computeStormCardHeight(obj.stormData!));
+    });
+
+    it("returns default min dimensions for sticky notes and text boxes", () => {
+      const sticky: CanvasObject = {
+        id: "st1",
+        type: "stickyNote",
+        x: 0,
+        y: 0,
+        width: 180,
+        height: 140,
+      };
+      expect(getCardMinDimensions(sticky)).toEqual({
+        minWidth: 100,
+        minHeight: 80,
+      });
+
+      const text: CanvasObject = {
+        id: "tb1",
+        type: "textBox",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 40,
+      };
+      expect(getCardMinDimensions(text)).toEqual({
+        minWidth: 60,
+        minHeight: 30,
+      });
+    });
+  });
+
+  describe("calculateResizedBounds", () => {
+    const initialBounds = { x: 100, y: 100, width: 200, height: 100 };
+
+    it("resizes east handle: increases width and snaps to grid", () => {
+      const res = calculateResizedBounds({
+        handle: "e",
+        initialBounds,
+        deltaX: 43,
+        deltaY: 0,
+        minWidth: 180,
+        minHeight: 80,
+        gridSize: 10,
+      });
+
+      expect(res.x).toBe(100);
+      expect(res.y).toBe(100);
+      expect(res.width).toBe(240); // 200 + 43 = 243 -> snaps to 240
+      expect(res.height).toBe(100);
+    });
+
+    it("resizes west handle: changes x and width while keeping right edge fixed", () => {
+      const res = calculateResizedBounds({
+        handle: "w",
+        initialBounds,
+        deltaX: -50,
+        deltaY: 0,
+        minWidth: 180,
+        minHeight: 80,
+        gridSize: 10,
+      });
+
+      // Dragging left by 50px expands width by 50px and moves x by -50px
+      expect(res.width).toBe(250);
+      expect(res.x).toBe(50);
+      expect(res.x + res.width).toBe(initialBounds.x + initialBounds.width);
+    });
+
+    it("clamps west handle at minWidth", () => {
+      const res = calculateResizedBounds({
+        handle: "w",
+        initialBounds,
+        deltaX: 100, // shrinks by 100 -> raw width 100, but min is 180
+        deltaY: 0,
+        minWidth: 180,
+        minHeight: 80,
+        gridSize: 10,
+      });
+
+      expect(res.width).toBe(180);
+      expect(res.x).toBe(120); // 100 + (200 - 180) = 120
+      expect(res.x + res.width).toBe(initialBounds.x + initialBounds.width);
+    });
+
+    it("resizes south handle: expands height downward", () => {
+      const res = calculateResizedBounds({
+        handle: "s",
+        initialBounds,
+        deltaX: 0,
+        deltaY: 60,
+        minWidth: 180,
+        minHeight: 80,
+        gridSize: 10,
+      });
+
+      expect(res.height).toBe(160);
+      expect(res.y).toBe(100);
+    });
+
+    it("resizes north handle: expands height upward while keeping bottom edge fixed", () => {
+      const res = calculateResizedBounds({
+        handle: "n",
+        initialBounds,
+        deltaX: 0,
+        deltaY: -40,
+        minWidth: 180,
+        minHeight: 80,
+        gridSize: 10,
+      });
+
+      expect(res.height).toBe(140);
+      expect(res.y).toBe(60);
+      expect(res.y + res.height).toBe(initialBounds.y + initialBounds.height);
+    });
+
+    it("resizes southeast corner: changes both width and height", () => {
+      const res = calculateResizedBounds({
+        handle: "se",
+        initialBounds,
+        deltaX: 30,
+        deltaY: 50,
+        minWidth: 180,
+        minHeight: 80,
+        gridSize: 10,
+      });
+
+      expect(res.x).toBe(100);
+      expect(res.y).toBe(100);
+      expect(res.width).toBe(230);
+      expect(res.height).toBe(150);
+    });
+
+    it("resizes northwest corner: changes both x, y, width and height", () => {
+      const res = calculateResizedBounds({
+        handle: "nw",
+        initialBounds,
+        deltaX: -30,
+        deltaY: -20,
+        minWidth: 180,
+        minHeight: 80,
+        gridSize: 10,
+      });
+
+      expect(res.width).toBe(230);
+      expect(res.height).toBe(120);
+      expect(res.x).toBe(70);
+      expect(res.y).toBe(80);
+      expect(res.x + res.width).toBe(initialBounds.x + initialBounds.width);
+      expect(res.y + res.height).toBe(initialBounds.y + initialBounds.height);
+    });
+  });
+
+  describe("computeOptimalCardWidth", () => {
+    it("returns default minWidth for short titles and fields", () => {
+      const data: StormData = {
+        kind: "command",
+        name: "CreateUser",
+        fields: [{ id: "f1", name: "id", fieldType: "uuid" }],
+      };
+      const width = computeOptimalStormCardWidth(data, 220);
+      expect(width).toBe(220);
+    });
+
+    it("expands width for long card title", () => {
+      const data: StormData = {
+        kind: "command",
+        name: "ProcessCustomerMonthlyInvoicePaymentCommand",
+        fields: [],
+      };
+      const width = computeOptimalStormCardWidth(data, 220);
+      // 44 chars title needs ~380px+
+      expect(width).toBeGreaterThanOrEqual(380);
+      // Snapped to 10px
+      expect(width % 10).toBe(0);
+    });
+
+    it("expands width for long field name and types", () => {
+      const data: StormData = {
+        kind: "event",
+        name: "OrderPlaced",
+        fields: [
+          {
+            id: "f1",
+            name: "veryLongBillingAccountIdentificationNumber",
+            fieldType: "CustomerBillingAccountReference",
+            tag: "billing",
+          },
+        ],
+      };
+      const width = computeOptimalStormCardWidth(data, 220);
+      expect(width).toBeGreaterThanOrEqual(450);
+      expect(width % 10).toBe(0);
+    });
+
+    it("calculates optimal width for data model nodes", () => {
+      const model: ModelData = {
+        kind: "object",
+        name: "ExtremelyLongDetailedOrderAggregateRootEntity",
+        fields: [
+          {
+            id: "f1",
+            name: "customerPrimaryPaymentMethodIdentifier",
+            fieldType: "PaymentMethod",
+          },
+        ],
+      };
+      const width = computeOptimalModelNodeWidth(model, 200);
+      expect(width).toBeGreaterThanOrEqual(400);
+      expect(width % 10).toBe(0);
+    });
+
+    it("resolves optimal width for CanvasObject", () => {
+      const obj: CanvasObject = {
+        id: "s1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "command",
+          name: "ProcessCustomerMonthlyInvoicePaymentCommand",
+          fields: [],
+        },
+      };
+      expect(computeOptimalCardWidth(obj)).toBeGreaterThanOrEqual(380);
+    });
+  });
 });
+

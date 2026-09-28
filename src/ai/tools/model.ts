@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import type { CanvasObject, ModelData, ModelField, ModelEnumValue } from "@/types";
-import { computeModelNodeHeight } from "@/utils/cardDimensions";
+import {
+  computeModelNodeHeight,
+  computeOptimalModelNodeWidth,
+} from "@/utils/cardDimensions";
 import { toDisplayName } from "@/utils/naming";
 import { defineTool } from "./schema";
 import { findFreeSpot, getViewportCenter } from "./helpers";
@@ -81,7 +84,7 @@ export const createModelNodesTool = defineTool({
       }
 
       const height = computeModelNodeHeight(data);
-      const width = 220;
+      const width = computeOptimalModelNodeWidth(data);
 
       let pos = { x: spec.x ?? 0, y: spec.y ?? 0 };
       if (!hasPosition) {

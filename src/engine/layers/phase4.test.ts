@@ -6,6 +6,7 @@ import {
   computeElbowPath,
 } from "@/utils/elbowRouting";
 import { collectMatchingEventIds } from "@/utils/stormQuery";
+import { GizmoLayer, getCursorForHandle } from "./GizmoLayer";
 import type { CanvasObject, GroupInfo } from "@/types";
 
 describe("Phase 4: Groups, Elbow Connectors & Visual Links", () => {
@@ -234,6 +235,80 @@ describe("Phase 4: Groups, Elbow Connectors & Visual Links", () => {
       expect(matchingIds).toContain("ev-1");
       expect(matchingIds).toContain("ev-2");
       expect(matchingIds).not.toContain("ev-3");
+    });
+  });
+
+  describe("GizmoLayer - Interactive Resize Handles", () => {
+    it("renders only left and right interactive handles when a single unlocked card is selected", () => {
+      const gizmo = new GizmoLayer();
+      const obj: CanvasObject = {
+        id: "card-1",
+        type: "storm",
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 120,
+      };
+
+      gizmo.renderSelection([obj], 1);
+
+      // East handle is at x + w = 300 (+ padding 2 = 302), y = 100 + 60 = 160
+      const hitE = gizmo.getHandleAt(302, 160, 1);
+      expect(hitE).toEqual({ handle: "e", objectId: "card-1" });
+
+      // West handle is at x = 98, y = 160
+      const hitW = gizmo.getHandleAt(98, 160, 1);
+      expect(hitW).toEqual({ handle: "w", objectId: "card-1" });
+
+      // Corners and vertical edges should NOT have handles (height is content-driven)
+      const hitSE = gizmo.getHandleAt(302, 222, 1);
+      expect(hitSE).toBeNull();
+
+      const hitN = gizmo.getHandleAt(200, 98, 1);
+      expect(hitN).toBeNull();
+
+      // Point in the center of card should not hit any handle
+      const hitCenter = gizmo.getHandleAt(200, 160, 1);
+      expect(hitCenter).toBeNull();
+    });
+
+    it("does not create resize handles for locked objects or multi-selection", () => {
+      const gizmo = new GizmoLayer();
+      const lockedObj: CanvasObject = {
+        id: "locked-1",
+        type: "storm",
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 120,
+        locked: true,
+      };
+
+      gizmo.renderSelection([lockedObj], 1);
+      expect(gizmo.getHandleAt(302, 160, 1)).toBeNull();
+
+      const obj2: CanvasObject = {
+        id: "card-2",
+        type: "storm",
+        x: 400,
+        y: 100,
+        width: 200,
+        height: 120,
+      };
+      // Multi-selection (2 objects)
+      gizmo.renderSelection([{ ...lockedObj, locked: false }, obj2], 1);
+      expect(gizmo.getHandleAt(302, 160, 1)).toBeNull();
+    });
+
+    it("returns appropriate CSS cursors for all handle directions", () => {
+      expect(getCursorForHandle("e")).toBe("ew-resize");
+      expect(getCursorForHandle("w")).toBe("ew-resize");
+      expect(getCursorForHandle("n")).toBe("ns-resize");
+      expect(getCursorForHandle("s")).toBe("ns-resize");
+      expect(getCursorForHandle("nw")).toBe("nwse-resize");
+      expect(getCursorForHandle("se")).toBe("nwse-resize");
+      expect(getCursorForHandle("ne")).toBe("nesw-resize");
+      expect(getCursorForHandle("sw")).toBe("nesw-resize");
     });
   });
 });

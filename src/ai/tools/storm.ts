@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import type { CanvasObject, StormData, StormField, StormKind, StormQueryItem, StormConstraint } from "@/types";
-import { computeStormCardHeight } from "@/utils/cardDimensions";
+import {
+  computeStormCardHeight,
+  computeOptimalStormCardWidth,
+} from "@/utils/cardDimensions";
 import { toDisplayName } from "@/utils/naming";
 import { arrangeStormLanes, type StormLaneCard, type StormLanePosition } from "@/utils/stormLayout";
 import {
@@ -217,12 +220,13 @@ export const createStormCardsTool = defineTool({
       });
 
       const height = computeStormCardHeight(data);
+      const width = computeOptimalStormCardWidth(data);
       const obj: CanvasObject = {
         id: `storm-${nanoid()}`,
         type: "storm",
         x: 0,
         y: 0,
-        width: 200,
+        width,
         height,
         stormData: data,
       };
@@ -361,8 +365,13 @@ export const updateStormCardTool = defineTool({
     if (args.constraints === undefined) data.constraints = existing.constraints;
 
     const newHeight = computeStormCardHeight(data);
+    const newWidth = Math.max(
+      object.width || 200,
+      computeOptimalStormCardWidth(data),
+    );
     state.updateObject(args.id, {
       stormData: data,
+      width: newWidth,
       height: newHeight,
     });
     return { updated: true, id: args.id };

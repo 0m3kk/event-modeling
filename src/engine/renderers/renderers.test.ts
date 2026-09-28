@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Container } from "pixi.js";
+import { Container, Text } from "pixi.js";
 import { StormCardRenderer } from "./StormCardRenderer";
 import { ModelNodeRenderer } from "./ModelNodeRenderer";
 import { StickyNoteRenderer } from "./StickyNoteRenderer";
@@ -48,6 +48,44 @@ describe("Pixi Card Renderers", () => {
 
     const fieldTypes = res.hitZones.filter((z) => z.type === "fieldType");
     expect(fieldTypes.length).toBe(2);
+  });
+
+  it("allows wider card width so long titles and field names fit without truncation", () => {
+    const longName = "veryLongBillingAccountIdentificationNumber";
+    const longTitle = "ProcessCustomerMonthlyInvoicePaymentCommand";
+    const containerNarrow = new Container();
+    const narrowObj: CanvasObject = {
+      id: "cmd-narrow",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      stormData: {
+        kind: "command",
+        name: longTitle,
+        fields: [{ id: "f1", name: longName, fieldType: "string" }],
+      },
+    };
+
+    StormCardRenderer.draw(containerNarrow, narrowObj, 1, false);
+    const narrowTexts = containerNarrow.children
+      .filter((c): c is Text => c instanceof Text)
+      .map((t) => t.text);
+    expect(narrowTexts.some((t) => t.includes("…"))).toBe(true);
+
+    const containerWide = new Container();
+    const wideObj: CanvasObject = {
+      ...narrowObj,
+      id: "cmd-wide",
+      width: 500,
+    };
+    StormCardRenderer.draw(containerWide, wideObj, 1, false);
+    const wideTexts = containerWide.children
+      .filter((c): c is Text => c instanceof Text)
+      .map((t) => t.text);
+    expect(wideTexts.includes(longTitle)).toBe(true);
+    expect(wideTexts.some((t) => t.includes(longName))).toBe(true);
   });
 
   it("shows the action badge only when the card has an action", () => {

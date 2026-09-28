@@ -7,15 +7,22 @@ import {
   getGroupAt,
   computeGroupBounds,
 } from "./layers/GroupLayer";
-import {
-  ElbowConnectorLayer,
-  type AnchorMarker,
-} from "./layers/ElbowConnectorLayer";
+import { ElbowConnectorLayer, type AnchorMarker } from "./layers/ElbowConnectorLayer";
 import { VisualLinkLayer } from "./layers/VisualLinkLayer";
 import { CardLayer } from "./layers/CardLayer";
-import { GizmoLayer, type MarqueeBox } from "./layers/GizmoLayer";
+import {
+  GizmoLayer,
+  getCursorForHandle,
+  type MarqueeBox,
+} from "./layers/GizmoLayer";
 import { useCanvasStore, type ActionTarget, type DescTarget } from "@/store";
 import { calculateSnapping } from "@/utils/snapping";
+import {
+  calculateResizedBounds,
+  computeOptimalCardWidth,
+  getCardMinDimensions,
+  type ResizeHandle,
+} from "@/utils/cardDimensions";
 import { MIN_ZOOM, MAX_ZOOM, CONNECTOR_HIT_SLOP } from "@/constants/canvas";
 import {
   getAllCardinalAnchors,
@@ -87,6 +94,20 @@ export class PixiEngine {
   private lastGroupClickTime: number = 0;
   private lastGroupClickId: string | null = null;
   private hadPopoverOnPointerDown: boolean = false;
+
+  // Card Resizing State
+  private isResizingCard: boolean = false;
+  private resizingHandle: ResizeHandle | null = null;
+  private resizingObjectId: string | null = null;
+  private resizeStartWorld: { x: number; y: number } = { x: 0, y: 0 };
+  private initialObjectBounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null = null;
+  private hoveredHandle: { handle: ResizeHandle; objectId: string } | null =
+    null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -366,7 +387,11 @@ export class PixiEngine {
 
   private setupInteractionHandlers(): void {
     // Card pointerdown handler
-    this.cardLayer.onCardPointerDown = (id: string, e: PointerEvent, zone) => {
+    this.cardLayer.onCardPointerDown = (
+      id: string,
+      e: PointerEvent,
+      zone: CardHitZone | null,
+    ) => {
       const state = useCanvasStore.getState();
       if (this.isSpaceHeld) return;
 
@@ -375,15 +400,33 @@ export class PixiEngine {
 
       this.cardPointerDownHandled = true;
 
-      const obj = state.objects.find((o) => o.id === id);
-      if (!obj) return;
-
-      // Calculate precise local coordinates inside the card
       const rect = this.container.getBoundingClientRect();
       const worldPos = this.viewport.toWorld(
         e.clientX - rect.left,
         e.clientY - rect.top,
       );
+
+      if (this.hoveredHandle) {
+        this.isResizingCard = true;
+        this.resizingHandle = this.hoveredHandle.handle;
+        this.resizingObjectId = this.hoveredHandle.objectId;
+        this.resizeStartWorld = { x: worldPos.x, y: worldPos.y };
+        const targetObj = state.objects.find(
+          (o) => o.id === this.resizingObjectId,
+        );
+        if (targetObj) {
+          this.initialObjectBounds = {
+            x: targetObj.x,
+            y: targetObj.y,
+            width: targetObj.width,
+            height: targetObj.height,
+          };
+        }
+        return;
+      }
+
+      const obj = state.objects.find((o) => o.id === id);
+      if (!obj) return;
       const localX = worldPos.x - obj.x;
       const localY = worldPos.y - obj.y;
       const accurateZone =
@@ -565,6 +608,18 @@ export class PixiEngine {
         state.clearModelPopups();
       }
 
+      // Double-click on resize handle auto-fits card width to its content
+      if (this.hoveredHandle) {
+        const targetObj = state.objects.find(
+          (o) => o.id === this.hoveredHandle!.objectId,
+        );
+        if (targetObj) {
+          const optimalWidth = computeOptimalCardWidth(targetObj);
+          state.updateObject(targetObj.id, { width: optimalWidth });
+          return;
+        }
+      }
+
       const rect = this.container.getBoundingClientRect();
       const worldPos = this.viewport.toWorld(
         e.clientX - rect.left,
@@ -638,6 +693,26 @@ export class PixiEngine {
         e.clientX - rect.left,
         e.clientY - rect.top,
       );
+
+      if (this.hoveredHandle) {
+        this.cardPointerDownHandled = true;
+        this.isResizingCard = true;
+        this.resizingHandle = this.hoveredHandle.handle;
+        this.resizingObjectId = this.hoveredHandle.objectId;
+        this.resizeStartWorld = { x: worldPos.x, y: worldPos.y };
+        const targetObj = state.objects.find(
+          (o) => o.id === this.resizingObjectId,
+        );
+        if (targetObj) {
+          this.initialObjectBounds = {
+            x: targetObj.x,
+            y: targetObj.y,
+            width: targetObj.width,
+            height: targetObj.height,
+          };
+        }
+        return;
+      }
 
       // 1. Connector Tool Mode — click the source anchor, then click the target
       // anchor. The connection is a two-click interaction, so the left mouse
@@ -864,6 +939,38 @@ export class PixiEngine {
         }
       }
 
+      // Handle Card Resizing
+      if (
+        this.isResizingCard &&
+        this.resizingObjectId &&
+        this.resizingHandle &&
+        this.initialObjectBounds
+      ) {
+        const dx = worldPos.x - this.resizeStartWorld.x;
+        const dy = worldPos.y - this.resizeStartWorld.y;
+        const targetObj = state.objects.find(
+          (o) => o.id === this.resizingObjectId,
+        );
+        if (targetObj) {
+          const minDims = getCardMinDimensions(targetObj);
+          const newBounds = calculateResizedBounds({
+            handle: this.resizingHandle,
+            initialBounds: this.initialObjectBounds,
+            deltaX: dx,
+            deltaY: dy,
+            minWidth: minDims.minWidth,
+            minHeight: minDims.minHeight,
+          });
+          useCanvasStore.getState().updateObject(this.resizingObjectId, {
+            x: newBounds.x,
+            y: newBounds.y,
+            width: newBounds.width,
+            height: newBounds.height,
+          });
+        }
+        return;
+      }
+
       // Handle Group Dragging
       if (this.isDraggingGroup && this.draggedGroupId) {
         const dx = worldPos.x - this.dragStartWorld.x;
@@ -980,7 +1087,33 @@ export class PixiEngine {
         this.isDraggingGroup ||
         this.isMarqueeDragging ||
         this.isCreatingConnector ||
-        this.isPanningCanvas;
+        this.isPanningCanvas ||
+        this.isResizingCard;
+
+      // Check resize handle hover when idle on select tool
+      if (
+        !isBusy &&
+        !this.isSpaceHeld &&
+        state.tool === "select" &&
+        !state.isLocked
+      ) {
+        const hitHandle = this.gizmoLayer.getHandleAt(
+          worldPos.x,
+          worldPos.y,
+          this.viewport.scaled || 1,
+        );
+        if (hitHandle) {
+          this.hoveredHandle = hitHandle;
+          const cursor = getCursorForHandle(hitHandle.handle);
+          this.container.style.cursor = cursor;
+          this.cardLayer.setCursor(cursor);
+        } else if (this.hoveredHandle) {
+          this.hoveredHandle = null;
+          this.container.style.cursor = "default";
+          this.cardLayer.setCursor("default");
+        }
+      }
+
       let nextHover: DescTarget | null = null;
       let nextActionHover: ActionTarget | null = null;
       if (
@@ -1061,6 +1194,19 @@ export class PixiEngine {
       if (this.isDraggingGroup) {
         this.isDraggingGroup = false;
         this.draggedGroupId = null;
+      }
+
+      // Finish Card Resizing
+      if (this.isResizingCard) {
+        this.isResizingCard = false;
+        this.resizingHandle = null;
+        this.resizingObjectId = null;
+        this.initialObjectBounds = null;
+        this.syncSpatialIndex();
+        if (!this.hoveredHandle && !this.isSpaceHeld) {
+          this.container.style.cursor = "default";
+          this.cardLayer.setCursor("default");
+        }
       }
 
       // Finish Card Dragging
@@ -1263,7 +1409,10 @@ export class PixiEngine {
 
     // 6. Render Selection Gizmos for Cards
     const selectedObjects = objects.filter((o) => selectedIds.includes(o.id));
-    this.gizmoLayer.renderSelection(selectedObjects);
+    this.gizmoLayer.renderSelection(
+      selectedObjects,
+      this.viewport.scaled || 1,
+    );
   }
 
   public async destroy(): Promise<void> {
