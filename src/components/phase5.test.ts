@@ -433,4 +433,99 @@ describe("Phase 5 - Floating Options Bars, Alignment & Domain Utilities", () => 
       expect(useCanvasStore.getState().isSearchOpen).toBe(false);
     });
   });
+
+  describe("Options Bar Contextual Trash & Info Resolution", () => {
+    it("deletes selected storm field when field is selected, and deletes card when card is selected", () => {
+      const card: CanvasObject = {
+        id: "storm-test",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "command",
+          name: "CreateUser",
+          description: "Card description",
+          fields: [
+            { id: "f1", name: "userId", fieldType: "uuid", description: "User ID field" },
+            { id: "f2", name: "email", fieldType: "string" },
+          ],
+        },
+      };
+
+      useCanvasStore.getState().addObject(card);
+      useCanvasStore.getState().setSelectedIds(["storm-test"]);
+
+      // Field f1 is selected
+      useCanvasStore.getState().setStormSelectedField({
+        objectId: "storm-test",
+        fieldId: "f1",
+      });
+
+      const state1 = useCanvasStore.getState();
+      const sf = state1.stormSelectedField;
+      const data = state1.objects[0].stormData!;
+      const selectedField =
+        sf && sf.objectId === "storm-test" && sf.fieldId
+          ? data.fields.find((f) => f.id === sf.fieldId)
+          : null;
+      expect(selectedField?.id).toBe("f1");
+
+      // Deleting when field is selected -> deletes field f1 only
+      useCanvasStore.getState().deleteSelectedStormField();
+
+      const state2 = useCanvasStore.getState();
+      expect(state2.objects).toHaveLength(1);
+      expect(state2.objects[0].stormData?.fields).toHaveLength(1);
+      expect(state2.objects[0].stormData?.fields[0].id).toBe("f2");
+      expect(state2.stormSelectedField).toBeNull();
+
+      // Now card is selected with no field -> deletes whole card
+      useCanvasStore.getState().deleteObjects(["storm-test"]);
+      expect(useCanvasStore.getState().objects).toHaveLength(0);
+    });
+
+    it("deletes selected model field / enum value when row is selected, and deletes model when model is selected", () => {
+      const modelObj: CanvasObject = {
+        id: "model-test",
+        type: "model",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        modelData: {
+          kind: "object",
+          name: "User",
+          description: "Model description",
+          fields: [
+            { id: "mf1", name: "name", fieldType: "string", description: "Name field" },
+            { id: "mf2", name: "age", fieldType: "int" },
+          ],
+        },
+      };
+
+      useCanvasStore.getState().addObject(modelObj);
+      useCanvasStore.getState().setSelectedIds(["model-test"]);
+
+      // Select row mf1
+      useCanvasStore.getState().setStormSelectedField({
+        objectId: "model-test",
+        fieldId: "mf1",
+      });
+
+      // Deleting when row is selected -> deletes field mf1
+      useCanvasStore.getState().deleteSelectedStormField();
+
+      const state1 = useCanvasStore.getState();
+      expect(state1.objects).toHaveLength(1);
+      expect(state1.objects[0].modelData?.fields).toHaveLength(1);
+      expect(state1.objects[0].modelData?.fields?.[0].id).toBe("mf2");
+      expect(state1.stormSelectedField).toBeNull();
+
+      // Deleting model when no field is selected
+      useCanvasStore.getState().deleteObjects(["model-test"]);
+      expect(useCanvasStore.getState().objects).toHaveLength(0);
+    });
+  });
 });

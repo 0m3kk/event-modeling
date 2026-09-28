@@ -4,6 +4,7 @@ import { useCanvasStore } from "@/store";
 import type { ModelNodeKind } from "@/types";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
 import { DescriptionPopover } from "./DescriptionPopover";
+import { findDescriptionText } from "@/utils/description";
 import {
   Box,
   List,
@@ -23,16 +24,22 @@ const MODEL_KIND_ICONS: Record<ModelNodeKind, ReactNode> = {
   wrap: <Parentheses size={16} />,
 };
 
+const ALL_KINDS: ModelNodeKind[] = ["object", "enum", "array", "wrap"];
+
 export function ModelOptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const objects = useCanvasStore((s) => s.objects);
   const viewport = useCanvasStore((s) => s.viewport);
   const updateObject = useCanvasStore((s) => s.updateObject);
   const deleteObjects = useCanvasStore((s) => s.deleteObjects);
+  const deleteSelectedStormField = useCanvasStore(
+    (s) => s.deleteSelectedStormField,
+  );
   const addModelField = useCanvasStore((s) => s.addModelField);
   const addModelEnumValue = useCanvasStore((s) => s.addModelEnumValue);
   const createReferenceCopy = useCanvasStore((s) => s.createReferenceCopy);
   const isLocked = useCanvasStore((s) => s.isLocked);
+  const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
 
   const [showKindDropdown, setShowKindDropdown] = useState(false);
   const [showDescriptionPopover, setShowDescriptionPopover] = useState(false);
@@ -79,7 +86,56 @@ export function ModelOptionsBar() {
     }
   };
 
-  const allKinds: ModelNodeKind[] = ["object", "enum", "array", "wrap"];
+  const sf = stormSelectedField;
+  const isRowSelected = Boolean(
+    sf &&
+      sf.objectId === selectedModel.id &&
+      sf.fieldId &&
+      ((kind === "object" && data.fields?.some((f) => f.id === sf.fieldId)) ||
+        (kind === "enum" && data.values?.some((v) => v.id === sf.fieldId))),
+  );
+
+  const selectedModelRow = useMemo(() => {
+    if (!isRowSelected || !sf?.fieldId) return null;
+    if (kind === "object") {
+      return data.fields?.find((f) => f.id === sf.fieldId) ?? null;
+    }
+    if (kind === "enum") {
+      return data.values?.find((v) => v.id === sf.fieldId) ?? null;
+    }
+    return null;
+  }, [isRowSelected, sf, kind, data.fields, data.values]);
+
+  const currentDescription =
+    isRowSelected && sf?.fieldId
+      ? findDescriptionText(selectedModel, sf.fieldId)
+      : data.description;
+
+  const infoTitle = currentDescription
+    ? `Description: ${currentDescription}`
+    : isRowSelected
+      ? kind === "enum"
+        ? "Add Value Description"
+        : "Add Field Description"
+      : "Add Description";
+
+  const handleDelete = () => {
+    if (isRowSelected) {
+      deleteSelectedStormField();
+    } else {
+      deleteObjects([selectedModel.id]);
+    }
+  };
+
+  const trashTitle = isRowSelected
+    ? kind === "enum"
+      ? selectedModelRow?.name
+        ? `Delete Value "${selectedModelRow.name}"`
+        : "Delete Value"
+      : selectedModelRow?.name
+        ? `Delete Field "${selectedModelRow.name}"`
+        : "Delete Field"
+    : "Delete Model";
 
   return (
     <>
@@ -107,7 +163,7 @@ export function ModelOptionsBar() {
 
           {showKindDropdown && (
             <div className="absolute top-full left-0 z-50 mt-1 flex w-32 flex-col rounded-xl border border-gray-200 bg-white p-1 shadow-2xl">
-              {allKinds.map((k) => (
+              {ALL_KINDS.map((k) => (
                 <button
                   key={k}
                   onClick={() => handleKindSelect(k)}
@@ -142,16 +198,12 @@ export function ModelOptionsBar() {
 
         <div className="h-5 w-px bg-gray-200" />
 
-        {/* Card description ⓘ — panel mirrored from the storm options bar */}
+        {/* Card or field description ⓘ — panel mirrored from the storm options bar */}
         <button
           onClick={() => setShowDescriptionPopover((v) => !v)}
-          title={
-            data.description
-              ? `Description: ${data.description}`
-              : "Add Description"
-          }
+          title={infoTitle}
           className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
-            data.description
+            currentDescription
               ? "border border-sky-200 bg-sky-50 text-sky-700"
               : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           }`}
@@ -172,10 +224,10 @@ export function ModelOptionsBar() {
 
         <div className="h-5 w-px bg-gray-200" />
 
-        {/* Delete Model Button */}
+        {/* Delete Field / Model Button */}
         <button
-          onClick={() => deleteObjects([selectedModel.id])}
-          title="Delete Model"
+          onClick={handleDelete}
+          title={trashTitle}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
         >
           <Trash2 size={15} />

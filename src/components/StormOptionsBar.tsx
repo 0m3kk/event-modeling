@@ -15,6 +15,7 @@ import { DescriptionPopover } from "./DescriptionPopover";
 import { PermissionsPopover } from "./PermissionsPopover";
 import { TagPopover } from "./TagPopover";
 import { QueryItemPopover } from "./QueryItemPopover";
+import { findDescriptionText } from "@/utils/description";
 import {
   Shield,
   Trash2,
@@ -34,6 +35,9 @@ export function StormOptionsBar() {
   const viewport = useCanvasStore((s) => s.viewport);
   const updateObject = useCanvasStore((s) => s.updateObject);
   const deleteObjects = useCanvasStore((s) => s.deleteObjects);
+  const deleteSelectedStormField = useCanvasStore(
+    (s) => s.deleteSelectedStormField,
+  );
   const addStormField = useCanvasStore((s) => s.addStormField);
   const addStormConstraint = useCanvasStore((s) => s.addStormConstraint);
   const createReferenceCopy = useCanvasStore((s) => s.createReferenceCopy);
@@ -78,6 +82,46 @@ export function StormOptionsBar() {
     sf && sf.objectId === selectedStorm.id && sf.fieldId
       ? (data.queryItems?.find((q) => q.id === sf.fieldId) ?? null)
       : null;
+
+  const selectedConstraint =
+    sf && sf.objectId === selectedStorm.id && sf.fieldId
+      ? (data.constraints?.find((c) => c.id === sf.fieldId) ?? null)
+      : null;
+
+  const isRowSelected = Boolean(
+    selectedField || selectedQueryItem || selectedConstraint,
+  );
+
+  const currentDescription =
+    isRowSelected && sf?.fieldId
+      ? findDescriptionText(selectedStorm, sf.fieldId)
+      : data.description;
+
+  const infoButtonTitle = currentDescription
+    ? `Description: ${currentDescription}`
+    : isRowSelected
+      ? "Add Field Description"
+      : "Add Description";
+
+  const handleDelete = () => {
+    if (isRowSelected) {
+      deleteSelectedStormField();
+    } else {
+      deleteObjects([selectedStorm.id]);
+    }
+  };
+
+  const trashTitle = isRowSelected
+    ? selectedField
+      ? selectedField.name
+        ? `Delete Field "${selectedField.name}"`
+        : "Delete Field"
+      : selectedQueryItem
+        ? "Delete Query Item"
+        : selectedConstraint
+          ? "Delete Constraint Rule"
+          : "Delete Field"
+    : "Delete Card";
 
   const hasTagActive = Boolean(selectedField?.tag || showTagPopover);
   const hasQueryItemActive = Boolean(
@@ -226,17 +270,13 @@ export function StormOptionsBar() {
           </button>
         )}
 
-        {/* Card description ⓘ — mirrors the action button: a header badge on
+        {/* Card or field description ⓘ — mirrors the action button: a header badge on
             the card plus a panel here in the options bar. */}
         <button
           onClick={() => setShowDescriptionPopover((v) => !v)}
-          title={
-            data.description
-              ? `Description: ${data.description}`
-              : "Add Description"
-          }
+          title={infoButtonTitle}
           className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
-            data.description
+            currentDescription
               ? "border border-sky-200 bg-sky-50 text-sky-700"
               : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           }`}
@@ -359,10 +399,10 @@ export function StormOptionsBar() {
           <Link2 size={16} />
         </button>
 
-        {/* Delete Card Button */}
+        {/* Delete Card / Field Button */}
         <button
-          onClick={() => deleteObjects([selectedStorm.id])}
-          title="Delete Card"
+          onClick={handleDelete}
+          title={trashTitle}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
         >
           <Trash2 size={15} />
