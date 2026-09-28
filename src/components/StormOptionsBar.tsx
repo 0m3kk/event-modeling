@@ -14,6 +14,7 @@ import { ActionPopover } from "./ActionPopover";
 import { DescriptionPopover } from "./DescriptionPopover";
 import { PermissionsPopover } from "./PermissionsPopover";
 import { TagPopover } from "./TagPopover";
+import { QueryItemPopover } from "./QueryItemPopover";
 import {
   Shield,
   Trash2,
@@ -24,6 +25,7 @@ import {
   Info,
   Link2,
   Tag,
+  Filter,
 } from "lucide-react";
 
 export function StormOptionsBar() {
@@ -33,7 +35,6 @@ export function StormOptionsBar() {
   const updateObject = useCanvasStore((s) => s.updateObject);
   const deleteObjects = useCanvasStore((s) => s.deleteObjects);
   const addStormField = useCanvasStore((s) => s.addStormField);
-  const addStormQueryItem = useCanvasStore((s) => s.addStormQueryItem);
   const addStormConstraint = useCanvasStore((s) => s.addStormConstraint);
   const createReferenceCopy = useCanvasStore((s) => s.createReferenceCopy);
   const isLocked = useCanvasStore((s) => s.isLocked);
@@ -43,6 +44,10 @@ export function StormOptionsBar() {
   const [showDescriptionPopover, setShowDescriptionPopover] = useState(false);
   const [showPermissionsPopover, setShowPermissionsPopover] = useState(false);
   const [showTagPopover, setShowTagPopover] = useState(false);
+  const [showQueryItemPopover, setShowQueryItemPopover] = useState(false);
+  const [queryItemPopoverMode, setQueryItemPopoverMode] = useState<
+    "create" | "edit"
+  >("create");
 
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const permissionsButtonRef = useRef<HTMLButtonElement>(null);
@@ -69,13 +74,40 @@ export function StormOptionsBar() {
         null)
       : null;
 
+  const selectedQueryItem =
+    sf && sf.objectId === selectedStorm.id && sf.fieldId
+      ? (data.queryItems?.find((q) => q.id === sf.fieldId) ?? null)
+      : null;
+
   const hasTagActive = Boolean(selectedField?.tag || showTagPopover);
+  const hasQueryItemActive = Boolean(
+    selectedQueryItem ||
+      (showQueryItemPopover && queryItemPopoverMode === "edit"),
+  );
 
   const tagButtonTitle = selectedField
     ? selectedField.tag
       ? `Tag: "${selectedField.tag}" (${selectedField.name})`
       : `Set Tag for "${selectedField.name}"`
     : "Set Field Tag";
+
+  const handleOpenEditQueryItem = () => {
+    setQueryItemPopoverMode("edit");
+    setShowQueryItemPopover(true);
+    setShowTagPopover(false);
+    setShowActionPopover(false);
+    setShowDescriptionPopover(false);
+    setShowPermissionsPopover(false);
+  };
+
+  const handleOpenAddQueryItem = () => {
+    setQueryItemPopoverMode("create");
+    setShowQueryItemPopover(true);
+    setShowTagPopover(false);
+    setShowActionPopover(false);
+    setShowDescriptionPopover(false);
+    setShowPermissionsPopover(false);
+  };
 
   // Calculate screen position
   const zoom = viewport.zoom;
@@ -230,6 +262,32 @@ export function StormOptionsBar() {
           </button>
         )}
 
+        {/* Edit Query Item Button — only visible when a query item row is selected on state/constraint card */}
+        {stormHasQueryItems(kind) && Boolean(selectedQueryItem) && (
+          <button
+            onClick={handleOpenEditQueryItem}
+            title={
+              selectedQueryItem?.types.length
+                ? `Edit Query Item: ${selectedQueryItem.types.join(", ")}`
+                : "Edit Query Item"
+            }
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+              hasQueryItemActive
+                ? "border border-violet-200 bg-violet-50 text-violet-700"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <Filter
+              size={16}
+              className={
+                hasQueryItemActive
+                  ? "text-violet-600"
+                  : "text-gray-600"
+              }
+            />
+          </button>
+        )}
+
         {/* Permissions Button (Actor) */}
         {kind === "actor" && (
           <button
@@ -269,9 +327,13 @@ export function StormOptionsBar() {
         {/* Add DCB Query Item Button (State and Constraint cards) */}
         {stormHasQueryItems(kind) && (
           <button
-            onClick={() => addStormQueryItem(selectedStorm.id)}
+            onClick={handleOpenAddQueryItem}
             title="Add DCB Query Item"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-violet-700 hover:bg-violet-50"
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+              showQueryItemPopover && queryItemPopoverMode === "create"
+                ? "border border-violet-200 bg-violet-50 text-violet-700"
+                : "text-violet-700 hover:bg-violet-50"
+            }`}
           >
             <Layers size={16} />
           </button>
@@ -342,6 +404,21 @@ export function StormOptionsBar() {
           anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 }}
         />
       )}
+
+      {/* Query Item Popover */}
+      {showQueryItemPopover &&
+        (queryItemPopoverMode === "create" || selectedQueryItem) && (
+          <QueryItemPopover
+            card={selectedStorm}
+            queryItemId={
+              queryItemPopoverMode === "edit"
+                ? selectedQueryItem?.id
+                : undefined
+            }
+            onClose={() => setShowQueryItemPopover(false)}
+            anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 }}
+          />
+        )}
     </>
   );
 }

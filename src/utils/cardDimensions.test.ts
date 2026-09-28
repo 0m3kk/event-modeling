@@ -111,6 +111,29 @@ describe("cardDimensions", () => {
     expect(computeStormCardHeight(withConstraint)).toBe(hBase + 22 + 26);
   });
 
+  it("expands query item height vertically when multiple events are present", () => {
+    const base: StormData = {
+      kind: "state",
+      name: "OrderState",
+      fields: [
+        { id: "f1", name: "orderId", fieldType: "string", tag: "order" },
+      ],
+      queryItems: [
+        {
+          id: "qi1",
+          types: ["OrderPlaced", "OrderCancelled", "OrderShipped"],
+          tagFieldIds: ["f1"],
+        },
+      ],
+    };
+
+    // 3 events, 1 tag -> 3 lines -> 4 + 3 * 22 = 70px (instead of single row 26px)
+    const expectedQueryHeight = 70;
+    const h = computeStormCardHeight(base);
+    // header (36+6) + fields (1*26) + query label (22) + query item (70) + bottom padding (10)
+    expect(h).toBe(42 + 26 + 22 + expectedQueryHeight + 10);
+  });
+
   it("expands model node height as fields are added", () => {
     const model: ModelData = {
       kind: "object",

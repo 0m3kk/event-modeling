@@ -1,4 +1,10 @@
-import type { CanvasObject, StormData, ModelData } from "@/types";
+import type {
+  CanvasObject,
+  StormData,
+  ModelData,
+  StormQueryItem,
+  StormField,
+} from "@/types";
 import {
   stormHasParamsSection,
   stormHasQueryItems,
@@ -10,6 +16,32 @@ import {
 import { GRID_SIZE } from "@/constants/canvas";
 import { snapToGrid } from "./snapping";
 import { resolveTargetModel } from "./modelResolution";
+
+/**
+ * Computes how many vertical lines a Query Item row requires based on its
+ * event types and tag filters (1 on left, 1 on right, expanding vertically).
+ */
+export function computeStormQueryItemLines(
+  item: StormQueryItem,
+  fields: StormField[] = [],
+): number {
+  const eventCount = item.types.length;
+  const tagCount = (item.tagFieldIds ?? []).filter((id) =>
+    fields.some((f) => f.id === id && Boolean(f.tag?.trim())),
+  ).length;
+  return Math.max(1, eventCount, tagCount);
+}
+
+/**
+ * Calculates the exact pixel height for a Query Item row.
+ */
+export function computeStormQueryItemHeight(
+  item: StormQueryItem,
+  fields: StormField[] = [],
+): number {
+  const lines = computeStormQueryItemLines(item, fields);
+  return 4 + lines * 22;
+}
 
 /**
  * Calculates the exact pixel height required to display all fields,
@@ -45,7 +77,11 @@ export function computeStormCardHeight(data: StormData): number {
   }
 
   if (stormHasQueryItems(kind) && queryItems.length > 0) {
-    h += sectionLabelHeight + queryItems.length * rowHeight;
+    let queryItemsTotalHeight = 0;
+    for (const item of queryItems) {
+      queryItemsTotalHeight += computeStormQueryItemHeight(item, fields);
+    }
+    h += sectionLabelHeight + queryItemsTotalHeight;
   }
 
   if (kind === "constraint" && constraints.length > 0) {
@@ -243,8 +279,25 @@ export function computeOptimalStormCardWidth(
 
   // 3. Query items
   for (const q of data.queryItems ?? []) {
-    const typesStr = q.types.length > 0 ? q.types.join(", ") : "*";
-    const qWidth = typesStr.length * 6.2 + 48;
+    const maxTypeLen =
+      q.types.length > 0 ? Math.max(...q.types.map((t) => t.length)) : 1;
+    const taggedFields = (q.tagFieldIds ?? [])
+      .map((id) => (data.fields ?? []).find((f) => f.id === id))
+      .filter((f): f is StormField => Boolean(f && f.tag && f.tag.trim()));
+    const maxTagTextLen =
+      taggedFields.length > 0
+        ? Math.max(
+            ...taggedFields.map(
+              (f) => `${f.tag!.trim()}:${f.name.trim()}`.length,
+            ),
+          )
+        : 0;
+    const tagPillW =
+      maxTagTextLen > 0
+        ? Math.min(105, Math.max(40, (maxTagTextLen + 1) * 6.0 + 14))
+        : 0;
+    const eventW = maxTypeLen * 6.5 + 28;
+    const qWidth = eventW + (tagPillW > 0 ? tagPillW + 12 : 0) + 24;
     requiredWidth = Math.max(requiredWidth, qWidth);
   }
 

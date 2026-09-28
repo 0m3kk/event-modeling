@@ -22,6 +22,7 @@ import {
   drawFieldTypePill,
 } from "./fieldTypePill";
 import { resolveTargetModel } from "@/utils/modelResolution";
+import { computeStormQueryItemHeight } from "@/utils/cardDimensions";
 
 function truncateText(str: string, maxLen: number): string {
   if (!str) return "";
@@ -496,42 +497,90 @@ export class StormCardRenderer {
       container.addChild(qLabel);
       renderY += sectionLabelHeight;
 
-      const maxQueryChars = Math.max(10, Math.floor((w - 34) / 6.2));
       for (const item of queryItems) {
         const rowY = renderY;
+        const itemHeight = computeStormQueryItemHeight(item, fields);
 
         // Draw selection highlight for this row
         if (selectedFieldId && item.id === selectedFieldId) {
-          g.roundRect(4, rowY + 1, w - 8, rowHeight - 2, 4).fill({
+          g.roundRect(4, rowY + 1, w - 8, itemHeight - 2, 4).fill({
             color: 0xdbeafe,
           });
         }
 
+        const itemTaggedFields = (item.tagFieldIds ?? [])
+          .map((id) => fields.find((f) => f.id === id))
+          .filter((f): f is StormField => Boolean(f && f.tag && f.tag.trim()));
+
+        // 1. Right side: render tags stacked vertically as {tag}:{field}
+        let maxTagW = 0;
+        for (let tIdx = 0; tIdx < itemTaggedFields.length; tIdx++) {
+          const tf = itemTaggedFields[tIdx];
+          const rawTagText = `${tf.tag!.trim()}:${tf.name.trim()}`;
+          const tagPillW = Math.min(
+            105,
+            Math.max(40, (rawTagText.length + 1) * 6.0 + 14),
+          );
+          maxTagW = Math.max(maxTagW, tagPillW);
+          const tagPillX = w - tagPillW - 10;
+          const tagY = rowY + 4 + tIdx * 22;
+
+          g.roundRect(tagPillX, tagY, tagPillW, 18, 9)
+            .fill({ color: 0xffedd5 })
+            .stroke({ color: 0xfdba74, width: 1 });
+
+          const tagText = new Text({
+            text: truncateText(rawTagText, 14),
+            style: {
+              fontSize: 9.5,
+              fontWeight: "600",
+              fontFamily: APP_FONT_FAMILY,
+              fill: 0x9a3412,
+            },
+            resolution: textResolution,
+          });
+          tagText.anchor.set(0.5, 0.5);
+          tagText.x = tagPillX + tagPillW / 2;
+          tagText.y = tagY + 9;
+          container.addChild(tagText);
+        }
+
+        // 2. Left side: render event types stacked vertically
+        const displayEvents = item.types.length > 0 ? item.types : ["*"];
+        const availableEventWidth =
+          itemTaggedFields.length > 0 ? w - maxTagW - 28 : w - 24;
+        const maxEventChars = Math.max(6, Math.floor(availableEventWidth / 6.5));
+
+        for (let eIdx = 0; eIdx < displayEvents.length; eIdx++) {
+          const eventY = rowY + 5 + eIdx * 22;
+          const isFirst = eIdx === 0;
+          const evName = displayEvents[eIdx];
+          const displayEv = truncateText(evName, maxEventChars);
+
+          const qText = new Text({
+            text: isFirst ? `◒ [${displayEv}]` : `[${displayEv}]`,
+            style: {
+              fontSize: 10,
+              fontWeight: "bold",
+              fontFamily: APP_FONT_FAMILY,
+              fill: 0x6d28d9,
+            },
+            resolution: textResolution,
+          });
+          qText.x = isFirst ? 10 : 22;
+          qText.y = eventY;
+          container.addChild(qText);
+        }
+
         const typesStr = item.types.length > 0 ? item.types.join(", ") : "*";
-        const displayQuery = truncateText(typesStr, maxQueryChars);
-
-        const qText = new Text({
-          text: `◒ [${displayQuery}]`,
-          style: {
-            fontSize: 10,
-            fontWeight: "bold",
-            fontFamily: APP_FONT_FAMILY,
-            fill: 0x6d28d9,
-          },
-          resolution: textResolution,
-        });
-        qText.x = 10;
-        qText.y = rowY + 5;
-        container.addChild(qText);
-
         hitZones.push({
           type: "queryItem",
-          bounds: { x: 0, y: rowY, width: w, height: rowHeight },
+          bounds: { x: 0, y: rowY, width: w, height: itemHeight },
           queryItemId: item.id,
           currentText: typesStr,
         });
 
-        renderY += rowHeight;
+        renderY += itemHeight;
       }
     }
 
