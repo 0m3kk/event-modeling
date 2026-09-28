@@ -25,9 +25,12 @@ import {
   createBackup,
   hasBackup,
   restoreBackup,
+  saveAutoSave,
 } from "@/utils/fileIO";
+import { DEFAULT_VIEWPORT } from "@/constants/canvas";
 import { JsonSchemaExportModal } from "./JsonSchemaExportModal";
 import { ExportImageModal } from "./ExportImageModal";
+import { NewBoardModal } from "./NewBoardModal";
 
 export function Header() {
   const objects = useCanvasStore((state) => state.objects);
@@ -73,6 +76,7 @@ export function Header() {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isJsonSchemaModalOpen, setIsJsonSchemaModalOpen] = useState(false);
   const [isExportImageModalOpen, setIsExportImageModalOpen] = useState(false);
+  const [isNewBoardModalOpen, setIsNewBoardModalOpen] = useState(false);
 
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -112,18 +116,33 @@ export function Header() {
     useCanvasStore.getState().setViewport({ zoom: 1 });
   };
 
-  const handleNewBoard = () => {
-    setIsFileMenuOpen(false);
-    if (objects.length > 0) {
-      const confirm = window.confirm(
-        "Start a new board? Current board will be backed up.",
-      );
-      if (!confirm) return;
+  const executeNewBoard = useCallback(() => {
+    setIsNewBoardModalOpen(false);
+    if (objects.length > 0 || groups.length > 0) {
       createBackup({ objects, groups, viewport, name: projectName });
     }
     useCanvasStore.getState().resetBoard([], [], "Untitled");
     clearHistory();
-  };
+    saveAutoSave({
+      objects: [],
+      groups: [],
+      viewport: {
+        ...DEFAULT_VIEWPORT,
+        screenWidth: viewport.screenWidth,
+        screenHeight: viewport.screenHeight,
+      },
+      name: "Untitled",
+    });
+  }, [objects, groups, viewport, projectName]);
+
+  const handleNewBoard = useCallback(() => {
+    setIsFileMenuOpen(false);
+    if (objects.length > 0 || groups.length > 0) {
+      setIsNewBoardModalOpen(true);
+    } else {
+      executeNewBoard();
+    }
+  }, [objects.length, groups.length, executeNewBoard]);
 
   const handleSaveFile = useCallback(() => {
     setIsFileMenuOpen(false);
@@ -143,18 +162,30 @@ export function Header() {
     downloadStormFile(JSON.parse(serialized), saveName);
   }, [isEditingTitle, titleInput, projectName, objects, groups, viewport, setProjectName]);
 
-  // Keyboard shortcut Cmd+S / Ctrl+S to save
+  // Keyboard shortcuts: Cmd+S / Ctrl+S to save, Cmd+N / Ctrl+N for new board
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       if (isCmdOrCtrl && e.code === "KeyS") {
         e.preventDefault();
         handleSaveFile();
+      } else if (isCmdOrCtrl && e.code === "KeyN") {
+        e.preventDefault();
+        handleNewBoard();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSaveFile]);
+  }, [handleSaveFile, handleNewBoard]);
 
   const handleOpenFileClick = () => {
     setIsFileMenuOpen(false);
@@ -286,27 +317,33 @@ export function Header() {
             </button>
 
             {isFileMenuOpen && (
-              <div className="absolute top-full left-0 mt-1 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
+              <div className="absolute top-full left-0 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
                 <button
                   onClick={handleNewBoard}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
                 >
-                  <FilePlus size={14} className="text-gray-400" />
-                  <span>New</span>
+                  <div className="flex items-center gap-2">
+                    <FilePlus size={14} className="text-gray-400" />
+                    <span>New</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-mono">⌘N</span>
                 </button>
                 <button
                   onClick={handleOpenFileClick}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
                 >
                   <FolderOpen size={14} className="text-gray-400" />
                   <span>Open</span>
                 </button>
                 <button
                   onClick={handleSaveFile}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
                 >
-                  <Save size={14} className="text-gray-400" />
-                  <span>Save</span>
+                  <div className="flex items-center gap-2">
+                    <Save size={14} className="text-gray-400" />
+                    <span>Save</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-mono">⌘S</span>
                 </button>
                 <div className="my-1 border-t border-gray-100" />
                 <button
@@ -464,6 +501,11 @@ export function Header() {
           setIsExportImageModalOpen(false);
           setIsJsonSchemaModalOpen(true);
         }}
+      />
+      <NewBoardModal
+        isOpen={isNewBoardModalOpen}
+        onClose={() => setIsNewBoardModalOpen(false)}
+        onConfirm={executeNewBoard}
       />
     </>
   );
