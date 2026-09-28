@@ -143,6 +143,7 @@ export function parseAndValidateStormFile(json: string): StormProjectFile {
 export function sanitizeFilename(name: string): string {
   const trimmed = (name || "").trim();
   const sanitized = trimmed
+    // eslint-disable-next-line no-control-regex
     .replace(/[/\\?%*:|"<>'\x00-\x1f]/g, "_")
     .replace(/\.+$/, "")
     .trim();
