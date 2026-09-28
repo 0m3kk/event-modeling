@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCanvasStore } from "@/store";
-import { MODEL_KIND_LABELS } from "@/constants/model";
-import { Check, Plus, Search, X } from "lucide-react";
+import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
+import { findModelByName } from "@/utils/modelResolution";
+import {
+  Boxes,
+  Brackets,
+  Check,
+  Link2,
+  ListTree,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 
 const PRIMITIVES = [
   "string",
@@ -371,26 +381,66 @@ export function TypeSelectPopover() {
         {/* Model References Section */}
         {filteredModels.length > 0 && (
           <div>
-            <div className="px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-purple-600 uppercase">
+            <div className="px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-slate-500 uppercase">
               Model Nodes
             </div>
             <div className="mt-0.5 space-y-0.5">
               {filteredModels.map((modelName) => {
                 const isSelected = baseType === modelName;
+                const targetModel = findModelByName(objects, modelName);
+                const kind = targetModel?.modelData?.kind ?? "object";
+                const kindColor = MODEL_KIND_COLORS[kind] ?? "#0891b2";
+
                 return (
                   <button
                     key={modelName}
                     onClick={() => handleSelectType(modelName)}
                     className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs font-mono transition-colors ${
                       isSelected
-                        ? "bg-purple-50 font-bold text-purple-700"
-                        : "text-purple-900 hover:bg-purple-50"
+                        ? "font-bold shadow-xs"
+                        : "text-slate-800 hover:bg-slate-50"
                     }`}
+                    style={
+                      isSelected
+                        ? {
+                            backgroundColor: `${kindColor}18`,
+                            color: kindColor,
+                          }
+                        : undefined
+                    }
                   >
-                    <span>{modelName}</span>
-                    {isSelected && (
-                      <Check size={13} className="text-purple-600" />
-                    )}
+                    <span className="flex items-center gap-1.5 truncate">
+                      {kind === "object" && (
+                        <Boxes size={13} style={{ color: kindColor }} className="shrink-0" />
+                      )}
+                      {kind === "enum" && (
+                        <ListTree size={13} style={{ color: kindColor }} className="shrink-0" />
+                      )}
+                      {kind === "array" && (
+                        <Brackets size={13} style={{ color: kindColor }} className="shrink-0" />
+                      )}
+                      {kind === "wrap" && (
+                        <Link2 size={13} style={{ color: kindColor }} className="shrink-0" />
+                      )}
+                      <span className="truncate" style={{ color: isSelected ? kindColor : "#1e293b" }}>
+                        {modelName}
+                      </span>
+                    </span>
+
+                    <span className="flex items-center gap-1 shrink-0 ml-1">
+                      <span
+                        className="rounded px-1 py-0.2 text-[9px] font-semibold uppercase tracking-wider"
+                        style={{
+                          backgroundColor: `${kindColor}18`,
+                          color: kindColor,
+                        }}
+                      >
+                        {kind}
+                      </span>
+                      {isSelected && (
+                        <Check size={13} style={{ color: kindColor }} />
+                      )}
+                    </span>
                   </button>
                 );
               })}

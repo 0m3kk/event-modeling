@@ -239,7 +239,7 @@ export function exportCanvasToSvg(
     </g>`);
     } else if (obj.type === "model" && obj.modelData) {
       const model = obj.modelData;
-      const headerColor = MODEL_KIND_COLORS[model.kind] || "#475569";
+      const headerColor = MODEL_KIND_COLORS[model.kind] || "#0891b2";
       const title = escapeXml(model.name);
 
       const fieldElements: string[] = [];

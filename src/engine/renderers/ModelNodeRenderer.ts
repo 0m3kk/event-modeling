@@ -30,7 +30,7 @@ export class ModelNodeRenderer {
     };
 
     const kind: ModelNodeKind = data.kind;
-    const kindColorHex = MODEL_KIND_COLORS[kind] ?? "#475569";
+    const kindColorHex = MODEL_KIND_COLORS[kind] ?? "#0891b2";
     const headerColor = parseInt(kindColorHex.replace("#", "0x"), 16);
     const kindLabel = MODEL_KIND_LABELS[kind] ?? kind;
     const rawTitle = data.name || obj.text || kindLabel;

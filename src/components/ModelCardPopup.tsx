@@ -1,22 +1,45 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useCanvasStore } from "@/store";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
-import {
-  findModelByName,
-  isModelType,
-} from "@/utils/modelResolution";
+import { findModelByName } from "@/utils/modelResolution";
+import { computeOptimalModelNodeWidth } from "@/utils/cardDimensions";
 import { getActivePixiEngine } from "@/engine/PixiEngine";
 import type { CanvasObject, ModelField } from "@/types";
 import {
   ArrowRight,
+  Boxes,
   Brackets,
-  Box,
   ChevronRight,
   Crosshair,
-  List,
-  Layers,
+  Link2,
+  ListTree,
   X,
 } from "lucide-react";
+
+function computePopupDimensions(
+  data: import("@/types").ModelData,
+  customWidth?: number,
+) {
+  const optimalWidth = computeOptimalModelNodeWidth(data, 260);
+  const width = Math.max(customWidth || 240, optimalWidth, 260);
+
+  let height = 44; // header height + border
+  if (data.description) {
+    height += 28;
+  }
+  const kind = data.kind;
+  if (kind === "object") {
+    const fieldCount = Math.max(1, (data.fields ?? []).length);
+    height += fieldCount * 32 + 12;
+  } else if (kind === "enum") {
+    const valCount = Math.max(1, (data.values ?? []).length);
+    height += valCount * 30 + 12;
+  } else if (kind === "array" || kind === "wrap") {
+    height += 80;
+  }
+
+  return { width, height };
+}
 
 export function ModelCardPopup() {
   const modelPopupChain = useCanvasStore((s) => s.modelPopupChain);
@@ -66,61 +89,95 @@ export function ModelCardPopup() {
     };
   }, [modelPopupChain.length, clearModelPopups]);
 
-  // Unified cascading layout calculation for all active popups
+  // Unified cascading layout calculation for all active popups with zoom scaling & content-fit
   const cardLayouts = useMemo(() => {
     if (modelPopupChain.length === 0) return [];
 
     const container = document.getElementById("canvas-container");
     const cWidth = container?.clientWidth || window.innerWidth || 1200;
     const cHeight = container?.clientHeight || window.innerHeight || 800;
-    const popupWidth = 250;
+    const zoom = viewport.zoom || 1;
     const gap = 8;
 
-    // 1. Determine Level 0 root anchor
+    // 1. Calculate unscaled dimensions for each popup in chain
+    const popupDims = modelPopupChain.map((entry) => {
+      const modelObj = objects.find((o) => o.id === entry.modelId);
+      if (!modelObj?.modelData) {
+        return { width: 260, height: 200 };
+      }
+      return computePopupDimensions(modelObj.modelData, modelObj.width);
+    });
+
+    // 2. Determine Level 0 root anchor
     const rootEntry = modelPopupChain[0];
     let baseLeft = 100;
     let baseTop = 100;
 
     if (rootEntry.worldAnchor) {
-      baseLeft = (rootEntry.worldAnchor.x - viewport.x) * viewport.zoom + gap;
-      baseTop = (rootEntry.worldAnchor.y - viewport.y) * viewport.zoom;
+      baseLeft = (rootEntry.worldAnchor.x - viewport.x) * zoom + gap * zoom;
+      baseTop = (rootEntry.worldAnchor.y - viewport.y) * zoom;
     } else if (rootEntry.anchorRect) {
-      baseLeft = rootEntry.anchorRect.x + gap;
+      baseLeft = rootEntry.anchorRect.x + gap * zoom;
       baseTop = rootEntry.anchorRect.y;
     }
 
-    // 2. Compute ideal positions for each level
+    // 3. Compute ideal positions for each level
     const idealLefts: number[] = [];
     const idealTops: number[] = [];
 
+    let currentLeft = baseLeft;
     for (let i = 0; i < modelPopupChain.length; i++) {
-      idealLefts.push(baseLeft + i * (popupWidth + gap));
+      idealLefts.push(currentLeft);
       if (i === 0) {
         idealTops.push(baseTop);
       } else {
-        const offset = modelPopupChain[i].rowOffsetFromParent ?? 40;
+        const offset = (modelPopupChain[i].rowOffsetFromParent ?? 40) * zoom;
         idealTops.push(idealTops[i - 1] + offset);
       }
+      currentLeft += (popupDims[i].width + gap) * zoom;
     }
 
-    // 3. Prevent chain from overflowing right edge by shifting the entire chain left
+    // 4. Prevent chain from overflowing right edge by shifting the entire chain left
     const lastIndex = modelPopupChain.length - 1;
-    const chainRight = idealLefts[lastIndex] + popupWidth;
+    const lastPopupRight =
+      idealLefts[lastIndex] + popupDims[lastIndex].width * zoom;
     let shiftX = 0;
-    if (chainRight > cWidth - 12) {
-      shiftX = chainRight - (cWidth - 12);
-      // Ensure we don't shift Level 0 further left than margin
+    if (lastPopupRight > cWidth - 12) {
+      shiftX = lastPopupRight - (cWidth - 12);
       const maxShift = Math.max(0, idealLefts[0] - 12);
       shiftX = Math.min(shiftX, maxShift);
     }
 
-    // 4. Output final clamped coordinates for each popup
+    // 5. Output final clamped coordinates, dimensions and zoom scale for each popup
     return modelPopupChain.map((_, i) => {
       const left = Math.max(12, idealLefts[i] - shiftX);
-      const top = Math.max(12, Math.min(cHeight - 220, idealTops[i]));
-      return { left, top };
+      const idealTop = idealTops[i];
+      const hScreen = popupDims[i].height * zoom;
+
+      // Vertical position clamping: shift up if it would overflow container bottom
+      let top = idealTop;
+      if (top + hScreen > cHeight - 16) {
+        top = Math.max(12, cHeight - hScreen - 16);
+      }
+      top = Math.max(12, top);
+
+      // Available unscaled height in screen viewport
+      const availScreenH = Math.max(200, cHeight - top - 12);
+      // If the estimated card height fits on screen, give generous headroom to prevent accidental scrolling
+      const maxHeight =
+        hScreen <= cHeight - 16
+          ? Math.max(popupDims[i].height + 80, availScreenH / zoom)
+          : availScreenH / zoom;
+
+      return {
+        left,
+        top,
+        width: popupDims[i].width,
+        maxHeight,
+        zoom,
+      };
     });
-  }, [modelPopupChain, viewport]);
+  }, [modelPopupChain, viewport, objects]);
 
   if (modelPopupChain.length === 0) return null;
 
@@ -137,7 +194,13 @@ export function ModelCardPopup() {
 
         const nextEntry = modelPopupChain[index + 1];
         const activeNextFieldId = nextEntry?.sourceFieldId;
-        const layout = cardLayouts[index] ?? { left: 100, top: 100 };
+        const layout = cardLayouts[index] ?? {
+          left: 100,
+          top: 100,
+          width: 260,
+          maxHeight: 600,
+          zoom: 1,
+        };
 
         return (
           <SingleModelPopupCard
@@ -149,6 +212,7 @@ export function ModelCardPopup() {
             activeNextFieldId={activeNextFieldId}
             onClose={() => closeModelPopup(entry.level)}
             onLocate={() => {
+              selectObject(modelObj.id);
               const engine = getActivePixiEngine();
               if (engine) {
                 const targetX = modelObj.x + (modelObj.width || 240) / 2;
@@ -157,7 +221,6 @@ export function ModelCardPopup() {
                   position: { x: targetX, y: targetY },
                   time: 300,
                 });
-                selectObject(modelObj.id);
               }
               clearModelPopups();
             }}
@@ -167,7 +230,8 @@ export function ModelCardPopup() {
 
               const rowRect = rowElem.getBoundingClientRect();
               const cardRect = cardElem.getBoundingClientRect();
-              const rowOffsetFromParent = rowRect.top - cardRect.top;
+              const zoom = viewport.zoom || 1;
+              const rowOffsetFromParent = (rowRect.top - cardRect.top) / zoom;
 
               openModelPopup({
                 modelId: targetModel.id,
@@ -185,7 +249,8 @@ export function ModelCardPopup() {
 
               const elemRect = elem.getBoundingClientRect();
               const cardRect = cardElem.getBoundingClientRect();
-              const rowOffsetFromParent = elemRect.top - cardRect.top;
+              const zoom = viewport.zoom || 1;
+              const rowOffsetFromParent = (elemRect.top - cardRect.top) / zoom;
 
               openModelPopup({
                 modelId: targetModel.id,
@@ -208,7 +273,13 @@ interface SingleModelPopupCardProps {
   entry: import("@/store").ModelPopupEntry;
   modelObj: CanvasObject;
   allObjects: CanvasObject[];
-  position: { left: number; top: number };
+  position: {
+    left: number;
+    top: number;
+    width: number;
+    maxHeight: number;
+    zoom: number;
+  };
   activeNextFieldId?: string;
   onClose: () => void;
   onLocate: () => void;
@@ -238,33 +309,39 @@ function SingleModelPopupCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const data = modelObj.modelData!;
   const kind = data.kind;
-  const kindColor = MODEL_KIND_COLORS[kind] ?? "#2563eb";
+  const kindColor = MODEL_KIND_COLORS[kind] ?? "#0891b2";
   const kindLabel = MODEL_KIND_LABELS[kind] ?? kind;
   const modelName = data.name || modelObj.text || kindLabel;
 
   return (
     <div
-      ref={cardRef}
-      data-model-popup
-      className="pointer-events-auto absolute flex flex-col rounded-lg border border-slate-200 bg-white shadow-2xl transition-all duration-150 animate-in fade-in zoom-in-95"
       style={{
+        position: "absolute",
         left: `${position.left}px`,
         top: `${position.top}px`,
-        width: "250px",
-        maxHeight: "420px",
         zIndex: 35 + entry.level,
       }}
     >
+      <div
+        ref={cardRef}
+        data-model-popup
+        className="pointer-events-auto flex flex-col rounded-lg border border-slate-200 bg-white shadow-2xl animate-in fade-in"
+        style={{
+          zoom: position.zoom,
+          width: `${position.width}px`,
+          maxHeight: `${position.maxHeight}px`,
+        }}
+      >
       {/* Header */}
       <div
         className="flex items-center justify-between rounded-t-lg px-3 py-2 text-white select-none"
         style={{ backgroundColor: kindColor }}
       >
         <div className="flex min-w-0 items-center gap-2">
-          {kind === "object" && <Brackets className="h-4 w-4 shrink-0 opacity-90" />}
-          {kind === "enum" && <List className="h-4 w-4 shrink-0 opacity-90" />}
-          {kind === "array" && <Layers className="h-4 w-4 shrink-0 opacity-90" />}
-          {kind === "wrap" && <Box className="h-4 w-4 shrink-0 opacity-90" />}
+          {kind === "object" && <Boxes className="h-4 w-4 shrink-0 opacity-90" />}
+          {kind === "enum" && <ListTree className="h-4 w-4 shrink-0 opacity-90" />}
+          {kind === "array" && <Brackets className="h-4 w-4 shrink-0 opacity-90" />}
+          {kind === "wrap" && <Link2 className="h-4 w-4 shrink-0 opacity-90" />}
           <span className="truncate text-xs font-bold leading-tight" title={modelName}>
             {modelName}
           </span>
@@ -310,7 +387,10 @@ function SingleModelPopupCard({
               </div>
             ) : (
               (data.fields ?? []).map((field, idx) => {
-                const isModel = isModelType(allObjects, field.fieldType);
+                const targetModel = findModelByName(allObjects, field.fieldType);
+                const isModel = Boolean(targetModel);
+                const targetKind = targetModel?.modelData?.kind;
+                const targetColor = targetKind ? MODEL_KIND_COLORS[targetKind] : kindColor;
                 const isActive = activeNextFieldId === field.id;
 
                 return (
@@ -321,9 +401,17 @@ function SingleModelPopupCard({
                         onFieldClick(field, e.currentTarget, cardRef.current);
                       }
                     }}
+                    style={
+                      isActive
+                        ? {
+                            backgroundColor: `${targetColor}12`,
+                            borderLeft: `3px solid ${targetColor}`,
+                          }
+                        : undefined
+                    }
                     className={`flex items-center justify-between px-3 py-1.5 text-xs transition-colors ${
                       isActive
-                        ? "bg-blue-50 border-l-2 border-l-blue-600 font-medium"
+                        ? "font-medium"
                         : isModel
                           ? "hover:bg-slate-50 cursor-pointer"
                           : ""
@@ -342,15 +430,24 @@ function SingleModelPopupCard({
                     </div>
 
                     <div className="shrink-0">
-                      {isModel ? (
+                      {isModel && targetKind ? (
                         <div
-                          className="flex items-center gap-1 rounded border border-blue-200 bg-blue-50/90 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors shadow-xs"
-                          title={`Click to preview model ${field.fieldType}`}
+                          className="flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold transition-colors shadow-xs"
+                          style={{
+                            borderColor: `${targetColor}40`,
+                            backgroundColor: `${targetColor}12`,
+                            color: targetColor,
+                          }}
+                          title={`Click to preview ${targetKind} ${field.fieldType}`}
                         >
-                          <span className="truncate max-w-22.5">
+                          {targetKind === "object" && <Boxes className="h-3 w-3 shrink-0" />}
+                          {targetKind === "enum" && <ListTree className="h-3 w-3 shrink-0" />}
+                          {targetKind === "array" && <Brackets className="h-3 w-3 shrink-0" />}
+                          {targetKind === "wrap" && <Link2 className="h-3 w-3 shrink-0" />}
+                          <span className="truncate max-w-44">
                             {field.fieldType}
                           </span>
-                          <ChevronRight className="h-3 w-3 shrink-0 text-blue-500" />
+                          <ChevronRight className="h-3 w-3 shrink-0 opacity-70" />
                         </div>
                       ) : (
                         <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
@@ -394,7 +491,10 @@ function SingleModelPopupCard({
           <div className="p-3">
             {(() => {
               const itemType = data.itemType || "any";
-              const isModel = isModelType(allObjects, itemType);
+              const targetModel = findModelByName(allObjects, itemType);
+              const isModel = Boolean(targetModel);
+              const targetKind = targetModel?.modelData?.kind;
+              const targetColor = targetKind ? MODEL_KIND_COLORS[targetKind] : kindColor;
 
               return (
                 <div
@@ -404,20 +504,42 @@ function SingleModelPopupCard({
                     }
                   }}
                   className={`rounded-md border p-2 text-xs transition-colors ${
-                    isModel
-                      ? "border-red-200 bg-red-50/60 hover:bg-red-50 cursor-pointer"
-                      : "border-slate-200 bg-slate-50"
+                    isModel ? "cursor-pointer hover:opacity-95" : ""
                   }`}
+                  style={
+                    isModel
+                      ? {
+                          borderColor: `${targetColor}50`,
+                          backgroundColor: `${targetColor}10`,
+                        }
+                      : {
+                          borderColor: "#e2e8f0",
+                          backgroundColor: "#f8fafc",
+                        }
+                  }
                 >
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
                     Array Element
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-red-700">
-                      {itemType}[]
+                    <span
+                      className="font-bold flex items-center gap-1.5"
+                      style={{ color: isModel ? targetColor : kindColor }}
+                    >
+                      {isModel && targetKind === "object" && <Boxes className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "enum" && <ListTree className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "array" && <Brackets className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "wrap" && <Link2 className="h-3.5 w-3.5 shrink-0" />}
+                      <span>{itemType}[]</span>
                     </span>
                     {isModel && (
-                      <span className="flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                      <span
+                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold shadow-xs"
+                        style={{
+                          backgroundColor: `${targetColor}20`,
+                          color: targetColor,
+                        }}
+                      >
                         Preview <ArrowRight className="h-3 w-3" />
                       </span>
                     )}
@@ -432,7 +554,10 @@ function SingleModelPopupCard({
           <div className="p-3">
             {(() => {
               const innerType = data.innerType || "any";
-              const isModel = isModelType(allObjects, innerType);
+              const targetModel = findModelByName(allObjects, innerType);
+              const isModel = Boolean(targetModel);
+              const targetKind = targetModel?.modelData?.kind;
+              const targetColor = targetKind ? MODEL_KIND_COLORS[targetKind] : kindColor;
 
               return (
                 <div
@@ -442,20 +567,42 @@ function SingleModelPopupCard({
                     }
                   }}
                   className={`rounded-md border p-2 text-xs transition-colors ${
-                    isModel
-                      ? "border-amber-200 bg-amber-50/60 hover:bg-amber-50 cursor-pointer"
-                      : "border-slate-200 bg-slate-50"
+                    isModel ? "cursor-pointer hover:opacity-95" : ""
                   }`}
+                  style={
+                    isModel
+                      ? {
+                          borderColor: `${targetColor}50`,
+                          backgroundColor: `${targetColor}10`,
+                        }
+                      : {
+                          borderColor: "#e2e8f0",
+                          backgroundColor: "#f8fafc",
+                        }
+                  }
                 >
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
                     Wrapped Target
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-700">
-                      {innerType}
+                    <span
+                      className="font-bold flex items-center gap-1.5"
+                      style={{ color: isModel ? targetColor : kindColor }}
+                    >
+                      {isModel && targetKind === "object" && <Boxes className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "enum" && <ListTree className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "array" && <Brackets className="h-3.5 w-3.5 shrink-0" />}
+                      {isModel && targetKind === "wrap" && <Link2 className="h-3.5 w-3.5 shrink-0" />}
+                      <span>{innerType}</span>
                     </span>
                     {isModel && (
-                      <span className="flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                      <span
+                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold shadow-xs"
+                        style={{
+                          backgroundColor: `${targetColor}20`,
+                          color: targetColor,
+                        }}
+                      >
                         Preview <ArrowRight className="h-3 w-3" />
                       </span>
                     )}
@@ -467,5 +614,6 @@ function SingleModelPopupCard({
         )}
       </div>
     </div>
-  );
+  </div>
+);
 }

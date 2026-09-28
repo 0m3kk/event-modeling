@@ -5,7 +5,7 @@ import type { ModelNodeKind } from "@/types";
  */
 
 export const MODEL_KIND_COLORS: Record<ModelNodeKind, string> = {
-  object: "#475569", // slate
+  object: "#0891b2", // cyan
   array: "#dc2626", // red
   wrap: "#ca8a04", // yellow
   enum: "#65a30d", // lime

@@ -1255,7 +1255,6 @@ export class PixiEngine {
     let prevGroups = useCanvasStore.getState().groups;
     let prevStormSelectedField = useCanvasStore.getState().stormSelectedField;
     let prevStormActionHover = useCanvasStore.getState().stormActionHover;
-    let prevModelPopupChain = useCanvasStore.getState().modelPopupChain;
     let prevViewport = useCanvasStore.getState().viewport;
 
     this.storeUnsubscribe = useCanvasStore.subscribe((state) => {
@@ -1285,11 +1284,6 @@ export class PixiEngine {
       // Hovering an action badge toggles the authorized-actor highlights
       if (state.stormActionHover !== prevStormActionHover) {
         prevStormActionHover = state.stormActionHover;
-        needsRender = true;
-      }
-
-      if (state.modelPopupChain !== prevModelPopupChain) {
-        prevModelPopupChain = state.modelPopupChain;
         needsRender = true;
       }
 
@@ -1381,9 +1375,8 @@ export class PixiEngine {
     this.connectorLayer.renderConnectors(objects, groups, selectedIds);
     this.groupLayer.renderGroups(groups, objects, zoom, selectedIds);
 
-    // 5. Visual Link Layer (Real-time DCB highlights, Actor Hover highlights, or Model Popup highlights)
+    // 5. Visual Link Layer (Real-time DCB highlights or Actor Hover highlights)
     const stormActionHover = useCanvasStore.getState().stormActionHover;
-    const modelPopupChain = useCanvasStore.getState().modelPopupChain;
     const selectedStateCard = objects.find(
       (o) =>
         selectedIds.includes(o.id) &&
@@ -1394,11 +1387,6 @@ export class PixiEngine {
     if (stormActionHover) {
       const authorizedActors = getAuthorizedActors(objects, stormActionHover);
       this.visualLinkLayer.renderHighlights(authorizedActors);
-    } else if (modelPopupChain.length > 0) {
-      const popupModels = objects.filter((o) =>
-        modelPopupChain.some((p) => p.modelId === o.id),
-      );
-      this.visualLinkLayer.renderHighlights(popupModels);
     } else if (selectedStateCard) {
       const matchingIds = collectMatchingEventIds(objects, selectedStateCard);
       const matchingEvents = objects.filter((o) => matchingIds.includes(o.id));
