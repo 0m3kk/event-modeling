@@ -14,8 +14,19 @@ import {
 export class CardLayer extends Container {
   private cardContainers: Map<string, Container> = new Map();
   private cardZones: Map<string, CardHitZone[]> = new Map();
+  /**
+   * Signature of the inputs each card was last drawn with. When it is unchanged
+   * the card keeps its existing Text/Graphics children — a move only needs to
+   * reposition the container, not re-rasterize every label.
+   */
+  private cardDrawKeys: Map<string, string> = new Map();
   /** Cursor shown while hovering a card; driven by the active tool. */
   private cardCursor: string = "default";
+
+  // Stable identity tokens for storm/model data objects. Store updates replace
+  // these objects on edit, so an identity change is exactly a content change.
+  private dataTokens: WeakMap<object, number> = new WeakMap();
+  private nextDataToken: number = 0;
 
   public onCardPointerDown?: (
     id: string,
@@ -26,6 +37,38 @@ export class CardLayer extends Container {
   constructor() {
     super();
     this.zIndex = Z_INDICES.CARDS;
+  }
+
+  private tokenFor(data: object | undefined): number {
+    if (!data) return 0;
+    let token = this.dataTokens.get(data);
+    if (token === undefined) {
+      token = ++this.nextDataToken;
+      this.dataTokens.set(data, token);
+    }
+    return token;
+  }
+
+  /**
+   * Fingerprint of every model object's data. Field type pills resolve their
+   * styling from other cards, so a model edit must still invalidate the cards
+   * referencing it — without rebuilding the whole card set.
+   */
+  private computeModelsKey(objects: CanvasObject[]): string {
+    let key = "";
+    for (const obj of objects) {
+      if (obj.type !== "model") continue;
+      key += `${obj.id}:${this.tokenFor(obj.modelData)}:${obj.modelData?.name ?? ""};`;
+    }
+    return key;
+  }
+
+  /**
+   * Forces the next render to redraw every card. Used by export, which needs
+   * an unculled, unselected snapshot regardless of cached draw state.
+   */
+  public invalidateAllCards(): void {
+    this.cardDrawKeys.clear();
   }
 
   /**
@@ -45,6 +88,7 @@ export class CardLayer extends Container {
     zoom: number = 1,
     selectedIds: string[] = [],
     selectedField?: string | { objectId: string; fieldId?: string } | null,
+    allObjects: CanvasObject[] = objects,
   ): void {
     const currentIds = new Set(objects.map((o) => o.id));
 
@@ -59,11 +103,17 @@ export class CardLayer extends Container {
         container.destroy({ children: true });
         this.cardContainers.delete(id);
         this.cardZones.delete(id);
+        this.cardDrawKeys.delete(id);
       }
     }
 
-    // Build model lookup map for resolving model types and styling field pills
-    const modelsMap = buildModelMap(objects);
+    if (objects.length === 0) return;
+
+    // Model lookup is built from every object — not just the visible ones — so
+    // a card styles its field pills correctly even when the model it points at
+    // is off-screen, and so the key below stays stable while panning.
+    const modelsMap = buildModelMap(allObjects);
+    const modelsKey = this.computeModelsKey(allObjects);
 
     // Render or update each card
     for (const obj of objects) {
@@ -89,7 +139,7 @@ export class CardLayer extends Container {
         this.cardContainers.set(obj.id, card);
       }
 
-      // Update position
+      // Moving a card is just a transform change — no need to redraw it.
       card.x = obj.x;
       card.y = obj.y;
 
@@ -100,6 +150,28 @@ export class CardLayer extends Container {
           : selectedField?.objectId === obj.id
             ? selectedField.fieldId
             : undefined;
+
+      // Everything the renderers read, folded into one signature. Only when it
+      // changes do we throw away and rebuild the card's children.
+      const drawKey = [
+        textResolution,
+        isSelected ? 1 : 0,
+        cardSelectedFieldId ?? "",
+        obj.width,
+        obj.type,
+        obj.text ?? "",
+        obj.fill ?? "",
+        obj.stroke ?? "",
+        obj.referenceId ?? "",
+        obj.type === "storm"
+          ? this.tokenFor(obj.stormData)
+          : obj.type === "model"
+            ? this.tokenFor(obj.modelData)
+            : 0,
+        modelsKey,
+      ].join("|");
+
+      if (this.cardDrawKeys.get(obj.id) === drawKey) continue;
 
       // Delegate drawing to specialized renderers
       let result;
@@ -126,6 +198,8 @@ export class CardLayer extends Container {
       } else if (obj.type === "textBox") {
         result = TextBoxRenderer.draw(card, obj, textResolution, isSelected);
       }
+
+      this.cardDrawKeys.set(obj.id, drawKey);
 
       if (result) {
         this.cardZones.set(obj.id, result.hitZones);
@@ -171,6 +245,7 @@ export class CardLayer extends Container {
     }
     this.cardContainers.clear();
     this.cardZones.clear();
+    this.cardDrawKeys.clear();
     super.destroy(options);
   }
 }

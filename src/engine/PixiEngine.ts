@@ -7,7 +7,11 @@ import {
   getGroupAt,
   computeGroupBounds,
 } from "./layers/GroupLayer";
-import { ElbowConnectorLayer, type AnchorMarker } from "./layers/ElbowConnectorLayer";
+import {
+  ElbowConnectorLayer,
+  buildConnectorLookup,
+  type AnchorMarker,
+} from "./layers/ElbowConnectorLayer";
 import { VisualLinkLayer } from "./layers/VisualLinkLayer";
 import { CardLayer } from "./layers/CardLayer";
 import {
@@ -65,6 +69,21 @@ export class PixiEngine {
   private storeUnsubscribe: (() => void) | null = null;
   private isDestroyed: boolean = false;
   private initPromise: Promise<void> | null = null;
+
+  // Render scheduling. Interaction handlers only flag *what* changed; the
+  // actual redraw is coalesced into a single requestAnimationFrame tick so a
+  // burst of pointermove/zoom events can never paint more than once per frame.
+  private renderQueued: boolean = false;
+  private viewDirty: boolean = false;
+  private contentDirty: boolean = false;
+  private lastRenderZoom: number = -1;
+
+  // Snapshot of the geometry currently inside the spatial index, so moving a
+  // handful of cards updates those entries instead of rebuilding the tree.
+  private indexedGeometry: Map<
+    string,
+    { x: number; y: number; width: number; height: number }
+  > = new Map();
 
   // Interaction State
   private isSpaceHeld: boolean = false;
@@ -202,22 +221,63 @@ export class PixiEngine {
 
       // Initial render
       this.syncSpatialIndex();
-      this.render();
+      this.flushRender();
     })();
 
     return this.initPromise;
   }
 
   private setupViewportEvents(): void {
+    // A pan only changes the camera transform — the layers already live inside
+    // the viewport, so cards/connectors/groups need no redraw. Only the grid
+    // (which is generated for the visible region) and the culling set follow.
     this.viewport.on("moved", () => {
-      this.syncViewportToStore();
-      this.render();
+      this.invalidateView();
     });
 
+    // A zoom changes zoom-dependent things too (text rasterization, handle
+    // sizes), so treat it as a full content invalidation.
     this.viewport.on("zoomed", () => {
-      this.syncViewportToStore();
-      this.render();
+      this.invalidateAll();
     });
+  }
+
+  /** Flags a camera-only change (pan/resize). */
+  public invalidateView(): void {
+    this.viewDirty = true;
+    this.scheduleRender();
+  }
+
+  /** Flags a change to card/connector/group content or styling. */
+  public invalidateContent(): void {
+    this.contentDirty = true;
+    this.scheduleRender();
+  }
+
+  /** Flags anything that needs a full repaint. */
+  public invalidateAll(): void {
+    this.viewDirty = true;
+    this.contentDirty = true;
+    this.scheduleRender();
+  }
+
+  /**
+   * Coalesces every invalidation that happens within a frame into one paint.
+   * Replaces direct `render()` calls so a 1000 Hz mouse can't outrun the
+   * display refresh.
+   */
+  private scheduleRender(): void {
+    if (this.renderQueued || this.isDestroyed) return;
+    this.renderQueued = true;
+    requestAnimationFrame(() => {
+      this.renderQueued = false;
+      this.flushRender();
+    });
+  }
+
+  /** Public entry point kept for callers that want a repaint scheduled. */
+  public render(): void {
+    this.invalidateAll();
   }
 
   private syncViewportToStore(): void {
@@ -360,6 +420,7 @@ export class PixiEngine {
     const { objects, groups } = useCanvasStore.getState();
     const threshold = CONNECTOR_HIT_SLOP / (this.viewport.scaled || 1);
     const point = { x: worldX, y: worldY };
+    const lookup = buildConnectorLookup(objects, groups);
 
     let best: CanvasObject | null = null;
     let bestDist = threshold;
@@ -372,6 +433,7 @@ export class PixiEngine {
         obj,
         objects,
         groups,
+        lookup,
       );
       if (!points) continue;
 
@@ -933,8 +995,7 @@ export class PixiEngine {
             this.viewport.corner.y - moveY,
           );
           this.lastPanPointer = { x: e.clientX, y: e.clientY };
-          this.syncViewportToStore();
-          this.render();
+          this.invalidateView();
           return;
         }
       }
@@ -1240,8 +1301,7 @@ export class PixiEngine {
         if (width > 0 && height > 0) {
           this.app.renderer.resize(width, height);
           this.viewport.resize(width, height);
-          this.syncViewportToStore();
-          this.render();
+          this.invalidateAll();
         }
       }
     });
@@ -1258,33 +1318,33 @@ export class PixiEngine {
     let prevViewport = useCanvasStore.getState().viewport;
 
     this.storeUnsubscribe = useCanvasStore.subscribe((state) => {
-      let needsRender = false;
+      let contentChanged = false;
 
       if (state.objects !== prevObjects) {
         prevObjects = state.objects;
-        this.syncSpatialIndex();
-        needsRender = true;
+        this.syncSpatialIndexIncremental(state.objects);
+        contentChanged = true;
       }
 
       if (state.selectedIds !== prevSelectedIds) {
         prevSelectedIds = state.selectedIds;
-        needsRender = true;
+        contentChanged = true;
       }
 
       if (state.groups !== prevGroups) {
         prevGroups = state.groups;
-        needsRender = true;
+        contentChanged = true;
       }
 
       if (state.stormSelectedField !== prevStormSelectedField) {
         prevStormSelectedField = state.stormSelectedField;
-        needsRender = true;
+        contentChanged = true;
       }
 
       // Hovering an action badge toggles the authorized-actor highlights
       if (state.stormActionHover !== prevStormActionHover) {
         prevStormActionHover = state.stormActionHover;
-        needsRender = true;
+        contentChanged = true;
       }
 
       if (state.tool !== prevTool) {
@@ -1313,15 +1373,17 @@ export class PixiEngine {
             } else {
               // Zoom changed only (e.g. Header Zoom buttons); keep center stable
               this.viewport.setZoom(vp.zoom, true);
-              this.syncViewportToStore();
             }
-            needsRender = true;
+            // An external camera change (zoom controls, search jump, restore)
+            // repaints everything.
+            this.invalidateAll();
+            return;
           }
         }
       }
 
-      if (needsRender) {
-        this.render();
+      if (contentChanged) {
+        this.invalidateContent();
       }
     });
   }
@@ -1332,10 +1394,81 @@ export class PixiEngine {
     // their own, so they stay out of the card spatial index (hit-testing them
     // happens against their resolved elbow path instead).
     this.spatialIndex.load(objects.filter((o) => o.type !== "connector"));
+    this.indexedGeometry.clear();
+    for (const o of objects) {
+      if (o.type === "connector") continue;
+      this.indexedGeometry.set(o.id, {
+        x: o.x,
+        y: o.y,
+        width: o.width,
+        height: o.height,
+      });
+    }
   }
 
-  public render(): void {
-    if (!this.viewport) return;
+  /**
+   * Keeps the spatial index in step with a new objects array without rebuilding
+   * the whole RBush tree. Store updates are immutable, so an entry only needs
+   * touching when its object reference — or its geometry — actually changed.
+   */
+  private syncSpatialIndexIncremental(objects: CanvasObject[]): void {
+    const nextIds = new Set<string>();
+
+    for (const obj of objects) {
+      if (obj.type === "connector") continue;
+      nextIds.add(obj.id);
+
+      const prev = this.indexedGeometry.get(obj.id);
+      if (!prev) {
+        this.spatialIndex.insert(obj);
+      } else if (
+        prev.x !== obj.x ||
+        prev.y !== obj.y ||
+        prev.width !== obj.width ||
+        prev.height !== obj.height
+      ) {
+        this.spatialIndex.update(obj);
+      } else {
+        continue;
+      }
+
+      this.indexedGeometry.set(obj.id, {
+        x: obj.x,
+        y: obj.y,
+        width: obj.width,
+        height: obj.height,
+      });
+    }
+
+    for (const id of this.indexedGeometry.keys()) {
+      if (!nextIds.has(id)) {
+        this.spatialIndex.remove(id);
+        this.indexedGeometry.delete(id);
+      }
+    }
+  }
+
+  /**
+   * The single paint pass. Runs at most once per animation frame; the dirty
+   * flags decide how much of the scene has to be rebuilt:
+   *
+   * - view-only (pan/resize): grid + culling. Cards keep their geometry and
+   *   styling; scrolling simply reveals/hides them.
+   * - content (objects, selection, zoom): cards redraw their contents, plus
+   *   connectors, groups, visual links and gizmos.
+   */
+  private flushRender(): void {
+    if (!this.viewport || this.isDestroyed) return;
+
+    const zoom = this.viewport.scaled || 1;
+    // Zoom changes text rasterization and handle sizes, so it forces content.
+    const zoomChanged = Math.abs(zoom - this.lastRenderZoom) > 0.0005;
+    const viewDirty = this.viewDirty;
+    const contentDirty = this.contentDirty || zoomChanged;
+
+    this.viewDirty = false;
+    this.contentDirty = false;
+    this.lastRenderZoom = zoom;
 
     const vb = this.viewport.getVisibleBounds();
     const visibleBounds = {
@@ -1344,63 +1477,76 @@ export class PixiEngine {
       right: vb.x + vb.width,
       bottom: vb.y + vb.height,
     };
-    const zoom = this.viewport.scaled;
 
-    // 1. Grid
+    // 1. Grid follows the visible region.
     this.gridLayer.renderGrid(visibleBounds, zoom);
 
-    // 2. Spatial Culling for Cards
-    const visibleIds = new Set(
-      this.spatialIndex.search({
-        minX: visibleBounds.left - 50,
-        minY: visibleBounds.top - 50,
-        maxX: visibleBounds.right + 50,
-        maxY: visibleBounds.bottom + 50,
-      }),
-    );
+    // 2. Publish the camera once per frame (coalesced).
+    if (viewDirty) {
+      this.syncViewportToStore();
+    }
 
     const { objects, selectedIds, groups, stormSelectedField } =
       useCanvasStore.getState();
-    const visibleObjects = objects.filter((o) => visibleIds.has(o.id));
 
-    // 3. Render Cards
-    this.cardLayer.renderCards(
-      visibleObjects,
-      zoom,
-      selectedIds,
-      stormSelectedField,
-    );
+    // 3. Cull cards, then render. A viewport-and-a-half of margin keeps
+    // off-screen cards alive across small pans so they don't get destroyed and
+    // re-rasterized every frame; only newly revealed cards are drawn.
+    if (viewDirty || contentDirty) {
+      const margin = Math.max(vb.width, vb.height) * 0.5;
+      const visibleIds = new Set(
+        this.spatialIndex.search({
+          minX: visibleBounds.left - margin,
+          minY: visibleBounds.top - margin,
+          maxX: visibleBounds.right + margin,
+          maxY: visibleBounds.bottom + margin,
+        }),
+      );
+      const visibleObjects = objects.filter(
+        (o) => o.type !== "connector" && visibleIds.has(o.id),
+      );
 
-    // 4. Render Connectors & Groups
-    this.connectorLayer.renderConnectors(objects, groups, selectedIds);
-    this.groupLayer.renderGroups(groups, objects, zoom, selectedIds);
-
-    // 5. Visual Link Layer (Real-time DCB highlights or Actor Hover highlights)
-    const stormActionHover = useCanvasStore.getState().stormActionHover;
-    const selectedStateCard = objects.find(
-      (o) =>
-        selectedIds.includes(o.id) &&
-        o.type === "storm" &&
-        (o.stormData?.kind === "state" || o.stormData?.kind === "constraint"),
-    );
-
-    if (stormActionHover) {
-      const authorizedActors = getAuthorizedActors(objects, stormActionHover);
-      this.visualLinkLayer.renderHighlights(authorizedActors);
-    } else if (selectedStateCard) {
-      const matchingIds = collectMatchingEventIds(objects, selectedStateCard);
-      const matchingEvents = objects.filter((o) => matchingIds.includes(o.id));
-      this.visualLinkLayer.renderHighlights(matchingEvents);
-    } else {
-      this.visualLinkLayer.clearHighlights();
+      this.cardLayer.renderCards(
+        visibleObjects,
+        zoom,
+        selectedIds,
+        stormSelectedField,
+        objects,
+      );
     }
 
-    // 6. Render Selection Gizmos for Cards
-    const selectedObjects = objects.filter((o) => selectedIds.includes(o.id));
-    this.gizmoLayer.renderSelection(
-      selectedObjects,
-      this.viewport.scaled || 1,
-    );
+    // 4. Connectors, groups, links and gizmos only depend on content — the
+    // viewport transform already moves them during a pan.
+    if (contentDirty) {
+      this.connectorLayer.renderConnectors(objects, groups, selectedIds);
+      this.groupLayer.renderGroups(groups, objects, zoom, selectedIds);
+
+      // Visual Link Layer (Real-time DCB highlights or Actor Hover highlights)
+      const stormActionHover = useCanvasStore.getState().stormActionHover;
+      const selectedStateCard = objects.find(
+        (o) =>
+          selectedIds.includes(o.id) &&
+          o.type === "storm" &&
+          (o.stormData?.kind === "state" || o.stormData?.kind === "constraint"),
+      );
+
+      if (stormActionHover) {
+        const authorizedActors = getAuthorizedActors(objects, stormActionHover);
+        this.visualLinkLayer.renderHighlights(authorizedActors);
+      } else if (selectedStateCard) {
+        const matchingIds = collectMatchingEventIds(objects, selectedStateCard);
+        const matchingEvents = objects.filter((o) =>
+          matchingIds.includes(o.id),
+        );
+        this.visualLinkLayer.renderHighlights(matchingEvents);
+      } else {
+        this.visualLinkLayer.clearHighlights();
+      }
+
+      // Selection gizmos for cards
+      const selectedObjects = objects.filter((o) => selectedIds.includes(o.id));
+      this.gizmoLayer.renderSelection(selectedObjects, zoom);
+    }
   }
 
   public async destroy(): Promise<void> {
@@ -1445,7 +1591,9 @@ export class PixiEngine {
     this.gizmoLayer.visible = false;
     this.visualLinkLayer.visible = false;
 
-    // Render all cards, connectors and groups unculled
+    // Render all cards, connectors and groups unculled. Cards may currently be
+    // styled for the live selection/zoom, so force a full redraw for the export.
+    this.cardLayer.invalidateAllCards();
     this.cardLayer.renderCards(objects, 1, []);
     this.connectorLayer.renderConnectors(objects, groups, []);
     this.groupLayer.renderGroups(groups, objects, 1, []);
@@ -1488,6 +1636,9 @@ export class PixiEngine {
       this.gridLayer.visible = prevGrid;
       this.gizmoLayer.visible = prevGizmo;
       this.visualLinkLayer.visible = prevLink;
+      // Cards were just redrawn for the export; the next frame restores the
+      // live selection/zoom styling.
+      this.cardLayer.invalidateAllCards();
       this.render();
     }
   }

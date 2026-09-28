@@ -414,9 +414,22 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       setViewport: (viewportPatch) => {
-        set((state) => ({
-          viewport: { ...state.viewport, ...viewportPatch },
-        }));
+        set((state) => {
+          const current = state.viewport;
+          const next = { ...current, ...viewportPatch };
+          // Pan/zoom publishes land here once per frame; skip the store write
+          // (and every React subscriber it would wake) when nothing moved.
+          if (
+            next.x === current.x &&
+            next.y === current.y &&
+            next.zoom === current.zoom &&
+            next.screenWidth === current.screenWidth &&
+            next.screenHeight === current.screenHeight
+          ) {
+            return {};
+          }
+          return { viewport: next };
+        });
       },
 
       setGroups: (groups) => set({ groups }),

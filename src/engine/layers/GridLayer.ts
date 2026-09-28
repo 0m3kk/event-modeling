@@ -44,11 +44,14 @@ export class GridLayer extends Container {
     const dotRadius = Math.max(1, 1.2 / Math.sqrt(zoom));
     const alpha = Math.min(0.5, 0.3 * Math.sqrt(zoom));
 
+    // Accumulate every dot into one path and fill once. Calling fill() per dot
+    // would push thousands of separate instructions (one per grid point).
     for (let x = startX; x <= endX; x += step) {
       for (let y = startY; y <= endY; y += step) {
-        this.graphics.circle(x, y, dotRadius).fill({ color: 0x9ca3af, alpha });
+        this.graphics.circle(x, y, dotRadius);
       }
     }
+    this.graphics.fill({ color: 0x9ca3af, alpha });
   }
 
   public override destroy(

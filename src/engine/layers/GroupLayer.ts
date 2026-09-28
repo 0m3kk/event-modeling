@@ -127,6 +127,12 @@ export function getGroupAt(
 export class GroupLayer extends Container {
   private graphics: Graphics;
   private labelsContainer: Container;
+  /**
+   * Cached group title nodes keyed by group id. The label rasterization only
+   * depends on the title text and the zoom-derived resolution, so dragging or
+   * panning just repositions existing nodes instead of rebuilding them.
+   */
+  private labelNodes: Map<string, { node: Text; key: string }> = new Map();
 
   constructor() {
     super();
@@ -144,11 +150,12 @@ export class GroupLayer extends Container {
     selectedIds: string[] = [],
   ): void {
     this.graphics.clear();
-    this.labelsContainer.removeChildren();
 
     const dpr =
       typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
     const textResolution = computeTextResolution(zoom, dpr);
+
+    const activeLabelIds = new Set<string>();
 
     for (const group of groups) {
       const bounds = computeGroupBounds(group, objects, groups);
@@ -196,16 +203,27 @@ export class GroupLayer extends Container {
         : 0x6366f1;
 
       const title = group.name || "Group";
-      const label = new Text({
-        text: title,
-        style: {
-          fontSize: 11,
-          fontFamily: APP_FONT_FAMILY,
-          fontWeight: "bold",
-          fill: 0xffffff,
-        },
-        resolution: textResolution,
-      });
+      const labelKey = `${title}|${textResolution}`;
+      let entry = this.labelNodes.get(group.id);
+      if (!entry || entry.key !== labelKey) {
+        entry?.node.destroy();
+        entry = {
+          node: new Text({
+            text: title,
+            style: {
+              fontSize: 11,
+              fontFamily: APP_FONT_FAMILY,
+              fontWeight: "bold",
+              fill: 0xffffff,
+            },
+            resolution: textResolution,
+          }),
+          key: labelKey,
+        };
+        this.labelNodes.set(group.id, entry);
+      }
+      const label = entry.node;
+      activeLabelIds.add(group.id);
 
       const badgeX = bounds.x + 16;
       const badgeY = bounds.y - 12;
@@ -225,7 +243,17 @@ export class GroupLayer extends Container {
 
       label.x = badgeX + badgePaddingX;
       label.y = badgeY + 4;
-      this.labelsContainer.addChild(label);
+      if (label.parent !== this.labelsContainer) {
+        this.labelsContainer.addChild(label);
+      }
+    }
+
+    // Drop labels whose group disappeared.
+    for (const [id, entry] of this.labelNodes) {
+      if (!activeLabelIds.has(id)) {
+        entry.node.destroy();
+        this.labelNodes.delete(id);
+      }
     }
   }
 
@@ -233,7 +261,8 @@ export class GroupLayer extends Container {
     options?: boolean | import("pixi.js").DestroyOptions,
   ): void {
     this.graphics.destroy();
-    this.labelsContainer.destroy();
+    this.labelNodes.clear();
+    this.labelsContainer.destroy({ children: true });
     super.destroy(options);
   }
 }

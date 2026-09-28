@@ -28,6 +28,26 @@ export interface AnchorMarker {
   isHovered?: boolean;
 }
 
+/**
+ * Prebuilt id lookups so resolving many connectors stays O(C) instead of
+ * O(C × N) when each endpoint would otherwise scan the objects/groups arrays.
+ */
+export interface ConnectorLookup {
+  objectsById: Map<string, CanvasObject>;
+  groupsById: Map<string, GroupInfo>;
+}
+
+export function buildConnectorLookup(
+  objects: CanvasObject[],
+  groups: GroupInfo[],
+): ConnectorLookup {
+  const objectsById = new Map<string, CanvasObject>();
+  for (const o of objects) objectsById.set(o.id, o);
+  const groupsById = new Map<string, GroupInfo>();
+  for (const g of groups) groupsById.set(g.id, g);
+  return { objectsById, groupsById };
+}
+
 export class ElbowConnectorLayer extends Container {
   private graphics: Graphics;
   private previewGraphics: Graphics;
@@ -55,10 +75,13 @@ export class ElbowConnectorLayer extends Container {
     const connectors = objects.filter(
       (o) => o.type === "connector" && o.connectorData,
     );
+    if (connectors.length === 0) return;
+
+    const lookup = buildConnectorLookup(objects, groups);
 
     for (const conn of connectors) {
       const data = conn.connectorData!;
-      const points = this.getConnectorPoints(conn, objects, groups);
+      const points = this.getConnectorPoints(conn, objects, groups, lookup);
       if (!points) continue;
 
       const isSelected = selectedIds.includes(conn.id);
@@ -88,12 +111,25 @@ export class ElbowConnectorLayer extends Container {
     conn: CanvasObject,
     objects: CanvasObject[],
     groups: GroupInfo[] = [],
+    lookup?: ConnectorLookup,
   ): Point[] | null {
     const data = conn.connectorData;
     if (!data) return null;
 
-    const startBounds = this.findBounds(data.start.objectId, objects, groups);
-    const endBounds = this.findBounds(data.end.objectId, objects, groups);
+    const resolved = lookup ?? buildConnectorLookup(objects, groups);
+
+    const startBounds = this.findBounds(
+      data.start.objectId,
+      objects,
+      groups,
+      resolved,
+    );
+    const endBounds = this.findBounds(
+      data.end.objectId,
+      objects,
+      groups,
+      resolved,
+    );
     if (!startBounds || !endBounds) return null;
 
     // Auto-pick the facing anchors so the connector re-routes itself as the
@@ -222,17 +258,18 @@ export class ElbowConnectorLayer extends Container {
     id: string,
     objects: CanvasObject[],
     groups: GroupInfo[],
+    lookup: ConnectorLookup,
   ): GroupBounds | null {
     const cleanId = id.startsWith("__group:") ? id.replace("__group:", "") : id;
 
     // 1. Check objects
-    const obj = objects.find((o) => o.id === cleanId);
+    const obj = lookup.objectsById.get(cleanId);
     if (obj) {
       return { x: obj.x, y: obj.y, width: obj.width, height: obj.height };
     }
 
     // 2. Check groups
-    const grp = groups.find((g) => g.id === cleanId);
+    const grp = lookup.groupsById.get(cleanId);
     if (grp) {
       return computeGroupBounds(grp, objects, groups);
     }
