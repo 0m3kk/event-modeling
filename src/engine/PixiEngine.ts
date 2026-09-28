@@ -69,6 +69,7 @@ export class PixiEngine {
   private panStartPointer: { x: number; y: number } = { x: 0, y: 0 };
   private lastPanPointer: { x: number; y: number } = { x: 0, y: 0 };
   private dragStartWorld: { x: number; y: number } = { x: 0, y: 0 };
+  private cardDragStartScreen: { x: number; y: number } | null = null;
   private initialObjectPositions: Map<string, { x: number; y: number }> =
     new Map();
   private primaryDragId: string | null = null;
@@ -497,7 +498,9 @@ export class PixiEngine {
           state.openModelPopup({
             modelId: targetModel.id,
             sourceObjectId: obj.id,
-            sourceFieldId: accurateZone.fieldId,
+            sourceFieldId:
+              accurateZone.fieldId ??
+              (accurateZone.type === "itemType" ? "item" : "inner"),
             sourceFieldName: fieldName,
             sourceFieldType: fieldType,
             worldAnchor: {
@@ -527,6 +530,7 @@ export class PixiEngine {
       this.isDraggingCards = true;
       this.primaryDragId = id;
       this.dragStartWorld = { x: worldPos.x, y: worldPos.y };
+      this.cardDragStartScreen = { x: e.clientX, y: e.clientY };
 
       const currentSelected = useCanvasStore.getState().selectedIds;
       this.initialObjectPositions.clear();
@@ -693,6 +697,9 @@ export class PixiEngine {
       // user can click-select (and then delete) a connector.
       const hitConnector = this.findConnectorAtWorld(worldPos.x, worldPos.y);
       if (hitConnector) {
+        if (state.modelPopupChain.length > 0) {
+          state.clearModelPopups();
+        }
         // Drop any row selection so Delete targets the connector, not a field.
         state.setStormSelectedField(null);
         state.selectObject(
@@ -711,6 +718,9 @@ export class PixiEngine {
       );
 
       if (hitGroup) {
+        if (state.modelPopupChain.length > 0) {
+          state.clearModelPopups();
+        }
         // Double-click detection on group header badge
         const now = Date.now();
         if (
@@ -748,10 +758,10 @@ export class PixiEngine {
       }
 
       // 4. Clicked on empty space
+      if (state.modelPopupChain.length > 0) {
+        state.clearModelPopups();
+      }
       if (!this.isDraggingCards && state.tool === "select") {
-        if (state.modelPopupChain.length > 0) {
-          state.clearModelPopups();
-        }
         const isControlOrMeta = e.ctrlKey || e.metaKey;
         if (isControlOrMeta) {
           // Multi-select mode: start marquee selection box
@@ -868,8 +878,15 @@ export class PixiEngine {
         const totalDx = worldPos.x - this.dragStartWorld.x;
         const totalDy = worldPos.y - this.dragStartWorld.y;
 
+        const screenDist = this.cardDragStartScreen
+          ? Math.hypot(
+              e.clientX - this.cardDragStartScreen.x,
+              e.clientY - this.cardDragStartScreen.y,
+            )
+          : Math.hypot(totalDx, totalDy);
+
         if (
-          Math.hypot(totalDx, totalDy) > 5 &&
+          screenDist > 6 &&
           useCanvasStore.getState().modelPopupChain.length > 0
         ) {
           useCanvasStore.getState().clearModelPopups();
@@ -1050,6 +1067,7 @@ export class PixiEngine {
       if (this.isDraggingCards) {
         this.isDraggingCards = false;
         this.primaryDragId = null;
+        this.cardDragStartScreen = null;
         this.initialObjectPositions.clear();
         const vb = this.viewport.getVisibleBounds();
         this.gizmoLayer.renderGuides([], {
@@ -1091,6 +1109,7 @@ export class PixiEngine {
     let prevGroups = useCanvasStore.getState().groups;
     let prevStormSelectedField = useCanvasStore.getState().stormSelectedField;
     let prevStormActionHover = useCanvasStore.getState().stormActionHover;
+    let prevModelPopupChain = useCanvasStore.getState().modelPopupChain;
     let prevViewport = useCanvasStore.getState().viewport;
 
     this.storeUnsubscribe = useCanvasStore.subscribe((state) => {
@@ -1120,6 +1139,11 @@ export class PixiEngine {
       // Hovering an action badge toggles the authorized-actor highlights
       if (state.stormActionHover !== prevStormActionHover) {
         prevStormActionHover = state.stormActionHover;
+        needsRender = true;
+      }
+
+      if (state.modelPopupChain !== prevModelPopupChain) {
+        prevModelPopupChain = state.modelPopupChain;
         needsRender = true;
       }
 

@@ -41,7 +41,13 @@ export function ModelCardPopup() {
 
     const handlePointerDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
+      // Do not dismiss if clicking inside any popup card
       if (target.closest("[data-model-popup]")) {
+        return;
+      }
+      // Do not dismiss if clicking on the canvas, since PixiEngine's pointerdown handler
+      // handles canvas clicks (opening popups for model fields, clearing for empty/other zones).
+      if (target.closest("canvas")) {
         return;
       }
       clearModelPopups();
@@ -110,7 +116,7 @@ export function ModelCardPopup() {
 
     // 4. Output final clamped coordinates for each popup
     return modelPopupChain.map((_, i) => {
-      const left = idealLefts[i] - shiftX;
+      const left = Math.max(12, idealLefts[i] - shiftX);
       const top = Math.max(12, Math.min(cHeight - 220, idealTops[i]));
       return { left, top };
     });

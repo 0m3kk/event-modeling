@@ -115,4 +115,39 @@ describe("ModelCardPopup logic and drill-down chain", () => {
     useCanvasStore.getState().clearModelPopups();
     expect(useCanvasStore.getState().modelPopupChain).toHaveLength(0);
   });
+
+  it("smoothly replaces level 0 popup when switching directly between model fields", () => {
+    useCanvasStore
+      .getState()
+      .addObjects([customerModel, addressModel, geoModel]);
+
+    // Open first model popup (Address)
+    useCanvasStore.getState().openModelPopup({
+      modelId: "m-addr",
+      sourceObjectId: customerModel.id,
+      sourceFieldId: "f-addr",
+      sourceFieldName: "shippingAddress",
+      sourceFieldType: "Address",
+      level: 0,
+    });
+
+    let chain = useCanvasStore.getState().modelPopupChain;
+    expect(chain).toHaveLength(1);
+    expect(chain[0].modelId).toBe("m-addr");
+
+    // Click another model field directly (GeoLocation)
+    useCanvasStore.getState().openModelPopup({
+      modelId: "m-geo",
+      sourceObjectId: addressModel.id,
+      sourceFieldId: "f-geo",
+      sourceFieldName: "geo",
+      sourceFieldType: "GeoLocation",
+      level: 0,
+    });
+
+    chain = useCanvasStore.getState().modelPopupChain;
+    expect(chain).toHaveLength(1);
+    expect(chain[0].modelId).toBe("m-geo");
+    expect(chain[0].sourceFieldId).toBe("f-geo");
+  });
 });
