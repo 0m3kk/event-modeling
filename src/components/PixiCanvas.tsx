@@ -322,11 +322,14 @@ export function PixiCanvas() {
       }
 
       if (e.code === "Escape") {
-        engine.cancelConnectorCreation();
-        // Escape leaves the connector tool and falls back to select.
         if (useCanvasStore.getState().tool === "connector") {
-          useCanvasStore.getState().setTool("select");
+          const handled = engine.handleEscape();
+          if (!handled) {
+            useCanvasStore.getState().setTool("select");
+          }
+          return;
         }
+        engine.cancelConnectorCreation();
         useCanvasStore.getState().setSearchOpen(false);
         useCanvasStore.getState().clearSelection();
         useCanvasStore.getState().setStormSelectedField(null);

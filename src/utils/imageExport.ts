@@ -1,8 +1,6 @@
 import type { CanvasObject, GroupInfo, Point } from "@/types";
 import {
-  computeElbowPath,
-  getCardinalAnchorPoint,
-  resolveConnectionAnchors,
+  computeResolvedConnectorPoints,
 } from "./elbowRouting";
 import { computeGroupBounds } from "@/engine/layers/GroupLayer";
 import { CONNECTOR_CONTACT_GAP } from "@/constants/canvas";
@@ -148,18 +146,34 @@ export function exportCanvasToSvg(
     );
     if (!startBounds || !endBounds) continue;
 
-    const { start, end } = resolveConnectionAnchors(startBounds, endBounds, {
-      startGap: CONNECTOR_CONTACT_GAP,
-      endGap: CONNECTOR_CONTACT_GAP,
-    });
-    const startPoint = getCardinalAnchorPoint(startBounds, start);
-    const endPoint = getCardinalAnchorPoint(endBounds, end);
-    const points: Point[] = computeElbowPath(startPoint, start, endPoint, end, {
-      startGap: CONNECTOR_CONTACT_GAP,
-      endGap: CONNECTOR_CONTACT_GAP,
-    });
+    const obstacleBounds: { x: number; y: number; width: number; height: number }[] = [];
+    for (const obj of objects) {
+      if (
+        obj.type !== "connector" &&
+        obj.id !== data.start.objectId &&
+        obj.id !== data.end.objectId
+      ) {
+        obstacleBounds.push({
+          x: obj.x,
+          y: obj.y,
+          width: obj.width ?? 200,
+          height: obj.height ?? 120,
+        });
+      }
+    }
 
-    if (points.length >= 2) {
+    const points: Point[] | null = computeResolvedConnectorPoints(
+      conn,
+      startBounds,
+      endBounds,
+      obstacleBounds,
+      {
+        startGap: CONNECTOR_CONTACT_GAP,
+        endGap: CONNECTOR_CONTACT_GAP,
+      },
+    );
+
+    if (points && points.length >= 2) {
       const pathData = points
         .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
         .join(" ");

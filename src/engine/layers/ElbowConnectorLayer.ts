@@ -8,10 +8,9 @@ import type {
 } from "@/types";
 import { Z_INDICES, CONNECTOR_CONTACT_GAP } from "@/constants/canvas";
 import {
-  computeElbowPath,
-  getCardinalAnchorPoint,
+  computeElbowPathWithBends,
+  computeResolvedConnectorPoints,
   getOppositeAnchor,
-  resolveConnectionAnchors,
 } from "@/utils/elbowRouting";
 import { computeGroupBounds } from "./GroupLayer";
 
@@ -19,6 +18,7 @@ export interface PreviewConnector {
   start: { objectId: string; anchor: CardinalAnchor; point: Point };
   currentPoint: Point;
   targetAnchor?: CardinalAnchor;
+  waypoints?: Point[];
 }
 
 export interface AnchorMarker {
@@ -69,6 +69,7 @@ export class ElbowConnectorLayer extends Container {
     objects: CanvasObject[],
     groups: GroupInfo[] = [],
     selectedIds: string[] = [],
+    hiddenConnectorId?: string | null,
   ): void {
     this.graphics.clear();
 
@@ -80,6 +81,8 @@ export class ElbowConnectorLayer extends Container {
     const lookup = buildConnectorLookup(objects, groups);
 
     for (const conn of connectors) {
+      if (hiddenConnectorId && conn.id === hiddenConnectorId) continue;
+
       const data = conn.connectorData!;
       const points = this.getConnectorPoints(conn, objects, groups, lookup);
       if (!points) continue;
@@ -99,6 +102,23 @@ export class ElbowConnectorLayer extends Container {
       if (data.arrowEnd !== false) {
         this.drawArrowhead(this.graphics, points, strokeColor, strokeWidth);
       }
+
+      if (isSelected) {
+        this.drawEndpointHandles(this.graphics, points);
+      }
+    }
+  }
+
+  private drawEndpointHandles(g: Graphics, points: Point[]): void {
+    const startPt = points[0]!;
+    const endPt = points[points.length - 1]!;
+
+    for (const pt of [startPt, endPt]) {
+      g.circle(pt.x, pt.y, 6)
+        .fill({ color: 0xffffff })
+        .stroke({ color: 0x2563eb, width: 2 });
+      g.circle(pt.x, pt.y, 2.5)
+        .fill({ color: 0x2563eb });
     }
   }
 
@@ -132,22 +152,51 @@ export class ElbowConnectorLayer extends Container {
     );
     if (!startBounds || !endBounds) return null;
 
-    // Auto-pick the facing anchors so the connector re-routes itself as the
-    // objects move (the stored anchors are only the user's initial intent).
-    const { start, end } = resolveConnectionAnchors(startBounds, endBounds, {
-      startGap: CONNECTOR_CONTACT_GAP,
-      endGap: CONNECTOR_CONTACT_GAP,
-    });
+    // Filter obstacles (all other objects/groups in proximity)
+    const obstacleBounds: GroupBounds[] = [];
+    const minX = Math.min(startBounds.x, endBounds.x) - 100;
+    const maxX =
+      Math.max(startBounds.x + startBounds.width, endBounds.x + endBounds.width) +
+      100;
+    const minY = Math.min(startBounds.y, endBounds.y) - 100;
+    const maxY =
+      Math.max(
+        startBounds.y + startBounds.height,
+        endBounds.y + endBounds.height,
+      ) + 100;
 
-    const startPoint = getCardinalAnchorPoint(startBounds, start);
-    const endPoint = getCardinalAnchorPoint(endBounds, end);
+    for (const obj of objects) {
+      if (
+        obj.type !== "connector" &&
+        obj.id !== data.start.objectId &&
+        obj.id !== data.end.objectId
+      ) {
+        if (
+          obj.x + obj.width >= minX &&
+          obj.x <= maxX &&
+          obj.y + obj.height >= minY &&
+          obj.y <= maxY
+        ) {
+          obstacleBounds.push({
+            x: obj.x,
+            y: obj.y,
+            width: obj.width,
+            height: obj.height,
+          });
+        }
+      }
+    }
 
-    const points = computeElbowPath(startPoint, start, endPoint, end, {
-      startGap: CONNECTOR_CONTACT_GAP,
-      endGap: CONNECTOR_CONTACT_GAP,
-    });
-
-    return points.length >= 2 ? points : null;
+    return computeResolvedConnectorPoints(
+      conn,
+      startBounds,
+      endBounds,
+      obstacleBounds,
+      {
+        startGap: CONNECTOR_CONTACT_GAP,
+        endGap: CONNECTOR_CONTACT_GAP,
+      },
+    );
   }
 
   /**
@@ -159,11 +208,12 @@ export class ElbowConnectorLayer extends Container {
 
     const startDir = preview.start.anchor;
     const endDir = preview.targetAnchor ?? getOppositeAnchor(startDir);
-    const points = computeElbowPath(
+    const points = computeElbowPathWithBends(
       preview.start.point,
       startDir,
       preview.currentPoint,
       endDir,
+      preview.waypoints,
       {
         startGap: CONNECTOR_CONTACT_GAP,
         // While the pointer is still floating (no target anchor), keep the
@@ -177,6 +227,15 @@ export class ElbowConnectorLayer extends Container {
     const previewColor = 0x3b82f6;
     this.drawElbowPath(this.previewGraphics, points, previewColor, 2);
     this.drawArrowhead(this.previewGraphics, points, previewColor, 2);
+
+    if (preview.waypoints && preview.waypoints.length > 0) {
+      for (const wp of preview.waypoints) {
+        this.previewGraphics
+          .circle(wp.x, wp.y, 4)
+          .fill({ color: 0x3b82f6 })
+          .stroke({ color: 0xffffff, width: 1.5 });
+      }
+    }
   }
 
   /**
@@ -254,7 +313,7 @@ export class ElbowConnectorLayer extends Container {
     });
   }
 
-  private findBounds(
+  public findBounds(
     id: string,
     objects: CanvasObject[],
     groups: GroupInfo[],

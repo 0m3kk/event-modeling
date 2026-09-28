@@ -32,13 +32,15 @@ import {
   getAllCardinalAnchors,
   findClosestAnchor,
   distanceToPolyline,
+  getCardinalAnchorPoint,
+  getOppositeAnchor,
 } from "@/utils/elbowRouting";
 import { collectMatchingEventIds } from "@/utils/stormQuery";
 import { getAuthorizedActors } from "@/utils/stormAuth";
 import { computeCanvasBounds } from "@/utils/imageExport";
 import { findModelByName } from "@/utils/modelResolution";
 import type { CardHitZone } from "./renderers";
-import type { CanvasObject } from "@/types";
+import type { CanvasObject, ElbowBend, Point } from "@/types";
 
 let activePixiEngine: PixiEngine | null = null;
 
@@ -106,6 +108,16 @@ export class PixiEngine {
   // by clicking the target anchor (no drag / button-hold required).
   private isCreatingConnector: boolean = false;
   private connectorStartAnchor: AnchorMarker | null = null;
+  private connectorWaypoints: Point[] = [];
+  private lastWorldPos: Point = { x: 0, y: 0 };
+
+  // Connector Endpoint Dragging State (modifying start or end endpoint after creation)
+  private isDraggingConnectorEndpoint: boolean = false;
+  private activeConnectorEndpoint: {
+    connectorId: string;
+    endpoint: "start" | "end";
+    point: Point;
+  } | null = null;
 
   // Group Dragging & Click State
   private isDraggingGroup: boolean = false;
@@ -346,8 +358,17 @@ export class PixiEngine {
     );
   }
 
-  private createConnector(start: AnchorMarker, end: AnchorMarker): void {
+  private createConnector(
+    start: AnchorMarker,
+    end: AnchorMarker,
+    waypoints: Point[] = [],
+  ): void {
     const id = `connector-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const bends: ElbowBend[] = waypoints.map((p, idx) => ({
+      id: `bend-${idx}-${Date.now().toString(36)}`,
+      x: p.x,
+      y: p.y,
+    }));
     const newConnector: CanvasObject = {
       id,
       type: "connector",
@@ -358,6 +379,7 @@ export class PixiEngine {
       connectorData: {
         start: { objectId: start.objectId, anchor: start.anchor },
         end: { objectId: end.objectId, anchor: end.anchor },
+        bends: bends.length > 0 ? bends : undefined,
         stroke: "#475569",
         strokeWidth: 2,
         arrowEnd: true,
@@ -371,8 +393,53 @@ export class PixiEngine {
   public cancelConnectorCreation(): void {
     this.isCreatingConnector = false;
     this.connectorStartAnchor = null;
+    this.connectorWaypoints = [];
     this.connectorLayer.renderPreview(null);
     this.connectorLayer.renderAnchors([]);
+  }
+
+  /**
+   * Handles Escape key when interacting with tools like connector creation or endpoint dragging.
+   * Returns true if the key press was consumed.
+   */
+  public handleEscape(): boolean {
+    if (this.isDraggingConnectorEndpoint) {
+      this.cancelConnectorEndpointDrag();
+      return true;
+    }
+    if (this.isCreatingConnector) {
+      if (this.connectorWaypoints.length > 0) {
+        this.connectorWaypoints.pop();
+        if (this.connectorStartAnchor) {
+          this.connectorLayer.renderPreview({
+            start: this.connectorStartAnchor,
+            currentPoint: { ...this.lastWorldPos },
+            waypoints: this.connectorWaypoints,
+          });
+        }
+        return true;
+      }
+      this.cancelConnectorCreation();
+      return true;
+    }
+    return false;
+  }
+
+  /** Clears pending connector endpoint dragging without modifying connector. */
+  public cancelConnectorEndpointDrag(): void {
+    if (this.isDraggingConnectorEndpoint) {
+      this.isDraggingConnectorEndpoint = false;
+      this.activeConnectorEndpoint = null;
+      this.connectorLayer.renderPreview(null);
+      this.connectorLayer.renderAnchors([]);
+      const state = useCanvasStore.getState();
+      this.connectorLayer.renderConnectors(
+        state.objects,
+        state.groups,
+        state.selectedIds,
+      );
+      this.invalidateContent();
+    }
   }
 
   /**
@@ -445,6 +512,54 @@ export class PixiEngine {
     }
 
     return best;
+  }
+
+  /**
+   * Finds any connector endpoint handle (start or end) within hit radius of world point.
+   * Prioritizes currently selected connectors so handles are easy to grab.
+   */
+  public findConnectorEndpointHandleAtWorld(
+    worldX: number,
+    worldY: number,
+    hitRadius: number = 14,
+  ): { connectorId: string; endpoint: "start" | "end"; point: Point } | null {
+    const { objects, groups, selectedIds } = useCanvasStore.getState();
+    const effectiveRadius = hitRadius / (this.viewport.scaled || 1);
+    const lookup = buildConnectorLookup(objects, groups);
+
+    const connectors = objects.filter(
+      (o) => o.type === "connector" && o.connectorData,
+    );
+    if (connectors.length === 0) return null;
+
+    const selectedConnectors = connectors.filter((c) =>
+      selectedIds.includes(c.id),
+    );
+    const otherConnectors = connectors.filter(
+      (c) => !selectedIds.includes(c.id),
+    );
+
+    for (const conn of [...selectedConnectors, ...otherConnectors]) {
+      const points = this.connectorLayer.getConnectorPoints(
+        conn,
+        objects,
+        groups,
+        lookup,
+      );
+      if (!points || points.length < 2) continue;
+
+      const startPt = points[0]!;
+      const endPt = points[points.length - 1]!;
+
+      if (Math.hypot(worldX - startPt.x, worldY - startPt.y) <= effectiveRadius) {
+        return { connectorId: conn.id, endpoint: "start", point: startPt };
+      }
+      if (Math.hypot(worldX - endPt.x, worldY - endPt.y) <= effectiveRadius) {
+        return { connectorId: conn.id, endpoint: "end", point: endPt };
+      }
+    }
+
+    return null;
   }
 
   private setupInteractionHandlers(): void {
@@ -776,10 +891,15 @@ export class PixiEngine {
         return;
       }
 
-      // 1. Connector Tool Mode — click the source anchor, then click the target
-      // anchor. The connection is a two-click interaction, so the left mouse
-      // button does not need to be held between the two anchors.
+      // 1. Connector Tool Mode — click the source anchor, then click optional
+      // waypoints on the canvas, and finally click the target anchor.
+      // Right-click or escape cancels creation.
       if (state.tool === "connector") {
+        if (e.button === 2) {
+          this.cancelConnectorCreation();
+          return;
+        }
+
         if (!this.isCreatingConnector) {
           const hitAnchor = findClosestAnchor(
             worldPos,
@@ -789,9 +909,11 @@ export class PixiEngine {
           if (hitAnchor) {
             this.isCreatingConnector = true;
             this.connectorStartAnchor = hitAnchor;
+            this.connectorWaypoints = [];
             this.connectorLayer.renderPreview({
               start: hitAnchor,
               currentPoint: { ...worldPos },
+              waypoints: [],
             });
             // Show every anchor the user can still pick as the destination.
             this.connectorLayer.renderAnchors(
@@ -804,18 +926,54 @@ export class PixiEngine {
           return;
         }
 
-        // Second click: complete at the target anchor. A click that misses
-        // every anchor cancels the pending connection.
+        // Active connector creation: complete at the target anchor, or click
+        // empty space / canvas to insert an intermediate waypoint.
         const targetAnchor = findClosestAnchor(
           worldPos,
           this.getConnectorTargetAnchors(),
           25,
         );
         if (this.connectorStartAnchor && targetAnchor) {
-          this.createConnector(this.connectorStartAnchor, targetAnchor);
+          this.createConnector(
+            this.connectorStartAnchor,
+            targetAnchor,
+            this.connectorWaypoints,
+          );
+          this.cancelConnectorCreation();
+          return;
         }
-        this.cancelConnectorCreation();
+
+        // Clicked canvas: record intermediate waypoint
+        this.connectorWaypoints.push({ x: worldPos.x, y: worldPos.y });
+        this.connectorLayer.renderPreview({
+          start: this.connectorStartAnchor!,
+          currentPoint: { ...worldPos },
+          waypoints: this.connectorWaypoints,
+        });
         return;
+      }
+
+      // 1.5. Check Connector Endpoint Handle hit (drag to re-connect start or end)
+      if (state.tool === "select" && !this.isSpaceHeld && !state.isLocked) {
+        const hitEndpoint = this.findConnectorEndpointHandleAtWorld(
+          worldPos.x,
+          worldPos.y,
+        );
+        if (hitEndpoint) {
+          if (state.modelPopupChain.length > 0) {
+            state.clearModelPopups();
+          }
+          state.setStormSelectedField(null);
+          state.selectObject(hitEndpoint.connectorId, false);
+          this.isDraggingConnectorEndpoint = true;
+          this.activeConnectorEndpoint = hitEndpoint;
+
+          const candidateAnchors = this.collectAllAnchors();
+          this.connectorLayer.renderAnchors(
+            candidateAnchors.map((a) => ({ ...a, isHovered: false })),
+          );
+          return;
+        }
       }
 
       // If a card is under the pointer, a card handler owns this event —
@@ -935,6 +1093,7 @@ export class PixiEngine {
       );
 
       const state = useCanvasStore.getState();
+      this.lastWorldPos = { ...worldPos };
 
       // Handle Connector Creation Live Preview (pending after the source click)
       if (this.isCreatingConnector && this.connectorStartAnchor) {
@@ -950,6 +1109,7 @@ export class PixiEngine {
           start: this.connectorStartAnchor,
           currentPoint,
           targetAnchor: targetCandidate?.anchor,
+          waypoints: this.connectorWaypoints,
         });
         this.connectorLayer.renderAnchors(
           candidateAnchors.map((a) => ({
@@ -973,6 +1133,99 @@ export class PixiEngine {
               a.objectId === hovered?.objectId && a.anchor === hovered?.anchor,
           })),
         );
+        return;
+      }
+
+      // Handle Connector Endpoint Dragging (reconnecting start or end anchor)
+      if (this.isDraggingConnectorEndpoint && this.activeConnectorEndpoint) {
+        const conn = state.objects.find(
+          (o) => o.id === this.activeConnectorEndpoint!.connectorId,
+        );
+        if (conn && conn.connectorData) {
+          const lookup = buildConnectorLookup(state.objects, state.groups);
+          const candidateAnchors = this.collectAllAnchors();
+          const targetCandidate = findClosestAnchor(
+            worldPos,
+            candidateAnchors,
+            25,
+          );
+          const currentPoint = targetCandidate
+            ? targetCandidate.point
+            : worldPos;
+
+          if (this.activeConnectorEndpoint.endpoint === "end") {
+            // Start is fixed, end is moving to currentPoint
+            const startBounds = this.connectorLayer.findBounds(
+              conn.connectorData.start.objectId,
+              state.objects,
+              state.groups,
+              lookup,
+            );
+            if (startBounds) {
+              const startPt = getCardinalAnchorPoint(
+                startBounds,
+                conn.connectorData.start.anchor,
+              );
+              this.connectorLayer.renderPreview({
+                start: {
+                  objectId: conn.connectorData.start.objectId,
+                  anchor: conn.connectorData.start.anchor,
+                  point: startPt,
+                },
+                currentPoint,
+                targetAnchor: targetCandidate?.anchor,
+              });
+            }
+          } else {
+            // End is fixed, start is moving to currentPoint
+            const endBounds = this.connectorLayer.findBounds(
+              conn.connectorData.end.objectId,
+              state.objects,
+              state.groups,
+              lookup,
+            );
+            if (endBounds) {
+              const endPt = getCardinalAnchorPoint(
+                endBounds,
+                conn.connectorData.end.anchor,
+              );
+              const startDir =
+                targetCandidate?.anchor ??
+                getOppositeAnchor(conn.connectorData.end.anchor);
+              this.connectorLayer.renderPreview({
+                start: {
+                  objectId: targetCandidate?.objectId ?? "",
+                  anchor: startDir,
+                  point: currentPoint,
+                },
+                currentPoint: endPt,
+                targetAnchor: conn.connectorData.end.anchor,
+              });
+            }
+          }
+
+          // Redraw connectors hiding the one being dragged
+          this.connectorLayer.renderConnectors(
+            state.objects,
+            state.groups,
+            state.selectedIds,
+            conn.id,
+          );
+
+          // Highlight target anchor if hovered
+          this.connectorLayer.renderAnchors(
+            candidateAnchors.map((a) => ({
+              ...a,
+              isHovered:
+                targetCandidate !== null &&
+                a.objectId === targetCandidate.objectId &&
+                a.anchor === targetCandidate.anchor,
+            })),
+          );
+
+          this.container.style.cursor = "grabbing";
+          this.cardLayer.setCursor("grabbing");
+        }
         return;
       }
 
@@ -1149,9 +1402,10 @@ export class PixiEngine {
         this.isMarqueeDragging ||
         this.isCreatingConnector ||
         this.isPanningCanvas ||
-        this.isResizingCard;
+        this.isResizingCard ||
+        this.isDraggingConnectorEndpoint;
 
-      // Check resize handle hover when idle on select tool
+      // Check resize handle or connector endpoint handle hover when idle on select tool
       if (
         !isBusy &&
         !this.isSpaceHeld &&
@@ -1163,11 +1417,20 @@ export class PixiEngine {
           worldPos.y,
           this.viewport.scaled || 1,
         );
+        const hitEndpoint = this.findConnectorEndpointHandleAtWorld(
+          worldPos.x,
+          worldPos.y,
+        );
+
         if (hitHandle) {
           this.hoveredHandle = hitHandle;
           const cursor = getCursorForHandle(hitHandle.handle);
           this.container.style.cursor = cursor;
           this.cardLayer.setCursor(cursor);
+        } else if (hitEndpoint) {
+          this.hoveredHandle = null;
+          this.container.style.cursor = "grab";
+          this.cardLayer.setCursor("grab");
         } else if (this.hoveredHandle) {
           this.hoveredHandle = null;
           this.container.style.cursor = "default";
@@ -1290,6 +1553,53 @@ export class PixiEngine {
         this.isMarqueeDragging = false;
         this.marqueeInitialSelectedIds = [];
         this.gizmoLayer.renderMarquee(null);
+      }
+
+      // Finish Connector Endpoint Dragging
+      if (this.isDraggingConnectorEndpoint && this.activeConnectorEndpoint) {
+        const state = useCanvasStore.getState();
+        const candidateAnchors = this.collectAllAnchors();
+        const targetAnchor = findClosestAnchor(
+          this.lastWorldPos,
+          candidateAnchors,
+          25,
+        );
+
+        if (targetAnchor) {
+          const conn = state.objects.find(
+            (o) => o.id === this.activeConnectorEndpoint!.connectorId,
+          );
+          if (conn && conn.connectorData) {
+            const updatedData = { ...conn.connectorData };
+            if (this.activeConnectorEndpoint.endpoint === "start") {
+              updatedData.start = {
+                objectId: targetAnchor.objectId,
+                anchor: targetAnchor.anchor,
+              };
+            } else {
+              updatedData.end = {
+                objectId: targetAnchor.objectId,
+                anchor: targetAnchor.anchor,
+              };
+            }
+            state.updateObject(conn.id, { connectorData: updatedData });
+          }
+        }
+
+        this.isDraggingConnectorEndpoint = false;
+        this.activeConnectorEndpoint = null;
+        this.connectorLayer.renderPreview(null);
+        this.connectorLayer.renderAnchors([]);
+        this.connectorLayer.renderConnectors(
+          state.objects,
+          state.groups,
+          state.selectedIds,
+        );
+        this.invalidateContent();
+        if (!this.isSpaceHeld) {
+          this.container.style.cursor = "default";
+          this.cardLayer.setCursor("default");
+        }
       }
     });
   }

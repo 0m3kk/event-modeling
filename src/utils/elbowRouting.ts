@@ -1,4 +1,4 @@
-import type { CardinalAnchor, Point } from "@/types";
+import type { CardinalAnchor, Point, ElbowBend, CanvasObject } from "@/types";
 
 export interface ElbowRoutingOptions {
   clearance?: number;
@@ -95,6 +95,188 @@ export function computeElbowPath(
 }
 
 /**
+ * Calculates an orthogonal path passing through user-defined intermediate bends/waypoints.
+ */
+export function computeElbowPathWithBends(
+  start: Point,
+  startDir: CardinalAnchor,
+  end: Point,
+  endDir: CardinalAnchor,
+  bends?: ElbowBend[] | Point[],
+  options: ElbowRoutingOptions = {},
+): Point[] {
+  if (!bends || bends.length === 0) {
+    return computeElbowPath(start, startDir, end, endDir, options);
+  }
+
+  const clearance = options.clearance ?? 20;
+  const startGap = options.startGap ?? 0;
+  const endGap = options.endGap ?? 0;
+
+  const getExitPoint = (
+    pt: Point,
+    dir: CardinalAnchor,
+    dist: number,
+  ): Point => {
+    switch (dir) {
+      case "top":
+        return { x: pt.x, y: pt.y - dist };
+      case "bottom":
+        return { x: pt.x, y: pt.y + dist };
+      case "left":
+        return { x: pt.x - dist, y: pt.y };
+      case "right":
+        return { x: pt.x + dist, y: pt.y };
+    }
+  };
+
+  const p1 = getExitPoint(start, startDir, startGap);
+  const p2 = getExitPoint(start, startDir, clearance);
+  const p4 = getExitPoint(end, endDir, clearance);
+  const p5 = getExitPoint(end, endDir, endGap);
+
+  const waypoints: Point[] = bends.map((b) => ({ x: b.x, y: b.y }));
+
+  // Build orthogonal path from p2 through waypoints to p4
+  const path: Point[] = [p1, p2];
+
+  let current = p2;
+  let currentDir = startDir;
+
+  for (let i = 0; i < waypoints.length; i++) {
+    const next = waypoints[i]!;
+    const isHorizontal = currentDir === "left" || currentDir === "right";
+    if (isHorizontal) {
+      if (current.x !== next.x && current.y !== next.y) {
+        path.push({ x: next.x, y: current.y });
+      }
+    } else {
+      if (current.x !== next.x && current.y !== next.y) {
+        path.push({ x: current.x, y: next.y });
+      }
+    }
+    path.push(next);
+    current = next;
+    currentDir = isHorizontal ? "top" : "left";
+  }
+
+  const isEndHorizontal = endDir === "left" || endDir === "right";
+  if (isEndHorizontal) {
+    if (current.x !== p4.x && current.y !== p4.y) {
+      path.push({ x: current.x, y: p4.y });
+    }
+  } else {
+    if (current.x !== p4.x && current.y !== p4.y) {
+      path.push({ x: p4.x, y: current.y });
+    }
+  }
+
+  path.push(p4, p5);
+  return simplifyPoints(path);
+}
+
+/**
+ * Checks whether a line segment intersects the interior of an axis-aligned box.
+ * Uses a small margin so lines originating on or touching the box edge do not count as intersecting.
+ */
+export function segmentIntersectsRect(
+  p1: Point,
+  p2: Point,
+  box: { x: number; y: number; width: number; height: number },
+  margin = 2,
+): boolean {
+  const effectiveMargin = Math.min(
+    margin,
+    Math.min(box.width, box.height) / 4,
+  );
+  const minX = box.x + effectiveMargin;
+  const maxX = box.x + box.width - effectiveMargin;
+  const minY = box.y + effectiveMargin;
+  const maxY = box.y + box.height - effectiveMargin;
+
+  if (minX >= maxX || minY >= maxY) return false;
+
+  // Horizontal segment
+  if (p1.y === p2.y) {
+    const y = p1.y;
+    return (
+      y > minY &&
+      y < maxY &&
+      Math.max(p1.x, p2.x) > minX &&
+      Math.min(p1.x, p2.x) < maxX
+    );
+  }
+
+  // Vertical segment
+  if (p1.x === p2.x) {
+    const x = p1.x;
+    return (
+      x > minX &&
+      x < maxX &&
+      Math.max(p1.y, p2.y) > minY &&
+      Math.min(p1.y, p2.y) < maxY
+    );
+  }
+
+  // General segment (Liang-Barsky parametric clipping)
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  let t0 = 0;
+  let t1 = 1;
+
+  const p = [-dx, dx, -dy, dy];
+  const q = [p1.x - minX, maxX - p1.x, p1.y - minY, maxY - p1.y];
+
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) {
+      if (q[i]! < 0) return false;
+    } else {
+      const t = q[i]! / p[i]!;
+      if (p[i]! < 0) {
+        if (t > t1) return false;
+        if (t > t0) t0 = t;
+      } else {
+        if (t < t0) return false;
+        if (t < t1) t1 = t;
+      }
+    }
+  }
+  return t0 < t1;
+}
+
+/**
+ * Determines whether a polyline cuts through the interior of start, end, or obstacle nodes.
+ */
+export function doesPathCutNodes(
+  points: Point[],
+  startBounds: { x: number; y: number; width: number; height: number },
+  endBounds: { x: number; y: number; width: number; height: number },
+  obstacleBounds: { x: number; y: number; width: number; height: number }[] = [],
+  margin = 2,
+): boolean {
+  if (points.length < 2) return false;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i]!;
+    const p2 = points[i + 1]!;
+
+    if (segmentIntersectsRect(p1, p2, startBounds, margin)) {
+      return true;
+    }
+    if (segmentIntersectsRect(p1, p2, endBounds, margin)) {
+      return true;
+    }
+    for (const obstacle of obstacleBounds) {
+      if (segmentIntersectsRect(p1, p2, obstacle, margin)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Eliminates redundant collinear points (points lying on the same line segment).
  */
 export function simplifyPoints(points: Point[]): Point[] {
@@ -156,20 +338,14 @@ function polylineLength(points: Point[]): number {
 }
 
 /**
- * Chooses the cardinal anchor on each box that gives the shortest, simplest
- * elbow path between them. Since the attach points follow the relative
- * positions of the two boxes, a connector keeps leaving/entering on the sides
- * that face each other — e.g. if B is dragged from above A to below A, B's
- * anchor flips from "bottom" to "top" instead of the path looping across B.
- *
- * The stored `connectorData` anchors are treated as the user's initial intent;
- * this resolver overrides them at render time so connectors stay correct as
- * objects move.
+ * Chooses the cardinal anchor on each box that gives the shortest, cleanest
+ * elbow path between them without cutting through nodes.
  */
 export function resolveConnectionAnchors(
   startBounds: { x: number; y: number; width: number; height: number },
   endBounds: { x: number; y: number; width: number; height: number },
   options: ElbowRoutingOptions = {},
+  obstacleBounds: { x: number; y: number; width: number; height: number }[] = [],
 ): { start: CardinalAnchor; end: CardinalAnchor } {
   let best: { start: CardinalAnchor; end: CardinalAnchor } = {
     start: "right",
@@ -188,9 +364,16 @@ export function resolveConnectionAnchors(
         end,
         options,
       );
+      const cuts = doesPathCutNodes(
+        points,
+        startBounds,
+        endBounds,
+        obstacleBounds,
+      );
       const score =
         polylineLength(points) +
-        Math.max(0, points.length - 2) * CONNECTOR_BEND_PENALTY;
+        Math.max(0, points.length - 2) * CONNECTOR_BEND_PENALTY +
+        (cuts ? 10000 : 0);
 
       if (score < bestScore) {
         bestScore = score;
@@ -200,6 +383,64 @@ export function resolveConnectionAnchors(
   }
 
   return best;
+}
+
+/**
+ * Resolves the elbow connector path.
+ * Follows the user's chosen points/anchors by default.
+ * Re-routes automatically ONLY when the path cuts through the start/end or obstacle nodes.
+ */
+export function computeResolvedConnectorPoints(
+  conn: CanvasObject,
+  startBounds: { x: number; y: number; width: number; height: number },
+  endBounds: { x: number; y: number; width: number; height: number },
+  obstacleBounds: { x: number; y: number; width: number; height: number }[] = [],
+  options: ElbowRoutingOptions = {},
+): Point[] | null {
+  const data = conn.connectorData;
+  if (!data) return null;
+
+  const initialStartAnchor = data.start.anchor;
+  const initialEndAnchor = data.end.anchor;
+
+  // 1. Follow what user drew (anchors + bends)
+  const initialStartPt = getCardinalAnchorPoint(startBounds, initialStartAnchor);
+  const initialEndPt = getCardinalAnchorPoint(endBounds, initialEndAnchor);
+  const initialPoints = computeElbowPathWithBends(
+    initialStartPt,
+    initialStartAnchor,
+    initialEndPt,
+    initialEndAnchor,
+    data.bends,
+    options,
+  );
+
+  // 2. Only re-route if the path cuts through nodes
+  const cuts = doesPathCutNodes(
+    initialPoints,
+    startBounds,
+    endBounds,
+    obstacleBounds,
+  );
+
+  if (!cuts && initialPoints.length >= 2) {
+    return initialPoints;
+  }
+
+  // 3. Re-route cleanly avoiding nodes
+  const { start, end } = resolveConnectionAnchors(
+    startBounds,
+    endBounds,
+    options,
+    obstacleBounds,
+  );
+
+  const startPoint = getCardinalAnchorPoint(startBounds, start);
+  const endPoint = getCardinalAnchorPoint(endBounds, end);
+
+  const points = computeElbowPath(startPoint, start, endPoint, end, options);
+
+  return points.length >= 2 ? points : null;
 }
 
 /**
