@@ -44,6 +44,7 @@ export function StormOptionsBar() {
   const createReferenceCopy = useCanvasStore((s) => s.createReferenceCopy);
   const isLocked = useCanvasStore((s) => s.isLocked);
   const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
+  const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [showActionPopover, setShowActionPopover] = useState(false);
   const [showDescriptionPopover, setShowDescriptionPopover] = useState(false);
@@ -64,7 +65,7 @@ export function StormOptionsBar() {
     return null;
   }, [selectedIds, objects, isLocked]);
 
-  if (!selectedStorm || !selectedStorm.stormData) return null;
+  if (!selectedStorm || !selectedStorm.stormData || isDragging) return null;
 
   const data = selectedStorm.stormData;
   const kind = data.kind;
@@ -154,16 +155,19 @@ export function StormOptionsBar() {
     setShowPermissionsPopover(false);
   };
 
-  // Calculate screen position
+  // Calculate screen position & zoom scale
   const zoom = viewport.zoom;
   const screenX = (selectedStorm.x - viewport.x) * zoom;
   const screenY = (selectedStorm.y - viewport.y) * zoom;
   const cardWidth = selectedStorm.width * zoom;
   const cardHeight = (selectedStorm.height || 140) * zoom;
 
+  // Scale the options bar dynamically with canvas zoom, clamped to a usable range
+  const barScale = Math.max(0.35, Math.min(2.0, zoom));
+
   // Position bar centered horizontally above the card (flip below if too close to top)
   const barX = screenX + cardWidth / 2;
-  const isAbove = screenY >= 50;
+  const isAbove = screenY >= 48 * barScale + 10;
   const barY = isAbove ? screenY - 10 : screenY + cardHeight + 10;
 
   // A BDD (Given/When/Then) card's phase is its identity — switching it also
@@ -203,15 +207,21 @@ export function StormOptionsBar() {
   return (
     <>
       <div
-        className={`absolute z-40 flex -translate-x-1/2 ${
+        className={`pointer-events-none absolute z-40 -translate-x-1/2 ${
           isAbove ? "-translate-y-full" : ""
-        } items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none`}
+        }`}
         style={{
           left: barX,
           top: barY,
         }}
-        onPointerDown={(e) => e.stopPropagation()}
       >
+        <div
+          className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
+          style={{
+            zoom: barScale,
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
         {/* BDD Phase switch (Given / When / Then) — only the Given/When/Then
             card kind carries a phase; every other kind is fixed at creation. */}
         {stormHasPhase(kind) && (
@@ -409,13 +419,14 @@ export function StormOptionsBar() {
           <Trash2 size={15} />
         </button>
       </div>
+      </div>
 
       {/* Action Popover */}
       {showActionPopover && (
         <ActionPopover
           card={selectedStorm}
           onClose={() => setShowActionPopover(false)}
-          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 }}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}
 
@@ -424,7 +435,7 @@ export function StormOptionsBar() {
         <DescriptionPopover
           target={selectedStorm}
           onClose={() => setShowDescriptionPopover(false)}
-          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 }}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}
 
@@ -433,7 +444,7 @@ export function StormOptionsBar() {
         <PermissionsPopover
           actor={selectedStorm}
           onClose={() => setShowPermissionsPopover(false)}
-          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 }}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}
 
@@ -442,7 +453,7 @@ export function StormOptionsBar() {
         <TagPopover
           card={selectedStorm}
           onClose={() => setShowTagPopover(false)}
-          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 }}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}
 
@@ -457,7 +468,7 @@ export function StormOptionsBar() {
                 : undefined
             }
             onClose={() => setShowQueryItemPopover(false)}
-            anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 }}
+            anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
           />
         )}
     </>

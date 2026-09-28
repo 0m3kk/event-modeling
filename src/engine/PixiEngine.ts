@@ -122,6 +122,7 @@ export class PixiEngine {
   // Group Dragging & Click State
   private isDraggingGroup: boolean = false;
   private draggedGroupId: string | null = null;
+  private groupDragStartScreen: { x: number; y: number } | null = null;
   private lastGroupClickTime: number = 0;
   private lastGroupClickId: string | null = null;
   private hadPopoverOnPointerDown: boolean = false;
@@ -1049,6 +1050,7 @@ export class PixiEngine {
         this.isDraggingGroup = true;
         this.draggedGroupId = hitGroup.group.id;
         this.dragStartWorld = { x: worldPos.x, y: worldPos.y };
+        this.groupDragStartScreen = { x: e.clientX, y: e.clientY };
         return;
       }
 
@@ -1260,6 +1262,9 @@ export class PixiEngine {
         this.resizingHandle &&
         this.initialObjectBounds
       ) {
+        if (!state.isDragging) {
+          state.setIsDragging(true);
+        }
         const dx = worldPos.x - this.resizeStartWorld.x;
         const dy = worldPos.y - this.resizeStartWorld.y;
         const targetObj = state.objects.find(
@@ -1287,6 +1292,15 @@ export class PixiEngine {
 
       // Handle Group Dragging
       if (this.isDraggingGroup && this.draggedGroupId) {
+        const screenDist = this.groupDragStartScreen
+          ? Math.hypot(
+              e.clientX - this.groupDragStartScreen.x,
+              e.clientY - this.groupDragStartScreen.y,
+            )
+          : 10;
+        if (screenDist > 3 && !state.isDragging) {
+          state.setIsDragging(true);
+        }
         const dx = worldPos.x - this.dragStartWorld.x;
         const dy = worldPos.y - this.dragStartWorld.y;
         state.moveGroupObjects(this.draggedGroupId, dx, dy, false);
@@ -1305,6 +1319,10 @@ export class PixiEngine {
               e.clientY - this.cardDragStartScreen.y,
             )
           : Math.hypot(totalDx, totalDy);
+
+        if (screenDist > 3 && !state.isDragging) {
+          state.setIsDragging(true);
+        }
 
         if (
           screenDist > 6 &&
@@ -1488,8 +1506,13 @@ export class PixiEngine {
       }
     });
 
-    window.addEventListener("pointerup", () => {
+    const handlePointerUp = () => {
       this.cardPointerDownHandled = false;
+
+      if (useCanvasStore.getState().isDragging) {
+        useCanvasStore.getState().setIsDragging(false);
+      }
+      this.groupDragStartScreen = null;
 
       if (this.isSpaceHeld) {
         this.container.style.cursor = "grab";
@@ -1601,7 +1624,10 @@ export class PixiEngine {
           this.cardLayer.setCursor("default");
         }
       }
-    });
+    };
+
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
   }
 
   private setupResizeObserver(): void {

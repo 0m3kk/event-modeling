@@ -41,6 +41,7 @@ export function GroupOptionsBar() {
   const updateGroup = useCanvasStore((s) => s.updateGroup);
   const ungroupObjects = useCanvasStore((s) => s.ungroupObjects);
   const isLocked = useCanvasStore((s) => s.isLocked);
+  const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
@@ -54,7 +55,7 @@ export function GroupOptionsBar() {
     return groups.find((g) => g.id === groupId) || null;
   }, [selectedIds, groups, isLocked]);
 
-  if (!selectedGroup || !selectedGroup.customBounds) return null;
+  if (!selectedGroup || !selectedGroup.customBounds || isDragging) return null;
 
   const bounds = selectedGroup.customBounds;
   const zoom = viewport.zoom;
@@ -63,8 +64,10 @@ export function GroupOptionsBar() {
   const groupWidth = bounds.width * zoom;
   const groupHeight = bounds.height * zoom;
 
+  const barScale = Math.max(0.35, Math.min(2.0, zoom));
+
   const barX = screenX + groupWidth / 2;
-  const isAbove = screenY >= 50;
+  const isAbove = screenY >= 48 * barScale + 10;
   const barY = isAbove ? screenY - 10 : screenY + groupHeight + 10;
 
   const handleStartRename = () => {
@@ -98,15 +101,21 @@ export function GroupOptionsBar() {
 
   return (
     <div
-      className={`absolute z-40 flex -translate-x-1/2 ${
+      className={`pointer-events-none absolute z-40 -translate-x-1/2 ${
         isAbove ? "-translate-y-full" : ""
-      } items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none`}
+      }`}
       style={{
         left: barX,
         top: barY,
       }}
-      onPointerDown={(e) => e.stopPropagation()}
     >
+      <div
+        className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
+        style={{
+          zoom: barScale,
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
       {/* Name / Rename Input */}
       {isEditingName ? (
         <div className="flex items-center gap-1">
@@ -200,6 +209,7 @@ export function GroupOptionsBar() {
       >
         <FolderMinus size={16} />
       </button>
+    </div>
     </div>
   );
 }

@@ -21,6 +21,7 @@ export function AlignOptionsBar() {
   const distributeObjects = useCanvasStore((s) => s.distributeObjects);
   const arrangeLanes = useCanvasStore((s) => s.arrangeLanes);
   const isLocked = useCanvasStore((s) => s.isLocked);
+  const isDragging = useCanvasStore((s) => s.isDragging);
 
   const selectedCards = useMemo(() => {
     if (selectedIds.length < 2 || isLocked) return [];
@@ -29,7 +30,7 @@ export function AlignOptionsBar() {
     );
   }, [selectedIds, objects, isLocked]);
 
-  if (selectedCards.length < 2) return null;
+  if (selectedCards.length < 2 || isDragging) return null;
 
   const canDistribute = selectedCards.length >= 3;
 
@@ -47,11 +48,12 @@ export function AlignOptionsBar() {
   }
 
   const zoom = viewport.zoom;
+  const barScale = Math.max(0.35, Math.min(2.0, zoom));
   const centerX = (minX + maxX) / 2;
   const screenX = (centerX - viewport.x) * zoom;
   const screenMinY = (minY - viewport.y) * zoom;
   const screenMaxY = (maxY - viewport.y) * zoom;
-  const isAbove = screenMinY >= 50;
+  const isAbove = screenMinY >= 48 * barScale + 10;
   const barY = isAbove ? screenMinY - 10 : screenMaxY + 10;
 
   const alignButtons: {
@@ -93,15 +95,21 @@ export function AlignOptionsBar() {
 
   return (
     <div
-      className={`absolute z-40 flex -translate-x-1/2 ${
+      className={`pointer-events-none absolute z-40 -translate-x-1/2 ${
         isAbove ? "-translate-y-full" : ""
-      } items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none`}
+      }`}
       style={{
         left: screenX,
         top: barY,
       }}
-      onPointerDown={(e) => e.stopPropagation()}
     >
+      <div
+        className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
+        style={{
+          zoom: barScale,
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
       {/* Horizontal Alignment */}
       <div className="flex items-center gap-0.5">
         {alignButtons.slice(0, 3).map(({ direction, icon, title }) => (
@@ -172,6 +180,7 @@ export function AlignOptionsBar() {
       >
         <Columns3 size={16} className="text-indigo-600" />
       </button>
+    </div>
     </div>
   );
 }

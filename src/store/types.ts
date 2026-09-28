@@ -96,6 +96,7 @@ export interface CanvasStoreState {
   descHover: DescTarget | null;
   actionHover: ActionTarget | null;
   modelPopupChain: ModelPopupEntry[];
+  isDragging: boolean;
 
   // AI Assistant State
   aiSettings: AISettings;
@@ -196,6 +197,9 @@ export interface CanvasStoreActions {
   openModelPopup: (entry: Omit<ModelPopupEntry, "id">) => void;
   closeModelPopup: (level?: number) => void;
   clearModelPopups: () => void;
+
+  // Dragging state
+  setIsDragging: (isDragging: boolean) => void;
 
   // Project metadata
   setProjectName: (name: string) => void;

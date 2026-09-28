@@ -69,6 +69,7 @@ export const initialCanvasState: CanvasStoreState = {
   descHover: null,
   actionHover: null,
   modelPopupChain: [],
+  isDragging: false,
 
   // AI Assistant State
   aiSettings: getStoredAISettings(),
@@ -1390,6 +1391,12 @@ export const useCanvasStore = create<CanvasStore>()(
 
       clearModelPopups: () => set({ modelPopupChain: [] }),
 
+      setIsDragging: (isDragging) => {
+        if (get().isDragging !== isDragging) {
+          set({ isDragging });
+        }
+      },
+
       setProjectName: (projectName) => set({ projectName }),
 
       resetBoard: (
@@ -1411,6 +1418,7 @@ export const useCanvasStore = create<CanvasStore>()(
           descHover: null,
           actionHover: null,
           modelPopupChain: [],
+          isDragging: false,
           viewport: {
             ...DEFAULT_VIEWPORT,
             // Keep the live canvas size — the engine owns it and only resyncs

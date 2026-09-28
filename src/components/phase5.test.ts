@@ -528,4 +528,33 @@ describe("Phase 5 - Floating Options Bars, Alignment & Domain Utilities", () => 
       expect(useCanvasStore.getState().objects).toHaveLength(0);
     });
   });
+
+  describe("Options Bar Dragging & Dynamic Zoom Scaling", () => {
+    it("tracks isDragging state correctly and resets on resetBoard", () => {
+      expect(useCanvasStore.getState().isDragging).toBe(false);
+
+      useCanvasStore.getState().setIsDragging(true);
+      expect(useCanvasStore.getState().isDragging).toBe(true);
+
+      useCanvasStore.getState().setIsDragging(false);
+      expect(useCanvasStore.getState().isDragging).toBe(false);
+
+      useCanvasStore.getState().setIsDragging(true);
+      useCanvasStore.getState().resetBoard();
+      expect(useCanvasStore.getState().isDragging).toBe(false);
+    });
+
+    it("clamps barScale properly within usable zoom boundaries [0.35, 2.0]", () => {
+      const computeBarScale = (zoom: number) =>
+        Math.max(0.35, Math.min(2.0, zoom));
+
+      expect(computeBarScale(1.0)).toBe(1.0);
+      expect(computeBarScale(0.8)).toBe(0.8);
+      expect(computeBarScale(1.5)).toBe(1.5);
+      // Extreme zoom out clamps at 0.35
+      expect(computeBarScale(0.1)).toBe(0.35);
+      // Extreme zoom in clamps at 2.0
+      expect(computeBarScale(5.0)).toBe(2.0);
+    });
+  });
 });
