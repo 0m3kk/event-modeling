@@ -228,7 +228,8 @@ export const deleteObjectsTool = defineTool({
 
 export const connectObjectsTool = defineTool({
   name: "connect_objects",
-  description: "Draw orthogonal 90° elbow connectors between existing cards/nodes.",
+  description:
+    "Draw orthogonal 90° elbow connectors between cards/nodes. For Write Slices: connect Command -> Constraint and Constraint -> Event. For Read Slices: connect Event -> State and Query -> State. NEVER connect Actor to Command or Query (authorization is decoupled via action and permissions).",
   schema: z.object({
     connections: z
       .array(

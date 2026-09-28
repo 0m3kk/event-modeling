@@ -88,3 +88,72 @@ export function arrangeStormLanes(
 
   return positions;
 }
+
+export interface VerticalSliceLayoutOptions {
+  rowGap?: number;
+  colGap?: number;
+  origin?: { x: number; y: number };
+}
+
+/**
+ * Arranges cards in a Vertical Slice from top to bottom:
+ * - Layer 0 (Top): Command, Query
+ * - Layer 1 (Middle): Constraint, State
+ * - Layer 2 (Bottom): Event, Notify
+ * - Layer 3: Actor, etc.
+ * Cards within each layer are arranged horizontally with colGap and centered relative to the widest layer.
+ */
+export function arrangeVerticalSlice(
+  cards: StormLaneCard[],
+  options: VerticalSliceLayoutOptions = {},
+): StormLanePosition[] {
+  const rowGap = options.rowGap ?? 60;
+  const colGap = options.colGap ?? 40;
+  const origin = options.origin ?? { x: 0, y: 0 };
+
+  const layers: StormLaneCard[][] = [[], [], [], []];
+  for (const card of cards) {
+    if (card.kind === "command" || card.kind === "query") {
+      layers[0].push(card);
+    } else if (card.kind === "constraint" || card.kind === "state") {
+      layers[1].push(card);
+    } else if (card.kind === "event" || card.kind === "notify") {
+      layers[2].push(card);
+    } else {
+      layers[3].push(card);
+    }
+  }
+
+  const activeLayers = layers.filter((l) => l.length > 0);
+  if (activeLayers.length === 0) return [];
+
+  const layerWidths = activeLayers.map((layer) =>
+    layer.reduce((sum, c, i) => sum + c.width + (i > 0 ? colGap : 0), 0),
+  );
+  const maxWidth = Math.max(...layerWidths);
+
+  const positions: StormLanePosition[] = [];
+  let y = origin.y;
+
+  for (let l = 0; l < activeLayers.length; l++) {
+    const layer = activeLayers[l];
+    const width = layerWidths[l];
+    const height = Math.max(...layer.map((c) => c.height));
+    let x = origin.x + (maxWidth - width) / 2;
+
+    for (const card of layer) {
+      positions.push({
+        id: card.id,
+        x: Math.round(x),
+        y: Math.round(y),
+        lane: card.kind,
+      });
+      x += card.width + colGap;
+    }
+
+    y += height + rowGap;
+  }
+
+  return positions;
+}
+

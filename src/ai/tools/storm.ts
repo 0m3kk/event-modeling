@@ -6,7 +6,12 @@ import {
   computeOptimalStormCardWidth,
 } from "@/utils/cardDimensions";
 import { toDisplayName } from "@/utils/naming";
-import { arrangeStormLanes, type StormLaneCard, type StormLanePosition } from "@/utils/stormLayout";
+import {
+  arrangeStormLanes,
+  arrangeVerticalSlice,
+  type StormLaneCard,
+  type StormLanePosition,
+} from "@/utils/stormLayout";
 import {
   describeStormOptions,
   validateStormWrite,
@@ -28,15 +33,38 @@ const STORM_KINDS = [
 
 const fieldSpec = z.object({
   name: z.string(),
-  fieldType: z.string().optional().describe("Type or Model node name (default 'string'). Notify cards ignore type."),
+  fieldType: z
+    .string()
+    .optional()
+    .describe(
+      "Type or Model node name (default 'string'). Notify cards ignore type.",
+    ),
   required: z.boolean().optional(),
-  description: z.string().optional(),
-  tag: z.string().optional().describe("Tag name (e.g. 'Order')."),
+  description: z
+    .string()
+    .optional()
+    .describe("Short, clear domain explanation of the field purpose."),
+  tag: z
+    .string()
+    .optional()
+    .describe(
+      "Tag name on Event field for DCB dynamic consistency boundary (e.g. 'Order').",
+    ),
 });
 
 const queryItemSpec = z.object({
-  types: z.array(z.string()).optional().describe("Existing Event card names; empty matches all."),
-  tagFields: z.array(z.string()).optional().describe("Names of tagged fields on this card."),
+  types: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Existing Event card names evaluated by this Constraint/State; empty matches all.",
+    ),
+  tagFields: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Names of tagged fields on this card used to filter matching events.",
+    ),
 });
 
 type FieldSpec = z.output<typeof fieldSpec>;
@@ -175,21 +203,47 @@ function layoutSize(
 export const createStormCardsTool = defineTool({
   name: "create_storm_cards",
   description:
-    "Create event-storming cards (command / event / notify / query / actor / state / constraint). Arranges cards into lanes unless arrange=false. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field.",
+    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (Decision Model with queryItems) -> Event (past fact with field tags). For Read Slices: Query (params + responseFields + action) -> State (projection with queryItems) <- Event. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field.",
   schema: z.object({
     cards: z
       .array(
         z.object({
           kind: z.enum(STORM_KINDS),
-          name: z.string().min(1),
-          description: z.string().optional(),
+          name: z.string().min(1).describe("Card title in Title Case (English)."),
+          description: z
+            .string()
+            .optional()
+            .describe("Concise, clear explanation of domain purpose."),
           isArray: z.boolean().optional(),
           fields: z.array(fieldSpec).optional(),
-          responseFields: z.array(fieldSpec).optional(),
-          queryItems: z.array(queryItemSpec).optional(),
-          constraints: z.array(z.string()).optional(),
-          action: z.string().optional(),
-          permissions: z.array(z.string()).optional(),
+          responseFields: z
+            .array(fieldSpec)
+            .optional()
+            .describe("Query cards only (output fields)."),
+          queryItems: z
+            .array(queryItemSpec)
+            .optional()
+            .describe(
+              "State & Constraint cards: DCB query matching event types and tagged fields.",
+            ),
+          constraints: z
+            .array(z.string())
+            .optional()
+            .describe(
+              "Constraint cards only: business invariant rules / policies.",
+            ),
+          action: z
+            .string()
+            .optional()
+            .describe(
+              "Authorization action (resource:verb:scope) required for Command and Query cards (e.g. 'order:create:own', 'order:read:own').",
+            ),
+          permissions: z
+            .array(z.string())
+            .optional()
+            .describe(
+              "Actor cards only: wildcard permission patterns (e.g. ['order:*', '*:read:own']).",
+            ),
           x: z.number().optional(),
           y: z.number().optional(),
           groupId: z
@@ -200,7 +254,22 @@ export const createStormCardsTool = defineTool({
       )
       .min(1)
       .max(100),
-    arrange: z.boolean().optional().describe("Auto-arrange into lanes (default true)."),
+    arrange: z
+      .boolean()
+      .optional()
+      .describe("Auto-arrange cards (default true)."),
+    layout: z
+      .enum(["verticalSlice", "lanes", "none"])
+      .optional()
+      .describe(
+        "Layout arrangement: 'verticalSlice' (default for slices: Command/Query top -> Constraint/State middle -> Event/Notify bottom) or 'lanes' (horizontal lanes).",
+      ),
+    nearCardId: z
+      .string()
+      .optional()
+      .describe(
+        "ID or name of an existing related domain card/slice to place the new cards immediately next to (domain proximity).",
+      ),
   }),
   execute: (args, ctx) => {
     const state = ctx.getState();
@@ -259,15 +328,46 @@ export const createStormCardsTool = defineTool({
       })),
     });
 
-    if (args.arrange !== false) {
+    const layoutMode =
+      args.layout ??
+      (args.arrange === false
+        ? "none"
+        : args.cards.some((c) => c.kind === "actor")
+          ? "lanes"
+          : "verticalSlice");
+
+    if (layoutMode !== "none") {
       const layoutCards: StormLaneCard[] = built.map(({ obj }) => ({
         id: obj.id,
         kind: obj.stormData?.kind ?? "event",
         width: obj.width ?? 200,
         height: obj.height ?? 120,
       }));
-      const probe = arrangeStormLanes(layoutCards, { origin: { x: 0, y: 0 } });
+
+      const arranger =
+        layoutMode === "verticalSlice"
+          ? arrangeVerticalSlice
+          : arrangeStormLanes;
+      const probe = arranger(layoutCards, { origin: { x: 0, y: 0 } });
       const size = layoutSize(probe, layoutCards);
+
+      // Check for nearCardId (spatial domain proximity)
+      let domainOriginCenter: { x: number; y: number } | undefined;
+      if (args.nearCardId) {
+        const needle = args.nearCardId.trim().toLowerCase();
+        const nearObj = state.objects.find(
+          (o) =>
+            o.id === args.nearCardId ||
+            (o.stormData?.name && o.stormData.name.toLowerCase() === needle) ||
+            (o.modelData?.name && o.modelData.name.toLowerCase() === needle),
+        );
+        if (nearObj) {
+          domainOriginCenter = {
+            x: nearObj.x + (nearObj.width ?? 200) + 80,
+            y: nearObj.y,
+          };
+        }
+      }
 
       // If all cards belong to the same group, place them relative to that group
       const commonGroupId = built.every(
@@ -279,7 +379,7 @@ export const createStormCardsTool = defineTool({
         ? state.groups.find((g) => g.id === commonGroupId)
         : undefined;
 
-      let groupOriginCenter = {
+      let groupOriginCenter = domainOriginCenter ?? {
         x: center.x - size.width / 2,
         y: center.y - size.height / 2,
       };
@@ -305,7 +405,7 @@ export const createStormCardsTool = defineTool({
 
       const origin = findFreeSpot(state.objects, size, groupOriginCenter);
       const byId = new Map(
-        arrangeStormLanes(layoutCards, { origin }).map((pos) => [pos.id, pos]),
+        arranger(layoutCards, { origin }).map((pos) => [pos.id, pos]),
       );
       for (const { spec, obj } of built) {
         if (spec.x !== undefined && spec.y !== undefined) {
@@ -381,16 +481,32 @@ export const createStormCardsTool = defineTool({
 export const updateStormCardTool = defineTool({
   name: "update_storm_card",
   description:
-    "Update an existing event-storming card. Recalculates card height automatically.",
+    "Update an existing event-storming card. Use this especially for Constraint Evolution (updating queryItems when new related events are added), updating authorization actions/permissions, or refining descriptions.",
   schema: z.object({
-    id: z.string(),
-    name: z.string().optional(),
-    description: z.string().optional(),
+    id: z.string().describe("Card ID to update."),
+    name: z.string().optional().describe("New card title in Title Case (English)."),
+    description: z
+      .string()
+      .optional()
+      .describe("Concise, clear explanation of domain purpose."),
     isArray: z.boolean().optional(),
     fields: z.array(fieldSpec).optional(),
     responseFields: z.array(fieldSpec).optional(),
-    queryItems: z.array(queryItemSpec).optional(),
+    queryItems: z
+      .array(queryItemSpec)
+      .optional()
+      .describe(
+        "Updated queryItems for State/Constraint (e.g. adding new event types during Constraint Evolution).",
+      ),
     constraints: z.array(z.string()).optional(),
+    action: z
+      .string()
+      .optional()
+      .describe("Authorization action (resource:verb:scope)."),
+    permissions: z
+      .array(z.string())
+      .optional()
+      .describe("Actor permissions with wildcards."),
   }),
   execute: (args, ctx) => {
     const state = ctx.getState();
@@ -433,6 +549,8 @@ export const updateStormCardTool = defineTool({
       responseFields,
       queryItems: args.queryItems,
       constraints: args.constraints,
+      action: args.action ?? existing.action,
+      permissions: args.permissions ?? existing.permissions,
     });
     if (args.responseFields === undefined) {
       data.responseFields = existing.responseFields;

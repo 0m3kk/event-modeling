@@ -61,6 +61,7 @@ describe("ai tool helpers", () => {
     expect(compact).toEqual({
       id: "1",
       type: "storm",
+      kind: "command",
       label: "Pay Order",
     });
 
@@ -68,6 +69,7 @@ describe("ai tool helpers", () => {
     expect(withGeo).toEqual({
       id: "1",
       type: "storm",
+      kind: "command",
       label: "Pay Order",
       x: 10,
       y: 21,

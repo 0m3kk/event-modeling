@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { arrangeStormLanes, STORM_LANE_ORDER } from "./stormLayout";
+import {
+  arrangeStormLanes,
+  arrangeVerticalSlice,
+  STORM_LANE_ORDER,
+} from "./stormLayout";
 import type { StormLaneCard } from "./stormLayout";
 
 const card = (
@@ -65,3 +69,49 @@ describe("arrangeStormLanes", () => {
     expect(arrangeStormLanes([])).toEqual([]);
   });
 });
+
+describe("arrangeVerticalSlice", () => {
+  it("arranges cards vertically top-to-bottom: Command -> Constraint -> Event", () => {
+    const cards = [
+      card("cmd1", "command", 200, 100),
+      card("cst1", "constraint", 220, 120),
+      card("evt1", "event", 200, 100),
+    ];
+    const positions = arrangeVerticalSlice(cards, {
+      origin: { x: 50, y: 100 },
+      rowGap: 60,
+    });
+
+    const byId = new Map(positions.map((p) => [p.id, p]));
+    const cmd = byId.get("cmd1")!;
+    const cst = byId.get("cst1")!;
+    const evt = byId.get("evt1")!;
+
+    expect(cmd.y).toBe(100);
+    expect(cst.y).toBe(cmd.y + 100 + 60);
+    expect(evt.y).toBe(cst.y + 120 + 60);
+
+    // Centered horizontally relative to widest card (constraint: width 220)
+    expect(cst.x).toBe(50);
+    expect(cmd.x).toBe(50 + (220 - 200) / 2);
+    expect(evt.x).toBe(50 + (220 - 200) / 2);
+  });
+
+  it("handles Read slice vertically: Query -> State <- Event", () => {
+    const cards = [
+      card("qry1", "query", 200, 100),
+      card("st1", "state", 200, 120),
+      card("evt1", "event", 200, 100),
+    ];
+    const positions = arrangeVerticalSlice(cards, {
+      origin: { x: 0, y: 0 },
+      rowGap: 50,
+    });
+
+    const byId = new Map(positions.map((p) => [p.id, p]));
+    expect(byId.get("qry1")!.y).toBe(0);
+    expect(byId.get("st1")!.y).toBe(100 + 50);
+    expect(byId.get("evt1")!.y).toBe(100 + 50 + 120 + 50);
+  });
+});
+

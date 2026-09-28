@@ -15,6 +15,10 @@ export interface ObjectRow {
   id: string;
   type: CanvasObject["type"];
   label: string;
+  kind?: string;
+  action?: string;
+  sourceId?: string;
+  targetId?: string;
   x?: number;
   y?: number;
   width?: number;
@@ -32,6 +36,13 @@ export function toObjectRow(
     label: objectLabel(obj),
     ...(obj.groupId ? { groupId: obj.groupId } : {}),
   };
+  const kind = obj.stormData?.kind ?? obj.modelData?.kind;
+  if (kind) row.kind = kind;
+  if (obj.stormData?.action) row.action = obj.stormData.action;
+  if (obj.connectorData) {
+    row.sourceId = obj.connectorData.start.objectId;
+    row.targetId = obj.connectorData.end.objectId;
+  }
   if (options.includeGeometry) {
     row.x = Math.round(obj.x);
     row.y = Math.round(obj.y);

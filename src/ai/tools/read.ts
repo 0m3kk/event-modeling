@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CanvasObject } from "@/types";
 import { defineTool } from "./schema";
 import {
   getObjectsBounds,
@@ -16,6 +17,16 @@ const OBJECT_TYPES = [
   "textBox",
 ] as const;
 
+const STORM_KINDS = [
+  "command",
+  "event",
+  "notify",
+  "query",
+  "actor",
+  "state",
+  "constraint",
+] as const;
+
 function countByType(objects: { type: string }[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const obj of objects) {
@@ -24,10 +35,20 @@ function countByType(objects: { type: string }[]): Record<string, number> {
   return counts;
 }
 
+function countStormKinds(objects: CanvasObject[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const obj of objects) {
+    if (obj.type === "storm" && obj.stormData?.kind) {
+      counts[obj.stormData.kind] = (counts[obj.stormData.kind] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
 export const getCanvasOverviewTool = defineTool({
   name: "get_canvas_overview",
   description:
-    "Get an overview of the canvas: object counts by type, bounds, viewport, groups, selection, and revision counter. If revision matches your last read, the canvas is unchanged.",
+    "Get an overview of the canvas: object counts by type, storm card kinds count, existing event card names, bounds, viewport, groups, selection, and revision counter. If revision matches your last read, the canvas is unchanged.",
   schema: z.object({}),
   execute: (_args, ctx) => {
     const state = ctx.getState();
@@ -35,10 +56,16 @@ export const getCanvasOverviewTool = defineTool({
       .filter((o) => state.selectedIds.includes(o.id))
       .map((o) => toObjectRow(o));
 
+    const existingEvents = state.objects
+      .filter((o) => o.type === "storm" && o.stormData?.kind === "event")
+      .map((o) => o.stormData!.name);
+
     return {
       revision: getCanvasRevision(),
       objectCount: state.objects.length,
       objectCountsByType: countByType(state.objects),
+      stormKindsCount: countStormKinds(state.objects),
+      existingEvents,
       bounds: getObjectsBounds(state.objects),
       groups: state.groups.map((group) => ({
         id: group.id,
@@ -54,9 +81,15 @@ export const getCanvasOverviewTool = defineTool({
 export const listObjectsTool = defineTool({
   name: "list_objects",
   description:
-    "List canvas objects as compact rows (id, type, label, group). Filter by type or label text. Geometry is omitted unless includeGeometry is set.",
+    "List canvas objects as compact rows (id, type, label, kind, action, group). Filter by type, stormKind, or label text. Geometry is omitted unless includeGeometry is set.",
   schema: z.object({
     type: z.enum(OBJECT_TYPES).optional().describe("Only return this type."),
+    stormKind: z
+      .enum(STORM_KINDS)
+      .optional()
+      .describe(
+        "Filter storm cards by kind (command, event, constraint, state, query, actor, notify).",
+      ),
     textContains: z
       .string()
       .optional()
@@ -96,6 +129,12 @@ export const listObjectsTool = defineTool({
 
     const filtered = state.objects.filter((obj) => {
       if (args.type && obj.type !== args.type) return false;
+      if (
+        args.stormKind &&
+        (obj.type !== "storm" || obj.stormData?.kind !== args.stormKind)
+      ) {
+        return false;
+      }
       if (needle) {
         const label = toObjectRow(obj).label.toLowerCase();
         if (!label.includes(needle)) return false;
