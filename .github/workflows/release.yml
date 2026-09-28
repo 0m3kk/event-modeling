@@ -18,13 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: "pnpm"
@@ -54,13 +54,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: "pnpm"
@@ -81,7 +81,7 @@ jobs:
       # When triggered by manual dispatch: build Tauri app without creating/updating a GitHub release
       - name: Build Tauri app (Manual dispatch)
         if: github.event_name == 'workflow_dispatch'
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: true
@@ -92,7 +92,7 @@ jobs:
       # When triggered by a GitHub Release: build Tauri app and upload assets directly to that release
       - name: Build Tauri app and upload to release
         if: github.event_name == 'release'
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: true
@@ -105,7 +105,7 @@ jobs:
       # Upload artifacts to GitHub Actions run summary (workflow_dispatch only)
       - name: Upload build artifacts
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: event-modeling-macos-${{ matrix.arch }}
           path: |
