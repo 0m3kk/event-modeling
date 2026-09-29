@@ -150,6 +150,48 @@ describe("jsonSchemaExport", () => {
     });
   });
 
+  it("exports model node validation for object fields, arrays and wraps", () => {
+    const objectModel: ModelData = {
+      kind: "object",
+      name: "Customer",
+      fields: [
+        { id: "1", name: "email", fieldType: "string", validation: { format: "email" } },
+      ],
+    };
+    const objectSchema = generateModelJsonSchema(objectModel);
+    expect(objectSchema.properties?.email).toEqual({
+      type: "string",
+      description: undefined,
+      format: "email",
+    });
+
+    const arrayModel: ModelData = {
+      kind: "array",
+      name: "Tags",
+      itemType: "string",
+      validation: { minItems: 1, maxItems: 5 },
+    };
+    const arraySchema = generateModelJsonSchema(arrayModel);
+    expect(arraySchema.type).toBe("array");
+    expect(arraySchema.minItems).toBe(1);
+    expect(arraySchema.maxItems).toBe(5);
+
+    const wrapModel: ModelData = {
+      kind: "wrap",
+      name: "Nickname",
+      innerType: "string",
+      validation: { maxLength: 20, pattern: "^[a-z]+$" },
+    };
+    const wrapSchema = generateModelJsonSchema(wrapModel) as {
+      title?: string;
+      maxLength?: number;
+      pattern?: string;
+    };
+    expect(wrapSchema.title).toBe("Nickname");
+    expect(wrapSchema.maxLength).toBe(20);
+    expect(wrapSchema.pattern).toBe("^[a-z]+$");
+  });
+
   it("generates complete canvas schema definitions", () => {
     const objects: CanvasObject[] = [
       {

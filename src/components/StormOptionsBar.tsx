@@ -232,6 +232,12 @@ export function StormOptionsBar() {
     }
   };
 
+  const handleToggleDescriptionPopover = () => {
+    const next = !showDescriptionPopover;
+    if (next) setValidationTarget(null);
+    setShowDescriptionPopover(next);
+  };
+
   // Calculate screen position & zoom scale
   const zoom = viewport.zoom;
   const screenX = (selectedStorm.x - viewport.x) * zoom;
@@ -361,7 +367,7 @@ export function StormOptionsBar() {
         {/* Card or field description ⓘ — mirrors the action button: a header badge on
             the card plus a panel here in the options bar. */}
         <button
-          onClick={() => setShowDescriptionPopover((v) => !v)}
+          onClick={handleToggleDescriptionPopover}
           title={infoButtonTitle}
           className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
             currentDescription
@@ -587,7 +593,7 @@ export function StormOptionsBar() {
       {/* Validation Popover (Command payload / Query params) */}
       {showValidationPopover && validationField && (
         <ValidationPopover
-          card={selectedStorm}
+          target={selectedStorm}
           onClose={() => setValidationTarget(null)}
           anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />

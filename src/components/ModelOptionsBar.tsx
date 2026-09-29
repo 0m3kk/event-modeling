@@ -1,11 +1,17 @@
 import { useState, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useCanvasStore } from "@/store";
-import type { ModelNodeKind } from "@/types";
+import type { ModelField, ModelNodeKind } from "@/types";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
 import { DescriptionPopover } from "./DescriptionPopover";
+import { ValidationPopover } from "./ValidationPopover";
 import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 import { findDescriptionText } from "@/utils/description";
+import {
+  describeValidationRules,
+  hasValidationRules,
+  modelValidationScope,
+} from "@/utils/fieldValidation";
 import {
   Box,
   List,
@@ -16,6 +22,7 @@ import {
   Plus,
   Trash2,
   Info,
+  ListChecks,
 } from "lucide-react";
 
 const MODEL_KIND_ICONS: Record<ModelNodeKind, ReactNode> = {
@@ -42,6 +49,8 @@ export function ModelOptionsBar() {
   const createReferenceCopy = useCanvasStore((s) => s.createReferenceCopy);
   const isLocked = useCanvasStore((s) => s.isLocked);
   const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
+  const validationTarget = useCanvasStore((s) => s.validationTarget);
+  const setValidationTarget = useCanvasStore((s) => s.setValidationTarget);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [showKindDropdown, setShowKindDropdown] = useState(false);
@@ -120,6 +129,58 @@ export function ModelOptionsBar() {
     isRowSelected && sf?.fieldId
       ? findDescriptionText(selectedModel, sf.fieldId)
       : data.description;
+
+  // Validation scope: object → per field row; array/wrap → the whole node;
+  // enum → none.
+  const validationScope = modelValidationScope(kind);
+  const selectedModelField =
+    kind === "object" && isRowSelected
+      ? ((selectedModelRow as ModelField | null) ?? null)
+      : null;
+  const canValidate =
+    validationScope !== "none" &&
+    (validationScope !== "field" || Boolean(selectedModelField));
+  const validationValue =
+    validationScope === "field"
+      ? selectedModelField?.validation
+      : validationScope === "none"
+        ? undefined
+        : data.validation;
+  const hasValidation = hasValidationRules(validationValue);
+
+  const expectedValidationFieldId =
+    validationScope === "field" ? selectedModelField?.id : undefined;
+  const showValidationPopover = Boolean(
+    validationTarget &&
+      validationTarget.objectId === selectedModel.id &&
+      validationTarget.fieldId === expectedValidationFieldId,
+  );
+
+  const validationButtonTitle = hasValidation
+    ? `Validation: ${describeValidationRules(validationValue)}`
+    : validationScope === "field"
+      ? `Set Validation for "${selectedModelField?.name ?? "field"}"`
+      : `Set Validation for this ${MODEL_KIND_LABELS[kind]}`;
+
+  const handleToggleValidationPopover = () => {
+    if (showValidationPopover) {
+      setValidationTarget(null);
+      return;
+    }
+    setShowDescriptionPopover(false);
+    if (canValidate) {
+      setValidationTarget({
+        objectId: selectedModel.id,
+        fieldId: expectedValidationFieldId,
+      });
+    }
+  };
+
+  const handleToggleDescriptionPopover = () => {
+    const next = !showDescriptionPopover;
+    if (next) setValidationTarget(null);
+    setShowDescriptionPopover(next);
+  };
 
   const infoTitle = currentDescription
     ? `Description: ${currentDescription}`
@@ -216,7 +277,7 @@ export function ModelOptionsBar() {
 
         {/* Card or field description ⓘ — panel mirrored from the storm options bar */}
         <button
-          onClick={() => setShowDescriptionPopover((v) => !v)}
+          onClick={handleToggleDescriptionPopover}
           title={infoTitle}
           className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
             currentDescription
@@ -226,6 +287,28 @@ export function ModelOptionsBar() {
         >
           <Info size={16} className="text-sky-600" />
         </button>
+
+        {/* Field / node validation ✓ — object fields, array length, wrap rules */}
+        {canValidate && (
+          <button
+            onClick={handleToggleValidationPopover}
+            title={validationButtonTitle}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+              hasValidation || showValidationPopover
+                ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <ListChecks
+              size={16}
+              className={
+                hasValidation || showValidationPopover
+                  ? "text-emerald-600"
+                  : "text-gray-600"
+              }
+            />
+          </button>
+        )}
 
         <div className="h-5 w-px bg-gray-200" />
 
@@ -267,6 +350,15 @@ export function ModelOptionsBar() {
         <DescriptionPopover
           target={selectedModel}
           onClose={() => setShowDescriptionPopover(false)}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
+        />
+      )}
+
+      {/* Validation Panel (object field / array node / wrap node) */}
+      {showValidationPopover && canValidate && (
+        <ValidationPopover
+          target={selectedModel}
+          onClose={() => setValidationTarget(null)}
           anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}

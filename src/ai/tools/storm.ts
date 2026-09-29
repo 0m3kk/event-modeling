@@ -4,7 +4,7 @@ import type {
   CanvasObject,
   StormData,
   StormField,
-  StormFieldValidation,
+  FieldValidation,
   StormKind,
   StormQueryItem,
   StormConstraint,
@@ -16,7 +16,7 @@ import {
 import { toDisplayName } from "@/utils/naming";
 import { getActorPermissions } from "@/utils/stormAuth";
 import { normalizeValidation } from "@/utils/fieldValidation";
-import { STORM_VALIDATION_FORMATS } from "@/constants/storm";
+import { fieldValidationSpec } from "./fieldValidationSpec";
 import {
   arrangeStormLanes,
   arrangeVerticalSlice,
@@ -43,40 +43,7 @@ const STORM_KINDS = [
   "constraint",
 ] as const;
 
-const validationSpec = z.object({
-  minLength: z
-    .number()
-    .int()
-    .nonnegative()
-    .optional()
-    .describe("Minimum string length (inclusive)."),
-  maxLength: z
-    .number()
-    .int()
-    .nonnegative()
-    .optional()
-    .describe("Maximum string length (inclusive)."),
-  pattern: z
-    .string()
-    .optional()
-    .describe("ECMAScript regular expression the value must match."),
-  format: z
-    .enum(STORM_VALIDATION_FORMATS)
-    .optional()
-    .describe("Well-known string format (JSON Schema format)."),
-  min: z
-    .number()
-    .optional()
-    .describe("Minimum numeric value (inclusive)."),
-  max: z
-    .number()
-    .optional()
-    .describe("Maximum numeric value (inclusive)."),
-  allowedValues: z
-    .array(z.string())
-    .optional()
-    .describe("Permitted values (JSON Schema enum)."),
-});
+const validationSpec = fieldValidationSpec;
 
 const fieldSpec = z.object({
   name: z.string(),
@@ -128,7 +95,7 @@ function createStormField(
   required = false,
   description?: string,
   tag?: string,
-  validation?: StormFieldValidation,
+  validation?: FieldValidation,
 ): StormField {
   return {
     id: nanoid(),

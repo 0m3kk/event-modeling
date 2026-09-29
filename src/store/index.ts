@@ -1141,6 +1141,7 @@ export const useCanvasStore = create<CanvasStore>()(
             fieldType: e.fieldType || "string",
             required: e.required,
             description: e.description,
+            ...(e.validation ? { validation: e.validation } : {}),
           }));
           const at = insertAt(fields);
           const nextFields = [

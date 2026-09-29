@@ -43,6 +43,7 @@ export function buildFieldClipboard(
           fieldType: f.fieldType,
           required: f.required,
           description: f.description,
+          ...(f.validation ? { validation: f.validation } : {}),
         }));
     }
   } else if (obj.type === "storm" && obj.stormData) {

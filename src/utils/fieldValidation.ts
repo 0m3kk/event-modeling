@@ -1,12 +1,14 @@
-import type { StormFieldValidation } from "@/types";
+import type { FieldValidation, ModelNodeKind } from "@/types";
 
 /**
- * Helpers for Command / Query param input validation.
+ * Helpers for field / node input validation.
  *
- * Validation is stored on `StormField.validation` and edited through
- * ValidationPopover.tsx. This module keeps the pure pieces — counting,
- * describing and round-tripping the rules — so they can be unit tested and
- * reused by the renderer and the JSON Schema export.
+ * Validation is stored on `StormField.validation` (Command payloads / Query
+ * params), `ModelField.validation` (object nodes) and `ModelData.validation`
+ * (array / wrap nodes), and edited through ValidationPopover.tsx. This module
+ * keeps the pure pieces — counting, describing and round-tripping the rules —
+ * so they can be unit tested and reused by the renderer and the JSON Schema
+ * export.
  */
 
 /** Editable draft: every rule as the raw string a text input holds. */
@@ -17,6 +19,8 @@ export interface FieldValidationDraft {
   format: string;
   min: string;
   max: string;
+  minItems: string;
+  maxItems: string;
   allowedValues: string;
 }
 
@@ -27,6 +31,8 @@ export const EMPTY_VALIDATION_DRAFT: FieldValidationDraft = {
   format: "",
   min: "",
   max: "",
+  minItems: "",
+  maxItems: "",
   allowedValues: "",
 };
 
@@ -76,6 +82,28 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 /**
+ * Where a model node kind keeps its validation:
+ * - `field` — object: one validation object per field row
+ * - `array` — node-level, item-count (length) rules only
+ * - `wrap`  — node-level, full value rules for the whole wrapped value
+ * - `none`  — enum: never validates
+ */
+export type ValidationScope = "field" | "array" | "wrap" | "none";
+
+export function modelValidationScope(kind: ModelNodeKind): ValidationScope {
+  switch (kind) {
+    case "object":
+      return "field";
+    case "array":
+      return "array";
+    case "wrap":
+      return "wrap";
+    default:
+      return "none";
+  }
+}
+
+/**
  * Parse a draft input into a finite number. Blank / invalid input yields
  * `undefined` so the rule is simply dropped rather than stored as NaN.
  */
@@ -103,7 +131,7 @@ export function parseAllowedValues(raw: string): string[] {
 
 /** Load stored validation into an editable draft. */
 export function validationToDraft(
-  validation?: StormFieldValidation,
+  validation?: FieldValidation,
 ): FieldValidationDraft {
   return {
     minLength: isFiniteNumber(validation?.minLength)
@@ -116,6 +144,12 @@ export function validationToDraft(
     format: validation?.format ?? "",
     min: isFiniteNumber(validation?.min) ? String(validation.min) : "",
     max: isFiniteNumber(validation?.max) ? String(validation.max) : "",
+    minItems: isFiniteNumber(validation?.minItems)
+      ? String(validation.minItems)
+      : "",
+    maxItems: isFiniteNumber(validation?.maxItems)
+      ? String(validation.maxItems)
+      : "",
     allowedValues: (validation?.allowedValues ?? []).join(", "),
   };
 }
@@ -126,8 +160,8 @@ export function validationToDraft(
  */
 export function draftToValidation(
   draft: FieldValidationDraft,
-): StormFieldValidation | undefined {
-  const validation: StormFieldValidation = {};
+): FieldValidation | undefined {
+  const validation: FieldValidation = {};
 
   const minLength = parseLength(draft.minLength);
   if (minLength !== undefined) validation.minLength = minLength;
@@ -147,6 +181,12 @@ export function draftToValidation(
   const max = parseNumber(draft.max);
   if (max !== undefined) validation.max = max;
 
+  const minItems = parseLength(draft.minItems);
+  if (minItems !== undefined) validation.minItems = minItems;
+
+  const maxItems = parseLength(draft.maxItems);
+  if (maxItems !== undefined) validation.maxItems = maxItems;
+
   const allowedValues = parseAllowedValues(draft.allowedValues);
   if (allowedValues.length > 0) validation.allowedValues = allowedValues;
 
@@ -155,7 +195,7 @@ export function draftToValidation(
 
 /** Number of individual rules a validation object declares. */
 export function countValidationRules(
-  validation?: StormFieldValidation,
+  validation?: FieldValidation,
 ): number {
   if (!validation) return 0;
   let count = 0;
@@ -165,13 +205,15 @@ export function countValidationRules(
   if ((validation.format ?? "").trim()) count += 1;
   if (isFiniteNumber(validation.min)) count += 1;
   if (isFiniteNumber(validation.max)) count += 1;
+  if (isFiniteNumber(validation.minItems)) count += 1;
+  if (isFiniteNumber(validation.maxItems)) count += 1;
   if ((validation.allowedValues ?? []).length > 0) count += 1;
   return count;
 }
 
 /** Whether the field carries at least one validation rule. */
 export function hasValidationRules(
-  validation?: StormFieldValidation,
+  validation?: FieldValidation,
 ): boolean {
   return countValidationRules(validation) > 0;
 }
@@ -183,15 +225,15 @@ export function hasValidationRules(
  * nothing remains.
  */
 export function normalizeValidation(
-  input?: StormFieldValidation | null,
-): StormFieldValidation | undefined {
+  input?: FieldValidation | null,
+): FieldValidation | undefined {
   if (!input) return undefined;
   return draftToValidation(validationToDraft(input));
 }
 
 /** Human-readable one-liner used in button titles / tooltips. */
 export function describeValidationRules(
-  validation?: StormFieldValidation,
+  validation?: FieldValidation,
 ): string {
   if (!validation) return "";
   const parts: string[] = [];
@@ -209,6 +251,12 @@ export function describeValidationRules(
   }
   if (isFiniteNumber(validation.min)) parts.push(`min ${validation.min}`);
   if (isFiniteNumber(validation.max)) parts.push(`max ${validation.max}`);
+  if (isFiniteNumber(validation.minItems)) {
+    parts.push(`min items ${validation.minItems}`);
+  }
+  if (isFiniteNumber(validation.maxItems)) {
+    parts.push(`max items ${validation.maxItems}`);
+  }
   if ((validation.allowedValues ?? []).length > 0) {
     parts.push(`one of ${validation.allowedValues!.join(", ")}`);
   }

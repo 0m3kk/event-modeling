@@ -7,6 +7,7 @@ import {
   formatFromFieldType,
   hasValidationRules,
   isStringLikeFieldType,
+  modelValidationScope,
   normalizeValidation,
   parseAllowedValues,
   validationToDraft,
@@ -32,6 +33,8 @@ describe("fieldValidation", () => {
       format: "email",
       min: "0",
       max: "100",
+      minItems: "",
+      maxItems: "",
       allowedValues: "pending, paid",
     });
     expect(draftToValidation(draft)).toEqual(validation);
@@ -47,6 +50,8 @@ describe("fieldValidation", () => {
         format: "",
         min: "",
         max: "",
+        minItems: "",
+        maxItems: "",
         allowedValues: " , ,",
       }),
     ).toBeUndefined();
@@ -113,6 +118,23 @@ describe("fieldValidation", () => {
       "min length 1, pattern ^x$, format email, one of a, b",
     );
     expect(describeValidationRules(undefined)).toBe("");
+  });
+
+  it("round-trips array length rules", () => {
+    expect(
+      draftToValidation({ ...EMPTY_VALIDATION_DRAFT, minItems: "1", maxItems: "10" }),
+    ).toEqual({ minItems: 1, maxItems: 10 });
+    expect(countValidationRules({ minItems: 1, maxItems: 10 })).toBe(2);
+    expect(describeValidationRules({ minItems: 1, maxItems: 10 })).toBe(
+      "min items 1, max items 10",
+    );
+  });
+
+  it("maps model kinds to their validation scope", () => {
+    expect(modelValidationScope("object")).toBe("field");
+    expect(modelValidationScope("array")).toBe("array");
+    expect(modelValidationScope("wrap")).toBe("wrap");
+    expect(modelValidationScope("enum")).toBe("none");
   });
 
   it("does not count blank patterns, formats or empty allowed-value lists", () => {

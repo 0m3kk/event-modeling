@@ -13,6 +13,10 @@ import {
   getModelKindHex,
 } from "./fieldTypePill";
 import { resolveTargetModel } from "@/utils/modelResolution";
+import {
+  describeValidationRules,
+  hasValidationRules,
+} from "@/utils/fieldValidation";
 
 function truncateText(str: string, maxLen: number): string {
   if (!str) return "";
@@ -221,9 +225,41 @@ export class ModelNodeRenderer {
           currentText: field.fieldType,
         });
 
-        if (field.description || selectedFieldId === field.id) {
+        if (
+          field.description ||
+          hasValidationRules(field.validation) ||
+          selectedFieldId === field.id
+        ) {
           const hasDesc = Boolean(field.description);
+          const hasValidation = hasValidationRules(field.validation);
           const rowInfoX = typeZoneX - 16;
+
+          if (
+            (hasValidation || selectedFieldId === field.id) &&
+            rowInfoX - 14 > 30
+          ) {
+            const validationX = rowInfoX - 14;
+            drawInfoBadge(g, container, validationX, rowY + 13, {
+              radius: 5,
+              stroke: hasValidation ? 0x86efac : 0x94a3b8,
+              fill: hasValidation ? 0x15803d : 0x64748b,
+              fontSize: 8,
+              bold: true,
+              glyph: "✓",
+              alpha: hasValidation ? 1 : 0.5,
+              textResolution,
+            });
+
+            hitZones.push({
+              type: "validation",
+              bounds: { x: validationX - 8, y: rowY + 5, width: 16, height: 16 },
+              fieldId: field.id,
+              currentText: hasValidation
+                ? describeValidationRules(field.validation)
+                : "Add validation rules",
+            });
+          }
+
           if (rowInfoX > 30) {
             drawInfoBadge(g, container, rowInfoX, rowY + 13, {
               radius: 5,
@@ -314,7 +350,14 @@ export class ModelNodeRenderer {
       const kindHex = isModel ? getModelKindHex(targetKind) : 0xb91c1c;
       const bgHex = isModel ? kindHex : 0xfef2f2;
       const strokeHex = isModel ? kindHex : 0xfecaca;
-      const maxItemChars = Math.max(6, Math.floor((w - (isModel ? 96 : 80)) / 6.5));
+      const hasValidation = hasValidationRules(data.validation);
+      const showValidationBadge = hasValidation || isSelected;
+      const maxItemChars = Math.max(
+        6,
+        Math.floor(
+          (w - (isModel ? 96 : 80) - (showValidationBadge ? 20 : 0)) / 6.5,
+        ),
+      );
       const displayType = `${truncateText(itemType, maxItemChars)}[]`;
 
       g.roundRect(10, rowY + 3, w - 20, 24, 4)
@@ -346,6 +389,28 @@ export class ModelNodeRenderer {
         bounds: { x: 10, y: rowY, width: w - 20, height: rowHeight },
         currentText: itemType,
       });
+
+      if (showValidationBadge) {
+        const validationX = w - 18;
+        drawInfoBadge(g, container, validationX, rowY + 15, {
+          radius: 5,
+          stroke: hasValidation ? 0x86efac : 0x94a3b8,
+          fill: hasValidation ? 0x15803d : 0x64748b,
+          fontSize: 8,
+          bold: true,
+          glyph: "✓",
+          alpha: hasValidation ? 1 : 0.5,
+          textResolution,
+        });
+
+        hitZones.push({
+          type: "validation",
+          bounds: { x: validationX - 8, y: rowY + 2, width: 16, height: rowHeight },
+          currentText: hasValidation
+            ? describeValidationRules(data.validation)
+            : "Add validation rules",
+        });
+      }
     } else if (kind === "wrap") {
       const rowY = renderY;
       const innerType = data.innerType || "any";
@@ -355,7 +420,14 @@ export class ModelNodeRenderer {
       const kindHex = isModel ? getModelKindHex(targetKind) : 0xa16207;
       const bgHex = isModel ? kindHex : 0xfefce8;
       const strokeHex = isModel ? kindHex : 0xfef08a;
-      const maxInnerChars = Math.max(6, Math.floor((w - (isModel ? 76 : 60)) / 6.5));
+      const hasValidation = hasValidationRules(data.validation);
+      const showValidationBadge = hasValidation || isSelected;
+      const maxInnerChars = Math.max(
+        6,
+        Math.floor(
+          (w - (isModel ? 76 : 60) - (showValidationBadge ? 20 : 0)) / 6.5,
+        ),
+      );
       const displayInner = truncateText(innerType, maxInnerChars);
 
       g.roundRect(10, rowY + 3, w - 20, 24, 4)
@@ -387,6 +459,28 @@ export class ModelNodeRenderer {
         bounds: { x: 10, y: rowY, width: w - 20, height: rowHeight },
         currentText: innerType,
       });
+
+      if (showValidationBadge) {
+        const validationX = w - 18;
+        drawInfoBadge(g, container, validationX, rowY + 15, {
+          radius: 5,
+          stroke: hasValidation ? 0x86efac : 0x94a3b8,
+          fill: hasValidation ? 0x15803d : 0x64748b,
+          fontSize: 8,
+          bold: true,
+          glyph: "✓",
+          alpha: hasValidation ? 1 : 0.5,
+          textResolution,
+        });
+
+        hitZones.push({
+          type: "validation",
+          bounds: { x: validationX - 8, y: rowY + 2, width: 16, height: rowHeight },
+          currentText: hasValidation
+            ? describeValidationRules(data.validation)
+            : "Add validation rules",
+        });
+      }
     }
 
     const finalHeight = Math.max(renderY + 10, 80);

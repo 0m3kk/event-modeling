@@ -2,6 +2,8 @@
  * Domain definitions for Event Storming cards
  */
 
+import type { FieldValidation } from "./validation";
+
 /**
  * Event storming card kind.
  *
@@ -51,40 +53,6 @@ export interface StormConstraint {
 }
 
 /**
- * Input validation rules for a Command field or Query param.
- *
- * Every rule is optional; an absent/empty object means "no extra validation".
- * The rules map one-to-one onto JSON Schema keywords so the exported schema
- * (utils/jsonSchemaExport.ts) carries the same constraints:
- * - minLength / maxLength → string length bounds
- * - pattern               → string regex
- * - min / max             → numeric bounds (minimum / maximum)
- * - allowedValues         → `enum`
- *
- * `required` lives directly on StormField (it predates this type and is shared
- * with Model fields).
- */
-export interface StormFieldValidation {
-  /** Minimum string length (inclusive). */
-  minLength?: number;
-  /** Maximum string length (inclusive). */
-  maxLength?: number;
-  /** ECMAScript regular expression the string value must match. */
-  pattern?: string;
-  /**
-   * Well-known string format (JSON Schema `format`), e.g. `email`, `uuid`,
-   * `uri`, `date-time`. See STORM_VALIDATION_FORMATS for the offered list.
-   */
-  format?: string;
-  /** Minimum numeric value (inclusive). */
-  min?: number;
-  /** Maximum numeric value (inclusive). */
-  max?: number;
-  /** Permitted values (JSON Schema `enum`). */
-  allowedValues?: string[];
-}
-
-/**
  * A single field row of an event storming card
  */
 export interface StormField {
@@ -96,7 +64,7 @@ export interface StormField {
   description?: string;
   tag?: string; // tag name (e.g. 'order') forming '{tag}:{name}'
   /** Command payload / Query param validation. Only set on those kinds. */
-  validation?: StormFieldValidation;
+  validation?: FieldValidation;
 }
 
 /**
@@ -162,7 +130,7 @@ export interface FieldClipboardEntry {
   description?: string;
   tag?: string;
   /** Carried through so copy/paste keeps Command / Query param validation. */
-  validation?: StormFieldValidation;
+  validation?: FieldValidation;
 }
 
 export interface FieldClipboard {

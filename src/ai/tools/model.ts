@@ -1,18 +1,44 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import type { CanvasObject, ModelData, ModelField, ModelEnumValue } from "@/types";
+import type {
+  CanvasObject,
+  FieldValidation,
+  ModelData,
+  ModelField,
+  ModelEnumValue,
+} from "@/types";
 import {
   computeModelNodeHeight,
   computeOptimalModelNodeWidth,
 } from "@/utils/cardDimensions";
 import { toDisplayName } from "@/utils/naming";
+import { normalizeValidation } from "@/utils/fieldValidation";
+import { fieldValidationSpec } from "./fieldValidationSpec";
 import { defineTool } from "./schema";
 import { findFreeSpot, getViewportCenter } from "./helpers";
+
+/**
+ * Reduce a normalized validation object to the rules a model kind understands:
+ * object/wrap keep every rule, array keeps item-count limits only.
+ */
+function modelValidation(
+  input: FieldValidation | undefined,
+  scope: "object" | "array" | "wrap",
+): FieldValidation | undefined {
+  const normalized = normalizeValidation(input);
+  if (!normalized) return undefined;
+  if (scope !== "array") return normalized;
+
+  const arrayOnly: FieldValidation = {};
+  if (normalized.minItems !== undefined) arrayOnly.minItems = normalized.minItems;
+  if (normalized.maxItems !== undefined) arrayOnly.maxItems = normalized.maxItems;
+  return Object.keys(arrayOnly).length > 0 ? arrayOnly : undefined;
+}
 
 export const createModelNodesTool = defineTool({
   name: "create_model_nodes",
   description:
-    "Create data-model nodes (object / array / wrap / enum). Object nodes carry a field list; array/wrap carry an item/inner type; enum carries values.",
+    "Create data-model nodes (object / array / wrap / enum). Object nodes carry a field list; array/wrap carry an item/inner type; enum carries values. Object fields and array/wrap nodes may set `validation` (an object field uses the full rule set; an array node only uses minItems/maxItems; a wrap node validates the whole wrapped value). Enum never validates.",
   schema: z.object({
     nodes: z
       .array(
@@ -29,11 +55,19 @@ export const createModelNodesTool = defineTool({
                 fieldType: z.string().optional(),
                 required: z.boolean().optional(),
                 description: z.string().optional(),
+                validation: fieldValidationSpec
+                  .optional()
+                  .describe("Object nodes only: per-field input validation."),
               }),
             )
             .optional(),
           itemType: z.string().optional(),
           innerType: z.string().optional(),
+          validation: fieldValidationSpec
+            .optional()
+            .describe(
+              "Array nodes: minItems/maxItems item-count limits only. Wrap nodes: rules for the whole wrapped value. Ignored on object/enum (object validation is per field).",
+            ),
           values: z
             .array(
               z.object({
@@ -79,17 +113,25 @@ export const createModelNodesTool = defineTool({
       };
 
       if (spec.kind === "object") {
-        data.fields = (spec.fields ?? []).map((f): ModelField => ({
-          id: nanoid(),
-          name: toDisplayName(f.name),
-          fieldType: f.fieldType ?? "string",
-          required: f.required ?? false,
-          description: f.description,
-        }));
+        data.fields = (spec.fields ?? []).map((f): ModelField => {
+          const validation = modelValidation(f.validation, "object");
+          return {
+            id: nanoid(),
+            name: toDisplayName(f.name),
+            fieldType: f.fieldType ?? "string",
+            required: f.required ?? false,
+            description: f.description,
+            ...(validation ? { validation } : {}),
+          };
+        });
       } else if (spec.kind === "array") {
         data.itemType = spec.itemType ?? "string";
+        const validation = modelValidation(spec.validation, "array");
+        if (validation) data.validation = validation;
       } else if (spec.kind === "wrap") {
         data.innerType = spec.innerType ?? "string";
+        const validation = modelValidation(spec.validation, "wrap");
+        if (validation) data.validation = validation;
       } else {
         data.values = (spec.values ?? []).map((v): ModelEnumValue => ({
           id: nanoid(),

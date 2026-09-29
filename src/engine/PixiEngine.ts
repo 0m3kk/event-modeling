@@ -705,15 +705,15 @@ export class PixiEngine {
         return;
       }
 
-      // Click on a row's validation ✓ badge selects the row and opens the
-      // validation panel in the options bar.
-      if (accurateZone?.type === "validation" && accurateZone.fieldId) {
+      // Click on a row's validation ✓ badge selects the target and opens the
+      // validation panel in the options bar. Array / wrap nodes have no field
+      // row, so their badge targets the node itself.
+      if (accurateZone?.type === "validation") {
         state.clearModelPopups();
         state.selectObject(id, e.shiftKey || e.metaKey || e.ctrlKey);
-        state.setStormSelectedField({
-          objectId: id,
-          fieldId: accurateZone.fieldId,
-        });
+        state.setStormSelectedField(
+          accurateZone.fieldId ? { objectId: id, fieldId: accurateZone.fieldId } : null,
+        );
         state.setValidationTarget({
           objectId: id,
           fieldId: accurateZone.fieldId,
@@ -1530,8 +1530,7 @@ export class PixiEngine {
         } else if (
           hit &&
           zone?.type === "validation" &&
-          zone.currentText &&
-          zone.fieldId
+          zone.currentText
         ) {
           nextValidationHover = {
             objectId: hit.obj.id,

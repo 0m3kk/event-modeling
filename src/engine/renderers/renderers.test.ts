@@ -189,6 +189,69 @@ describe("Pixi Card Renderers", () => {
     ).toBe(true);
   });
 
+  it("draws validation badges on model object fields, arrays and wraps", () => {
+    const objectObj: CanvasObject = {
+      id: "obj-val",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 120,
+      modelData: {
+        kind: "object",
+        name: "Customer",
+        fields: [
+          {
+            id: "f1",
+            name: "email",
+            fieldType: "string",
+            validation: { format: "email" },
+          },
+        ],
+      },
+    };
+    const objectRes = ModelNodeRenderer.draw(new Container(), objectObj, 1, false);
+    const objectZone = objectRes.hitZones.find((z) => z.type === "validation");
+    expect(objectZone?.fieldId).toBe("f1");
+    expect(objectZone?.currentText).toBe("format email");
+
+    const arrayObj: CanvasObject = {
+      id: "arr-val",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 80,
+      modelData: {
+        kind: "array",
+        name: "Tags",
+        itemType: "string",
+        validation: { maxItems: 5 },
+      },
+    };
+    const arrayRes = ModelNodeRenderer.draw(new Container(), arrayObj, 1, false);
+    const arrayZone = arrayRes.hitZones.find((z) => z.type === "validation");
+    expect(arrayZone?.fieldId).toBeUndefined();
+    expect(arrayZone?.currentText).toBe("max items 5");
+
+    // Enum nodes never validate.
+    const enumObj: CanvasObject = {
+      id: "enum-val",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 80,
+      modelData: {
+        kind: "enum",
+        name: "Status",
+        values: [{ id: "v1", name: "Open" }],
+      },
+    };
+    const enumRes = ModelNodeRenderer.draw(new Container(), enumObj, 1, false);
+    expect(enumRes.hitZones.some((z) => z.type === "validation")).toBe(false);
+  });
+
   it("allows wider card width so long titles and field names fit without truncation", () => {
     const longName = "veryLongBillingAccountIdentificationNumber";
     const longTitle = "ProcessCustomerMonthlyInvoicePaymentCommand";

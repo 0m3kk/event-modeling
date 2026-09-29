@@ -606,6 +606,65 @@ describe("AI Model & Write Tools", () => {
     expect(fake.objects[1]!.modelData?.kind).toBe("enum");
   });
 
+  it("create_model_nodes applies validation by model kind", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_model_nodes",
+        arguments: JSON.stringify({
+          nodes: [
+            {
+              kind: "object",
+              name: "Customer",
+              fields: [
+                {
+                  name: "email",
+                  fieldType: "string",
+                  validation: { format: "email" },
+                },
+              ],
+            },
+            {
+              kind: "array",
+              name: "Tags",
+              itemType: "string",
+              validation: { maxItems: 5, format: "email" },
+            },
+            {
+              kind: "wrap",
+              name: "Nickname",
+              innerType: "string",
+              validation: { maxLength: 20 },
+            },
+            {
+              kind: "enum",
+              name: "Status",
+              values: [{ value: "Open" }],
+              validation: { maxItems: 2 },
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const byName = (name: string) =>
+      fake.objects.find((o) => o.modelData?.name === name)!;
+
+    expect(byName("Customer").modelData?.fields?.[0].validation).toEqual({
+      format: "email",
+    });
+    // Array keeps only the item-count limits; the string format is dropped.
+    expect(byName("Tags").modelData?.validation).toEqual({ maxItems: 5 });
+    expect(byName("Nickname").modelData?.validation).toEqual({ maxLength: 20 });
+    // Enum never validates.
+    expect(byName("Status").modelData?.validation).toBeUndefined();
+  });
+
   it("connect_objects creates orthogonal elbow connector between cards", async () => {
     const fake = createFakeStore();
     fake.objects.push(

@@ -107,6 +107,7 @@ Data-model nodes use create_model_nodes (always place in the "Shared Types" grou
 - enum: enumerated values
 - array: collection of itemType
 - wrap: value-object wrapper around innerType
+Validation on model nodes: an object field may set the full rule set (minLength, maxLength, pattern, format, min, max, allowedValues); an array node accepts only minItems/maxItems (item count); a wrap node validates the whole wrapped value with the full rule set; enum never validates.
 Model node names can be referenced as field types on Storm cards and other Model nodes.`;
 
 export const AGENT_FALLBACK_PROMPT = `You are an AI assistant for an Event Storming & Data Modeling canvas using CQRS and Event Sourcing with DCB (https://dcb.events/). The endpoint you run on does not support tool calling, so you MUST respond with a single JSON object and nothing else.
@@ -129,6 +130,7 @@ Available tools:
 - delete_objects { ids: [...] }
 - connect_objects { connections: [{ sourceId, targetId, sourceAnchor?, targetAnchor? }] }
 - create_model_nodes { nodes: [{ ..., groupId? }] }
+- create_model_nodes validation: object fields and array/wrap nodes may include "validation" (object field: full rules; array: minItems/maxItems only; wrap: full rules for the wrapped value; enum: none).
 - create_reference_copies { ids: [...] }
 - group_objects { ids: [...], name?, groupId? }
 - ungroup_objects { groupIds: [...] }

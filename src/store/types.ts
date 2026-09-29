@@ -62,7 +62,8 @@ export interface ActionTarget {
  */
 export interface ValidationTarget {
   objectId: string;
-  fieldId: string;
+  /** Omitted for node-level targets (array / wrap). */
+  fieldId?: string;
   text: string;
   iconBounds: { x: number; y: number; width: number; height: number };
 }

@@ -2,7 +2,7 @@ import type {
   ModelData,
   StormData,
   StormField,
-  StormFieldValidation,
+  FieldValidation,
   CanvasObject,
 } from "@/types";
 
@@ -25,6 +25,8 @@ export interface JsonSchemaDefinition {
   required?: string[];
   items?: JsonSchemaProperty;
   enum?: string[];
+  minItems?: number;
+  maxItems?: number;
   definitions?: Record<string, JsonSchemaDefinition>;
 }
 
@@ -96,18 +98,28 @@ export function generateModelJsonSchema(
         allModelNames,
         defsKey,
       );
+      // Arrays only carry item-count (length) limits.
+      if (typeof model.validation?.minItems === "number") {
+        def.minItems = model.validation.minItems;
+      }
+      if (typeof model.validation?.maxItems === "number") {
+        def.maxItems = model.validation.maxItems;
+      }
       break;
     }
     case "wrap": {
-      return {
-        ...resolveFieldSchema(
-          model.innerType ?? "string",
-          allModelNames,
-          defsKey,
-        ),
-        title,
-        description: model.description,
-      };
+      return applyFieldValidation(
+        {
+          ...resolveFieldSchema(
+            model.innerType ?? "string",
+            allModelNames,
+            defsKey,
+          ),
+          title,
+          description: model.description,
+        },
+        model.validation,
+      );
     }
     case "object":
     default: {
@@ -117,10 +129,13 @@ export function generateModelJsonSchema(
 
       for (const field of model.fields ?? []) {
         const propName = sanitizeIdentifier(field.name);
-        def.properties[propName] = {
-          ...resolveFieldSchema(field.fieldType, allModelNames, defsKey),
-          description: field.description,
-        };
+        def.properties[propName] = applyFieldValidation(
+          {
+            ...resolveFieldSchema(field.fieldType, allModelNames, defsKey),
+            description: field.description,
+          },
+          field.validation,
+        );
         if (field.required) {
           required.push(propName);
         }
@@ -141,10 +156,10 @@ export function generateModelJsonSchema(
  * maps to a JSON Schema keyword; unset rules add nothing, so an un-validated
  * field keeps the base shape untouched.
  */
-export function applyFieldValidation(
-  base: JsonSchemaProperty,
-  validation?: StormFieldValidation,
-): JsonSchemaProperty {
+export function applyFieldValidation<T extends JsonSchemaProperty>(
+  base: T,
+  validation?: FieldValidation,
+): T {
   if (!validation) return base;
 
   const next: JsonSchemaProperty = { ...base };
@@ -166,13 +181,19 @@ export function applyFieldValidation(
   if (typeof validation.max === "number") {
     next.maximum = validation.max;
   }
+  if (typeof validation.minItems === "number") {
+    next.minItems = validation.minItems;
+  }
+  if (typeof validation.maxItems === "number") {
+    next.maxItems = validation.maxItems;
+  }
   const allowedValues = (validation.allowedValues ?? []).filter(
     (value) => value.trim().length > 0,
   );
   if (allowedValues.length > 0) {
     next.enum = allowedValues;
   }
-  return next;
+  return next as T;
 }
 
 function buildFieldProperties(
