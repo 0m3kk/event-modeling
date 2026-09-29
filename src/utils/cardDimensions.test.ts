@@ -427,6 +427,25 @@ describe("cardDimensions", () => {
       expect(width % 10).toBe(0);
     });
 
+    it("expands width for a long field tag so it is never truncated", () => {
+      const data: StormData = {
+        kind: "event",
+        name: "OrderPlaced",
+        fields: [
+          {
+            id: "f1",
+            name: "orderId",
+            fieldType: "uuid",
+            tag: "customerBillingAccountReference",
+          },
+        ],
+      };
+      // The 31-char tag needs ~200px on its own, far past the old 70px cap.
+      const width = computeOptimalStormCardWidth(data, 220);
+      expect(width).toBeGreaterThanOrEqual(380);
+      expect(width % 10).toBe(0);
+    });
+
     it("calculates optimal width for data model nodes", () => {
       const model: ModelData = {
         kind: "object",

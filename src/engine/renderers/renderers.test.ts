@@ -141,6 +141,40 @@ describe("Pixi Card Renderers", () => {
     expect(res.hitZones.some((z) => z.type === "fieldType")).toBe(true);
   });
 
+  it("renders a long field tag in full instead of truncating it", () => {
+    const container = new Container();
+    const longTag = "customerBillingAccountReference";
+    const obj: CanvasObject = {
+      id: "ev-tag",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 100,
+      stormData: {
+        kind: "event",
+        name: "OrderPlaced",
+        fields: [
+          { id: "f1", name: "orderId", fieldType: "uuid", tag: longTag },
+        ],
+      },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+
+    // The tag is rendered verbatim (no ellipsis) and the hit zone carries it.
+    const texts = container.children
+      .filter((c): c is Text => c instanceof Text)
+      .map((t) => t.text);
+    expect(texts).toContain(`#${longTag}`);
+
+    const tagZone = res.hitZones.find((z) => z.type === "fieldTag");
+    expect(tagZone).toBeDefined();
+    expect(tagZone?.currentText).toBe(longTag);
+    // The pill is sized to the full text, well past the old 80px cap.
+    expect(tagZone!.bounds.width).toBeGreaterThan(80);
+  });
+
   it("renders Storm query card with dual sections (params & response)", () => {
     const container = new Container();
     const obj: CanvasObject = {

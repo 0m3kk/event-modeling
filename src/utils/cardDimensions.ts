@@ -350,7 +350,9 @@ export function computeOptimalStormCardWidth(
       : 0;
     const rawTag = f.tag || "";
     const hasTag = Boolean(f.tag && hasTags);
-    const tagPillW = hasTag ? Math.min(70, rawTag.length * 6 + 10) : 0;
+    // Size to the full `#tag` label (matches the renderer; no truncation cap),
+    // so fitting the card width always gives long tags room.
+    const tagPillW = hasTag ? Math.max(36, (rawTag.length + 1) * 6 + 14) : 0;
     const nameWidth =
       f.name.length * 7.2 + 24 + (f.required ? 12 : 0) + (f.description ? 20 : 0);
 
@@ -379,7 +381,7 @@ export function computeOptimalStormCardWidth(
         : 0;
     const tagPillW =
       maxTagTextLen > 0
-        ? Math.min(105, Math.max(40, (maxTagTextLen + 1) * 6.0 + 14))
+        ? Math.max(40, (maxTagTextLen + 1) * 6.0 + 14)
         : 0;
     const eventW = maxTypeLen * 6.5 + 28;
     const qWidth = eventW + (tagPillW > 0 ? tagPillW + 12 : 0) + 24;

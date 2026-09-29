@@ -249,11 +249,13 @@ export class StormCardRenderer {
         const typeZoneX = w - typeZoneW - 8;
 
         // Tag Pill (event, state, constraint, bdd) — only on the input band;
-        // projected output fields never carry tags.
+        // projected output fields never carry tags. The pill is sized to the
+        // full tag text (never truncated): a long tag can run past the row, so
+        // the user widens the card to give it room.
         const hasTag = Boolean(showTags && field.tag && stormHasTags(kind));
         const rawTag = field.tag || "";
         const tagPillW = hasTag
-          ? Math.min(80, Math.max(36, (rawTag.length + 1) * 6 + 14))
+          ? Math.max(36, (rawTag.length + 1) * 6 + 14)
           : 0;
         const tagPillX = hasTag
           ? hasTypes
@@ -322,7 +324,7 @@ export class StormCardRenderer {
 
         // Draw Tag Pill (distinctive capsule badge with warm orange tint & # prefix)
         if (hasTag) {
-          const displayTag = truncateText(rawTag, 8);
+          const displayTag = rawTag;
           const tagPillH = 18;
           const tagPillY = rowY + Math.round((rowHeight - tagPillH) / 2);
 
@@ -550,9 +552,9 @@ export class StormCardRenderer {
         for (let tIdx = 0; tIdx < itemTaggedFields.length; tIdx++) {
           const tf = itemTaggedFields[tIdx];
           const rawTagText = `${tf.tag!.trim()}:${tf.name.trim()}`;
-          const tagPillW = Math.min(
-            105,
-            Math.max(40, (rawTagText.length + 1) * 6.0 + 14),
+          const tagPillW = Math.max(
+            40,
+            (rawTagText.length + 1) * 6.0 + 14,
           );
           maxTagW = Math.max(maxTagW, tagPillW);
           const tagPillX = w - tagPillW - 10;
@@ -563,7 +565,7 @@ export class StormCardRenderer {
             .stroke({ color: 0xfdba74, width: 1 });
 
           const tagText = new Text({
-            text: truncateText(rawTagText, 14),
+            text: rawTagText,
             style: {
               fontSize: 9.5,
               fontWeight: "600",
