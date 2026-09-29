@@ -4,6 +4,7 @@ import { useCanvasStore } from "@/store";
 import type { ModelNodeKind } from "@/types";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
 import { DescriptionPopover } from "./DescriptionPopover";
+import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 import { findDescriptionText } from "@/utils/description";
 import {
   Box,
@@ -29,6 +30,7 @@ const ALL_KINDS: ModelNodeKind[] = ["object", "enum", "array", "wrap"];
 export function ModelOptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const objects = useCanvasStore((s) => s.objects);
+  const groups = useCanvasStore((s) => s.groups);
   const viewport = useCanvasStore((s) => s.viewport);
   const updateObject = useCanvasStore((s) => s.updateObject);
   const deleteObjects = useCanvasStore((s) => s.deleteObjects);
@@ -56,6 +58,11 @@ export function ModelOptionsBar() {
 
   const data = selectedModel.modelData;
   const kind = data.kind;
+
+  // Membership shows a one-click way to detach this node from its group.
+  const parentGroup = selectedModel.groupId
+    ? groups.find((g) => g.id === selectedModel.groupId)
+    : undefined;
 
   // Calculate screen position & zoom scale
   const zoom = viewport.zoom;
@@ -232,6 +239,17 @@ export function ModelOptionsBar() {
         </button>
 
         <div className="h-5 w-px bg-gray-200" />
+
+        {/* Remove from Group — detaches just this node, keeping the group */}
+        {parentGroup && !parentGroup.locked && (
+          <>
+            <RemoveFromGroupButton
+              objectId={selectedModel.id}
+              groupName={parentGroup.name}
+            />
+            <div className="h-5 w-px bg-gray-200" />
+          </>
+        )}
 
         {/* Delete Field / Model Button */}
         <button

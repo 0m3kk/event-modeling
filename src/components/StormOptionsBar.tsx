@@ -15,6 +15,7 @@ import { DescriptionPopover } from "./DescriptionPopover";
 import { PermissionsPopover } from "./PermissionsPopover";
 import { TagPopover } from "./TagPopover";
 import { QueryItemPopover } from "./QueryItemPopover";
+import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 import { findDescriptionText } from "@/utils/description";
 import { getActorPermissions } from "@/utils/stormAuth";
 import {
@@ -33,6 +34,7 @@ import {
 export function StormOptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const objects = useCanvasStore((s) => s.objects);
+  const groups = useCanvasStore((s) => s.groups);
   const viewport = useCanvasStore((s) => s.viewport);
   const updateObject = useCanvasStore((s) => s.updateObject);
   const deleteObjects = useCanvasStore((s) => s.deleteObjects);
@@ -71,6 +73,11 @@ export function StormOptionsBar() {
   const kind = data.kind;
   const isArray = Boolean(data.isArray);
   const phase = data.phase;
+
+  // Membership shows a one-click way to detach this card from its group.
+  const parentGroup = selectedStorm.groupId
+    ? groups.find((g) => g.id === selectedStorm.groupId)
+    : undefined;
 
   const sf = stormSelectedField;
   const selectedField =
@@ -409,6 +416,17 @@ export function StormOptionsBar() {
         >
           <Link2 size={16} />
         </button>
+
+        {/* Remove from Group — detaches just this card, keeping the group */}
+        {parentGroup && !parentGroup.locked && (
+          <>
+            <div className="h-5 w-px bg-gray-200" />
+            <RemoveFromGroupButton
+              objectId={selectedStorm.id}
+              groupName={parentGroup.name}
+            />
+          </>
+        )}
 
         {/* Delete Card / Field Button */}
         <button
