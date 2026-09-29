@@ -7,6 +7,7 @@ import {
   formatFromFieldType,
   hasValidationRules,
   isStringLikeFieldType,
+  normalizeValidation,
   parseAllowedValues,
   validationToDraft,
 } from "./fieldValidation";
@@ -55,6 +56,19 @@ describe("fieldValidation", () => {
     expect(
       draftToValidation({ ...EMPTY_VALIDATION_DRAFT, format: "uuid" }),
     ).toEqual({ format: "uuid" });
+  });
+
+  it("normalizes externally supplied validation (AI tools)", () => {
+    expect(normalizeValidation(undefined)).toBeUndefined();
+    expect(normalizeValidation({})).toBeUndefined();
+    expect(
+      normalizeValidation({
+        minLength: 2.9,
+        pattern: "  ^a$  ",
+        allowedValues: ["x", "  ", "y"],
+        max: 10,
+      }),
+    ).toEqual({ minLength: 2, pattern: "^a$", max: 10, allowedValues: ["x", "y"] });
   });
 
   it("parses length bounds as non-negative integers and keeps numeric signs", () => {

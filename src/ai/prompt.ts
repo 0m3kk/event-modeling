@@ -38,6 +38,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
    - **Business Logic Invariants vs. Command Validation**:
      - Constraints evaluate **business logic / state invariants** against event history via \`queryItems\` (e.g., "Account has sufficient funds", "User must exist", "Order cannot be cancelled after shipping", "Email must be unique").
      - Constraints do **NOT perform command input validation**. Command input validation (such as checking required fields, string formats, not empty, email format, positive amounts) belongs to the Command schema/payload validation. NEVER write command input validation rules inside a Constraint!
+      - **Field validation lives on the Command payload / Query params**: use the optional "validation" object on a Command's "fields" or a Query's "fields" (params) — { minLength, maxLength, pattern, format, min, max, allowedValues } — together with the field's "required" flag. "format" accepts email, uuid, uri, hostname, ipv4, ipv6, date, date-time, or time. These rules map to JSON Schema and are IGNORED on any other kind (Event, State, Constraint, Notify, Actor) and on Query "responseFields".
    - **Constraint Evolution**: When introducing a new Event, ALWAYS consider whether existing Constraints need revision! A new event may affect previously defined invariants.
      - Example: If a constraint checks "User Exists", initially it only queries \`User Registered\`. When a \`User Deleted\` event is added later, the existing "User Exists" constraint MUST be updated to also query \`User Deleted\` so it can verify the user is not deleted. Call \`update_storm_card\` to update existing constraints when related new events are created.
 6. **Authorization (Actions & Permissions)**:
@@ -146,6 +147,7 @@ Modeling Guidelines:
 - DCB Tags: Only tag key/unique identifier fields (IDs, unique email, code). NEVER tag non-key fields (amount, status, dates) or all fields in an event.
 - State & Constraint split: inputFields = INPUT params (only these carry tags and can be referenced by queryItems.tagFields); queryItems = which events feed the card; outputFields = OUTPUT fields projected by rehydrating those events (never tagged). inputFields may be empty when a query item filters by event type only.
 - Constraints: Reusable and independent components checking domain business invariants against historical events (queryItems). Never perform command input validation in constraints or bundle unrelated workflow checks.
+- Command/Query input validation: a Command's fields and a Query's params (fields) may include a "validation" object ({ minLength, maxLength, pattern, format, min, max, allowedValues }) for input validation that maps to JSON Schema. Never put input validation in Constraint rules, and never set validation on Event/State/Constraint/Notify/Actor fields or on Query responseFields.
 - Connectors: Use sourceAnchor: "bottom", targetAnchor: "top" for downward vertical slice flows.
 - Groups: Group all Actors in an "Actors" group. Group all Model nodes in a "Shared Types" group.
 - Domain Proximity: Place new slices/flows next to related existing domain cards (pass nearCardId).

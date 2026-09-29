@@ -362,6 +362,92 @@ describe("AI Storm Tools", () => {
     expect(res.content).toContain("output field");
   });
 
+  it("applies field validation to Command fields and Query params only", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          arrange: false,
+          cards: [
+            {
+              kind: "command",
+              name: "Place Order",
+              action: "order:create:own",
+              fields: [
+                {
+                  name: "email",
+                  fieldType: "string",
+                  validation: { format: "email", maxLength: 255 },
+                },
+                {
+                  name: "quantity",
+                  fieldType: "number",
+                  validation: { min: 1, max: 10 },
+                },
+              ],
+            },
+            {
+              kind: "query",
+              name: "Get Order",
+              action: "order:read:own",
+              fields: [
+                {
+                  name: "status",
+                  fieldType: "string",
+                  validation: { allowedValues: ["draft", "placed"] },
+                },
+              ],
+              responseFields: [
+                {
+                  name: "total",
+                  fieldType: "number",
+                  validation: { min: 0 },
+                },
+              ],
+            },
+            {
+              kind: "event",
+              name: "Order Placed",
+              fields: [
+                {
+                  name: "Order ID",
+                  fieldType: "uuid",
+                  tag: "order",
+                  validation: { minLength: 1 },
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+
+    const command = fake.objects.find((o) => o.stormData?.kind === "command")!;
+    expect(command.stormData?.fields[0].validation).toEqual({
+      format: "email",
+      maxLength: 255,
+    });
+    expect(command.stormData?.fields[1].validation).toEqual({ min: 1, max: 10 });
+
+    const query = fake.objects.find((o) => o.stormData?.kind === "query")!;
+    expect(query.stormData?.fields[0].validation).toEqual({
+      allowedValues: ["draft", "placed"],
+    });
+    // Query response fields are output, never validated.
+    expect(query.stormData?.responseFields?.[0].validation).toBeUndefined();
+
+    // Event fields never carry validation.
+    const event = fake.objects.find((o) => o.stormData?.kind === "event")!;
+    expect(event.stormData?.fields[0].validation).toBeUndefined();
+  });
+
   it("rejects actor card whose permissions do not match any action on canvas", async () => {
     const fake = createFakeStore();
     fake.objects.push({

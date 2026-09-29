@@ -1,12 +1,22 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import type { CanvasObject, StormData, StormField, StormKind, StormQueryItem, StormConstraint } from "@/types";
+import type {
+  CanvasObject,
+  StormData,
+  StormField,
+  StormFieldValidation,
+  StormKind,
+  StormQueryItem,
+  StormConstraint,
+} from "@/types";
 import {
   computeStormCardHeight,
   computeOptimalStormCardWidth,
 } from "@/utils/cardDimensions";
 import { toDisplayName } from "@/utils/naming";
 import { getActorPermissions } from "@/utils/stormAuth";
+import { normalizeValidation } from "@/utils/fieldValidation";
+import { STORM_VALIDATION_FORMATS } from "@/constants/storm";
 import {
   arrangeStormLanes,
   arrangeVerticalSlice,
@@ -33,6 +43,41 @@ const STORM_KINDS = [
   "constraint",
 ] as const;
 
+const validationSpec = z.object({
+  minLength: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe("Minimum string length (inclusive)."),
+  maxLength: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe("Maximum string length (inclusive)."),
+  pattern: z
+    .string()
+    .optional()
+    .describe("ECMAScript regular expression the value must match."),
+  format: z
+    .enum(STORM_VALIDATION_FORMATS)
+    .optional()
+    .describe("Well-known string format (JSON Schema format)."),
+  min: z
+    .number()
+    .optional()
+    .describe("Minimum numeric value (inclusive)."),
+  max: z
+    .number()
+    .optional()
+    .describe("Maximum numeric value (inclusive)."),
+  allowedValues: z
+    .array(z.string())
+    .optional()
+    .describe("Permitted values (JSON Schema enum)."),
+});
+
 const fieldSpec = z.object({
   name: z.string(),
   fieldType: z
@@ -51,6 +96,11 @@ const fieldSpec = z.object({
     .optional()
     .describe(
       "Tag name on Event field for DCB dynamic consistency boundary (e.g. 'Order'). Tag ONLY key/unique identifier fields (IDs, unique email, code); never tag non-key fields or all fields.",
+    ),
+  validation: validationSpec
+    .optional()
+    .describe(
+      "Input validation for Command payload fields and Query params only (ignored on Event/State/Constraint/Notify/Actor fields and Query responseFields). Maps to JSON Schema (minLength, format, pattern, minimum, enum).",
     ),
 });
 
@@ -78,6 +128,7 @@ function createStormField(
   required = false,
   description?: string,
   tag?: string,
+  validation?: StormFieldValidation,
 ): StormField {
   return {
     id: nanoid(),
@@ -86,6 +137,7 @@ function createStormField(
     required,
     description,
     tag,
+    ...(validation ? { validation } : {}),
   };
 }
 
@@ -117,17 +169,33 @@ function assertValidStormWrite(input: StormValidationInput): void {
   );
 }
 
-function buildFields(specs: FieldSpec[] | undefined, kind: StormKind): StormField[] {
+function buildFields(
+  specs: FieldSpec[] | undefined,
+  kind: StormKind,
+  options: { allowValidation?: boolean } = {},
+): StormField[] {
   return (specs ?? []).map((spec) => {
-    const fieldType = kind === "notify" || kind === "actor" ? "" : (spec.fieldType ?? "string");
+    const fieldType =
+      kind === "notify" || kind === "actor"
+        ? ""
+        : (spec.fieldType ?? "string");
     return createStormField(
       toDisplayName(spec.name),
       fieldType,
       kind === "notify" || kind === "actor" ? false : (spec.required ?? false),
       spec.description,
       spec.tag ? toDisplayName(spec.tag) : undefined,
+      options.allowValidation ? normalizeValidation(spec.validation) : undefined,
     );
   });
+}
+
+/**
+ * Whether a kind's PRIMARY field list (Command payload / Query params) may
+ * carry input validation. Query responseFields and all other kinds cannot.
+ */
+function kindValidatesFields(kind: StormKind): boolean {
+  return kind === "command" || kind === "query";
 }
 
 function buildStormData(input: {
@@ -217,7 +285,7 @@ function layoutSize(
 export const createStormCardsTool = defineTool({
   name: "create_storm_cards",
   description:
-    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; prefer event fields that also appear in the Command or Constraint payload, though timestamp/audit fields like Created At/Updated At are exempt). For Read Slices: Query (params + responseFields + action) -> State (projection) <- Event. State and Constraint split fields into three parts: inputFields (INPUT params; only these may carry tags and feed queryItems.tagFields), queryItems (which events feed the card; leave inputFields empty if it filters by event type only), and outputFields (OUTPUT fields produced by rehydrating the matching events; never tag these). Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
+    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; prefer event fields that also appear in the Command or Constraint payload, though timestamp/audit fields like Created At/Updated At are exempt). For Read Slices: Query (params + responseFields + action) -> State (projection) <- Event. State and Constraint split fields into three parts: inputFields (INPUT params; only these may carry tags and feed queryItems.tagFields), queryItems (which events feed the card; leave inputFields empty if it filters by event type only), and outputFields (OUTPUT fields produced by rehydrating the matching events; never tag these). Command payload fields and Query params may set `validation` (minLength/maxLength/pattern/format/min/max/allowedValues) for input validation that maps to JSON Schema; never put validation rules in Constraint text. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
   schema: z.object({
     cards: z
       .array(
@@ -319,7 +387,9 @@ export const createStormCardsTool = defineTool({
         isArray: spec.isArray,
         action: spec.action,
         permissions: spec.permissions,
-        fields: buildFields(spec.fields, spec.kind),
+        fields: buildFields(spec.fields, spec.kind, {
+          allowValidation: kindValidatesFields(spec.kind),
+        }),
         inputFields:
           spec.inputFields !== undefined
             ? buildFields(spec.inputFields, spec.kind)
@@ -526,7 +596,7 @@ export const createStormCardsTool = defineTool({
 export const updateStormCardTool = defineTool({
   name: "update_storm_card",
   description:
-    "Update an existing event-storming card. Use this especially for Constraint Evolution (updating queryItems when new related events are added), updating authorization actions/permissions, or refining descriptions.",
+    "Update an existing event-storming card. Use this especially for Constraint Evolution (updating queryItems when new related events are added), updating authorization actions/permissions, or refining descriptions. When replacing `fields` on a Command or Query, include each field's `validation` (minLength/maxLength/pattern/format/min/max/allowedValues) so input validation is preserved.",
   schema: z.object({
     id: z.string().describe("Card ID to update."),
     name: z.string().optional().describe("New card title in Title Case (English)."),
@@ -578,7 +648,9 @@ export const updateStormCardTool = defineTool({
       existing.kind === "state" || existing.kind === "constraint";
     const fields =
       args.fields !== undefined
-        ? buildFields(args.fields, existing.kind)
+        ? buildFields(args.fields, existing.kind, {
+            allowValidation: kindValidatesFields(existing.kind),
+          })
         : existing.fields;
     const inputFields =
       args.inputFields !== undefined

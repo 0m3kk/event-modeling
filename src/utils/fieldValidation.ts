@@ -176,6 +176,19 @@ export function hasValidationRules(
   return countValidationRules(validation) > 0;
 }
 
+/**
+ * Clean an externally supplied validation payload (e.g. from the AI write
+ * tools) so it matches what the popover would store: finite numbers, trimmed
+ * pattern/format, and non-blank allowed values. Returns `undefined` when
+ * nothing remains.
+ */
+export function normalizeValidation(
+  input?: StormFieldValidation | null,
+): StormFieldValidation | undefined {
+  if (!input) return undefined;
+  return draftToValidation(validationToDraft(input));
+}
+
 /** Human-readable one-liner used in button titles / tooltips. */
 export function describeValidationRules(
   validation?: StormFieldValidation,
