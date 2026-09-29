@@ -346,7 +346,7 @@ export function computeOptimalStormCardWidth(
     const targetModel = objects ? resolveTargetModel(objects, rawType) : null;
     const isModel = Boolean(targetModel && targetModel.modelData);
     const typeZoneW = hasTypes
-      ? Math.min(108, Math.max(isModel ? 72 : 65, rawType.length * 6.5 + (isModel ? 24 : 14)))
+      ? Math.max(isModel ? 72 : 65, rawType.length * 6.5 + (isModel ? 24 : 14))
       : 0;
     const rawTag = f.tag || "";
     const hasTag = Boolean(f.tag && hasTags);
@@ -428,7 +428,7 @@ export function computeOptimalModelNodeWidth(
     const rawType = f.fieldType || "string";
     const targetModel = objects ? resolveTargetModel(objects, rawType) : null;
     const isModel = Boolean(targetModel && targetModel.modelData);
-    const typeZoneW = Math.min(108, Math.max(isModel ? 72 : 65, rawType.length * 6.5 + (isModel ? 24 : 14)));
+    const typeZoneW = Math.max(isModel ? 72 : 65, rawType.length * 6.5 + (isModel ? 24 : 14));
     const nameWidth = f.name.length * 7.2 + 20 + (f.description ? 20 : 0);
     const rowWidth = nameWidth + typeZoneW + 24;
     requiredWidth = Math.max(requiredWidth, rowWidth);

@@ -463,6 +463,24 @@ describe("cardDimensions", () => {
       expect(width % 10).toBe(0);
     });
 
+    it("expands width for a long model field type so it is never truncated", () => {
+      const model: ModelData = {
+        kind: "object",
+        name: "Order",
+        fields: [
+          {
+            id: "f1",
+            name: "billingAccount",
+            fieldType: "CustomerBillingAccountReferenceAggregate",
+          },
+        ],
+      };
+      // The 41-char type needs ~290px on its own, past the old 108px cap.
+      const width = computeOptimalModelNodeWidth(model, 200);
+      expect(width).toBeGreaterThanOrEqual(380);
+      expect(width % 10).toBe(0);
+    });
+
     it("resolves optimal width for CanvasObject", () => {
       const obj: CanvasObject = {
         id: "s1",

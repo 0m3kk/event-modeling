@@ -221,7 +221,7 @@ function svgTypePill(
     return `<text x="${x + w - 14}" y="${rowY + 2}" text-anchor="end" font-size="10" font-family="${SVG_FONT}" fill="#64748b">${escapeXml(rawType)}</text>`;
   }
   const kindColor = MODEL_KIND_COLORS[targetKind] || "#0891b2";
-  const pillW = Math.min(108, Math.max(72, rawType.length * 6.5 + 20));
+  const pillW = Math.max(72, rawType.length * 6.5 + 20);
   return `<rect x="${x + w - pillW - 10}" y="${rowY - 11}" width="${pillW}" height="17" rx="3" fill="${kindColor}18" stroke="${kindColor}60" stroke-width="0.8"/>
       <text x="${x + w - 14}" y="${rowY + 2}" text-anchor="end" font-size="10" font-family="${SVG_FONT}" font-weight="600" fill="${kindColor}">${escapeXml(rawType)}</text>`;
 }

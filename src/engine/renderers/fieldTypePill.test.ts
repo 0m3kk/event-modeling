@@ -30,6 +30,21 @@ describe("fieldTypePill renderer", () => {
     expect(modelW).toBeGreaterThanOrEqual(72);
   });
 
+  it("grows the type zone with the full type name (no truncation cap)", () => {
+    const short = computeTypeZoneWidth("Order", true);
+    const long = computeTypeZoneWidth(
+      "CustomerBillingAccountReferenceAggregate",
+      true,
+    );
+
+    expect(long).toBeGreaterThan(short);
+    // Width tracks the full string instead of clamping to the old 108px cap.
+    expect(long).toBeGreaterThan(108);
+    expect(long).toBeGreaterThanOrEqual(
+      "CustomerBillingAccountReferenceAggregate".length * 6.5,
+    );
+  });
+
   it("truncates long strings with ellipsis", () => {
     expect(truncateText("veryLongTypeNameHere", 8)).toBe("veryLon…");
     expect(truncateText("short", 10)).toBe("short");
@@ -106,5 +121,41 @@ describe("fieldTypePill renderer", () => {
     expect(textChild.style.fill).toBe(getModelKindHex("object"));
     expect(textChild.style.fontWeight).toBe("600");
     expect(textChild.x).toBe(118); // x + 18 (leaves space for the kind micro-icon)
+  });
+
+  it("renders the full long model type instead of an ellipsized label", () => {
+    const g = new Graphics();
+    const container = new Container();
+    const longType = "CustomerBillingAccountReferenceAggregate";
+
+    const mockModel: CanvasObject = {
+      id: "m1",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 120,
+      modelData: {
+        kind: "object",
+        name: longType,
+        fields: [],
+      },
+    };
+
+    drawFieldTypePill({
+      g,
+      container,
+      rawType: longType,
+      x: 0,
+      y: 20,
+      w: computeTypeZoneWidth(longType, true),
+      h: 20,
+      targetModel: mockModel,
+      textResolution: 1,
+    });
+
+    const textChild = container.children.find((c) => c instanceof Text) as Text;
+    expect(textChild.text).toBe(longType);
+    expect(textChild.text).not.toContain("…");
   });
 });

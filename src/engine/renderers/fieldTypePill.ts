@@ -20,14 +20,17 @@ export function getModelKindHex(kind?: string): number {
 }
 
 /**
- * Computes optimal width for the type pill on a field row.
- * Adds extra width for model nodes to display the kind icon gracefully.
+ * Computes the width for the type pill on a field row so the full type name is
+ * always visible. Model types keep extra room for the kind micro-icon on the
+ * left. The pill is never capped or truncated — when a long type (or the tag /
+ * name beside it) runs out of room, the user widens the node to give it space,
+ * exactly like tag pills.
  */
 export function computeTypeZoneWidth(rawType: string, isModel: boolean): number {
   if (isModel) {
-    return Math.min(108, Math.max(72, rawType.length * 6.5 + 24));
+    return Math.max(72, rawType.length * 6.5 + 24);
   }
-  return Math.min(88, Math.max(60, rawType.length * 6.5 + 14));
+  return Math.max(60, rawType.length * 6.5 + 14);
 }
 
 /**
@@ -171,13 +174,10 @@ export function drawFieldTypePill(options: DrawFieldTypePillOptions): void {
     const iconCY = y + h / 2;
     drawFieldKindIcon(g, targetKind, iconCX, iconCY, kindHex);
 
-    // Text with kind color and semibold weight
-    const availableTextWidth = Math.max(16, w - 24);
-    const maxTypeChars = Math.max(3, Math.floor(availableTextWidth / 6.2));
-    const displayType = truncateText(rawType, maxTypeChars);
-
+    // Text with kind color and semibold weight. Rendered in full (never
+    // truncated) so long model names stay readable; the node widens around it.
     const typeText = new Text({
-      text: displayType,
+      text: rawType,
       style: {
         fontSize: 10,
         fontWeight: "600",
@@ -190,17 +190,14 @@ export function drawFieldTypePill(options: DrawFieldTypePillOptions): void {
     typeText.y = y + 3;
     container.addChild(typeText);
   } else {
-    // Primitive type: neutral slate pill
+    // Primitive type: neutral slate pill. The full type text is rendered so
+    // custom / long type names are never cut off.
     g.roundRect(x, y, w, h, 3)
       .fill({ color: 0xf8fafc })
       .stroke({ color: 0xe2e8f0, width: 1 });
 
-    const availableTextWidth = Math.max(16, w - 12);
-    const maxTypeChars = Math.max(3, Math.floor(availableTextWidth / 6.2));
-    const displayType = truncateText(rawType, maxTypeChars);
-
     const typeText = new Text({
-      text: displayType,
+      text: rawType,
       style: {
         fontSize: 10,
         fontFamily: APP_FONT_FAMILY,
