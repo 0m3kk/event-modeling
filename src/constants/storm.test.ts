@@ -9,6 +9,7 @@ import {
   stormHasPhase,
   stormHasQueryItems,
   stormHasTags,
+  stormHasValidation,
 } from "./storm";
 
 describe("storm kind helpers", () => {
@@ -54,5 +55,15 @@ describe("storm kind helpers", () => {
     expect(stormHasQueryItems("constraint")).toBe(true);
     expect(stormHasQueryItems("command")).toBe(false);
     expect(stormHasQueryItems("event")).toBe(false);
+  });
+
+  it("only lets Command payloads and Query params carry validation", () => {
+    expect(stormHasValidation("command")).toBe(true);
+    expect(stormHasValidation("query")).toBe(true);
+    expect(stormHasValidation("event")).toBe(false);
+    expect(stormHasValidation("state")).toBe(false);
+    expect(stormHasValidation("constraint")).toBe(false);
+    expect(stormHasValidation("actor")).toBe(false);
+    expect(stormHasValidation("bdd")).toBe(false);
   });
 });

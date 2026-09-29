@@ -5,6 +5,7 @@ import { InlineTextEditor } from "@/components/InlineTextEditor";
 import { TypeSelectPopover } from "@/components/TypeSelectPopover";
 import { DescTooltip } from "@/components/DescTooltip";
 import { ActionTooltip } from "@/components/ActionTooltip";
+import { ValidationTooltip } from "@/components/ValidationTooltip";
 import { StormOptionsBar } from "@/components/StormOptionsBar";
 import { ModelOptionsBar } from "@/components/ModelOptionsBar";
 import { GroupOptionsBar } from "@/components/GroupOptionsBar";
@@ -30,6 +31,7 @@ export function App() {
         <ModelCardPopup />
         <DescTooltip />
         <ActionTooltip />
+        <ValidationTooltip />
         <StormOptionsBar />
         <ModelOptionsBar />
         <GroupOptionsBar />

@@ -56,6 +56,17 @@ export interface ActionTarget {
   iconBounds: { x: number; y: number; width: number; height: number };
 }
 
+/**
+ * Target of the validation ✓ hover tooltip on a Command field / Query param
+ * row. `text` is the pre-rendered rule summary shown in the tooltip.
+ */
+export interface ValidationTarget {
+  objectId: string;
+  fieldId: string;
+  text: string;
+  iconBounds: { x: number; y: number; width: number; height: number };
+}
+
 export interface ModelPopupEntry {
   id: string;
   modelId: string;
@@ -90,6 +101,10 @@ export interface CanvasStoreState {
   inlineEdit: InlineEditTarget | null;
   typeSelect: TypeSelectTarget | null;
   stormSelectedField: StormFieldSelection | null;
+  /** Open validation panel target (Command field / Query param). */
+  validationTarget: StormFieldSelection | null;
+  /** Hovered validation ✓ badge, used to anchor its tooltip. */
+  validationHover: ValidationTarget | null;
   fieldClipboard: FieldClipboard | null;
   stormActionHover: string | null;
   isSearchOpen: boolean;
@@ -190,6 +205,10 @@ export interface CanvasStoreActions {
 
   // Description (ⓘ) hover tooltip
   setDescHover: (target: DescTarget | null) => void;
+
+  // Validation panel + ✓ hover tooltip (Command fields / Query params)
+  setValidationTarget: (target: StormFieldSelection | null) => void;
+  setValidationHover: (target: ValidationTarget | null) => void;
 
   // Authorization-action hover tooltip (Command / Query header icon)
   setActionHover: (target: ActionTarget | null) => void;

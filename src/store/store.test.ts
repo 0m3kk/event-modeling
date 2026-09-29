@@ -17,6 +17,31 @@ describe("useCanvasStore", () => {
     expect(state.projectName).toBe("Untitled");
   });
 
+  it("tracks the validation panel target and its hover tooltip", () => {
+    const store = useCanvasStore.getState();
+    expect(store.validationTarget).toBeNull();
+    expect(store.validationHover).toBeNull();
+
+    store.setValidationTarget({ objectId: "cmd-1", fieldId: "f1" });
+    store.setValidationHover({
+      objectId: "cmd-1",
+      fieldId: "f1",
+      text: "min length 1",
+      iconBounds: { x: 40, y: 50, width: 15, height: 26 },
+    });
+
+    expect(useCanvasStore.getState().validationTarget).toEqual({
+      objectId: "cmd-1",
+      fieldId: "f1",
+    });
+    expect(useCanvasStore.getState().validationHover?.text).toBe("min length 1");
+
+    // resetBoard clears both, like the other hover/selection state.
+    useCanvasStore.getState().resetBoard();
+    expect(useCanvasStore.getState().validationTarget).toBeNull();
+    expect(useCanvasStore.getState().validationHover).toBeNull();
+  });
+
   it("updates projectName and preserves it across object edits", () => {
     useCanvasStore.getState().setProjectName("My Architecture Board");
     expect(useCanvasStore.getState().projectName).toBe("My Architecture Board");

@@ -10,15 +10,21 @@ import {
   stormHasPhase,
   stormHasQueryItems,
   stormHasTags,
+  stormHasValidation,
 } from "@/constants/storm";
 import { ActionPopover } from "./ActionPopover";
 import { DescriptionPopover } from "./DescriptionPopover";
 import { PermissionsPopover } from "./PermissionsPopover";
 import { TagPopover } from "./TagPopover";
 import { QueryItemPopover } from "./QueryItemPopover";
+import { ValidationPopover } from "./ValidationPopover";
 import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 import { findDescriptionText } from "@/utils/description";
 import { getActorPermissions } from "@/utils/stormAuth";
+import {
+  describeValidationRules,
+  hasValidationRules,
+} from "@/utils/fieldValidation";
 import {
   Shield,
   Trash2,
@@ -30,6 +36,7 @@ import {
   Link2,
   Tag,
   Filter,
+  ListChecks,
 } from "lucide-react";
 
 export function StormOptionsBar() {
@@ -47,6 +54,8 @@ export function StormOptionsBar() {
   const createReferenceCopy = useCanvasStore((s) => s.createReferenceCopy);
   const isLocked = useCanvasStore((s) => s.isLocked);
   const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
+  const validationTarget = useCanvasStore((s) => s.validationTarget);
+  const setValidationTarget = useCanvasStore((s) => s.setValidationTarget);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [showActionPopover, setShowActionPopover] = useState(false);
@@ -98,6 +107,35 @@ export function StormOptionsBar() {
         ? (data.inputFields ?? []).some((f) => f.id === selectedField.id)
         : data.fields.some((f) => f.id === selectedField.id)
       : false;
+
+  // Command payload fields and Query params are the only user input the board
+  // validates. Query Response fields live in `responseFields`, so a selected
+  // response row simply falls through to null here.
+  const validationField =
+    selectedField && stormHasValidation(kind)
+      ? data.fields.some((f) => f.id === selectedField.id)
+        ? selectedField
+        : null
+      : null;
+
+  // The validation panel is driven by store state so the canvas ✓ badge can
+  // open it. It stays open only while the targeted field remains selected.
+  const showValidationPopover = Boolean(
+    validationTarget &&
+      validationTarget.objectId === selectedStorm.id &&
+      validationTarget.fieldId === validationField?.id,
+  );
+
+  const hasValidationActive = Boolean(
+    showValidationPopover ||
+      (validationField && hasValidationRules(validationField.validation)),
+  );
+
+  const validationButtonTitle = validationField
+    ? hasValidationRules(validationField.validation)
+      ? `Validation: ${describeValidationRules(validationField.validation)}`
+      : `Set Validation for "${validationField.name}"`
+    : "Set Field Validation";
 
   const selectedQueryItem =
     sf && sf.objectId === selectedStorm.id && sf.fieldId
@@ -163,6 +201,7 @@ export function StormOptionsBar() {
     setShowActionPopover(false);
     setShowDescriptionPopover(false);
     setShowPermissionsPopover(false);
+    setValidationTarget(null);
   };
 
   const handleOpenAddQueryItem = () => {
@@ -172,6 +211,25 @@ export function StormOptionsBar() {
     setShowActionPopover(false);
     setShowDescriptionPopover(false);
     setShowPermissionsPopover(false);
+    setValidationTarget(null);
+  };
+
+  const handleToggleValidationPopover = () => {
+    if (showValidationPopover) {
+      setValidationTarget(null);
+      return;
+    }
+    setShowTagPopover(false);
+    setShowActionPopover(false);
+    setShowDescriptionPopover(false);
+    setShowPermissionsPopover(false);
+    setShowQueryItemPopover(false);
+    if (validationField) {
+      setValidationTarget({
+        objectId: selectedStorm.id,
+        fieldId: validationField.id,
+      });
+    }
   };
 
   // Calculate screen position & zoom scale
@@ -328,6 +386,27 @@ export function StormOptionsBar() {
             <Tag
               size={16}
               className={hasTagActive ? "text-orange-600" : "text-gray-600"}
+            />
+          </button>
+        )}
+
+        {/* Set Field Validation Button — only visible when a Command payload
+            field or Query param row is selected */}
+        {validationField && (
+          <button
+            onClick={handleToggleValidationPopover}
+            title={validationButtonTitle}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+              hasValidationActive
+                ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <ListChecks
+              size={16}
+              className={
+                hasValidationActive ? "text-emerald-600" : "text-gray-600"
+              }
             />
           </button>
         )}
@@ -501,6 +580,15 @@ export function StormOptionsBar() {
         <TagPopover
           card={selectedStorm}
           onClose={() => setShowTagPopover(false)}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
+        />
+      )}
+
+      {/* Validation Popover (Command payload / Query params) */}
+      {showValidationPopover && validationField && (
+        <ValidationPopover
+          card={selectedStorm}
+          onClose={() => setValidationTarget(null)}
           anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}

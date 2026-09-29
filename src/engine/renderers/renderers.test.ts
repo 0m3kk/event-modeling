@@ -50,6 +50,127 @@ describe("Pixi Card Renderers", () => {
     expect(fieldTypes.length).toBe(2);
   });
 
+  it("draws the validation check on selected Command fields and Query params only", () => {
+    const commandObj: CanvasObject = {
+      id: "cmd-val",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 120,
+      stormData: {
+        kind: "command",
+        name: "PlaceOrder",
+        fields: [
+          {
+            id: "f1",
+            name: "quantity",
+            fieldType: "number",
+            validation: { min: 1 },
+          },
+          { id: "f2", name: "note", fieldType: "string" },
+        ],
+      },
+    };
+
+    // Unselected rows show no validation badge (it mirrors the ⓘ affordance).
+    const idleRes = StormCardRenderer.draw(new Container(), commandObj, 1, false);
+    expect(idleRes.hitZones.some((z) => z.type === "validation")).toBe(false);
+
+    // Selecting a validated field draws the ✓ badge with its rule summary.
+    const commandContainer = new Container();
+    const commandRes = StormCardRenderer.draw(
+      commandContainer,
+      commandObj,
+      1,
+      true,
+      "f1",
+    );
+    const commandTexts = commandContainer.children
+      .filter((c): c is Text => c instanceof Text)
+      .map((t) => t.text);
+    expect(commandTexts.filter((t) => t === "✓").length).toBe(1);
+
+    const commandZones = commandRes.hitZones.filter(
+      (z) => z.type === "validation",
+    );
+    expect(commandZones).toHaveLength(1);
+    expect(commandZones[0].fieldId).toBe("f1");
+    expect(commandZones[0].currentText).toBe("min 1");
+
+    // A selected field without rules still shows the muted ✓ affordance.
+    const emptyRes = StormCardRenderer.draw(
+      new Container(),
+      commandObj,
+      1,
+      true,
+      "f2",
+    );
+    const emptyZone = emptyRes.hitZones.find((z) => z.type === "validation");
+    expect(emptyZone?.fieldId).toBe("f2");
+    expect(emptyZone?.currentText).toBe("Add validation rules");
+
+    // Query response fields are output, never validated — only Params are.
+    const queryObj: CanvasObject = {
+      id: "q-val",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 160,
+      stormData: {
+        kind: "query",
+        name: "GetOrder",
+        fields: [
+          {
+            id: "p1",
+            name: "orderId",
+            fieldType: "uuid",
+            validation: { pattern: "^x$" },
+          },
+        ],
+        responseFields: [
+          {
+            id: "r1",
+            name: "status",
+            fieldType: "string",
+            validation: { minLength: 1 },
+          },
+        ],
+      },
+    };
+
+    const queryContainer = new Container();
+    const queryRes = StormCardRenderer.draw(
+      queryContainer,
+      queryObj,
+      1,
+      true,
+      "p1",
+    );
+    const queryTexts = queryContainer.children
+      .filter((c): c is Text => c instanceof Text)
+      .map((t) => t.text);
+    expect(queryTexts.filter((t) => t === "✓").length).toBe(1);
+
+    const queryZones = queryRes.hitZones.filter((z) => z.type === "validation");
+    expect(queryZones).toHaveLength(1);
+    expect(queryZones[0].fieldId).toBe("p1");
+    expect(queryZones[0].section).toBe("params");
+
+    // Selecting a Response row yields no validation badge at all.
+    const responseRes = StormCardRenderer.draw(
+      new Container(),
+      queryObj,
+      1,
+      true,
+      "r1",
+    );
+    expect(responseRes.hitZones.some((z) => z.type === "validation")).toBe(
+      false,
+    );
+  });
+
   it("allows wider card width so long titles and field names fit without truncation", () => {
     const longName = "veryLongBillingAccountIdentificationNumber";
     const longTitle = "ProcessCustomerMonthlyInvoicePaymentCommand";

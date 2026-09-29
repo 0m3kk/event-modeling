@@ -181,6 +181,50 @@ export function stormHasAction(kind: StormKind): boolean {
   return STORM_ACTION_KINDS.includes(kind);
 }
 
+/**
+ * Kinds whose primary field list is user input and can therefore carry
+ * validation: a Command's payload fields and a Query's params. Projections
+ * (State/Constraint), Events, responses and the Actor chip describe domain
+ * data rather than accepting input, so they never validate.
+ */
+export const STORM_VALIDATION_KINDS: readonly StormKind[] = ["command", "query"];
+
+/** Whether a kind's primary fields may carry input validation */
+export function stormHasValidation(kind: StormKind): boolean {
+  return STORM_VALIDATION_KINDS.includes(kind);
+}
+
+/**
+ * Well-known string formats offered as validation, using the JSON Schema
+ * format vocabulary so the exported schema stays portable.
+ */
+export const STORM_VALIDATION_FORMATS = [
+  "email",
+  "uuid",
+  "uri",
+  "hostname",
+  "ipv4",
+  "ipv6",
+  "date",
+  "date-time",
+  "time",
+] as const;
+
+export type StormValidationFormat = (typeof STORM_VALIDATION_FORMATS)[number];
+
+/** Human labels for the format options (format metadata is case-sensitive). */
+export const STORM_VALIDATION_FORMAT_LABELS: Record<string, string> = {
+  email: "Email",
+  uuid: "UUID",
+  uri: "URI / URL",
+  hostname: "Hostname",
+  ipv4: "IPv4",
+  ipv6: "IPv6",
+  date: "Date (YYYY-MM-DD)",
+  "date-time": "Date-time (ISO 8601)",
+  time: "Time (HH:MM:SS)",
+};
+
 export const STORM_LAYOUT = {
   cardWidth: 260,
   minWidth: 220,

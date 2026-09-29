@@ -7,22 +7,25 @@ export interface InfoBadgeStyle {
   /** Circle stroke color. */
   stroke: number;
   strokeWidth?: number;
-  /** "i" glyph color. */
+  /** Glyph color. */
   fill: number;
   fontSize: number;
   bold?: boolean;
   /** Overall opacity — badges dim when the card/row has no description yet. */
   alpha?: number;
+  /** Glyph to draw at the circle center (defaults to the description "i"). */
+  glyph?: string;
   textResolution?: number;
 }
 
 /**
- * Draws the ⓘ description badge (circle + "i").
+ * Draws a small circular badge (circle + centered glyph). Used for the ⓘ
+ * description badge and the ✓ validation badge so both share one size/style.
  *
  * The glyph is anchored at its own center and placed on the circle center, so
  * it stays optically centered regardless of font metrics. Hand-tuned offsets
  * (e.g. `center - 2`) drift to the right because a monospace advance width is
- * wider than the narrow "i" ink.
+ * wider than narrow glyph ink.
  */
 export function drawInfoBadge(
   g: Graphics,
@@ -37,13 +40,14 @@ export function drawInfoBadge(
     fontSize,
     bold = false,
     alpha = 1,
+    glyph = "i",
     textResolution,
   }: InfoBadgeStyle,
 ): void {
   g.circle(cx, cy, radius).stroke({ color: stroke, width: strokeWidth, alpha });
 
-  const iText = new Text({
-    text: "i",
+  const glyphText = new Text({
+    text: glyph,
     style: {
       fontSize,
       fontFamily: APP_FONT_FAMILY,
@@ -52,9 +56,9 @@ export function drawInfoBadge(
     },
     resolution: textResolution,
   });
-  iText.anchor.set(0.5);
-  iText.x = cx;
-  iText.y = cy;
-  iText.alpha = alpha;
-  container.addChild(iText);
+  glyphText.anchor.set(0.5);
+  glyphText.x = cx;
+  glyphText.y = cy;
+  glyphText.alpha = alpha;
+  container.addChild(glyphText);
 }

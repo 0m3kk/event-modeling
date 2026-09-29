@@ -29,6 +29,8 @@ function createFakeStore(): FakeStore {
     isSearchOpen: false,
     descHover: null,
     actionHover: null,
+    validationTarget: null,
+    validationHover: null,
     addObject: (obj: CanvasObject) => {
       objects.push(obj);
     },

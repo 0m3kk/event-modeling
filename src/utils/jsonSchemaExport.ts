@@ -1,4 +1,10 @@
-import type { ModelData, StormData, StormField, CanvasObject } from "@/types";
+import type {
+  ModelData,
+  StormData,
+  StormField,
+  StormFieldValidation,
+  CanvasObject,
+} from "@/types";
 
 export interface JsonSchemaProperty {
   type?: string;
@@ -130,6 +136,45 @@ export function generateModelJsonSchema(
   return def;
 }
 
+/**
+ * Merge a field's input-validation rules into its resolved property. Each rule
+ * maps to a JSON Schema keyword; unset rules add nothing, so an un-validated
+ * field keeps the base shape untouched.
+ */
+export function applyFieldValidation(
+  base: JsonSchemaProperty,
+  validation?: StormFieldValidation,
+): JsonSchemaProperty {
+  if (!validation) return base;
+
+  const next: JsonSchemaProperty = { ...base };
+  if (typeof validation.minLength === "number") {
+    next.minLength = validation.minLength;
+  }
+  if (typeof validation.maxLength === "number") {
+    next.maxLength = validation.maxLength;
+  }
+  if ((validation.pattern ?? "").trim()) {
+    next.pattern = validation.pattern;
+  }
+  if ((validation.format ?? "").trim()) {
+    next.format = validation.format;
+  }
+  if (typeof validation.min === "number") {
+    next.minimum = validation.min;
+  }
+  if (typeof validation.max === "number") {
+    next.maximum = validation.max;
+  }
+  const allowedValues = (validation.allowedValues ?? []).filter(
+    (value) => value.trim().length > 0,
+  );
+  if (allowedValues.length > 0) {
+    next.enum = allowedValues;
+  }
+  return next;
+}
+
 function buildFieldProperties(
   fields: StormField[],
   allModelNames: Set<string>,
@@ -139,10 +184,13 @@ function buildFieldProperties(
   const required: string[] = [];
   for (const field of fields) {
     const propName = sanitizeIdentifier(field.name);
-    properties[propName] = {
-      ...resolveFieldSchema(field.fieldType, allModelNames, defsKey),
-      description: field.description,
-    };
+    properties[propName] = applyFieldValidation(
+      {
+        ...resolveFieldSchema(field.fieldType, allModelNames, defsKey),
+        description: field.description,
+      },
+      field.validation,
+    );
     if (field.required) {
       required.push(propName);
     }

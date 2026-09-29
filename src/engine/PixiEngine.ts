@@ -20,7 +20,12 @@ import {
   getCursorForHandle,
   type MarqueeBox,
 } from "./layers/GizmoLayer";
-import { useCanvasStore, type ActionTarget, type DescTarget } from "@/store";
+import {
+  useCanvasStore,
+  type ActionTarget,
+  type DescTarget,
+  type ValidationTarget,
+} from "@/store";
 import { calculateSnapping } from "@/utils/snapping";
 import {
   calculateResizedBounds,
@@ -700,6 +705,22 @@ export class PixiEngine {
         return;
       }
 
+      // Click on a row's validation ✓ badge selects the row and opens the
+      // validation panel in the options bar.
+      if (accurateZone?.type === "validation" && accurateZone.fieldId) {
+        state.clearModelPopups();
+        state.selectObject(id, e.shiftKey || e.metaKey || e.ctrlKey);
+        state.setStormSelectedField({
+          objectId: id,
+          fieldId: accurateZone.fieldId,
+        });
+        state.setValidationTarget({
+          objectId: id,
+          fieldId: accurateZone.fieldId,
+        });
+        return;
+      }
+
       // Single-click row selection: clicking anywhere on a field row (name, tag, type,
       // enum value, query item, constraint) selects and highlights that row.
       if (
@@ -720,6 +741,9 @@ export class PixiEngine {
             accurateZone.queryItemId ||
             accurateZone.constraintId,
         });
+        // Selecting a row normally dismisses the validation panel; it is only
+        // (re)opened by clicking the row's ✓ badge above.
+        state.setValidationTarget(null);
 
         if (targetModel) {
           const worldRightX = obj.x + (obj.width || 240);
@@ -746,6 +770,7 @@ export class PixiEngine {
         }
       } else {
         state.setStormSelectedField(null);
+        state.setValidationTarget(null);
         state.clearModelPopups();
       }
 
@@ -780,6 +805,7 @@ export class PixiEngine {
       useCanvasStore.getState().setDescHover(null);
       useCanvasStore.getState().setActionHover(null);
       useCanvasStore.getState().setStormActionHover(null);
+      useCanvasStore.getState().setValidationHover(null);
     });
 
     // Double-click handling uses the browser's native dblclick so it never
@@ -1480,6 +1506,7 @@ export class PixiEngine {
 
       let nextHover: DescTarget | null = null;
       let nextActionHover: ActionTarget | null = null;
+      let nextValidationHover: ValidationTarget | null = null;
       if (
         !isBusy &&
         !this.isSpaceHeld &&
@@ -1498,6 +1525,18 @@ export class PixiEngine {
           nextActionHover = {
             objectId: hit.obj.id,
             action: zone.currentText,
+            iconBounds: zone.bounds,
+          };
+        } else if (
+          hit &&
+          zone?.type === "validation" &&
+          zone.currentText &&
+          zone.fieldId
+        ) {
+          nextValidationHover = {
+            objectId: hit.obj.id,
+            fieldId: zone.fieldId,
+            text: zone.currentText,
             iconBounds: zone.bounds,
           };
         }
@@ -1525,6 +1564,16 @@ export class PixiEngine {
         useCanvasStore
           .getState()
           .setStormActionHover(nextActionHover ? nextActionHover.action : null);
+      }
+
+      const currentValidation = useCanvasStore.getState().validationHover;
+      const sameValidation =
+        currentValidation && nextValidationHover
+          ? currentValidation.objectId === nextValidationHover.objectId &&
+            currentValidation.fieldId === nextValidationHover.fieldId
+          : currentValidation === null && nextValidationHover === null;
+      if (!sameValidation) {
+        useCanvasStore.getState().setValidationHover(nextValidationHover);
       }
     });
 

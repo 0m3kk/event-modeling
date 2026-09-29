@@ -90,6 +90,66 @@ describe("jsonSchemaExport", () => {
     });
   });
 
+  it("exports Command and Query param validation as JSON Schema keywords", () => {
+    const command: StormData = {
+      kind: "command",
+      name: "PlaceOrder",
+      fields: [
+        { id: "1", name: "orderId", fieldType: "uuid", required: true },
+        {
+          id: "2",
+          name: "quantity",
+          fieldType: "number",
+          validation: { min: 1, max: 100 },
+        },
+        {
+          id: "3",
+          name: "code",
+          fieldType: "string",
+          validation: { minLength: 3, maxLength: 12, pattern: "^[A-Z]+$" },
+        },
+        {
+          id: "4",
+          name: "status",
+          fieldType: "string",
+          validation: { allowedValues: ["draft", "placed", "  "] },
+        },
+        {
+          id: "5",
+          name: "contact",
+          fieldType: "string",
+          validation: { format: "email" },
+        },
+      ],
+    };
+
+    const schema = generateStormCardJsonSchema(command);
+    expect(schema.required).toEqual(["orderId"]);
+    expect(schema.properties?.quantity).toEqual({
+      type: "number",
+      description: undefined,
+      minimum: 1,
+      maximum: 100,
+    });
+    expect(schema.properties?.code).toEqual({
+      type: "string",
+      description: undefined,
+      minLength: 3,
+      maxLength: 12,
+      pattern: "^[A-Z]+$",
+    });
+    expect(schema.properties?.status).toEqual({
+      type: "string",
+      description: undefined,
+      enum: ["draft", "placed"],
+    });
+    expect(schema.properties?.contact).toEqual({
+      type: "string",
+      description: undefined,
+      format: "email",
+    });
+  });
+
   it("generates complete canvas schema definitions", () => {
     const objects: CanvasObject[] = [
       {

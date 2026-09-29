@@ -2,7 +2,11 @@ import { create } from "zustand";
 import { temporal } from "zundo";
 import { nanoid } from "nanoid";
 import { DEFAULT_VIEWPORT, GRID_SIZE } from "@/constants/canvas";
-import { stormHasFieldTypes, stormHasInputFields } from "@/constants/storm";
+import {
+  stormHasFieldTypes,
+  stormHasInputFields,
+  stormHasValidation,
+} from "@/constants/storm";
 import { moveModelRowInObject, moveStormRowInObject } from "@/utils/rowReorder";
 import { buildFieldClipboard, canPasteFields } from "@/utils/fieldClipboard";
 import { alignObjects, distributeObjects } from "@/utils/align";
@@ -64,6 +68,8 @@ export const initialCanvasState: CanvasStoreState = {
   inlineEdit: null,
   typeSelect: null,
   stormSelectedField: null,
+  validationTarget: null,
+  validationHover: null,
   fieldClipboard: null,
   stormActionHover: null,
   isSearchOpen: false,
@@ -948,6 +954,10 @@ export const useCanvasStore = create<CanvasStore>()(
       setStormSelectedField: (stormSelectedField) =>
         set({ stormSelectedField }),
 
+      setValidationTarget: (validationTarget) => set({ validationTarget }),
+
+      setValidationHover: (validationHover) => set({ validationHover }),
+
       setStormActionHover: (stormActionHover) => set({ stormActionHover }),
 
       moveRow: (objectId, rowId, direction) => {
@@ -1157,14 +1167,6 @@ export const useCanvasStore = create<CanvasStore>()(
 
         if (obj.type === "storm" && obj.stormData) {
           const data = obj.stormData;
-          const newFields = fieldClipboard.entries.map((e) => ({
-            id: nanoid(),
-            name: e.name,
-            fieldType: e.fieldType || "string",
-            required: e.required,
-            description: e.description,
-            ...(e.tag ? { tag: e.tag } : {}),
-          }));
           // State/Constraint split fields into INPUT params and OUTPUT fields;
           // paste into whichever band holds the anchor row (default OUTPUT).
           let targetList: "fields" | "inputFields" | "outputFields" = "fields";
@@ -1175,6 +1177,21 @@ export const useCanvasStore = create<CanvasStore>()(
                 ? "inputFields"
                 : "outputFields";
           }
+          // Validation only belongs on a Command payload / Query param, so it
+          // survives a paste into those lists and is dropped everywhere else.
+          const keepsValidation =
+            stormHasValidation(data.kind) && targetList === "fields";
+          const newFields = fieldClipboard.entries.map((e) => ({
+            id: nanoid(),
+            name: e.name,
+            fieldType: e.fieldType || "string",
+            required: e.required,
+            description: e.description,
+            ...(e.tag ? { tag: e.tag } : {}),
+            ...(keepsValidation && e.validation
+              ? { validation: e.validation }
+              : {}),
+          }));
           const list = data[targetList] ?? [];
           const at = insertAt(list);
           const nextList = [
@@ -1489,6 +1506,8 @@ export const useCanvasStore = create<CanvasStore>()(
           inlineEdit: null,
           typeSelect: null,
           stormSelectedField: null,
+          validationTarget: null,
+          validationHover: null,
           stormActionHover: null,
           isSearchOpen: false,
           descHover: null,

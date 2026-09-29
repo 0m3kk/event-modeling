@@ -10,6 +10,7 @@ export type CardHitZoneType =
   | "queryItem"
   | "constraint"
   | "desc"
+  | "validation"
   | "stickyText"
   | "textBoxText";
 

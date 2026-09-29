@@ -42,6 +42,32 @@ describe("fieldClipboard", () => {
     });
   });
 
+  it("carries Command / Query param validation into the clipboard", () => {
+    const card: CanvasObject = {
+      id: "s1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      stormData: {
+        kind: "command",
+        name: "PlaceOrder",
+        fields: [
+          {
+            id: "f1",
+            name: "quantity",
+            fieldType: "number",
+            validation: { min: 1, max: 10 },
+          },
+        ],
+      },
+    };
+
+    const clipboard = buildFieldClipboard(card, ["f1"]);
+    expect(clipboard?.entries[0].validation).toEqual({ min: 1, max: 10 });
+  });
+
   it("builds field clipboard from model enum values", () => {
     const card: CanvasObject = {
       id: "m1",

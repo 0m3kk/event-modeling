@@ -62,6 +62,7 @@ export function buildFieldClipboard(
         required: f.required,
         description: f.description,
         ...(f.tag ? { tag: f.tag } : {}),
+        ...(f.validation ? { validation: f.validation } : {}),
       }));
   }
 
