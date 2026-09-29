@@ -1,4 +1,4 @@
-import type { BddPhase, StormKind } from "@/types";
+import type { BddPhase, BddStepRef, StormKind } from "@/types";
 
 /**
  * Event Storming (Command / Event / State / …) constants.
@@ -94,15 +94,66 @@ export function stormDefaultTitle(kind: StormKind, phase?: BddPhase): string {
 }
 
 /**
+ * Kinds whose body is a list of Given/When/Then scenario steps instead of
+ * generic field rows. BDD is the only such kind: a step is a named
+ * Event/Command/Query/State/Error carrying concrete example payload values.
+ */
+export const STORM_STEP_KINDS: readonly StormKind[] = ["bdd"];
+
+/** Whether a kind renders the BDD scenario step list instead of fields */
+export function stormHasSteps(kind: StormKind): boolean {
+  return STORM_STEP_KINDS.includes(kind);
+}
+
+/** Display label per scenario step ref */
+export const BDD_STEP_REF_LABELS: Record<BddStepRef, string> = {
+  event: "Event",
+  command: "Command",
+  query: "Query",
+  state: "State",
+  error: "Error",
+  notify: "Notify",
+};
+
+/** Accent color per scenario step ref (reuses kind colors, adds Error). */
+export const BDD_STEP_REF_COLORS: Record<BddStepRef, string> = {
+  event: STORM_KIND_COLORS.event,
+  command: STORM_KIND_COLORS.command,
+  query: STORM_KIND_COLORS.query,
+  state: STORM_KIND_COLORS.state,
+  error: "#dc2626", // Red 600
+  notify: STORM_KIND_COLORS.notify,
+};
+
+/**
+ * Step refs a phase may introduce. A Given card only lists Events; a When card
+ * captures the Command or Query under test; a Then card asserts outcomes.
+ */
+const BDD_PHASE_REFS: Record<BddPhase, readonly BddStepRef[]> = {
+  given: ["event"],
+  when: ["command", "query"],
+  then: ["event", "state", "error", "notify"],
+};
+
+/** The step refs allowed on a card's phase (fallback: Given events). */
+export function bddRefsForPhase(phase?: BddPhase): readonly BddStepRef[] {
+  return BDD_PHASE_REFS[phase ?? "given"];
+}
+
+/** The ref a freshly added step defaults to for a card's phase. */
+export function bddDefaultRefForPhase(phase?: BddPhase): BddStepRef {
+  return bddRefsForPhase(phase)[0] ?? "event";
+}
+
+/**
  * Kinds whose field rows render a tag pill. Event, State and Constraint tags
- * feed DCB matching; BDD (Given/When/Then) cards carry tags for scenario
- * readability.
+ * feed DCB matching. BDD cards no longer carry fields, so they are not
+ * taggable.
  */
 export const STORM_TAGGABLE_KINDS: readonly StormKind[] = [
   "event",
   "state",
   "constraint",
-  "bdd",
 ];
 
 /** Whether a kind renders a tag pill on its field rows */

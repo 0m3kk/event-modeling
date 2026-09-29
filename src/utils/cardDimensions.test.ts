@@ -498,5 +498,58 @@ describe("cardDimensions", () => {
       expect(computeOptimalCardWidth(obj)).toBeGreaterThanOrEqual(380);
     });
   });
+
+  describe("BDD scenario steps", () => {
+    it("measures height from step name rows plus payload rows", () => {
+      const empty: StormData = {
+        kind: "bdd",
+        name: "Given",
+        phase: "given",
+        fields: [],
+      };
+      // Header + the empty placeholder + bottom padding.
+      expect(computeStormCardHeight(empty)).toBe(80);
+
+      const withSteps: StormData = {
+        ...empty,
+        steps: [
+          {
+            id: "s1",
+            ref: "event",
+            name: "OrderPlaced",
+            payload: [
+              { id: "p1", key: "orderId", value: "42" },
+              { id: "p2", key: "total", value: "100" },
+            ],
+          },
+          { id: "s2", ref: "event", name: "PaymentTaken", payload: [] },
+        ],
+      };
+      // 42 base + step1 (24 + 2*18) + gap 6 + step2 (24) + 10 bottom.
+      expect(computeStormCardHeight(withSteps)).toBe(
+        36 + 6 + (24 + 36) + 6 + 24 + 10,
+      );
+    });
+
+    it("sizes width to the longest payload line", () => {
+      const data: StormData = {
+        kind: "bdd",
+        name: "Given",
+        phase: "given",
+        fields: [],
+        steps: [
+          {
+            id: "s1",
+            ref: "event",
+            name: "OrderPlaced",
+            payload: [{ id: "p1", key: "customerReference", value: "ACME-42" }],
+          },
+        ],
+      };
+      const width = computeOptimalStormCardWidth(data, 220);
+      expect(width).toBeGreaterThan(220);
+      expect(width % 10).toBe(0);
+    });
+  });
 });
 

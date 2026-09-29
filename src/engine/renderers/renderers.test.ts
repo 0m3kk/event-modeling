@@ -313,7 +313,7 @@ describe("Pixi Card Renderers", () => {
     expect(selected.hitZones.some((z) => z.type === "action")).toBe(false);
   });
 
-  it("renders Given/When/Then (BDD) card with phase badge, field types and tag", () => {
+  it("renders Given/When/Then (BDD) card with phase badge and scenario steps", () => {
     const container = new Container();
     const obj: CanvasObject = {
       id: "bdd-1",
@@ -326,21 +326,48 @@ describe("Pixi Card Renderers", () => {
         kind: "bdd",
         name: "Given",
         phase: "given",
-        fields: [
-          { id: "f1", name: "orderId", fieldType: "uuid", tag: "order" },
+        fields: [],
+        steps: [
+          {
+            id: "s1",
+            ref: "event",
+            name: "OrderPlaced",
+            payload: [{ id: "p1", key: "orderId", value: "42" }],
+          },
         ],
       },
     };
 
     const res = StormCardRenderer.draw(container, obj, 1, false);
     expect(res.hitZones.some((z) => z.type === "header")).toBe(true);
-    expect(
-      res.hitZones.some(
-        (z) => z.type === "fieldTag" && z.currentText === "order",
-      ),
-    ).toBe(true);
-    // BDD cards carry a normal typed field list
-    expect(res.hitZones.some((z) => z.type === "fieldType")).toBe(true);
+    // Step selection + inline-edit zones replace the old field rows.
+    expect(res.hitZones.some((z) => z.type === "bddStep")).toBe(true);
+    expect(res.hitZones.some((z) => z.type === "bddStepName")).toBe(true);
+    expect(res.hitZones.some((z) => z.type === "bddPayloadValue")).toBe(true);
+    expect(res.hitZones.some((z) => z.type === "fieldType")).toBe(false);
+
+    const texts = container.children
+      .filter((c): c is Text => c instanceof Text)
+      .map((t) => t.text);
+    expect(texts).toContain("OrderPlaced");
+    expect(texts).toContain("42");
+  });
+
+  it("shows an add-step placeholder on an empty BDD card", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "bdd-empty",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 80,
+      stormData: { kind: "bdd", name: "Then", phase: "then", fields: [] },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, true);
+    expect(res.hitZones.some((z) => z.type === "bddAddStep")).toBe(true);
+    expect(res.height).toBe(80);
   });
 
   it("renders a long field tag in full instead of truncating it", () => {

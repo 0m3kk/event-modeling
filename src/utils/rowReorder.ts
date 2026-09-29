@@ -28,7 +28,8 @@ export type StormRowList =
   | "outputFields"
   | "responseFields"
   | "queryItems"
-  | "constraints";
+  | "constraints"
+  | "steps";
 
 /**
  * Splices `fromIndex` to `toIndex` in a new array (input untouched).
@@ -98,6 +99,7 @@ export function resolveStormRowList(
   if ((data.queryItems ?? []).some((i) => i.id === rowId)) return "queryItems";
   if ((data.constraints ?? []).some((c) => c.id === rowId))
     return "constraints";
+  if ((data.steps ?? []).some((s) => s.id === rowId)) return "steps";
   return null;
 }
 
@@ -214,6 +216,19 @@ export function moveStormRowInObject(
       stormData: {
         ...data,
         queryItems: reorderItems(items, fromIndex, toIndex),
+      },
+    };
+  }
+  if (list === "steps") {
+    const items = data.steps ?? [];
+    const fromIndex = items.findIndex((s) => s.id === rowId);
+    const toIndex = stepIndex(fromIndex, items.length, direction);
+    if (toIndex === -1) return null;
+    return {
+      ...obj,
+      stormData: {
+        ...data,
+        steps: reorderItems(items, fromIndex, toIndex),
       },
     };
   }

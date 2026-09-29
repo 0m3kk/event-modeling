@@ -25,6 +25,49 @@ export type StormKind =
 export type BddPhase = "given" | "when" | "then";
 
 /**
+ * What a BDD scenario step stands for.
+ *
+ * - Given steps are Events ("the story so far")
+ * - When steps are Commands or Queries (the action under test)
+ * - Then steps are outcomes: Events, a State, an Error, or a Notify
+ *
+ * `error` is not a storm card kind — it is the failure outcome a scenario
+ * asserts (e.g. a rejected command), so it only ever appears as a step ref.
+ */
+export type BddStepRef =
+  | "event"
+  | "command"
+  | "query"
+  | "state"
+  | "error"
+  | "notify";
+
+/**
+ * One concrete key/value pair in a scenario step payload.
+ *
+ * Payloads are examples, not schemas: a scenario only fills the fields it
+ * needs to tell the story, so any field may be omitted.
+ */
+export interface BddPayloadField {
+  id: string;
+  key: string;
+  value: string;
+}
+
+/**
+ * A single Given/When/Then scenario step: a named Event/Command/Query/State
+ * (etc.) plus the concrete payload values used in this scenario.
+ */
+export interface BddStep {
+  id: string;
+  ref: BddStepRef;
+  /** Free-typed name of the referenced card (e.g. "OrderPlaced"). */
+  name: string;
+  /** Concrete example values — partial by design. */
+  payload: BddPayloadField[];
+}
+
+/**
  * One DCB Query Item of a State (or Constraint) card.
  *
  * Semantics:
@@ -96,9 +139,16 @@ export interface StormData {
   inputFields?: StormField[];
   /** State & Constraint cards only: OUTPUT fields produced by projecting matching events. */
   outputFields?: StormField[];
+  /** Query cards only (Response fields) */
   responseFields?: StormField[]; // Query cards only (Response fields)
   queryItems?: StormQueryItem[]; // State & Constraint cards (DCB Query)
   constraints?: StormConstraint[]; // Constraint cards only
+  /**
+   * BDD (Given/When/Then) cards only: the scenario steps of this phase card.
+   * Each step is a named Event/Command/Query/State/Error plus the concrete
+   * payload values that describe the scenario. Replaces `fields` for `bdd`.
+   */
+  steps?: BddStep[];
   isArray?: boolean; // Collection indicator '[]'
   action?: string; // Authorization action (resource:verb:scope)
   permissions?: string[]; // Actor cards only (wildcard patterns)

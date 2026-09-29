@@ -1,4 +1,4 @@
-import type { CanvasObject, GroupInfo, Tool, Viewport, AISettings, AIConversation } from "@/types";
+import type { CanvasObject, GroupInfo, Tool, Viewport, AISettings, AIConversation, BddStep, BddStepRef } from "@/types";
 import type { CardHitZone } from "@/engine/renderers/types";
 
 export interface AlignmentGuide {
@@ -32,6 +32,15 @@ import type { AlignDirection, DistributeDirection } from "@/utils/align";
 export interface StormFieldSelection {
   objectId: string;
   fieldId?: string;
+}
+
+/**
+ * Target of the BDD scenario step popover. `stepId` omitted means "create a
+ * new step" on the card; present means "edit that step".
+ */
+export interface BddStepPopupTarget {
+  objectId: string;
+  stepId?: string;
 }
 
 /**
@@ -104,6 +113,8 @@ export interface CanvasStoreState {
   stormSelectedField: StormFieldSelection | null;
   /** Open validation panel target (Command field / Query param). */
   validationTarget: StormFieldSelection | null;
+  /** Open BDD scenario step popover target (create when stepId is omitted). */
+  bddStepPopup: BddStepPopupTarget | null;
   /** Hovered validation ✓ badge, used to anchor its tooltip. */
   validationHover: ValidationTarget | null;
   fieldClipboard: FieldClipboard | null;
@@ -165,6 +176,16 @@ export interface CanvasStoreActions {
   ) => string | undefined;
   addStormQueryItem: (objectId: string) => string | undefined;
   addStormConstraint: (objectId: string) => string | undefined;
+  /** Create a BDD scenario step (defaults to the phase's ref) and select it. */
+  addBddStep: (objectId: string, ref?: BddStepRef) => string | undefined;
+  /** Replace the editable parts of a BDD scenario step. */
+  updateBddStep: (
+    objectId: string,
+    stepId: string,
+    patch: Partial<Pick<BddStep, "ref" | "name" | "payload">>,
+  ) => void;
+  /** Open / close the BDD scenario step popover. */
+  setBddStepPopup: (target: BddStepPopupTarget | null) => void;
   addModelField: (objectId: string) => string | undefined;
   addModelEnumValue: (objectId: string) => string | undefined;
 

@@ -4,12 +4,14 @@ import type {
   ModelData,
   StormQueryItem,
   StormField,
+  BddStep,
 } from "@/types";
 import {
   stormHasInputFields,
   stormHasParamsSection,
   stormHasQueryItems,
   stormHasResponseFields,
+  stormHasSteps,
   stormHasTags,
   stormHasFieldTypes,
   stormHasAction,
@@ -79,6 +81,23 @@ export function computeStormConstraintItemHeight(
   return Math.max(26, lines * 14 + 12);
 }
 
+/** Layout constants for BDD scenario step rows. */
+export const BDD_STEP_HEADER_HEIGHT = 24;
+export const BDD_STEP_PAYLOAD_ROW_HEIGHT = 18;
+export const BDD_STEP_GAP = 6;
+/** Muted placeholder row shown when a BDD card has no steps yet. */
+export const BDD_STEP_PLACEHOLDER_HEIGHT = 26;
+
+/**
+ * Exact pixel height of one BDD scenario step: its name row plus one row per
+ * payload example value. Payloads are partial, so this grows with whatever the
+ * scenario actually fills in.
+ */
+export function computeBddStepHeight(step: BddStep): number {
+  const payloadRows = step.payload?.length ?? 0;
+  return BDD_STEP_HEADER_HEIGHT + payloadRows * BDD_STEP_PAYLOAD_ROW_HEIGHT;
+}
+
 /**
  * Calculates the exact pixel height required to display all fields,
  * query items, constraints, and section headers of a Storm card. The
@@ -108,6 +127,22 @@ export function computeStormCardHeight(
     const actorPerms = getActorPermissions(data);
     h += actorPerms.length * rowHeight;
     return Math.max(h, 80);
+  }
+
+  if (stormHasSteps(kind)) {
+    // BDD cards list scenario steps instead of field rows. Each step is its
+    // name row plus one row per concrete payload value it fills in.
+    const steps = data.steps ?? [];
+    if (steps.length === 0) {
+      h += BDD_STEP_PLACEHOLDER_HEIGHT;
+    } else {
+      for (const step of steps) {
+        h += computeBddStepHeight(step);
+      }
+      h += (steps.length - 1) * BDD_STEP_GAP;
+    }
+    h += 10; // bottom padding
+    return Math.max(80, h);
   }
 
   if (hasInputOutput) {
@@ -364,7 +399,18 @@ export function computeOptimalStormCardWidth(
     requiredWidth = Math.max(requiredWidth, rowWidth);
   }
 
-  // 3. Query items
+  // 3. BDD scenario steps — name row plus one `key = value` row per payload
+  // example. Payloads are partial, so only filled fields contribute width.
+  for (const step of data.steps ?? []) {
+    const nameWidth = (step.name?.length ?? 0) * 7.2 + 56;
+    requiredWidth = Math.max(requiredWidth, nameWidth);
+    for (const p of step.payload ?? []) {
+      const payloadWidth = (p.key.length + p.value.length + 4) * 6.4 + 48;
+      requiredWidth = Math.max(requiredWidth, payloadWidth);
+    }
+  }
+
+  // 4. Query items
   for (const q of data.queryItems ?? []) {
     const maxTypeLen =
       q.types.length > 0 ? Math.max(...q.types.map((t) => t.length)) : 1;

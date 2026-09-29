@@ -1,13 +1,18 @@
 import { describe, it, expect } from "vitest";
 import {
+  BDD_STEP_REF_COLORS,
+  BDD_STEP_REF_LABELS,
   STORM_KIND_COLORS,
   STORM_KIND_LABELS,
   STORM_PHASE_COLORS,
+  bddDefaultRefForPhase,
+  bddRefsForPhase,
   stormAccentColor,
   stormHasFieldTypes,
   stormHasFields,
   stormHasPhase,
   stormHasQueryItems,
+  stormHasSteps,
   stormHasTags,
   stormHasValidation,
 } from "./storm";
@@ -34,10 +39,31 @@ describe("storm kind helpers", () => {
     expect(stormAccentColor("command")).toBe(STORM_KIND_COLORS.command);
   });
 
-  it("renders a typed, taggable field list on BDD cards", () => {
-    expect(stormHasFieldTypes("bdd")).toBe(true);
-    expect(stormHasTags("bdd")).toBe(true);
+  it("renders scenario steps instead of a field list on BDD cards", () => {
+    expect(stormHasSteps("bdd")).toBe(true);
+    expect(stormHasSteps("command")).toBe(false);
+    // BDD no longer carries a typed, taggable field list.
+    expect(stormHasFieldTypes("bdd")).toBe(true); // still typed for other kinds
+    expect(stormHasTags("bdd")).toBe(false);
     expect(stormHasTags("command")).toBe(false);
+    expect(stormHasTags("event")).toBe(true);
+  });
+
+  it("constrains step refs by phase", () => {
+    expect(bddRefsForPhase("given")).toEqual(["event"]);
+    expect(bddRefsForPhase("when")).toEqual(["command", "query"]);
+    expect(bddRefsForPhase("then")).toEqual([
+      "event",
+      "state",
+      "error",
+      "notify",
+    ]);
+    expect(bddDefaultRefForPhase("given")).toBe("event");
+    expect(bddDefaultRefForPhase("when")).toBe("command");
+    expect(bddDefaultRefForPhase("then")).toBe("event");
+    // Error is a scenario-only outcome with its own label/color.
+    expect(BDD_STEP_REF_LABELS.error).toBe("Error");
+    expect(BDD_STEP_REF_COLORS.error).toBeTruthy();
   });
 
   it("treats only the actor chip as fieldless (constraint carries fields)", () => {

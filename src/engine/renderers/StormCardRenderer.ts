@@ -5,6 +5,8 @@ import {
   STORM_KIND_LABELS,
   STORM_PHASE_COLORS,
   STORM_PHASE_LABELS,
+  BDD_STEP_REF_COLORS,
+  BDD_STEP_REF_LABELS,
   stormAccentColor,
   stormHasFieldTypes,
   stormHasAction,
@@ -12,6 +14,7 @@ import {
   stormHasParamsSection,
   stormHasQueryItems,
   stormHasResponseFields,
+  stormHasSteps,
   stormHasTags,
   stormHasValidation,
 } from "@/constants/storm";
@@ -28,6 +31,11 @@ import { resolveTargetModel } from "@/utils/modelResolution";
 import {
   computeStormQueryItemHeight,
   computeStormConstraintItemLines,
+  computeBddStepHeight,
+  BDD_STEP_HEADER_HEIGHT,
+  BDD_STEP_PAYLOAD_ROW_HEIGHT,
+  BDD_STEP_GAP,
+  BDD_STEP_PLACEHOLDER_HEIGHT,
 } from "@/utils/cardDimensions";
 import { getActorPermissions } from "@/utils/stormAuth";
 
@@ -465,7 +473,192 @@ export class StormCardRenderer {
       }
     };
 
-    if (isActor) {
+    if (stormHasSteps(kind)) {
+      // BDD (Given/When/Then) cards list scenario steps rather than field rows.
+      // Each step is a named Event/Command/Query/State/Error plus the concrete
+      // example values that describe the scenario (payloads are partial).
+      const steps = data.steps ?? [];
+      const refLabelMaxWidth = w - 40;
+
+      if (steps.length === 0) {
+        const hint = new Text({
+          text: isSelected ? "+ Add step…" : "No steps yet",
+          style: {
+            fontSize: 11,
+            fontFamily: APP_FONT_FAMILY,
+            fill: isSelected ? 0x3b82f6 : 0x94a3b8,
+            fontStyle: isSelected ? "normal" : "italic",
+          },
+          resolution: textResolution,
+        });
+        hint.x = 12;
+        hint.y = renderY + 6;
+        container.addChild(hint);
+
+        hitZones.push({
+          type: "bddAddStep",
+          bounds: {
+            x: 0,
+            y: renderY,
+            width: w,
+            height: BDD_STEP_PLACEHOLDER_HEIGHT,
+          },
+        });
+        renderY += BDD_STEP_PLACEHOLDER_HEIGHT;
+      }
+
+      steps.forEach((step, stepIndex) => {
+        const rowY = renderY;
+        const stepHeight = computeBddStepHeight(step);
+        const refColorHex = BDD_STEP_REF_COLORS[step.ref] ?? "#64748b";
+
+        // Selection highlight for the whole step block.
+        if (selectedFieldId && step.id === selectedFieldId) {
+          g.roundRect(4, rowY - 1, w - 8, stepHeight + 2, 4).fill({
+            color: 0xdbeafe,
+          });
+        }
+
+        // Ref icon + name row.
+        const iconCX = 18;
+        const iconCY = rowY + BDD_STEP_HEADER_HEIGHT / 2 - 2;
+        drawHeaderKindIcon(
+          g,
+          step.ref,
+          iconCX,
+          iconCY,
+          parseInt(refColorHex.replace("#", "0x"), 16),
+        );
+
+        // Ref label on the right edge, echoing the icon's meaning.
+        const refLabel = (
+          BDD_STEP_REF_LABELS[step.ref] ?? step.ref
+        ).toUpperCase();
+        const refLabelW = refLabel.length * 5.2;
+        const refLabelText = new Text({
+          text: refLabel,
+          style: {
+            fontSize: 8.5,
+            fontWeight: "bold",
+            fontFamily: APP_FONT_FAMILY,
+            fill: parseInt(refColorHex.replace("#", "0x"), 16),
+            letterSpacing: 0.4,
+          },
+          resolution: textResolution,
+        });
+        refLabelText.x = w - 10 - refLabelW;
+        refLabelText.y = rowY + 7;
+        container.addChild(refLabelText);
+
+        const nameAvailable = Math.min(
+          refLabelMaxWidth,
+          refLabelText.x - 34,
+        );
+        const maxNameChars = Math.max(6, Math.floor(nameAvailable / 7.0));
+        const stepName = step.name?.trim() || "Untitled";
+        const nameText = new Text({
+          text: truncateText(stepName, maxNameChars),
+          style: {
+            fontSize: 12,
+            fontWeight: "bold",
+            fontFamily: APP_FONT_FAMILY,
+            fill: step.name?.trim() ? 0x1e293b : 0x94a3b8,
+          },
+          resolution: textResolution,
+        });
+        nameText.x = 30;
+        nameText.y = rowY + 5;
+        container.addChild(nameText);
+
+        // Whole-step zone for selection (pushed first so payload/name zones win).
+        hitZones.push({
+          type: "bddStep",
+          bounds: { x: 0, y: rowY, width: w, height: stepHeight },
+          fieldId: step.id,
+          currentText: stepName,
+        });
+
+        // Double-click target for renaming the step.
+        hitZones.push({
+          type: "bddStepName",
+          bounds: {
+            x: 24,
+            y: rowY,
+            width: Math.max(20, w - 34),
+            height: BDD_STEP_HEADER_HEIGHT,
+          },
+          fieldId: step.id,
+          currentText: step.name,
+        });
+
+        // Payload example rows: `key = value`.
+        const payload = step.payload ?? [];
+        payload.forEach((entry, payloadIndex) => {
+          const payloadY =
+            rowY + BDD_STEP_HEADER_HEIGHT + payloadIndex * BDD_STEP_PAYLOAD_ROW_HEIGHT;
+
+          const keyText = new Text({
+            text: `${entry.key || "key"} =`,
+            style: {
+              fontSize: 10,
+              fontWeight: "600",
+              fontFamily: APP_FONT_FAMILY,
+              fill: 0x64748b,
+            },
+            resolution: textResolution,
+          });
+          keyText.x = 30;
+          keyText.y = payloadY + 2;
+          container.addChild(keyText);
+
+          const keyWidth = (entry.key?.length ?? 0) * 6.1 + 16;
+          const valueX = 30 + keyWidth;
+          const valueAvailable = Math.max(20, w - 12 - valueX);
+          const maxValueChars = Math.max(4, Math.floor(valueAvailable / 6.2));
+          const valueText = new Text({
+            text: truncateText(entry.value ?? "", maxValueChars),
+            style: {
+              fontSize: 10,
+              fontWeight: "500",
+              fontFamily: APP_FONT_FAMILY,
+              fill: entry.value ? 0x0f172a : 0xcbd5e1,
+            },
+            resolution: textResolution,
+          });
+          valueText.x = valueX;
+          valueText.y = payloadY + 2;
+          container.addChild(valueText);
+
+          hitZones.push({
+            type: "bddPayloadKey",
+            bounds: {
+              x: 24,
+              y: payloadY,
+              width: keyWidth,
+              height: BDD_STEP_PAYLOAD_ROW_HEIGHT,
+            },
+            fieldId: step.id,
+            valueId: entry.id,
+            currentText: entry.key,
+          });
+          hitZones.push({
+            type: "bddPayloadValue",
+            bounds: {
+              x: valueX,
+              y: payloadY,
+              width: Math.max(20, w - 12 - valueX),
+              height: BDD_STEP_PAYLOAD_ROW_HEIGHT,
+            },
+            fieldId: step.id,
+            valueId: entry.id,
+            currentText: entry.value,
+          });
+        });
+
+        renderY += stepHeight;
+        if (stepIndex < steps.length - 1) renderY += BDD_STEP_GAP;
+      });
+    } else if (isActor) {
       const actorPerms = getActorPermissions(data);
       const maxPermChars = Math.max(8, Math.floor((w - 32) / 6.5));
       for (let pIdx = 0; pIdx < actorPerms.length; pIdx++) {

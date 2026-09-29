@@ -5,14 +5,18 @@ import {
   STORM_PHASE_COLORS,
   STORM_PHASE_LABELS,
   STORM_PHASE_TITLES,
+  bddDefaultRefForPhase,
+  bddRefsForPhase,
   stormHasAction,
   stormHasInputFields,
   stormHasPhase,
   stormHasQueryItems,
+  stormHasSteps,
   stormHasTags,
   stormHasValidation,
 } from "@/constants/storm";
 import { ActionPopover } from "./ActionPopover";
+import { BddStepPopover } from "./BddStepPopover";
 import { DescriptionPopover } from "./DescriptionPopover";
 import { PermissionsPopover } from "./PermissionsPopover";
 import { TagPopover } from "./TagPopover";
@@ -37,6 +41,8 @@ import {
   Tag,
   Filter,
   ListChecks,
+  Pencil,
+  PlusCircle,
 } from "lucide-react";
 
 export function StormOptionsBar() {
@@ -56,6 +62,8 @@ export function StormOptionsBar() {
   const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
   const validationTarget = useCanvasStore((s) => s.validationTarget);
   const setValidationTarget = useCanvasStore((s) => s.setValidationTarget);
+  const bddStepPopup = useCanvasStore((s) => s.bddStepPopup);
+  const setBddStepPopup = useCanvasStore((s) => s.setBddStepPopup);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [showActionPopover, setShowActionPopover] = useState(false);
@@ -83,6 +91,7 @@ export function StormOptionsBar() {
   const kind = data.kind;
   const isArray = Boolean(data.isArray);
   const phase = data.phase;
+  const isStepKind = stormHasSteps(kind);
 
   // Membership shows a one-click way to detach this card from its group.
   const parentGroup = selectedStorm.groupId
@@ -147,6 +156,17 @@ export function StormOptionsBar() {
       ? (data.constraints?.find((c) => c.id === sf.fieldId) ?? null)
       : null;
 
+  const selectedStep =
+    sf && sf.objectId === selectedStorm.id && sf.fieldId
+      ? ((data.steps ?? []).find((s) => s.id === sf.fieldId) ?? null)
+      : null;
+
+  // The step popover is store-driven so the canvas "add step" placeholder can
+  // open it directly. It only stays open for the selected card.
+  const showBddStepPopover = Boolean(
+    isStepKind && bddStepPopup && bddStepPopup.objectId === selectedStorm.id,
+  );
+
   const isRowSelected = Boolean(
     selectedField || selectedQueryItem || selectedConstraint,
   );
@@ -163,24 +183,28 @@ export function StormOptionsBar() {
       : "Add Description";
 
   const handleDelete = () => {
-    if (isRowSelected) {
+    if (isRowSelected || selectedStep) {
       deleteSelectedStormField();
     } else {
       deleteObjects([selectedStorm.id]);
     }
   };
 
-  const trashTitle = isRowSelected
-    ? selectedField
-      ? selectedField.name
-        ? `Delete Field "${selectedField.name}"`
-        : "Delete Field"
-      : selectedQueryItem
-        ? "Delete Query Item"
-        : selectedConstraint
-          ? "Delete Constraint Rule"
+  const trashTitle = selectedStep
+    ? selectedStep.name
+      ? `Delete Step "${selectedStep.name}"`
+      : "Delete Step"
+    : isRowSelected
+      ? selectedField
+        ? selectedField.name
+          ? `Delete Field "${selectedField.name}"`
           : "Delete Field"
-    : "Delete Card";
+        : selectedQueryItem
+          ? "Delete Query Item"
+          : selectedConstraint
+            ? "Delete Constraint Rule"
+            : "Delete Field"
+      : "Delete Card";
 
   const hasTagActive = Boolean(selectedField?.tag || showTagPopover);
   const hasQueryItemActive = Boolean(
@@ -261,11 +285,21 @@ export function StormOptionsBar() {
     const isDefaultTitle =
       trimmedName === "" ||
       Object.values(STORM_PHASE_TITLES).includes(trimmedName);
+    // A step's ref must fit its phase (Given = events, When = command/query,
+    // Then = outcomes). Refs that no longer fit are coerced to the phase's
+    // default so the card stays coherent while names/payloads are preserved.
+    const allowed = bddRefsForPhase(targetPhase);
+    const steps = (current.steps ?? []).map((step) =>
+      allowed.includes(step.ref)
+        ? step
+        : { ...step, ref: bddDefaultRefForPhase(targetPhase) },
+    );
     updateObject(selectedStorm.id, {
       stormData: {
         ...current,
         phase: targetPhase,
         ...(isDefaultTitle ? { name: STORM_PHASE_TITLES[targetPhase] } : {}),
+        ...(current.steps ? { steps } : {}),
       },
     });
   };
@@ -280,11 +314,20 @@ export function StormOptionsBar() {
   };
 
   const handleAddRow = () => {
+    if (isStepKind) {
+      setBddStepPopup({ objectId: selectedStorm.id });
+      return;
+    }
     if (kind === "query") {
       addStormField(selectedStorm.id, "params");
     } else {
       addStormField(selectedStorm.id);
     }
+  };
+
+  const handleEditStep = () => {
+    if (!selectedStep) return;
+    setBddStepPopup({ objectId: selectedStorm.id, stepId: selectedStep.id });
   };
 
   return (
@@ -331,18 +374,20 @@ export function StormOptionsBar() {
           </div>
         )}
 
-        {/* Collection Array [] Toggle */}
-        <button
-          onClick={handleToggleArray}
-          title="Toggle Array Collection []"
-          className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
-            isArray
-              ? "border border-blue-200 bg-blue-100 text-blue-700"
-              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-          }`}
-        >
-          <Brackets size={16} />
-        </button>
+        {/* Collection Array [] Toggle — irrelevant for scenario step cards */}
+        {!isStepKind && (
+          <button
+            onClick={handleToggleArray}
+            title="Toggle Array Collection []"
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+              isArray
+                ? "border border-blue-200 bg-blue-100 text-blue-700"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <Brackets size={16} />
+          </button>
+        )}
 
         {/* RBAC Action Button (Command / Query) */}
         {stormHasAction(kind) && (
@@ -455,11 +500,11 @@ export function StormOptionsBar() {
           </button>
         )}
 
-        {/* Add Field Button (hidden on the fieldless Actor chip). On Query
-            cards this appends to the Params list; on State/Constraint it
-            appends to the INPUT params. A dedicated output/response button
-            follows. */}
-        {kind !== "actor" && (
+        {/* Add Field Button (hidden on the fieldless Actor chip and on BDD
+            scenario step cards, which add steps instead). On Query cards this
+            appends to the Params list; on State/Constraint it appends to the
+            INPUT params. A dedicated output/response button follows. */}
+        {kind !== "actor" && !isStepKind && (
           <button
             onClick={handleAddRow}
             title={
@@ -472,6 +517,43 @@ export function StormOptionsBar() {
             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           >
             <Plus size={16} />
+          </button>
+        )}
+
+        {/* Edit Step Button — only when a scenario step row is selected */}
+        {isStepKind && selectedStep && (
+          <button
+            onClick={handleEditStep}
+            title={
+              selectedStep.name
+                ? `Edit Step: ${selectedStep.name}`
+                : "Edit Step"
+            }
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+              showBddStepPopover
+                ? "border border-sky-200 bg-sky-50 text-sky-700"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <Pencil
+              size={15}
+              className={showBddStepPopover ? "text-sky-600" : "text-gray-600"}
+            />
+          </button>
+        )}
+
+        {/* Add Step Button (BDD scenario cards) */}
+        {isStepKind && (
+          <button
+            onClick={handleAddRow}
+            title="Add Scenario Step"
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+              showBddStepPopover && !bddStepPopup?.stepId
+                ? "border border-sky-200 bg-sky-50 text-sky-700"
+                : "text-sky-700 hover:bg-sky-50"
+            }`}
+          >
+            <PlusCircle size={16} />
           </button>
         )}
 
@@ -613,6 +695,16 @@ export function StormOptionsBar() {
             anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
           />
         )}
+
+      {/* BDD Scenario Step Popover (create when stepId is omitted) */}
+      {showBddStepPopover && bddStepPopup && (
+        <BddStepPopover
+          card={selectedStorm}
+          stepId={bddStepPopup.stepId}
+          onClose={() => setBddStepPopup(null)}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
+        />
+      )}
     </>
   );
 }

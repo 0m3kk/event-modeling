@@ -858,6 +858,76 @@ describe("useCanvasStore", () => {
     ]);
   });
 
+  it("adds, updates, reorders and deletes BDD scenario steps", () => {
+    const bddCard: CanvasObject = {
+      id: "bdd-A",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 120,
+      stormData: { kind: "bdd", name: "Given", phase: "given", fields: [] },
+    };
+    useCanvasStore.getState().addObjects([bddCard]);
+
+    // Default ref follows the phase (Given => event).
+    const step1 = useCanvasStore.getState().addBddStep("bdd-A")!;
+    const step2 = useCanvasStore.getState().addBddStep("bdd-A")!;
+    let updated = useCanvasStore
+      .getState()
+      .objects.find((o) => o.id === "bdd-A");
+    expect(updated?.stormData?.steps?.map((s) => s.id)).toEqual([step1, step2]);
+    expect(updated?.stormData?.steps?.every((s) => s.ref === "event")).toBe(
+      true,
+    );
+    // A new step is selected so the options bar can edit it.
+    expect(useCanvasStore.getState().stormSelectedField).toEqual({
+      objectId: "bdd-A",
+      fieldId: step2,
+    });
+
+    // Update name + payload.
+    useCanvasStore.getState().updateBddStep("bdd-A", step1, {
+      name: "OrderPlaced",
+      payload: [{ id: "p1", key: "orderId", value: "42" }],
+    });
+    updated = useCanvasStore.getState().objects.find((o) => o.id === "bdd-A");
+    expect(updated?.stormData?.steps?.[0].name).toBe("OrderPlaced");
+    expect(updated?.stormData?.steps?.[0].payload).toHaveLength(1);
+
+    // Reorder then delete via the selected-row path.
+    useCanvasStore.getState().moveRow("bdd-A", step1, "down");
+    updated = useCanvasStore.getState().objects.find((o) => o.id === "bdd-A");
+    expect(updated?.stormData?.steps?.map((s) => s.id)).toEqual([step2, step1]);
+
+    useCanvasStore
+      .getState()
+      .setStormSelectedField({ objectId: "bdd-A", fieldId: step1 });
+    useCanvasStore.getState().deleteSelectedStormField();
+    updated = useCanvasStore.getState().objects.find((o) => o.id === "bdd-A");
+    expect(updated?.stormData?.steps?.map((s) => s.id)).toEqual([step2]);
+    expect(useCanvasStore.getState().stormSelectedField).toBeNull();
+  });
+
+  it("tracks the BDD step popover and clears it on selection changes", () => {
+    expect(useCanvasStore.getState().bddStepPopup).toBeNull();
+    useCanvasStore.getState().setBddStepPopup({ objectId: "bdd-A" });
+    expect(useCanvasStore.getState().bddStepPopup).toEqual({
+      objectId: "bdd-A",
+    });
+
+    // Selecting a different card drops the stale popup target.
+    useCanvasStore.getState().selectObject("other-card");
+    expect(useCanvasStore.getState().bddStepPopup).toBeNull();
+
+    useCanvasStore.getState().setBddStepPopup({ objectId: "bdd-A" });
+    useCanvasStore.getState().clearSelection();
+    expect(useCanvasStore.getState().bddStepPopup).toBeNull();
+
+    useCanvasStore.getState().resetBoard();
+    expect(useCanvasStore.getState().bddStepPopup).toBeNull();
+  });
+
   it("handles alignObjects, distributeObjects, and arrangeLanes", () => {
     const c1: CanvasObject = {
       id: "c1",

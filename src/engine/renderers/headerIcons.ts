@@ -104,6 +104,22 @@ export function drawHeaderKindIcon(
       break;
     }
 
+    case "error": {
+      // Warning: triangle with an exclamation mark
+      g.moveTo(cx, y0 + 1.5)
+        .lineTo(x0 + 14, y0 + 13)
+        .lineTo(x0 + 2, y0 + 13)
+        .closePath()
+        .stroke({ color, width: 1.2, join: "round" });
+
+      g.moveTo(cx, y0 + 5.5)
+        .lineTo(cx, y0 + 9.5)
+        .stroke({ color, width: 1.4, cap: "round" });
+
+      g.circle(cx, y0 + 11.2, 0.85).fill({ color });
+      break;
+    }
+
     case "bdd": {
       // Given/When/Then: ListChecks icon (matching toolbar ListChecks)
       // Checkmark 1 (top)

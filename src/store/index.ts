@@ -3,6 +3,7 @@ import { temporal } from "zundo";
 import { nanoid } from "nanoid";
 import { DEFAULT_VIEWPORT, GRID_SIZE } from "@/constants/canvas";
 import {
+  bddDefaultRefForPhase,
   stormHasFieldTypes,
   stormHasInputFields,
   stormHasValidation,
@@ -28,6 +29,7 @@ import {
   touchesSyncedReferenceField,
 } from "@/utils/reference";
 import type { CanvasObject } from "@/types";
+import type { BddStep } from "@/types";
 import type { CanvasStore, CanvasStoreState } from "./types";
 import { createDebouncedHandleSet } from "./historyDebounce";
 import { registerHistoryBatch, beginHistoryBatch, endHistoryBatch } from "./historyBatch";
@@ -69,6 +71,7 @@ export const initialCanvasState: CanvasStoreState = {
   typeSelect: null,
   stormSelectedField: null,
   validationTarget: null,
+  bddStepPopup: null,
   validationHover: null,
   fieldClipboard: null,
   stormActionHover: null,
@@ -133,7 +136,8 @@ export const useCanvasStore = create<CanvasStore>()(
             set({ selectedIds: [...selectedIds, id] });
           }
         } else {
-          set({ selectedIds: [id] });
+          // Selecting a different card drops any step popover from the old one.
+          set({ selectedIds: [id], bddStepPopup: null });
         }
       },
 
@@ -144,11 +148,13 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       clearSelection: () => {
-        const { selectedIds, stormSelectedField, modelPopupChain } = get();
+        const { selectedIds, stormSelectedField, modelPopupChain, bddStepPopup } =
+          get();
         if (
           selectedIds.length > 0 ||
           stormSelectedField ||
-          modelPopupChain.length > 0
+          modelPopupChain.length > 0 ||
+          bddStepPopup
         ) {
           // A storm field selection only makes sense while its card is
           // selected, so clear both together. Also clear active model popups.
@@ -156,6 +162,7 @@ export const useCanvasStore = create<CanvasStore>()(
             selectedIds: [],
             stormSelectedField: null,
             modelPopupChain: [],
+            bddStepPopup: null,
           });
         }
       },
@@ -956,6 +963,8 @@ export const useCanvasStore = create<CanvasStore>()(
 
       setValidationTarget: (validationTarget) => set({ validationTarget }),
 
+      setBddStepPopup: (bddStepPopup) => set({ bddStepPopup }),
+
       setValidationHover: (validationHover) => set({ validationHover }),
 
       setStormActionHover: (stormActionHover) => set({ stormActionHover }),
@@ -1031,6 +1040,7 @@ export const useCanvasStore = create<CanvasStore>()(
           const nextConstraints = (data.constraints ?? []).filter(
             (c) => c.id !== rowId,
           );
+          const nextSteps = (data.steps ?? []).filter((s) => s.id !== rowId);
 
           const nextData = {
             ...data,
@@ -1040,6 +1050,7 @@ export const useCanvasStore = create<CanvasStore>()(
             responseFields: nextResponseFields,
             queryItems: nextQueryItems,
             constraints: nextConstraints,
+            steps: nextSteps,
           };
 
           const newHeight = computeStormCardHeight(nextData, obj.width);
@@ -1332,6 +1343,65 @@ export const useCanvasStore = create<CanvasStore>()(
         return newId;
       },
 
+      addBddStep: (objectId, ref) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "storm" || !obj.stormData || obj.locked)
+          return;
+        if (obj.stormData.kind !== "bdd") return;
+
+        const newId = nanoid();
+        const newStep: BddStep = {
+          id: newId,
+          ref: ref ?? bddDefaultRefForPhase(obj.stormData.phase),
+          name: "",
+          payload: [],
+        };
+        const nextData = {
+          ...obj.stormData,
+          steps: [...(obj.stormData.steps ?? []), newStep],
+        };
+        const newHeight = computeStormCardHeight(nextData, obj.width);
+        set({
+          objects: syncReferenceAfterChange(
+            objects.map((o) =>
+              o.id === obj.id
+                ? { ...o, height: newHeight, stormData: nextData }
+                : o,
+            ),
+            obj.id,
+          ),
+          selectedIds: [obj.id],
+          stormSelectedField: { objectId: obj.id, fieldId: newId },
+        });
+        return newId;
+      },
+
+      updateBddStep: (objectId, stepId, patch) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "storm" || !obj.stormData || obj.locked) return;
+        if (obj.stormData.kind !== "bdd") return;
+
+        const steps = obj.stormData.steps ?? [];
+        if (!steps.some((s) => s.id === stepId)) return;
+        const nextSteps = steps.map((s) =>
+          s.id === stepId ? { ...s, ...patch } : s,
+        );
+        const nextData = { ...obj.stormData, steps: nextSteps };
+        const newHeight = computeStormCardHeight(nextData, obj.width);
+        set({
+          objects: syncReferenceAfterChange(
+            objects.map((o) =>
+              o.id === obj.id
+                ? { ...o, height: newHeight, stormData: nextData }
+                : o,
+            ),
+            obj.id,
+          ),
+        });
+      },
+
       addModelField: (objectId) => {
         const { objects } = get();
         const obj = objects.find((o) => o.id === objectId);
@@ -1508,6 +1578,7 @@ export const useCanvasStore = create<CanvasStore>()(
           typeSelect: null,
           stormSelectedField: null,
           validationTarget: null,
+          bddStepPopup: null,
           validationHover: null,
           stormActionHover: null,
           isSearchOpen: false,

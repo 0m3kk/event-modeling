@@ -721,8 +721,19 @@ export class PixiEngine {
         return;
       }
 
+      // Click on a BDD card's "add step" placeholder opens the step editor
+      // directly, so an empty scenario card has a visible entry point.
+      if (accurateZone?.type === "bddAddStep") {
+        state.clearModelPopups();
+        state.selectObject(id, e.shiftKey || e.metaKey || e.ctrlKey);
+        state.setStormSelectedField(null);
+        state.setBddStepPopup({ objectId: id });
+        return;
+      }
+
       // Single-click row selection: clicking anywhere on a field row (name, tag, type,
-      // enum value, query item, constraint) selects and highlights that row.
+      // enum value, query item, constraint, BDD scenario step) selects and
+      // highlights that row.
       if (
         accurateZone?.type === "fieldName" ||
         accurateZone?.type === "fieldTag" ||
@@ -731,15 +742,23 @@ export class PixiEngine {
         accurateZone?.type === "innerType" ||
         accurateZone?.type === "enumValue" ||
         accurateZone?.type === "queryItem" ||
-        accurateZone?.type === "constraint"
+        accurateZone?.type === "constraint" ||
+        accurateZone?.type === "bddStep" ||
+        accurateZone?.type === "bddStepName" ||
+        accurateZone?.type === "bddPayloadKey" ||
+        accurateZone?.type === "bddPayloadValue"
       ) {
+        // BDD zones carry the owning step in `fieldId`; payload zones must not
+        // fall through to `valueId` (that is the payload row, not the step).
+        const isBddZone = accurateZone.type.startsWith("bdd");
         state.setStormSelectedField({
           objectId: id,
-          fieldId:
-            accurateZone.fieldId ||
-            accurateZone.valueId ||
-            accurateZone.queryItemId ||
-            accurateZone.constraintId,
+          fieldId: isBddZone
+            ? accurateZone.fieldId
+            : accurateZone.fieldId ||
+              accurateZone.valueId ||
+              accurateZone.queryItemId ||
+              accurateZone.constraintId,
         });
         // Selecting a row normally dismisses the validation panel; it is only
         // (re)opened by clicking the row's ✓ badge above.
@@ -842,6 +861,14 @@ export class PixiEngine {
       const hit = this.findCardZoneAtWorld(worldPos.x, worldPos.y);
       if (!hit) return;
       const { obj, zone } = hit;
+
+      // Double-click on a BDD card's add-step placeholder opens the step
+      // editor instead of an inline text field.
+      if (zone?.type === "bddAddStep") {
+        state.selectObject(obj.id);
+        state.setBddStepPopup({ objectId: obj.id });
+        return;
+      }
 
       // Double-click on type zone directly opens type selector
       if (

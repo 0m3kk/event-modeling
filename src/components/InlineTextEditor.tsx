@@ -256,6 +256,34 @@ function applyUpdate(
         constraints: nextList,
       },
     });
+  } else if (zone.type === "bddStepName" && obj.type === "storm" && obj.stormData) {
+    const steps = obj.stormData.steps ?? [];
+    const nextSteps = steps.map((s) =>
+      s.id === zone.fieldId ? { ...s, name: newValue } : s,
+    );
+    updateObject(obj.id, {
+      stormData: { ...obj.stormData, steps: nextSteps },
+    });
+  } else if (
+    (zone.type === "bddPayloadKey" || zone.type === "bddPayloadValue") &&
+    obj.type === "storm" &&
+    obj.stormData
+  ) {
+    const steps = obj.stormData.steps ?? [];
+    const key = zone.type === "bddPayloadKey" ? "key" : "value";
+    const nextSteps = steps.map((s) =>
+      s.id === zone.fieldId
+        ? {
+            ...s,
+            payload: (s.payload ?? []).map((p) =>
+              p.id === zone.valueId ? { ...p, [key]: newValue } : p,
+            ),
+          }
+        : s,
+    );
+    updateObject(obj.id, {
+      stormData: { ...obj.stormData, steps: nextSteps },
+    });
   } else if (zone.type === "queryItem" && obj.type === "storm" && obj.stormData) {
     const types = newValue
       .split(",")

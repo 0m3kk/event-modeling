@@ -5,6 +5,8 @@ import {
 import { computeGroupBounds } from "@/engine/layers/GroupLayer";
 import { CONNECTOR_CONTACT_GAP, APP_FONT_FAMILY } from "@/constants/canvas";
 import {
+  BDD_STEP_REF_COLORS,
+  BDD_STEP_REF_LABELS,
   STORM_PHASE_LABELS,
   stormAccentColor,
   stormHasAction,
@@ -13,6 +15,7 @@ import {
   stormHasParamsSection,
   stormHasQueryItems,
   stormHasResponseFields,
+  stormHasSteps,
   stormHasTags,
 } from "@/constants/storm";
 import { MODEL_KIND_COLORS } from "@/constants/model";
@@ -290,6 +293,37 @@ function svgStormBody(
         `<text x="${x + 14}" y="${rowY + 2}" font-size="11" font-family="${SVG_FONT}" fill="#334155">🔑 ${escapeXml(perm)}</text>`,
       );
       rowY += 22;
+    }
+    return { svg: parts.join("\n"), endY: rowY };
+  }
+
+  // BDD (Given/When/Then) cards list scenario steps: a named step per row plus
+  // one `key = value` line per concrete payload example (payloads are partial).
+  if (stormHasSteps(kind)) {
+    const steps = storm.steps ?? [];
+    for (const step of steps) {
+      const color = BDD_STEP_REF_COLORS[step.ref] ?? "#64748b";
+      const refLabel = (
+        BDD_STEP_REF_LABELS[step.ref] ?? step.ref
+      ).toUpperCase();
+      parts.push(
+        `<text x="${x + 14}" y="${rowY + 2}" font-size="11" font-weight="700" font-family="${SVG_FONT}" fill="#1e293b">${escapeXml(step.name || "Untitled")}</text>`,
+      );
+      parts.push(
+        `<text x="${x + w - 14}" y="${rowY + 2}" text-anchor="end" font-size="8" font-weight="700" letter-spacing="0.4" font-family="${SVG_FONT}" fill="${color}">${escapeXml(refLabel)}</text>`,
+      );
+      rowY += 20;
+      for (const entry of step.payload ?? []) {
+        const keyW = (entry.key?.length ?? 0) * 6.1 + 16;
+        parts.push(
+          `<text x="${x + 24}" y="${rowY + 2}" font-size="10" font-weight="600" font-family="${SVG_FONT}" fill="#64748b">${escapeXml(entry.key)} =</text>`,
+        );
+        parts.push(
+          `<text x="${x + 24 + keyW}" y="${rowY + 2}" font-size="10" font-weight="500" font-family="${SVG_FONT}" fill="#0f172a">${escapeXml(entry.value)}</text>`,
+        );
+        rowY += 16;
+      }
+      rowY += 6;
     }
     return { svg: parts.join("\n"), endY: rowY };
   }
