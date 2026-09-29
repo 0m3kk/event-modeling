@@ -19,6 +19,8 @@ import { cn } from "@/utils/cn";
 import { useCanvasStore } from "@/store";
 import { DEFAULT_AI_SETTINGS } from "@/ai/client";
 import { clampAIMaxTokens } from "@/ai";
+import { useResizablePanel } from "@/hooks/useResizablePanel";
+import type { ResizeDirection } from "@/hooks/useResizablePanel";
 
 const TOOL_LABELS: Record<string, string> = {
   get_canvas_overview: "Read canvas",
@@ -185,6 +187,39 @@ function MessageBubble({ message }: { message: AIChatMessage }) {
   );
 }
 
+function ResizeHandles({
+  beginResize,
+}: {
+  beginResize: (
+    direction: ResizeDirection,
+  ) => (event: React.PointerEvent<HTMLElement>) => void;
+}) {
+  return (
+    <>
+      {/* Top edge */}
+      <div
+        onPointerDown={beginResize("top")}
+        className="absolute top-0 right-3 left-3 z-40 h-1.5 cursor-ns-resize touch-none rounded-full transition-colors hover:bg-violet-500/40"
+        title="Drag to resize"
+      />
+      {/* Left edge */}
+      <div
+        onPointerDown={beginResize("left")}
+        className="absolute top-3 bottom-3 left-0 z-40 w-1.5 cursor-ew-resize touch-none rounded-full transition-colors hover:bg-violet-500/40"
+        title="Drag to resize"
+      />
+      {/* Top-left corner grip */}
+      <div
+        onPointerDown={beginResize("top-left")}
+        className="group absolute top-0 left-0 z-50 flex h-4 w-4 cursor-nwse-resize touch-none items-start justify-start"
+        title="Drag to resize"
+      >
+        <span className="m-0.5 h-2.5 w-2.5 rounded-tl-lg border-t-2 border-l-2 border-gray-500 transition-colors group-hover:border-violet-400" />
+      </div>
+    </>
+  );
+}
+
 export function AIPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -196,6 +231,7 @@ export function AIPanel() {
   const [keyInput, setKeyInput] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { size, beginResize } = useResizablePanel();
 
   const aiSettings = useCanvasStore((s) => s.aiSettings);
   const aiConversation = useCanvasStore((s) => s.aiConversation);
@@ -288,10 +324,12 @@ export function AIPanel() {
 
   return (
     <div
-      className="fixed right-6 bottom-6 z-40 flex h-176 max-h-[calc(100vh-5rem)] w-xl max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-gray-900 border border-gray-700/80 shadow-2xl text-gray-200"
+      className="fixed right-6 bottom-6 z-40 flex max-h-[calc(100vh-5rem)] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-gray-900 border border-gray-700/80 shadow-2xl text-gray-200"
+      style={{ width: size.width, height: size.height }}
       onMouseDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
+      <ResizeHandles beginResize={beginResize} />
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-gray-800 px-4 py-3.5 bg-gray-900/90 backdrop-blur-sm">
         <div className="flex min-w-0 items-center gap-2.5">
