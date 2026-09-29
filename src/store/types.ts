@@ -104,6 +104,10 @@ export interface CanvasStoreState {
   aiRunning: boolean;
   aiError: string | null;
   aiUsageCount: number;
+  /** Agent loop steps used in the current turn. */
+  aiStepUsed: number;
+  /** Maximum agent loop steps allowed per turn. */
+  aiStepLimit: number;
 }
 
 export interface CanvasStoreActions {

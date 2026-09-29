@@ -238,6 +238,8 @@ export function AIPanel() {
   const aiConversation = useCanvasStore((s) => s.aiConversation);
   const aiRunning = useCanvasStore((s) => s.aiRunning);
   const aiError = useCanvasStore((s) => s.aiError);
+  const aiStepUsed = useCanvasStore((s) => s.aiStepUsed);
+  const aiStepLimit = useCanvasStore((s) => s.aiStepLimit);
   const setAISettings = useCanvasStore((s) => s.setAISettings);
   const sendAIMessage = useCanvasStore((s) => s.sendAIMessage);
   const stopAI = useCanvasStore((s) => s.stopAI);
@@ -254,6 +256,7 @@ export function AIPanel() {
     () => plan.filter((step) => step.status === "done").length,
     [plan],
   );
+  const stepsRemaining = Math.max(0, aiStepLimit - aiStepUsed);
 
   useEffect(() => {
     if (isOpen && canSend && inputRef.current) {
@@ -565,6 +568,17 @@ export function AIPanel() {
           <div className="flex items-center gap-2.5 text-[12.5px] text-violet-400 bg-gray-800/40 rounded-xl p-2.5 border border-gray-800">
             <Loader2 className="h-4 w-4 animate-spin shrink-0" />
             <span>AI Assistant is working on the canvas…</span>
+            <span
+              className={cn(
+                "ml-auto shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10.5px]",
+                stepsRemaining <= 3
+                  ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                  : "border-violet-500/30 bg-violet-500/10 text-violet-300",
+              )}
+              title={`Agent budget: ${aiStepUsed} of ${aiStepLimit} steps used this turn`}
+            >
+              {stepsRemaining} step{stepsRemaining === 1 ? "" : "s"} left
+            </span>
           </div>
         )}
       </div>
@@ -606,11 +620,26 @@ export function AIPanel() {
           )}
         </div>
 
-        <div className="mt-2 flex items-center justify-between px-1 text-[11px] text-gray-500 font-mono">
+        <div className="mt-2 flex items-center justify-between gap-2 px-1 text-[11px] text-gray-500 font-mono">
           <span className="truncate max-w-50">
             {aiSettings.model} · {host}
           </span>
-          <span className="text-gray-600">Single Cmd+Z undo per turn</span>
+          <div className="flex shrink-0 items-center gap-2">
+            {aiStepUsed > 0 && (
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5",
+                  stepsRemaining <= 0
+                    ? "bg-amber-500/10 text-amber-300"
+                    : "text-gray-400",
+                )}
+                title={`Agent budget this turn: ${aiStepUsed} of ${aiStepLimit} steps used`}
+              >
+                {aiStepUsed}/{aiStepLimit} steps
+              </span>
+            )}
+            <span className="text-gray-600">Single Cmd+Z undo per turn</span>
+          </div>
         </div>
       </div>
     </div>

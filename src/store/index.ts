@@ -36,6 +36,7 @@ import {
   deriveConversationTitle,
   getStoredAISettings,
   isAbortError,
+  MAX_AGENT_ITERATIONS,
   runAgent,
   storeAISettings,
 } from "@/ai";
@@ -77,6 +78,8 @@ export const initialCanvasState: CanvasStoreState = {
   aiRunning: false,
   aiError: null,
   aiUsageCount: 0,
+  aiStepUsed: 0,
+  aiStepLimit: MAX_AGENT_ITERATIONS,
 };
 
 let activeRun: AbortController | null = null;
@@ -1524,7 +1527,13 @@ export const useCanvasStore = create<CanvasStore>()(
           createUserMessage(trimmed),
         );
 
-        set({ aiConversation: withUser, aiRunning: true, aiError: null });
+        set({
+          aiConversation: withUser,
+          aiRunning: true,
+          aiError: null,
+          aiStepUsed: 0,
+          aiStepLimit: MAX_AGENT_ITERATIONS,
+        });
 
         const controller = new AbortController();
         activeRun = controller;
@@ -1551,6 +1560,7 @@ export const useCanvasStore = create<CanvasStore>()(
               onPlan: (plan) => patchConversation((c) => ({ ...c, plan })),
               onSummary: (summary, summarizedUpTo) =>
                 patchConversation((c) => ({ ...c, summary, summarizedUpTo })),
+              onStep: (used, limit) => set({ aiStepUsed: used, aiStepLimit: limit }),
             },
           });
           set((state) => ({
@@ -1597,6 +1607,8 @@ export const useCanvasStore = create<CanvasStore>()(
           aiConversation: createEmptyConversation(),
           aiError: null,
           aiRunning: false,
+          aiStepUsed: 0,
+          aiStepLimit: MAX_AGENT_ITERATIONS,
         });
       },
 

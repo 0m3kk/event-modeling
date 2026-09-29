@@ -41,6 +41,8 @@ export interface AgentCallbacks {
   onMessage: (message: AIChatMessage) => void;
   onPlan: (plan: AIPlanStep[]) => void;
   onSummary: (summary: string, summarizedUpTo: number) => void;
+  /** Reports how much of the per-turn step budget has been consumed. */
+  onStep?: (used: number, limit: number) => void;
 }
 
 export interface RunAgentOptions {
@@ -125,6 +127,7 @@ export async function runAgent(
       ctx,
       signal,
       emit: emitCounted,
+      onStep: (used, limit) => callbacks.onStep?.(used, limit),
     });
   } catch (error) {
     if (error instanceof AIToolsUnsupportedError && emitted === 0) {
@@ -136,6 +139,7 @@ export async function runAgent(
         ctx,
         signal,
         emit: emitCounted,
+        onStep: (used, limit) => callbacks.onStep?.(used, limit),
       });
       return;
     }
@@ -151,6 +155,7 @@ interface LoopArgs {
   ctx: AIToolContext;
   signal: AbortSignal;
   emit: (message: AIChatMessage) => void;
+  onStep: (used: number, limit: number) => void;
 }
 
 async function runToolLoop({
@@ -162,12 +167,14 @@ async function runToolLoop({
   ctx,
   signal,
   emit,
+  onStep,
 }: LoopArgs & { tools: AIToolDefinition[] }): Promise<void> {
   const messages = toModelMessages(working, AGENT_SYSTEM_PROMPT);
   const openAITools = toOpenAITools(tools);
 
   for (let iteration = 0; iteration < MAX_AGENT_ITERATIONS; iteration++) {
     throwIfAborted(signal);
+    onStep(iteration + 1, MAX_AGENT_ITERATIONS);
     const assistant = await chatCompletion(settings, messages, {
       sessionId,
       maxTokens: settings.maxTokens ?? DEFAULT_AI_MAX_TOKENS,
@@ -281,11 +288,13 @@ async function runFallbackLoop({
   ctx,
   signal,
   emit,
+  onStep,
 }: LoopArgs): Promise<void> {
   const messages = buildFallbackMessages(working);
 
   for (let iteration = 0; iteration < MAX_AGENT_ITERATIONS; iteration++) {
     throwIfAborted(signal);
+    onStep(iteration + 1, MAX_AGENT_ITERATIONS);
     const result = await chatCompletion(settings, messages, {
       sessionId,
       maxTokens: settings.maxTokens ?? DEFAULT_AI_MAX_TOKENS,

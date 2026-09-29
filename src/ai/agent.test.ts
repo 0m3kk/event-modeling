@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AIChatMessage, AIPlanStep, CanvasObject } from "@/types";
 import type { CanvasStore } from "@/store/types";
-import { runAgent } from "./agent";
+import { runAgent, MAX_AGENT_ITERATIONS } from "./agent";
 import { createEmptyConversation, createUserMessage } from "./conversation";
 import * as clientModule from "./client";
 
@@ -90,6 +90,59 @@ describe("runAgent", () => {
     // Check store got the card
     expect(fake.objects).toHaveLength(1);
     expect(fake.objects[0]!.stormData?.name).toBe("Order Placed");
+
+    chatSpy.mockRestore();
+  });
+
+  it("reports step usage per iteration", async () => {
+    const fake = createFakeStore();
+    const conv = createEmptyConversation();
+    conv.messages.push(createUserMessage("Create an event card OrderPlaced"));
+
+    const chatSpy = vi.spyOn(clientModule, "chatCompletion");
+    chatSpy.mockResolvedValueOnce({
+      content: "",
+      toolCalls: [
+        {
+          id: "call-1",
+          type: "function",
+          function: {
+            name: "create_storm_cards",
+            arguments: JSON.stringify({
+              cards: [{ kind: "event", name: "Order Placed" }],
+            }),
+          },
+        },
+      ],
+    });
+    chatSpy.mockResolvedValueOnce({ content: "Done.", toolCalls: [] });
+
+    const steps: Array<[number, number]> = [];
+
+    await runAgent(
+      conv,
+      {
+        apiKey: "test",
+        baseUrl: "https://test.com",
+        model: "test-model",
+        maxTokens: 1000,
+      },
+      {
+        getState: () => fake.store,
+        signal: new AbortController().signal,
+        callbacks: {
+          onMessage: () => {},
+          onPlan: () => {},
+          onSummary: () => {},
+          onStep: (used, limit) => steps.push([used, limit]),
+        },
+      },
+    );
+
+    expect(steps).toEqual([
+      [1, MAX_AGENT_ITERATIONS],
+      [2, MAX_AGENT_ITERATIONS],
+    ]);
 
     chatSpy.mockRestore();
   });
