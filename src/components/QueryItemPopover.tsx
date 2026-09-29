@@ -69,12 +69,13 @@ export function QueryItemPopover({
     return Array.from(names).sort();
   }, [objects]);
 
-  // Tagged fields on this State/Constraint card available for filtering
+  // Tagged INPUT params on this State/Constraint card available for filtering
+  // (only input params can carry the tags a query item filters on).
   const taggedFields = useMemo(() => {
-    return (card.stormData?.fields ?? []).filter(
+    return (card.stormData?.inputFields ?? []).filter(
       (f) => Boolean((f.tag ?? "").trim()),
     );
-  }, [card.stormData?.fields]);
+  }, [card.stormData?.inputFields]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -349,7 +350,7 @@ export function QueryItemPopover({
 
           {taggedFields.length === 0 ? (
             <div className="text-[11px] italic text-gray-400">
-              No tagged fields on this card (matches any tag).
+              No tagged input params on this card (matches any tag).
             </div>
           ) : (
             <div className="flex flex-wrap gap-1">

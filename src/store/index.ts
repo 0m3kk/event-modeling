@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { temporal } from "zundo";
 import { nanoid } from "nanoid";
 import { DEFAULT_VIEWPORT, GRID_SIZE } from "@/constants/canvas";
-import { stormHasFieldTypes } from "@/constants/storm";
+import { stormHasFieldTypes, stormHasInputFields } from "@/constants/storm";
 import { moveModelRowInObject, moveStormRowInObject } from "@/utils/rowReorder";
 import { buildFieldClipboard, canPasteFields } from "@/utils/fieldClipboard";
 import { alignObjects, distributeObjects } from "@/utils/align";
@@ -1000,6 +1000,12 @@ export const useCanvasStore = create<CanvasStore>()(
         } else if (obj.type === "storm" && obj.stormData) {
           const data = obj.stormData;
           const nextFields = data.fields.filter((f) => f.id !== rowId);
+          const nextInputFields = (data.inputFields ?? []).filter(
+            (f) => f.id !== rowId,
+          );
+          const nextOutputFields = (data.outputFields ?? []).filter(
+            (f) => f.id !== rowId,
+          );
           const nextResponseFields = (data.responseFields ?? []).filter(
             (f) => f.id !== rowId,
           );
@@ -1016,6 +1022,8 @@ export const useCanvasStore = create<CanvasStore>()(
           const nextData = {
             ...data,
             fields: nextFields,
+            inputFields: nextInputFields,
+            outputFields: nextOutputFields,
             responseFields: nextResponseFields,
             queryItems: nextQueryItems,
             constraints: nextConstraints,
@@ -1154,13 +1162,24 @@ export const useCanvasStore = create<CanvasStore>()(
             description: e.description,
             ...(e.tag ? { tag: e.tag } : {}),
           }));
-          const at = insertAt(data.fields);
-          const nextFields = [
-            ...data.fields.slice(0, at),
+          // State/Constraint split fields into INPUT params and OUTPUT fields;
+          // paste into whichever band holds the anchor row (default OUTPUT).
+          let targetList: "fields" | "inputFields" | "outputFields" = "fields";
+          if (stormHasInputFields(data.kind)) {
+            targetList =
+              anchorId &&
+              (data.inputFields ?? []).some((f) => f.id === anchorId)
+                ? "inputFields"
+                : "outputFields";
+          }
+          const list = data[targetList] ?? [];
+          const at = insertAt(list);
+          const nextList = [
+            ...list.slice(0, at),
             ...newFields,
-            ...data.fields.slice(at),
+            ...list.slice(at),
           ];
-          const nextData = { ...data, fields: nextFields };
+          const nextData = { ...data, [targetList]: nextList };
           const newHeight = computeStormCardHeight(nextData, obj.width);
           set({
             objects: syncReferenceAfterChange(
@@ -1190,30 +1209,30 @@ export const useCanvasStore = create<CanvasStore>()(
           required: false,
         };
 
-        if (section === "response" && obj.stormData.kind === "query") {
-          const nextResponse = [
-            ...(obj.stormData.responseFields ?? []),
-            newField,
-          ];
-          const nextData = { ...obj.stormData, responseFields: nextResponse };
-          const newHeight = computeStormCardHeight(nextData, obj.width);
-          set({
-            objects: syncReferenceAfterChange(
-              objects.map((o) =>
-                o.id === obj.id
-                  ? { ...o, height: newHeight, stormData: nextData }
-                  : o,
-              ),
-              obj.id,
-            ),
-            selectedIds: [obj.id],
-            stormSelectedField: { objectId: obj.id, fieldId: newFieldId },
-          });
-          return newFieldId;
+        const data = obj.stormData;
+        let nextData = data;
+        if (stormHasInputFields(data.kind)) {
+          // State/Constraint split INPUT params from OUTPUT fields: the
+          // "response" section is the projected output band.
+          nextData =
+            section === "response"
+              ? {
+                  ...data,
+                  outputFields: [...(data.outputFields ?? []), newField],
+                }
+              : {
+                  ...data,
+                  inputFields: [...(data.inputFields ?? []), newField],
+                };
+        } else if (data.kind === "query" && section === "response") {
+          nextData = {
+            ...data,
+            responseFields: [...(data.responseFields ?? []), newField],
+          };
+        } else {
+          nextData = { ...data, fields: [...data.fields, newField] };
         }
 
-        const nextFields = [...obj.stormData.fields, newField];
-        const nextData = { ...obj.stormData, fields: nextFields };
         const newHeight = computeStormCardHeight(nextData, obj.width);
         set({
           objects: syncReferenceAfterChange(

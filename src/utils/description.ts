@@ -1,9 +1,27 @@
 import type {
   CanvasObject,
+  StormData,
   StormField,
   ModelField,
   ModelEnumValue,
 } from "@/types";
+
+/**
+ * Finds a storm field row by id across every field band a card can carry:
+ * primary fields, State/Constraint input params, projected output fields, and
+ * Query response fields.
+ */
+function findStormField(
+  data: StormData,
+  fieldId: string,
+): StormField | undefined {
+  return (
+    data.fields.find((f) => f.id === fieldId) ??
+    (data.inputFields ?? []).find((f) => f.id === fieldId) ??
+    (data.outputFields ?? []).find((f) => f.id === fieldId) ??
+    (data.responseFields ?? []).find((f) => f.id === fieldId)
+  );
+}
 
 /**
  * Reads the description text for a card header (`fieldId` omitted) or one of
@@ -17,10 +35,7 @@ export function findDescriptionText(
   if (obj.type === "storm" && obj.stormData) {
     const data = obj.stormData;
     if (!fieldId) return data.description;
-    const field =
-      data.fields.find((f) => f.id === fieldId) ??
-      (data.responseFields ?? []).find((f) => f.id === fieldId);
-    return field?.description;
+    return findStormField(data, fieldId)?.description;
   }
 
   if (obj.type === "model" && obj.modelData) {
@@ -49,10 +64,7 @@ export function findRowName(
 
   if (obj.type === "storm" && obj.stormData) {
     const data = obj.stormData;
-    const field =
-      data.fields.find((f) => f.id === fieldId) ??
-      (data.responseFields ?? []).find((f) => f.id === fieldId);
-    return field?.name;
+    return findStormField(data, fieldId)?.name;
   }
 
   if (obj.type === "model" && obj.modelData) {
@@ -101,23 +113,27 @@ export function applyDescription(
         return rest;
       });
 
-    const nextFields = updateFields(data.fields);
-    const nextResponse = data.responseFields
-      ? updateFields(data.responseFields)
-      : data.responseFields;
-    if (
-      nextFields.some((f, i) => f !== data.fields[i]) ||
-      (nextResponse &&
-        data.responseFields &&
-        nextResponse.some((f, i) => f !== data.responseFields![i]))
-    ) {
-      updateObject(obj.id, {
-        stormData: {
-          ...data,
-          fields: nextFields,
-          responseFields: nextResponse,
-        },
-      });
+    const bands: Array<
+      "fields" | "inputFields" | "outputFields" | "responseFields"
+    > = ["fields", "inputFields", "outputFields", "responseFields"];
+    const patch: Partial<
+      Record<
+        "fields" | "inputFields" | "outputFields" | "responseFields",
+        StormField[]
+      >
+    > = {};
+    let changed = false;
+    for (const band of bands) {
+      const original = data[band];
+      if (!original) continue;
+      const next = updateFields(original);
+      if (next.some((f, i) => f !== original[i])) {
+        patch[band] = next;
+        changed = true;
+      }
+    }
+    if (changed) {
+      updateObject(obj.id, { stormData: { ...data, ...patch } });
     }
     return;
   }

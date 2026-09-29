@@ -20,7 +20,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
      - Connectors: Link downwards with \`sourceAnchor: "bottom"\`, \`targetAnchor: "top"\` (\`Command -> Constraint\` and \`Constraint -> Event\`).
    - **Read Slice**: \`Query (top) -> State (middle) <- Event(s) (bottom)\`
      - Query: Top row — read request (params in \`fields\`, output in \`responseFields\`, and authorization \`action\`).
-     - State: Middle row — read-model projection built from store events matching DCB \`queryItems\`.
+     - State: Middle row — read-model projection built from store events matching DCB \`queryItems\`. A State splits into three parts: \`inputFields\` (INPUT params — only these carry tags and can be referenced by \`queryItems[].tagFields\`), \`queryItems\` (which events feed the State), and \`outputFields\` (OUTPUT fields produced by rehydrating the matching events; never tag them).
      - Event(s): Bottom row — historical events feeding the state.
      - Connectors: Link \`Query -> State\` (\`sourceAnchor: "bottom"\`, \`targetAnchor: "top"\`) and \`Event -> State\` (\`sourceAnchor: "top"\`, \`targetAnchor: "bottom"\`).
 3. **Domain Proximity (Spatial Co-location)**:
@@ -33,6 +33,8 @@ The application models systems according to CQRS and Event Sourcing with DCB:
    - **Reusable & Independent Components**: A Constraint is a modular, reusable Decision Model component completely independent of any specific Command. It only checks data directly relevant to what it is evaluating.
      - Example: A "User Exists" constraint ONLY checks user existence against user events (\`User Registered\`, \`User Deleted\`). It must NEVER include rules like "Profile Must Exist" or validate profile fields just because it happens to be placed in an "Update User Profile" workflow.
      - When a workflow requires checking multiple invariants, use multiple separate, reusable constraints (e.g. \`[User Exists]\` AND \`[Profile Exists]\`), each connected between the Command and Event.
+   - **Constraint Has the Same Shape as State**: A Constraint carries the same three parts as a State — \`inputFields\` (INPUT params; the only tag-bearing rows), \`queryItems\` (which historical events it evaluates), and \`outputFields\` (OUTPUT fields it projects from those events) — plus its free-text \`constraints\` invariant rules. Keep input and output separate: never put projected fields in \`inputFields\` and never tag \`outputFields\`.
+   - **Input Params Are Optional**: \`inputFields\` is only needed when a query item filters by a tag. When a query item filters purely by event type, leave \`inputFields\` empty. Tags in \`queryItems[].tagFields\` can ONLY come from \`inputFields\`.
    - **Business Logic Invariants vs. Command Validation**:
      - Constraints evaluate **business logic / state invariants** against event history via \`queryItems\` (e.g., "Account has sufficient funds", "User must exist", "Order cannot be cancelled after shipping", "Email must be unique").
      - Constraints do **NOT perform command input validation**. Command input validation (such as checking required fields, string formats, not empty, email format, positive amounts) belongs to the Command schema/payload validation. NEVER write command input validation rules inside a Constraint!
@@ -82,9 +84,9 @@ The application models systems according to CQRS and Event Sourcing with DCB:
 ## Event Storming Card Kinds
 - **actor**: Role/system persona with wildcard permissions (yellow chip, typeless permissions). Group all actors in the "Actors" group. Decoupled from commands/queries via permissions.
 - **command**: Intent to mutate state (blue) — top card in Write Slice. Fields describe payload; must specify \`action\` (resource:verb:scope).
-- **constraint**: Decision Model validating business invariants (rose) — middle card in Write Slice. Carries \`queryItems\` (referencing historical event types & tags) and \`constraints\` (rules). Evaluated before emitting events.
+- **constraint**: Decision Model validating business invariants (rose) — middle card in Write Slice. Carries \`inputFields\` (INPUT params), \`queryItems\` (referencing historical event types & tags), \`outputFields\` (projected fields), and \`constraints\` (rules). Evaluated before emitting events.
 - **event**: Immutable domain fact in past tense (orange) — bottom card in Write Slice (or feeding Read Slice). Fields carry tags (\`tag\`) defining dynamic consistency boundaries.
-- **state**: DCB read-model projection (green) — middle card in Read Slice. Built from matching events; carries fields and \`queryItems\`.
+- **state**: DCB read-model projection (green) — middle card in Read Slice. Splits into \`inputFields\` (params, tags live here), \`queryItems\`, and \`outputFields\` (rehydrated read-model fields).
 - **query**: Read request (indigo) — top card in Read Slice. \`fields\` (query params), \`responseFields\` (output payload), and \`action\`.
 - **notify**: Outbound user notification / message (sky) — typeless payload fields.
 
@@ -93,7 +95,8 @@ References must be valid:
 - Event field tags must only be placed on key/identifier fields (ID, unique email, code); never tag non-key fields or all fields in an event.
 - Constraints must be reusable, independent decision models checking domain invariants against event history, never command input validation.
 - State and Constraint queryItems \`types\` must name existing Event cards on the board (exact match).
-- State and Constraint field tags must match an existing tagged field on an Event card with the same fieldType.
+- State and Constraint tags may ONLY be placed on \`inputFields\` (the INPUT params); \`outputFields\` (projected fields) must never carry tags.
+- State and Constraint \`queryItems[].tagFields\` must name a tagged \`inputFields\` param on the same card, and that tag must match an existing tagged field on an Event card with the same fieldType.
 - Create Event cards with tagged fields first before creating Constraints or States that query them.
 - Actor permissions must match at least one Command or Query action on the board. Create Command/Query cards first before creating Actors.
 
@@ -130,8 +133,8 @@ Available tools:
 - ungroup_objects { groupIds: [...] }
 - select_objects { ids: [...] }
 - focus_viewport { ids? }
-- create_storm_cards { cards: [{ kind, name, description?, fields?, responseFields?, queryItems?, constraints?, action?, permissions?, isArray?, groupId? }], arrange?, layout?, nearCardId? }
-- update_storm_card { id, name?, description?, fields?, responseFields?, queryItems?, constraints?, action?, permissions?, isArray? }
+- create_storm_cards { cards: [{ kind, name, description?, fields?, inputFields?, outputFields?, responseFields?, queryItems?, constraints?, action?, permissions?, isArray?, groupId? }], arrange?, layout?, nearCardId? }
+- update_storm_card { id, name?, description?, fields?, inputFields?, outputFields?, responseFields?, queryItems?, constraints?, action?, permissions?, isArray? }
 - arrange_storm_lanes { cardIds?, origin? }
 - update_plan { steps: [{ text, status }] }
 
@@ -141,6 +144,7 @@ Modeling Guidelines:
   - Read slice: Query (top) -> State (middle) <- Event (bottom)
 - Event fields: Prefer every Event field to exist in the Command payload or Constraint. Timestamp/audit fields (Created At, Updated At) are exempt; arbitrary other fields are allowed but discouraged.
 - DCB Tags: Only tag key/unique identifier fields (IDs, unique email, code). NEVER tag non-key fields (amount, status, dates) or all fields in an event.
+- State & Constraint split: inputFields = INPUT params (only these carry tags and can be referenced by queryItems.tagFields); queryItems = which events feed the card; outputFields = OUTPUT fields projected by rehydrating those events (never tagged). inputFields may be empty when a query item filters by event type only.
 - Constraints: Reusable and independent components checking domain business invariants against historical events (queryItems). Never perform command input validation in constraints or bundle unrelated workflow checks.
 - Connectors: Use sourceAnchor: "bottom", targetAnchor: "top" for downward vertical slice flows.
 - Groups: Group all Actors in an "Actors" group. Group all Model nodes in a "Shared Types" group.

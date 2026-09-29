@@ -290,6 +290,76 @@ describe("AI Storm Tools", () => {
     expect(fake.objects).toHaveLength(0);
   });
 
+  it("builds State input params, output fields and resolved query-item tags", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          arrange: false,
+          cards: [
+            {
+              kind: "event",
+              name: "Order Placed",
+              fields: [{ name: "Order ID", fieldType: "uuid", tag: "order" }],
+            },
+            {
+              kind: "state",
+              name: "Order Summary",
+              inputFields: [
+                { name: "Order ID", fieldType: "uuid", tag: "order" },
+              ],
+              outputFields: [{ name: "Total", fieldType: "number" }],
+              queryItems: [
+                { types: ["Order Placed"], tagFields: ["Order ID"] },
+              ],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+    expect(res.isError).toBeFalsy();
+
+    const state = fake.objects.find((o) => o.stormData?.kind === "state")!;
+    expect(state.stormData?.fields).toEqual([]);
+    expect(state.stormData?.inputFields?.[0].name).toBe("Order ID");
+    expect(state.stormData?.inputFields?.[0].tag).toBe("Order");
+    expect(state.stormData?.outputFields?.[0].name).toBe("Total");
+    const item = state.stormData?.queryItems?.[0];
+    expect(item?.tagFieldIds).toEqual([state.stormData!.inputFields![0].id]);
+  });
+
+  it("rejects a tag on a State output field", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "state",
+              name: "Order Summary",
+              outputFields: [
+                { name: "Total", fieldType: "number", tag: "order" },
+              ],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBe(true);
+    expect(res.content).toContain("output field");
+  });
+
   it("rejects actor card whose permissions do not match any action on canvas", async () => {
     const fake = createFakeStore();
     fake.objects.push({

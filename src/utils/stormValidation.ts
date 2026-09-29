@@ -140,12 +140,22 @@ function getCardOrObjectFields(
   source: StormValidationCard | CanvasObject,
 ): StormField[] {
   if ("stormData" in source) {
-    return source.stormData?.fields ?? [];
+    const sd = source.stormData;
+    return [
+      ...(sd?.fields ?? []),
+      ...(sd?.inputFields ?? []),
+      ...(sd?.outputFields ?? []),
+    ];
   }
-  return (
-    (source as StormValidationCard).writtenFields ??
-    (source as StormValidationCard).fields
-  );
+  const card = source as StormValidationCard;
+  if (card.writtenFields !== undefined || card.inputFields || card.outputFields) {
+    return [
+      ...(card.writtenFields ?? card.fields),
+      ...(card.inputFields ?? []),
+      ...(card.outputFields ?? []),
+    ];
+  }
+  return card.fields;
 }
 
 function getCardOrObjectName(
@@ -223,7 +233,12 @@ function findCandidateSourcesForEvent(
 export interface StormValidationCard {
   kind: StormKind;
   name: string;
+  /** Primary fields (Command/Event/Notify/BDD payload; Query params). */
   fields: StormField[];
+  /** State/Constraint INPUT params (the only tag-bearing rows on those cards). */
+  inputFields?: StormField[];
+  /** State/Constraint OUTPUT (rehydrated) fields — tags are not allowed here. */
+  outputFields?: StormField[];
   writtenFields?: StormField[];
   queryItems?: { types?: string[]; tagFields?: string[] }[];
   constraints?: (string | { id?: string; text: string })[];
@@ -341,6 +356,25 @@ export function validateStormWrite(input: StormValidationInput): string[] {
           );
         }
       }
+    } else if (card.kind === "state" || card.kind === "constraint") {
+      // On State/Constraint cards tags live ONLY on the INPUT params. The
+      // projected OUTPUT fields never carry tags.
+      for (const field of card.inputFields ?? []) {
+        const tag = (field.tag ?? "").trim();
+        if (!tag) continue;
+        if (!eventTags.get(field.fieldType)?.has(tag)) {
+          issues.push(
+            `${label} input param "${field.name}" has tag "${tag}", but no Event field of type "${field.fieldType}" carries that tag.`,
+          );
+        }
+      }
+      for (const field of card.outputFields ?? []) {
+        if ((field.tag ?? "").trim()) {
+          issues.push(
+            `${label} output field "${field.name}" carries a tag, but tags are only valid on the card's input params.`,
+          );
+        }
+      }
     } else if (card.kind !== "event" && card.kind !== "bdd") {
       for (const field of writtenFields) {
         const tag = (field.tag ?? "").trim();
@@ -388,10 +422,13 @@ export function validateStormWrite(input: StormValidationInput): string[] {
       }
       for (const rawName of item.tagFields ?? []) {
         const name = toDisplayName(rawName);
-        const field = findFieldByName(card.fields, rawName);
+        const field = findFieldByName(
+          card.inputFields ?? card.fields,
+          rawName,
+        );
         if (!field || !(field.tag ?? "").trim()) {
           issues.push(
-            `${label} queryItems[${index}] tagField "${name}" is not a tagged field on this card.`,
+            `${label} queryItems[${index}] tagField "${name}" is not a tagged input param on this card.`,
           );
         }
       }

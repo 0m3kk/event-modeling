@@ -106,7 +106,13 @@ describe("imageExport", () => {
         stormData: {
           kind: "state",
           name: "Order",
-          fields: [{ id: "f1", name: "orderId", fieldType: "uuid", tag: "order" }],
+          fields: [],
+          inputFields: [
+            { id: "f1", name: "orderId", fieldType: "uuid", tag: "order" },
+          ],
+          outputFields: [
+            { id: "o1", name: "status", fieldType: "string" },
+          ],
           queryItems: [
             { id: "q1", types: ["OrderPlaced"], tagFieldIds: ["f1"] },
           ],
@@ -165,6 +171,8 @@ describe("imageExport", () => {
     expect(svg).toContain("OrderPlaced");
     expect(svg).toContain("order:orderId");
     expect(svg).toContain("PARAMS");
+    expect(svg).toContain("FIELDS");
+    expect(svg).toContain("status");
     expect(svg).toContain("RESPONSE");
     expect(svg).toContain("total");
     expect(svg).toContain("CONSTRAINTS");

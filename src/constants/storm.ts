@@ -128,6 +128,27 @@ export function stormHasFields(kind: StormKind): boolean {
 }
 
 /**
+ * State & Constraint cards split their fields into two distinct bands:
+ * - INPUT params (`inputFields`): the tags a Query Item can filter on
+ * - OUTPUT fields (`outputFields`): what rehydrating the matching events yields
+ * The split keeps a card's input and output from blurring together.
+ */
+export const STORM_INPUT_OUTPUT_KINDS: readonly StormKind[] = [
+  "state",
+  "constraint",
+];
+
+/** Whether a kind carries the INPUT param list (State & Constraint) */
+export function stormHasInputFields(kind: StormKind): boolean {
+  return STORM_INPUT_OUTPUT_KINDS.includes(kind);
+}
+
+/** Whether a kind carries the OUTPUT (rehydrated) field list (State & Constraint) */
+export function stormHasOutputFields(kind: StormKind): boolean {
+  return STORM_INPUT_OUTPUT_KINDS.includes(kind);
+}
+
+/**
  * Kinds with DCB Query Items ("Related Events"): a State card builds its
  * consistency boundary from events, and a Constraint card shares that body
  * (field rows → Query Items → free-text Constraints).

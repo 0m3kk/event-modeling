@@ -39,7 +39,8 @@ function eventCard(
 const stateData: StormData = {
   kind: "state",
   name: "OrderState",
-  fields: [
+  fields: [],
+  inputFields: [
     { id: "sf-id", name: "id", fieldType: "uuid", tag: "order" },
     { id: "sf-email", name: "email", fieldType: "email", tag: "email" },
     { id: "sf-total", name: "total", fieldType: "number" },
@@ -199,7 +200,8 @@ describe("collectStateTagOptions", () => {
     const data: StormData = {
       kind: "state",
       name: "S",
-      fields: [
+      fields: [],
+      inputFields: [
         { id: "f1", name: "id", fieldType: "uuid", tag: "order" },
         { id: "f2", name: "refId", fieldType: "uuid", tag: "order" },
         { id: "f3", name: "email", fieldType: "email", tag: "email" },

@@ -134,6 +134,108 @@ describe("jsonSchemaExport", () => {
     );
   });
 
+  it("exports State and Constraint projections with params, query items and output fields", () => {
+    const state: StormData = {
+      kind: "state",
+      name: "OrderSummary",
+      fields: [],
+      inputFields: [
+        {
+          id: "i1",
+          name: "orderId",
+          fieldType: "uuid",
+          tag: "order",
+          required: true,
+        },
+      ],
+      outputFields: [{ id: "o1", name: "total", fieldType: "number" }],
+      queryItems: [{ id: "q1", types: ["OrderPlaced"], tagFieldIds: ["i1"] }],
+    };
+
+    const schema = generateStormCardJsonSchema(state);
+    expect(schema.title).toBe("OrderSummary");
+    const props = schema.properties!;
+    const inputFields = props.inputFields as {
+      type?: string;
+      required?: string[];
+      properties: Record<string, { format?: string }>;
+    };
+    expect(inputFields.type).toBe("object");
+    expect(inputFields.required).toEqual(["orderId"]);
+    expect(inputFields.properties.orderId.format).toBe("uuid");
+
+    const outputFields = props.outputFields as {
+      type?: string;
+      properties: Record<string, { type?: string }>;
+    };
+    expect(outputFields.type).toBe("object");
+    expect(outputFields.properties.total.type).toBe("number");
+
+    const queryItems = props.queryItems as {
+      type?: string;
+      items: { properties: Record<string, { type?: string }> };
+    };
+    expect(queryItems.type).toBe("array");
+    expect(queryItems.items.properties.types.type).toBe("array");
+    expect(props.constraints).toBeUndefined();
+
+    const constraint: StormData = {
+      kind: "constraint",
+      name: "OrderRules",
+      fields: [],
+      inputFields: [],
+      outputFields: [],
+      constraints: [{ id: "c1", text: "total > 0" }],
+    };
+    const cSchema = generateStormCardJsonSchema(constraint);
+    expect(
+      (cSchema.properties!.constraints as { type?: string }).type,
+    ).toBe("array");
+  });
+
+  it("includes State and Constraint cards in the canvas export", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "st",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 120,
+        stormData: {
+          kind: "state",
+          name: "OrderSummary",
+          fields: [],
+          inputFields: [],
+          outputFields: [{ id: "o", name: "total", fieldType: "number" }],
+        },
+      },
+      {
+        id: "co",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 120,
+        stormData: {
+          kind: "constraint",
+          name: "OrderRules",
+          fields: [],
+          constraints: [{ id: "c", text: "total > 0" }],
+        },
+      },
+    ];
+
+    const parsed = JSON.parse(exportCanvasJsonSchema(objects));
+    expect(
+      parsed.definitions.OrderSummary.properties.outputFields.properties.total
+        .type,
+    ).toBe("number");
+    expect(parsed.definitions.OrderRules.properties.constraints.type).toBe(
+      "array",
+    );
+  });
+
   it("generates Draft 2020-12 schema with $defs and updated $schema", () => {
     const objects: CanvasObject[] = [
       {

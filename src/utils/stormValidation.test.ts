@@ -51,7 +51,8 @@ describe("validateStormWrite", () => {
     const input: StormValidationInput = {
       existing: [orderEvent],
       cards: [
-        card("state", "Order State", [field("Order ID", "uuid", "order")], {
+        card("state", "Order State", [], {
+          inputFields: [field("Order ID", "uuid", "order")],
           queryItems: [{ types: ["Order Placed"], tagFields: ["Order ID"] }],
         }),
       ],
@@ -76,10 +77,14 @@ describe("validateStormWrite", () => {
   it("flags a State tag that no Event field of the same type carries", () => {
     const input: StormValidationInput = {
       existing: [orderEvent],
-      cards: [card("state", "Order State", [field("Email", "email", "email")])],
+      cards: [
+        card("state", "Order State", [], {
+          inputFields: [field("Email", "email", "email")],
+        }),
+      ],
     };
     expect(validateStormWrite(input)).toEqual([
-      '"Order State" (state) field "Email" has tag "email", but no Event field of type "email" carries that tag.',
+      '"Order State" (state) input param "Email" has tag "email", but no Event field of type "email" carries that tag.',
     ]);
   });
 
@@ -87,9 +92,9 @@ describe("validateStormWrite", () => {
     const input: StormValidationInput = {
       existing: [orderEvent],
       cards: [
-        card("constraint", "Invariant", [
-          field("Customer Order", "uuid", "order"),
-        ]),
+        card("constraint", "Invariant", [], {
+          inputFields: [field("Customer Order", "uuid", "order")],
+        }),
       ],
     };
     expect(validateStormWrite(input)).toEqual([]);
@@ -107,17 +112,18 @@ describe("validateStormWrite", () => {
     ]);
   });
 
-  it("flags a tagField that is not a tagged field on the card", () => {
+  it("flags a tagField that is not a tagged input param on the card", () => {
     const input: StormValidationInput = {
       existing: [orderEvent],
       cards: [
-        card("state", "Order State", [field("Order ID", "uuid")], {
+        card("state", "Order State", [], {
+          inputFields: [field("Order ID", "uuid")],
           queryItems: [{ types: ["Order Placed"], tagFields: ["Order ID"] }],
         }),
       ],
     };
     expect(validateStormWrite(input)).toEqual([
-      '"Order State" (state) queryItems[0] tagField "Order ID" is not a tagged field on this card.',
+      '"Order State" (state) queryItems[0] tagField "Order ID" is not a tagged input param on this card.',
     ]);
   });
 
@@ -126,7 +132,8 @@ describe("validateStormWrite", () => {
       existing: [],
       cards: [
         card("event", "Order Placed", [field("Order ID", "uuid", "order")]),
-        card("state", "Order State", [field("Order ID", "uuid", "order")], {
+        card("state", "Order State", [], {
+          inputFields: [field("Order ID", "uuid", "order")],
           queryItems: [{ types: ["OrderPlaced"], tagFields: ["orderId"] }],
         }),
       ],
@@ -138,7 +145,8 @@ describe("validateStormWrite", () => {
     const input: StormValidationInput = {
       existing: [orderEvent],
       cards: [
-        card("state", "Order State", [field("Order ID", "uuid", "order")], {
+        card("state", "Order State", [], {
+          inputFields: [field("Order ID", "uuid", "order")],
           writtenFields: [],
           queryItems: [{ types: ["Order Placed"], tagFields: ["Order ID"] }],
         }),

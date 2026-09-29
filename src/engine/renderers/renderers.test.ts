@@ -179,7 +179,10 @@ describe("Pixi Card Renderers", () => {
       stormData: {
         kind: "state",
         name: "OrderState",
-        fields: [{ id: "f1", name: "status", fieldType: "string" }],
+        fields: [],
+        inputFields: [
+          { id: "f1", name: "status", fieldType: "string" },
+        ],
         queryItems: [
           {
             id: "qi1",
@@ -208,9 +211,10 @@ describe("Pixi Card Renderers", () => {
       stormData: {
         kind: "constraint",
         name: "OrderConstraints",
-        // Constraint shares the State body: field rows + Related Events,
-        // then the free-text Constraints section.
-        fields: [
+        // Constraint shares the State body: INPUT params + Related Events
+        // + projected FIELDS, then the free-text Constraints section.
+        fields: [],
+        inputFields: [
           { id: "cf1", name: "total", fieldType: "number", tag: "order" },
         ],
         queryItems: [

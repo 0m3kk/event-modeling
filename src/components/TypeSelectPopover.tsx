@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCanvasStore } from "@/store";
+import type { StormData } from "@/types";
+import { stormHasInputFields } from "@/constants/storm";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
 import { findModelByName } from "@/utils/modelResolution";
 import {
@@ -24,6 +26,20 @@ const PRIMITIVES = [
   "any",
   "void",
 ];
+
+/**
+ * Which StormData field list a type change targets. State/Constraint split
+ * fields into input params/output fields; Query uses params/response.
+ */
+function stormFieldListKey(
+  data: StormData,
+  section?: "params" | "response",
+): "fields" | "inputFields" | "outputFields" | "responseFields" {
+  if (stormHasInputFields(data.kind)) {
+    return section === "response" ? "outputFields" : "inputFields";
+  }
+  return section === "response" ? "responseFields" : "fields";
+}
 
 export function TypeSelectPopover() {
   const typeSelect = useCanvasStore((s) => s.typeSelect);
@@ -61,10 +77,8 @@ export function TypeSelectPopover() {
     let showRequired = false;
 
     if (obj.type === "storm" && obj.stormData) {
-      const isResponse = typeSelect.section === "response";
-      const list = isResponse
-        ? obj.stormData.responseFields ?? []
-        : obj.stormData.fields;
+      const key = stormFieldListKey(obj.stormData, typeSelect.section);
+      const list = obj.stormData[key] ?? [];
       const field = list.find((f) => f.id === typeSelect.fieldId);
       if (field) {
         currentType = field.fieldType || "string";
@@ -193,19 +207,15 @@ export function TypeSelectPopover() {
 
   const commitTypeChange = (newType: string, newRequired: boolean) => {
     if (obj.type === "storm" && obj.stormData) {
-      const isResponse = typeSelect.section === "response";
-      const list = isResponse
-        ? obj.stormData.responseFields ?? []
-        : obj.stormData.fields;
+      const key = stormFieldListKey(obj.stormData, typeSelect.section);
+      const list = obj.stormData[key] ?? [];
       const nextList = list.map((f) =>
         f.id === typeSelect.fieldId
           ? { ...f, fieldType: newType, required: newRequired }
           : f,
       );
       updateObject(obj.id, {
-        stormData: isResponse
-          ? { ...obj.stormData, responseFields: nextList }
-          : { ...obj.stormData, fields: nextList },
+        stormData: { ...obj.stormData, [key]: nextList },
       });
     } else if (obj.type === "model" && obj.modelData) {
       if (obj.modelData.kind === "array") {

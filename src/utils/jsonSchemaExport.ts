@@ -1,4 +1,4 @@
-import type { ModelData, StormData, CanvasObject } from "@/types";
+import type { ModelData, StormData, StormField, CanvasObject } from "@/types";
 
 export interface JsonSchemaProperty {
   type?: string;
@@ -130,16 +130,14 @@ export function generateModelJsonSchema(
   return def;
 }
 
-export function generateStormCardJsonSchema(
-  storm: StormData,
-  allModelNames = new Set<string>(),
-  defsKey: "definitions" | "$defs" = "definitions",
-): JsonSchemaDefinition {
-  const title = sanitizeIdentifier(storm.name);
+function buildFieldProperties(
+  fields: StormField[],
+  allModelNames: Set<string>,
+  defsKey: "definitions" | "$defs",
+): { properties: Record<string, JsonSchemaProperty>; required: string[] } {
   const properties: Record<string, JsonSchemaProperty> = {};
   const required: string[] = [];
-
-  for (const field of storm.fields) {
+  for (const field of fields) {
     const propName = sanitizeIdentifier(field.name);
     properties[propName] = {
       ...resolveFieldSchema(field.fieldType, allModelNames, defsKey),
@@ -149,6 +147,114 @@ export function generateStormCardJsonSchema(
       required.push(propName);
     }
   }
+  return { properties, required };
+}
+
+function buildFieldGroup(
+  fields: StormField[],
+  description: string,
+  allModelNames: Set<string>,
+  defsKey: "definitions" | "$defs",
+): JsonSchemaProperty {
+  const { properties, required } = buildFieldProperties(
+    fields,
+    allModelNames,
+    defsKey,
+  );
+  const group: JsonSchemaProperty = {
+    type: "object",
+    description,
+    properties,
+  };
+  if (required.length > 0) group.required = required;
+  return group;
+}
+
+/**
+ * JSON schema for a State / Constraint projection card. Unlike Command/Event
+ * (a flat object of fields), a projection card keeps its INPUT params, its DCB
+ * query items, and its OUTPUT (rehydrated) fields as three distinct parts, so
+ * the exported schema preserves the input/output split. Constraint cards add
+ * their free-text invariant rules.
+ */
+function generateProjectionCardJsonSchema(
+  storm: StormData,
+  allModelNames: Set<string>,
+  defsKey: "definitions" | "$defs",
+): JsonSchemaDefinition {
+  const title = sanitizeIdentifier(storm.name);
+  const inputFields = storm.inputFields ?? [];
+  const outputFields = storm.outputFields ?? [];
+
+  const properties: Record<string, JsonSchemaProperty> = {
+    inputFields: buildFieldGroup(
+      inputFields,
+      "INPUT params of the projection. Their tags are the only tags a query item can filter on.",
+      allModelNames,
+      defsKey,
+    ),
+    queryItems: {
+      type: "array",
+      description:
+        "DCB query items selecting the events projected into this card (combined with OR).",
+      items: {
+        type: "object",
+        properties: {
+          types: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Event type names selected by this item (empty matches all types).",
+          },
+          tagFields: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              'Tagged INPUT params of this card, formatted "tag:field" (empty matches all tags).',
+          },
+        },
+      },
+    },
+    outputFields: buildFieldGroup(
+      outputFields,
+      "OUTPUT fields produced by rehydrating the matching events.",
+      allModelNames,
+      defsKey,
+    ),
+  };
+
+  if (storm.kind === "constraint") {
+    properties.constraints = {
+      type: "array",
+      description:
+        "Business invariant rules evaluated against the queried events.",
+      items: { type: "string" },
+    };
+  }
+
+  return {
+    title,
+    description: storm.description,
+    type: "object",
+    properties,
+  };
+}
+
+export function generateStormCardJsonSchema(
+  storm: StormData,
+  allModelNames = new Set<string>(),
+  defsKey: "definitions" | "$defs" = "definitions",
+): JsonSchemaDefinition {
+  if (storm.kind === "state" || storm.kind === "constraint") {
+    return generateProjectionCardJsonSchema(storm, allModelNames, defsKey);
+  }
+
+  const title = sanitizeIdentifier(storm.name);
+  const { properties, required } = buildFieldProperties(
+    storm.fields,
+    allModelNames,
+    defsKey,
+  );
 
   const def: JsonSchemaDefinition = {
     title,
@@ -181,7 +287,8 @@ export function exportCanvasJsonSchema(
       !!o.stormData &&
       (o.stormData.kind === "command" ||
         o.stormData.kind === "event" ||
-        o.stormData.kind === "state"),
+        o.stormData.kind === "state" ||
+        o.stormData.kind === "constraint"),
   );
 
   const modelNames = new Set(modelObjects.map((m) => m.modelData.name.trim()));

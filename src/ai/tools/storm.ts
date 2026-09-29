@@ -65,7 +65,7 @@ const queryItemSpec = z.object({
     .array(z.string())
     .optional()
     .describe(
-      "Names of tagged fields on this card used to filter matching events.",
+      "Names of tagged INPUT params (inputFields) on this State/Constraint card used to filter matching events. Tags only exist on input params.",
     ),
 });
 
@@ -136,17 +136,24 @@ function buildStormData(input: {
   description?: string;
   isArray?: boolean;
   fields: StormField[];
+  inputFields?: StormField[];
+  outputFields?: StormField[];
   responseFields?: StormField[];
   queryItems?: QueryItemSpec[];
   constraints?: string[];
   action?: string;
   permissions?: string[];
 }): StormData {
+  const isProjection = input.kind === "state" || input.kind === "constraint";
   const data: StormData = {
     kind: input.kind,
     name: toDisplayName(input.name),
-    fields: input.fields,
+    fields: isProjection ? [] : input.fields,
   };
+  if (isProjection) {
+    data.inputFields = input.inputFields ?? [];
+    data.outputFields = input.outputFields ?? [];
+  }
   if (input.description) data.description = input.description;
   if (input.isArray !== undefined) data.isArray = input.isArray;
   if (input.action && (input.kind === "command" || input.kind === "query")) {
@@ -163,8 +170,13 @@ function buildStormData(input: {
   }
 
   if (input.queryItems) {
+    // Tags are supplied by INPUT params on projection cards; on every other
+    // kind the primary field list is the tag source.
+    const tagSource = isProjection
+      ? (data.inputFields ?? [])
+      : (data.fields ?? []);
     const fieldIdByName = new Map(
-      input.fields.map((f) => [toDisplayName(f.name), f.id]),
+      tagSource.map((f) => [toDisplayName(f.name), f.id]),
     );
     data.queryItems = input.queryItems.map((item) => {
       const tagFieldIds = (item.tagFields ?? [])
@@ -205,7 +217,7 @@ function layoutSize(
 export const createStormCardsTool = defineTool({
   name: "create_storm_cards",
   description:
-    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; prefer event fields that also appear in the Command or Constraint payload, though timestamp/audit fields like Created At/Updated At are exempt). For Read Slices: Query (params + responseFields + action) -> State (projection with queryItems) <- Event. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
+    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; prefer event fields that also appear in the Command or Constraint payload, though timestamp/audit fields like Created At/Updated At are exempt). For Read Slices: Query (params + responseFields + action) -> State (projection) <- Event. State and Constraint split fields into three parts: inputFields (INPUT params; only these may carry tags and feed queryItems.tagFields), queryItems (which events feed the card; leave inputFields empty if it filters by event type only), and outputFields (OUTPUT fields produced by rehydrating the matching events; never tag these). Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
   schema: z.object({
     cards: z
       .array(
@@ -218,6 +230,18 @@ export const createStormCardsTool = defineTool({
             .describe("Concise, clear explanation of domain purpose."),
           isArray: z.boolean().optional(),
           fields: z.array(fieldSpec).optional(),
+          inputFields: z
+            .array(fieldSpec)
+            .optional()
+            .describe(
+              "State & Constraint cards only: INPUT params. Their `tag` values are the only tags a queryItems.tagFields entry can reference. Leave empty when query items filter by event type only.",
+            ),
+          outputFields: z
+            .array(fieldSpec)
+            .optional()
+            .describe(
+              "State & Constraint cards only: OUTPUT fields produced by rehydrating/projecting the matching events. Never put tags here.",
+            ),
           responseFields: z
             .array(fieldSpec)
             .optional()
@@ -226,7 +250,7 @@ export const createStormCardsTool = defineTool({
             .array(queryItemSpec)
             .optional()
             .describe(
-              "State & Constraint cards: DCB query matching event types and tagged fields.",
+              "State & Constraint cards: DCB query matching event types and tagged input params.",
             ),
           constraints: z
             .array(z.string())
@@ -296,6 +320,14 @@ export const createStormCardsTool = defineTool({
         action: spec.action,
         permissions: spec.permissions,
         fields: buildFields(spec.fields, spec.kind),
+        inputFields:
+          spec.inputFields !== undefined
+            ? buildFields(spec.inputFields, spec.kind)
+            : undefined,
+        outputFields:
+          spec.outputFields !== undefined
+            ? buildFields(spec.outputFields, spec.kind)
+            : undefined,
         responseFields:
           spec.responseFields !== undefined
             ? buildFields(spec.responseFields, spec.kind)
@@ -326,6 +358,8 @@ export const createStormCardsTool = defineTool({
         kind: spec.kind,
         name: obj.stormData?.name ?? toDisplayName(spec.name),
         fields: obj.stormData?.fields ?? [],
+        inputFields: obj.stormData?.inputFields,
+        outputFields: obj.stormData?.outputFields,
         queryItems: spec.queryItems,
         constraints: spec.constraints,
         action: obj.stormData?.action,
@@ -502,12 +536,24 @@ export const updateStormCardTool = defineTool({
       .describe("Concise, clear explanation of domain purpose."),
     isArray: z.boolean().optional(),
     fields: z.array(fieldSpec).optional(),
+    inputFields: z
+      .array(fieldSpec)
+      .optional()
+      .describe(
+        "State & Constraint cards: replace the INPUT params. Tags are only allowed here.",
+      ),
+    outputFields: z
+      .array(fieldSpec)
+      .optional()
+      .describe(
+        "State & Constraint cards: replace the OUTPUT (rehydrated) fields. No tags.",
+      ),
     responseFields: z.array(fieldSpec).optional(),
     queryItems: z
       .array(queryItemSpec)
       .optional()
       .describe(
-        "Updated queryItems for State/Constraint (e.g. adding new event types during Constraint Evolution).",
+        "Updated queryItems for State/Constraint (e.g. adding new event types during Constraint Evolution). tagFields reference tagged input params.",
       ),
     constraints: z.array(z.string()).optional(),
     action: z
@@ -528,10 +574,20 @@ export const updateStormCardTool = defineTool({
     }
 
     const existing = object.stormData;
+    const isProjection =
+      existing.kind === "state" || existing.kind === "constraint";
     const fields =
       args.fields !== undefined
         ? buildFields(args.fields, existing.kind)
         : existing.fields;
+    const inputFields =
+      args.inputFields !== undefined
+        ? buildFields(args.inputFields, existing.kind)
+        : existing.inputFields;
+    const outputFields =
+      args.outputFields !== undefined
+        ? buildFields(args.outputFields, existing.kind)
+        : existing.outputFields;
     const responseFields =
       args.responseFields !== undefined
         ? buildFields(args.responseFields, existing.kind)
@@ -551,7 +607,9 @@ export const updateStormCardTool = defineTool({
           kind: existing.kind,
           name:
             args.name !== undefined ? toDisplayName(args.name) : existing.name,
-          fields,
+          fields: isProjection ? [] : fields,
+          inputFields: isProjection ? inputFields : undefined,
+          outputFields: isProjection ? outputFields : undefined,
           writtenFields: args.fields !== undefined ? fields : [],
           queryItems: args.queryItems,
           constraints: args.constraints ?? existing.constraints,
@@ -580,6 +638,8 @@ export const updateStormCardTool = defineTool({
       description: args.description ?? existing.description,
       isArray: args.isArray ?? existing.isArray,
       fields,
+      inputFields,
+      outputFields,
       responseFields,
       queryItems: args.queryItems,
       constraints: args.constraints,
@@ -589,6 +649,9 @@ export const updateStormCardTool = defineTool({
     if (args.responseFields === undefined) {
       data.responseFields = existing.responseFields;
     }
+    if (args.inputFields === undefined) data.inputFields = existing.inputFields;
+    if (args.outputFields === undefined)
+      data.outputFields = existing.outputFields;
     if (args.queryItems === undefined) data.queryItems = existing.queryItems;
     if (args.constraints === undefined) data.constraints = existing.constraints;
 

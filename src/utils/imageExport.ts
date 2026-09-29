@@ -9,6 +9,7 @@ import {
   stormAccentColor,
   stormHasAction,
   stormHasFieldTypes,
+  stormHasInputFields,
   stormHasParamsSection,
   stormHasQueryItems,
   stormHasResponseFields,
@@ -294,6 +295,8 @@ function svgStormBody(
   }
 
   const fields = storm.fields ?? [];
+  const inputFields = storm.inputFields ?? [];
+  const outputFields = storm.outputFields ?? [];
   const responseFields = storm.responseFields ?? [];
   const queryItems = storm.queryItems ?? [];
   const constraints = storm.constraints ?? [];
@@ -301,22 +304,35 @@ function svgStormBody(
   const showType = stormHasFieldTypes(kind);
   const hasParams = stormHasParamsSection(kind);
   const hasResponse = stormHasResponseFields(kind);
+  const hasInputOutput = stormHasInputFields(kind);
 
-  if (hasParams && (fields.length > 0 || hasResponse)) {
-    parts.push(svgSectionLabel(x + 14, rowY + 2, "PARAMS", "#94a3b8"));
-    rowY += 18;
-  }
-  for (const field of fields) {
-    parts.push(svgFieldRow(objects, x, w, rowY, field, showTag, showType));
-    rowY += 22;
-  }
-
-  if (hasResponse) {
-    parts.push(svgSectionLabel(x + 14, rowY + 4, "RESPONSE", "#94a3b8"));
-    rowY += 18;
-    for (const field of responseFields) {
+  if (hasInputOutput) {
+    // State/Constraint: INPUT params -> Query Items -> OUTPUT fields.
+    if (inputFields.length > 0) {
+      parts.push(svgSectionLabel(x + 14, rowY + 2, "PARAMS", "#94a3b8"));
+      rowY += 18;
+      for (const field of inputFields) {
+        parts.push(svgFieldRow(objects, x, w, rowY, field, showTag, showType));
+        rowY += 22;
+      }
+    }
+  } else {
+    if (hasParams && (fields.length > 0 || hasResponse)) {
+      parts.push(svgSectionLabel(x + 14, rowY + 2, "PARAMS", "#94a3b8"));
+      rowY += 18;
+    }
+    for (const field of fields) {
       parts.push(svgFieldRow(objects, x, w, rowY, field, showTag, showType));
       rowY += 22;
+    }
+
+    if (hasResponse) {
+      parts.push(svgSectionLabel(x + 14, rowY + 4, "RESPONSE", "#94a3b8"));
+      rowY += 18;
+      for (const field of responseFields) {
+        parts.push(svgFieldRow(objects, x, w, rowY, field, showTag, showType));
+        rowY += 22;
+      }
     }
   }
 
@@ -327,7 +343,7 @@ function svgStormBody(
     for (const item of queryItems) {
       const types = item.types.length > 0 ? item.types : ["*"];
       const taggedFields = (item.tagFieldIds ?? [])
-        .map((id) => fields.find((f) => f.id === id))
+        .map((id) => inputFields.find((f) => f.id === id))
         .filter((f): f is StormField => Boolean(f && f.tag && f.tag.trim()));
       const rows = Math.max(types.length, taggedFields.length, 1);
       const itemTop = rowY;
@@ -348,6 +364,16 @@ function svgStormBody(
       });
 
       rowY = itemTop + rows * 20 + 4;
+    }
+  }
+
+  // OUTPUT fields (State/Constraint): the projected read-model shape.
+  if (hasInputOutput && outputFields.length > 0) {
+    parts.push(svgSectionLabel(x + 14, rowY + 4, "FIELDS", "#94a3b8"));
+    rowY += 18;
+    for (const field of outputFields) {
+      parts.push(svgFieldRow(objects, x, w, rowY, field, false, showType));
+      rowY += 22;
     }
   }
 

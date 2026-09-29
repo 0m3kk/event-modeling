@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useCanvasStore } from "@/store";
 import type { CanvasObject } from "@/types";
+import { stormHasInputFields } from "@/constants/storm";
 import { Tag, X, Trash2 } from "lucide-react";
 
 interface TagPopoverProps {
@@ -17,9 +18,15 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Taggable rows: on State/Constraint only the INPUT params carry tags;
+  // every other taggable kind tags its primary field list.
   const fields = useMemo(() => {
-    return card.stormData?.fields ?? [];
-  }, [card.stormData?.fields]);
+    const sd = card.stormData;
+    if (!sd) return [];
+    return stormHasInputFields(sd.kind)
+      ? (sd.inputFields ?? [])
+      : (sd.fields ?? []);
+  }, [card.stormData]);
 
   // Determine which field is selected
   const initialFieldId = useMemo(() => {
@@ -104,13 +111,16 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
     if (!currentField || !card.stormData) return;
     const trimmed = valueToApply.trim().replace(/^#+/, "");
     const nextTag = trimmed || undefined;
-    const nextFields = card.stormData.fields.map((f) =>
+    const data = card.stormData;
+    const key = stormHasInputFields(data.kind) ? "inputFields" : "fields";
+    const list = data[key] ?? [];
+    const nextFields = list.map((f) =>
       f.id === currentField.id ? { ...f, tag: nextTag } : f,
     );
     updateObject(card.id, {
       stormData: {
-        ...card.stormData,
-        fields: nextFields,
+        ...data,
+        [key]: nextFields,
       },
     });
     setTagInput(trimmed);

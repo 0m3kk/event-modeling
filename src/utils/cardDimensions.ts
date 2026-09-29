@@ -6,6 +6,7 @@ import type {
   StormField,
 } from "@/types";
 import {
+  stormHasInputFields,
   stormHasParamsSection,
   stormHasQueryItems,
   stormHasResponseFields,
@@ -95,7 +96,10 @@ export function computeStormCardHeight(
   const sectionLabelHeight = 22;
   const hasParams = stormHasParamsSection(kind);
   const hasResponse = stormHasResponseFields(kind);
+  const hasInputOutput = stormHasInputFields(kind);
   const fields = data.fields ?? [];
+  const inputFields = data.inputFields ?? [];
+  const outputFields = data.outputFields ?? [];
   const responseFields = data.responseFields ?? [];
   const queryItems = data.queryItems ?? [];
   const constraints = data.constraints ?? [];
@@ -104,6 +108,39 @@ export function computeStormCardHeight(
     const actorPerms = getActorPermissions(data);
     h += actorPerms.length * rowHeight;
     return Math.max(h, 80);
+  }
+
+  if (hasInputOutput) {
+    // Order mirrors the canvas: INPUT params -> Query Items -> OUTPUT fields.
+    if (inputFields.length > 0) {
+      h += sectionLabelHeight + inputFields.length * rowHeight;
+    }
+
+    if (queryItems.length > 0) {
+      let queryItemsTotalHeight = 0;
+      for (const item of queryItems) {
+        queryItemsTotalHeight += computeStormQueryItemHeight(item, inputFields);
+      }
+      h += sectionLabelHeight + queryItemsTotalHeight;
+    }
+
+    if (outputFields.length > 0) {
+      h += sectionLabelHeight + outputFields.length * rowHeight;
+    }
+
+    if (kind === "constraint" && constraints.length > 0) {
+      let constraintsTotalHeight = 0;
+      for (const c of constraints) {
+        constraintsTotalHeight += computeStormConstraintItemHeight(
+          c.text,
+          cardWidth,
+        );
+      }
+      h += sectionLabelHeight + constraintsTotalHeight;
+    }
+
+    h += 10; // bottom padding
+    return Math.max(80, h);
   }
 
   if (hasParams && (fields.length > 0 || hasResponse)) {
@@ -297,7 +334,12 @@ export function computeOptimalStormCardWidth(
   // 2. Field rows
   const hasTypes = stormHasFieldTypes(kind);
   const hasTags = stormHasTags(kind);
-  const allFields = [...(data.fields ?? []), ...(data.responseFields ?? [])];
+  const allFields = [
+    ...(data.fields ?? []),
+    ...(data.inputFields ?? []),
+    ...(data.outputFields ?? []),
+    ...(data.responseFields ?? []),
+  ];
 
   for (const f of allFields) {
     const rawType = f.fieldType || "string";
@@ -325,7 +367,7 @@ export function computeOptimalStormCardWidth(
     const maxTypeLen =
       q.types.length > 0 ? Math.max(...q.types.map((t) => t.length)) : 1;
     const taggedFields = (q.tagFieldIds ?? [])
-      .map((id) => (data.fields ?? []).find((f) => f.id === id))
+      .map((id) => (data.inputFields ?? []).find((f) => f.id === id))
       .filter((f): f is StormField => Boolean(f && f.tag && f.tag.trim()));
     const maxTagTextLen =
       taggedFields.length > 0

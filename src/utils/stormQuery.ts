@@ -35,8 +35,9 @@ export function getStormQueryItemTags(
   stateData: StormData,
 ): StormQueryTag[] {
   const tags: StormQueryTag[] = [];
+  const inputFields = stateData.inputFields ?? [];
   for (const fieldId of item.tagFieldIds) {
-    const field = stateData.fields.find((f) => f.id === fieldId);
+    const field = inputFields.find((f) => f.id === fieldId);
     const tag = (field?.tag ?? "").trim();
     if (!field || !tag) continue;
     tags.push({
@@ -87,7 +88,7 @@ export interface StormTagOption {
 export function collectStateTagOptions(stateData: StormData): StormTagOption[] {
   const options: StormTagOption[] = [];
   const seen = new Set<string>();
-  for (const field of stateData.fields) {
+  for (const field of stateData.inputFields ?? []) {
     const tag = (field.tag ?? "").trim();
     if (!tag) continue;
     const dedupeKey = `${tag}:${field.fieldType}`;

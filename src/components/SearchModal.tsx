@@ -60,6 +60,19 @@ function getObjectSearchableItems(
         items.push({ label: f.fieldType, detail: `Type in ${sd.name}` });
       if (f.tag) items.push({ label: f.tag, detail: `Tag in ${sd.name}` });
     });
+    sd.inputFields?.forEach((f) => {
+      if (f.name)
+        items.push({ label: f.name, detail: `Input Param in ${sd.name}` });
+      if (f.fieldType)
+        items.push({ label: f.fieldType, detail: `Param Type in ${sd.name}` });
+      if (f.tag) items.push({ label: f.tag, detail: `Input Tag in ${sd.name}` });
+    });
+    sd.outputFields?.forEach((f) => {
+      if (f.name)
+        items.push({ label: f.name, detail: `Output Field in ${sd.name}` });
+      if (f.fieldType)
+        items.push({ label: f.fieldType, detail: `Output Type in ${sd.name}` });
+    });
     sd.responseFields?.forEach((f) => {
       if (f.name)
         items.push({ label: f.name, detail: `Response Field in ${sd.name}` });

@@ -23,7 +23,12 @@ export type ModelRowList = "fields" | "values";
 
 /** Which list inside a StormData a row id belongs to */
 export type StormRowList =
-  "fields" | "responseFields" | "queryItems" | "constraints";
+  | "fields"
+  | "inputFields"
+  | "outputFields"
+  | "responseFields"
+  | "queryItems"
+  | "constraints";
 
 /**
  * Splices `fromIndex` to `toIndex` in a new array (input untouched).
@@ -85,6 +90,9 @@ export function resolveStormRowList(
   rowId: string,
 ): StormRowList | null {
   if (data.fields.some((f) => f.id === rowId)) return "fields";
+  if ((data.inputFields ?? []).some((f) => f.id === rowId)) return "inputFields";
+  if ((data.outputFields ?? []).some((f) => f.id === rowId))
+    return "outputFields";
   if ((data.responseFields ?? []).some((f) => f.id === rowId))
     return "responseFields";
   if ((data.queryItems ?? []).some((i) => i.id === rowId)) return "queryItems";
@@ -154,6 +162,32 @@ export function moveStormRowInObject(
       stormData: {
         ...data,
         fields: reorderItems(data.fields, fromIndex, toIndex),
+      },
+    };
+  }
+  if (list === "inputFields") {
+    const items = data.inputFields ?? [];
+    const fromIndex = items.findIndex((f) => f.id === rowId);
+    const toIndex = stepIndex(fromIndex, items.length, direction);
+    if (toIndex === -1) return null;
+    return {
+      ...obj,
+      stormData: {
+        ...data,
+        inputFields: reorderItems(items, fromIndex, toIndex),
+      },
+    };
+  }
+  if (list === "outputFields") {
+    const items = data.outputFields ?? [];
+    const fromIndex = items.findIndex((f) => f.id === rowId);
+    const toIndex = stepIndex(fromIndex, items.length, direction);
+    if (toIndex === -1) return null;
+    return {
+      ...obj,
+      stormData: {
+        ...data,
+        outputFields: reorderItems(items, fromIndex, toIndex),
       },
     };
   }

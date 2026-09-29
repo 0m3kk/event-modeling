@@ -68,6 +68,8 @@ function cloneStormData(data: StormData): StormData {
   return {
     ...data,
     fields: data.fields.map((f) => ({ ...f })),
+    inputFields: data.inputFields?.map((f) => ({ ...f })),
+    outputFields: data.outputFields?.map((f) => ({ ...f })),
     responseFields: data.responseFields?.map((f) => ({ ...f })),
     queryItems: data.queryItems?.map((item) => ({
       ...item,

@@ -633,6 +633,12 @@ export class PixiEngine {
           obj.stormData.fields?.find(
             (field) => field.id === accurateZone?.fieldId,
           ) ||
+          obj.stormData.inputFields?.find(
+            (field) => field.id === accurateZone?.fieldId,
+          ) ||
+          obj.stormData.outputFields?.find(
+            (field) => field.id === accurateZone?.fieldId,
+          ) ||
           obj.stormData.responseFields?.find(
             (field) => field.id === accurateZone?.fieldId,
           );

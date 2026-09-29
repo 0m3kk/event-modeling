@@ -47,7 +47,14 @@ export function buildFieldClipboard(
     }
   } else if (obj.type === "storm" && obj.stormData) {
     sourceKind = "storm";
-    entries = obj.stormData.fields
+    const lists = [
+      obj.stormData.fields,
+      obj.stormData.inputFields ?? [],
+      obj.stormData.outputFields ?? [],
+      obj.stormData.responseFields ?? [],
+    ];
+    entries = lists
+      .flat()
       .filter((f) => idSet.has(f.id))
       .map((f) => ({
         name: f.name,

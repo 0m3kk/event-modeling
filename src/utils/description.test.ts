@@ -142,3 +142,62 @@ describe("applyDescription", () => {
     expect(remove.calls[0].patch.stormData?.fields[0].description).toBeUndefined();
   });
 });
+
+describe("State/Constraint input & output bands", () => {
+  const state: CanvasObject = {
+    id: "st1",
+    type: "storm",
+    x: 0,
+    y: 0,
+    width: 200,
+    height: 120,
+    stormData: {
+      kind: "state",
+      name: "OrderSummary",
+      fields: [],
+      inputFields: [
+        {
+          id: "i1",
+          name: "orderId",
+          fieldType: "uuid",
+          description: "Input info",
+        },
+      ],
+      outputFields: [
+        {
+          id: "o1",
+          name: "total",
+          fieldType: "number",
+          description: "Output info",
+        },
+      ],
+    },
+  };
+
+  it("resolves names and descriptions across both bands", () => {
+    expect(findDescriptionText(state, "i1")).toBe("Input info");
+    expect(findDescriptionText(state, "o1")).toBe("Output info");
+    expect(findRowName(state, "i1")).toBe("orderId");
+    expect(findRowName(state, "o1")).toBe("total");
+  });
+
+  it("writes descriptions into the matching band only", () => {
+    const input = capture();
+    applyDescription(state, "i1", "Updated input", input.updateObject);
+    expect(input.calls[0].patch.stormData?.inputFields?.[0].description).toBe(
+      "Updated input",
+    );
+    expect(
+      input.calls[0].patch.stormData?.outputFields?.[0].description,
+    ).toBe("Output info");
+
+    const output = capture();
+    applyDescription(state, "o1", "Updated output", output.updateObject);
+    expect(output.calls[0].patch.stormData?.outputFields?.[0].description).toBe(
+      "Updated output",
+    );
+    expect(output.calls[0].patch.stormData?.inputFields?.[0].description).toBe(
+      "Input info",
+    );
+  });
+});

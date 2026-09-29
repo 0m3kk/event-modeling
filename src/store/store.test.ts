@@ -792,14 +792,45 @@ describe("useCanvasStore", () => {
       "orderId",
     );
 
-    // Paste into cardB
+    // Paste into cardB (State/Constraint paste into the OUTPUT band by default)
     useCanvasStore.getState().pasteFields("storm-B");
     const updatedB = useCanvasStore
       .getState()
       .objects.find((o) => o.id === "storm-B");
-    expect(updatedB?.stormData?.fields).toHaveLength(1);
-    expect(updatedB?.stormData?.fields[0].name).toBe("orderId");
-    expect(updatedB?.stormData?.fields[0].tag).toBe("order");
+    expect(updatedB?.stormData?.outputFields).toHaveLength(1);
+    expect(updatedB?.stormData?.outputFields?.[0].name).toBe("orderId");
+    expect(updatedB?.stormData?.outputFields?.[0].tag).toBe("order");
+  });
+
+  it("routes addStormField to input/output bands on State and Constraint cards", () => {
+    const state: CanvasObject = {
+      id: "storm-S",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 150,
+      stormData: { kind: "state", name: "OrderState", fields: [] },
+    };
+    useCanvasStore.getState().addObjects([state]);
+
+    const inputId = useCanvasStore
+      .getState()
+      .addStormField("storm-S", "params");
+    const outputId = useCanvasStore
+      .getState()
+      .addStormField("storm-S", "response");
+
+    const updated = useCanvasStore
+      .getState()
+      .objects.find((o) => o.id === "storm-S");
+    expect(updated?.stormData?.fields).toEqual([]);
+    expect(updated?.stormData?.inputFields?.map((f) => f.id)).toEqual([
+      inputId,
+    ]);
+    expect(updated?.stormData?.outputFields?.map((f) => f.id)).toEqual([
+      outputId,
+    ]);
   });
 
   it("handles alignObjects, distributeObjects, and arrangeLanes", () => {

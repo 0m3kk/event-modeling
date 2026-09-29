@@ -79,8 +79,9 @@ describe("cardDimensions", () => {
     const base: StormData = {
       kind: "constraint",
       name: "OrderConstraints",
-      // Two fields keep the base above the 80px minimum so each delta is exact.
-      fields: [
+      // Two input params keep the base above the 80px minimum so each delta is exact.
+      fields: [],
+      inputFields: [
         { id: "cf1", name: "total", fieldType: "number" },
         { id: "cf2", name: "status", fieldType: "string" },
       ],
@@ -88,11 +89,11 @@ describe("cardDimensions", () => {
 
     const hBase = computeStormCardHeight(base);
 
-    // +1 field row
+    // +1 input param row
     const withField: StormData = {
       ...base,
-      fields: [
-        ...base.fields,
+      inputFields: [
+        ...(base.inputFields ?? []),
         { id: "cf3", name: "currency", fieldType: "string" },
       ],
     };
@@ -117,7 +118,8 @@ describe("cardDimensions", () => {
     const base: StormData = {
       kind: "state",
       name: "OrderState",
-      fields: [
+      fields: [],
+      inputFields: [
         { id: "f1", name: "orderId", fieldType: "string", tag: "order" },
       ],
       queryItems: [
@@ -132,8 +134,9 @@ describe("cardDimensions", () => {
     // 3 events, 1 tag -> 3 lines -> 4 + 3 * 22 = 70px (instead of single row 26px)
     const expectedQueryHeight = 70;
     const h = computeStormCardHeight(base);
-    // header (36+6) + fields (1*26) + query label (22) + query item (70) + bottom padding (10)
-    expect(h).toBe(42 + 26 + 22 + expectedQueryHeight + 10);
+    // header (36+6) + params label (22) + 1 input param (26)
+    // + query label (22) + query item (70) + bottom padding (10)
+    expect(h).toBe(42 + 22 + 26 + 22 + expectedQueryHeight + 10);
   });
 
   it("calculates constraint lines and height based on text and card width", () => {

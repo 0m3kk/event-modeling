@@ -6,6 +6,7 @@ import {
   STORM_PHASE_LABELS,
   STORM_PHASE_TITLES,
   stormHasAction,
+  stormHasInputFields,
   stormHasPhase,
   stormHasQueryItems,
   stormHasTags,
@@ -83,9 +84,20 @@ export function StormOptionsBar() {
   const selectedField =
     sf && sf.objectId === selectedStorm.id && sf.fieldId
       ? (data.fields.find((f) => f.id === sf.fieldId) ??
+        data.inputFields?.find((f) => f.id === sf.fieldId) ??
+        data.outputFields?.find((f) => f.id === sf.fieldId) ??
         data.responseFields?.find((f) => f.id === sf.fieldId) ??
         null)
       : null;
+
+  // Only INPUT params (State/Constraint) or primary fields (Event/BDD) carry
+  // tags; projected output fields and Query responses never do.
+  const taggableField =
+    selectedField && stormHasTags(kind)
+      ? stormHasInputFields(kind)
+        ? (data.inputFields ?? []).some((f) => f.id === selectedField.id)
+        : data.fields.some((f) => f.id === selectedField.id)
+      : false;
 
   const selectedQueryItem =
     sf && sf.objectId === selectedStorm.id && sf.fieldId
@@ -302,8 +314,8 @@ export function StormOptionsBar() {
           <Info size={16} className="text-sky-600" />
         </button>
 
-        {/* Set Field Tag Button — only visible when a field is selected */}
-        {stormHasTags(kind) && Boolean(selectedField) && (
+        {/* Set Field Tag Button — only visible when a taggable row is selected */}
+        {taggableField && (
           <button
             onClick={() => setShowTagPopover((v) => !v)}
             title={tagButtonTitle}
@@ -359,12 +371,19 @@ export function StormOptionsBar() {
         )}
 
         {/* Add Field Button (hidden on the fieldless Actor chip). On Query
-            cards this appends to the Params list; a dedicated Response button
+            cards this appends to the Params list; on State/Constraint it
+            appends to the INPUT params. A dedicated output/response button
             follows. */}
         {kind !== "actor" && (
           <button
             onClick={handleAddRow}
-            title={kind === "query" ? "Add Param Field" : "Add Field"}
+            title={
+              kind === "query"
+                ? "Add Param Field"
+                : stormHasInputFields(kind)
+                  ? "Add Input Param"
+                  : "Add Field"
+            }
             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           >
             <Plus size={16} />
@@ -376,6 +395,17 @@ export function StormOptionsBar() {
           <button
             onClick={() => addStormField(selectedStorm.id, "response")}
             title="Add Response Field"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 hover:bg-indigo-50"
+          >
+            <Plus size={16} />
+          </button>
+        )}
+
+        {/* Add Output Field Button (State/Constraint — rehydrated FIELDS band) */}
+        {stormHasInputFields(kind) && (
+          <button
+            onClick={() => addStormField(selectedStorm.id, "response")}
+            title="Add Output Field"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 hover:bg-indigo-50"
           >
             <Plus size={16} />
@@ -467,7 +497,7 @@ export function StormOptionsBar() {
       )}
 
       {/* Tag Popover */}
-      {showTagPopover && selectedField && (
+      {showTagPopover && taggableField && (
         <TagPopover
           card={selectedStorm}
           onClose={() => setShowTagPopover(false)}

@@ -8,6 +8,7 @@ import {
   stormAccentColor,
   stormHasFieldTypes,
   stormHasAction,
+  stormHasInputFields,
   stormHasParamsSection,
   stormHasQueryItems,
   stormHasResponseFields,
@@ -93,6 +94,8 @@ export class StormCardRenderer {
 
     // Measure body content
     const fields = data.fields ?? [];
+    const inputFields = data.inputFields ?? [];
+    const outputFields = data.outputFields ?? [];
     const responseFields = data.responseFields ?? [];
     const queryItems = data.queryItems ?? [];
     const constraints = data.constraints ?? [];
@@ -105,6 +108,7 @@ export class StormCardRenderer {
 
     const hasParams = stormHasParamsSection(kind);
     const hasResponse = stormHasResponseFields(kind);
+    const hasInputOutput = stormHasInputFields(kind);
     const isActor = kind === "actor";
     const isConstraint = kind === "constraint";
 
@@ -223,6 +227,7 @@ export class StormCardRenderer {
     const renderFieldList = (
       fieldList: StormField[],
       section: "params" | "response",
+      showTags: boolean,
     ) => {
       for (const field of fieldList) {
         const rowY = renderY;
@@ -243,8 +248,9 @@ export class StormCardRenderer {
           : 0;
         const typeZoneX = w - typeZoneW - 8;
 
-        // Tag Pill (for event, state, constraint, bdd)
-        const hasTag = Boolean(field.tag && stormHasTags(kind));
+        // Tag Pill (event, state, constraint, bdd) — only on the input band;
+        // projected output fields never carry tags.
+        const hasTag = Boolean(showTags && field.tag && stormHasTags(kind));
         const rawTag = field.tag || "";
         const tagPillW = hasTag
           ? Math.min(80, Math.max(36, (rawTag.length + 1) * 6 + 14))
@@ -439,6 +445,28 @@ export class StormCardRenderer {
 
         renderY += rowHeight;
       }
+    } else if (hasInputOutput) {
+      // State/Constraint INPUT params. Their tags are the only tags a Query
+      // Item can filter on. Output fields render later, after Query Items.
+      if (inputFields.length > 0) {
+        const pLabel = new Text({
+          text: "PARAMS",
+          style: {
+            fontSize: 9,
+            fontWeight: "bold",
+            fontFamily: APP_FONT_FAMILY,
+            fill: 0x94a3b8,
+            letterSpacing: 0.5,
+          },
+          resolution: textResolution,
+        });
+        pLabel.x = 10;
+        pLabel.y = renderY + 2;
+        container.addChild(pLabel);
+        renderY += sectionLabelHeight;
+      }
+
+      renderFieldList(inputFields, "params", true);
     } else {
       // Render Params
       if (hasParams && (fields.length > 0 || hasResponse)) {
@@ -459,7 +487,7 @@ export class StormCardRenderer {
         renderY += sectionLabelHeight;
       }
 
-      renderFieldList(fields, "params");
+      renderFieldList(fields, "params", stormHasTags(kind));
 
       // Render Response — the band is always present on Query cards, matching
       // the Params band (the original keeps both sections visible even when empty).
@@ -480,7 +508,7 @@ export class StormCardRenderer {
         container.addChild(rLabel);
         renderY += sectionLabelHeight;
 
-        renderFieldList(responseFields, "response");
+        renderFieldList(responseFields, "response", false);
       }
     }
 
@@ -504,7 +532,7 @@ export class StormCardRenderer {
 
       for (const item of queryItems) {
         const rowY = renderY;
-        const itemHeight = computeStormQueryItemHeight(item, fields);
+        const itemHeight = computeStormQueryItemHeight(item, inputFields);
 
         // Draw selection highlight for this row
         if (selectedFieldId && item.id === selectedFieldId) {
@@ -514,7 +542,7 @@ export class StormCardRenderer {
         }
 
         const itemTaggedFields = (item.tagFieldIds ?? [])
-          .map((id) => fields.find((f) => f.id === id))
+          .map((id) => inputFields.find((f) => f.id === id))
           .filter((f): f is StormField => Boolean(f && f.tag && f.tag.trim()));
 
         // 1. Right side: render tags stacked vertically as {tag}:{field}
@@ -587,6 +615,29 @@ export class StormCardRenderer {
 
         renderY += itemHeight;
       }
+    }
+
+    // OUTPUT fields (State/Constraint): the read-model shape obtained by
+    // rehydrating the events selected by the Query Items. Rendered after the
+    // Query Items, without tags (only input params carry tags).
+    if (hasInputOutput && outputFields.length > 0) {
+      const oLabel = new Text({
+        text: "FIELDS",
+        style: {
+          fontSize: 9,
+          fontWeight: "bold",
+          fontFamily: APP_FONT_FAMILY,
+          fill: 0x94a3b8,
+          letterSpacing: 0.5,
+        },
+        resolution: textResolution,
+      });
+      oLabel.x = 10;
+      oLabel.y = renderY + 4;
+      container.addChild(oLabel);
+      renderY += sectionLabelHeight;
+
+      renderFieldList(outputFields, "response", false);
     }
 
     // Render Constraints

@@ -1,7 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "@/store";
-import type { CanvasObject } from "@/types";
+import type { CanvasObject, StormData } from "@/types";
+import { stormHasInputFields } from "@/constants/storm";
 import { getActorPermissions } from "@/utils/stormAuth";
+
+/**
+ * Resolves which StormData field list an inline edit targets from the hit
+ * zone's section. State/Constraint split fields into input params/output
+ * fields; Query uses params/response; every other kind edits `fields`.
+ */
+function stormFieldListKey(
+  data: StormData,
+  section?: "params" | "response",
+): "fields" | "inputFields" | "outputFields" | "responseFields" {
+  if (stormHasInputFields(data.kind)) {
+    return section === "response" ? "outputFields" : "inputFields";
+  }
+  return section === "response" ? "responseFields" : "fields";
+}
 
 export function InlineTextEditor() {
   const inlineEdit = useCanvasStore((s) => s.inlineEdit);
@@ -185,17 +201,13 @@ function applyUpdate(
           },
         });
       } else {
-        const isResponse = zone.section === "response";
-        const list = isResponse
-          ? obj.stormData.responseFields ?? []
-          : obj.stormData.fields;
+        const key = stormFieldListKey(obj.stormData, zone.section);
+        const list = obj.stormData[key] ?? [];
         const nextList = list.map((f) =>
           f.id === zone.fieldId ? { ...f, name: newValue } : f,
         );
         updateObject(obj.id, {
-          stormData: isResponse
-            ? { ...obj.stormData, responseFields: nextList }
-            : { ...obj.stormData, fields: nextList },
+          stormData: { ...obj.stormData, [key]: nextList },
         });
       }
     } else if (obj.type === "model" && obj.modelData) {
@@ -211,18 +223,14 @@ function applyUpdate(
       });
     }
   } else if (zone.type === "fieldTag" && obj.type === "storm" && obj.stormData) {
-    const isResponse = zone.section === "response";
-    const list = isResponse
-      ? obj.stormData.responseFields ?? []
-      : obj.stormData.fields;
+    const key = stormFieldListKey(obj.stormData, zone.section);
+    const list = obj.stormData[key] ?? [];
     const cleanTag = newValue.trim().replace(/^#+/, "");
     const nextList = list.map((f) =>
       f.id === zone.fieldId ? { ...f, tag: cleanTag || undefined } : f,
     );
     updateObject(obj.id, {
-      stormData: isResponse
-        ? { ...obj.stormData, responseFields: nextList }
-        : { ...obj.stormData, fields: nextList },
+      stormData: { ...obj.stormData, [key]: nextList },
     });
   } else if (zone.type === "enumValue" && obj.type === "model" && obj.modelData) {
     const list = obj.modelData.values ?? [];

@@ -34,7 +34,11 @@ export interface StormQueryItem {
   id: string; // unique identifier
   /** Event type names — empty array = match all types */
   types: string[];
-  /** State field IDs whose tags filter Events */
+  /**
+   * Ids of the card's INPUT fields (`inputFields`) whose tags filter Events.
+   * Only input params can carry the tags a query item filters on; output
+   * fields (projected after rehydrate) never contribute tags.
+   */
   tagFieldIds: string[];
 }
 
@@ -61,6 +65,17 @@ export interface StormField {
 
 /**
  * Event storming card payload
+ *
+ * Input/output split for State & Constraint cards:
+ * - `inputFields` — INPUT params of the card. Their tags are the only tags a
+ *   Query Item can filter on; tags may only live here.
+ * - `queryItems` — the DCB query that selects the Events feeding the card.
+ * - `outputFields` — OUTPUT fields obtained after rehydrating / projecting the
+ *   selected events (the read-model shape). Output fields never carry tags.
+ *
+ * Every other kind keeps using `fields` (and `responseFields` on Query cards).
+ * State/Constraint do not reuse `fields`: it stays empty for them so input and
+ * output never blur together.
  */
 export interface StormData {
   kind: StormKind;
@@ -71,7 +86,12 @@ export interface StormData {
    */
   phase?: BddPhase;
   description?: string;
-  fields: StormField[]; // Primary fields (Params on Query cards)
+  /** Primary fields (payload on Command/Event/Notify/BDD; Query params). Empty on State/Constraint — use inputFields/outputFields. */
+  fields: StormField[];
+  /** State & Constraint cards only: INPUT params; their tags feed Query Items. */
+  inputFields?: StormField[];
+  /** State & Constraint cards only: OUTPUT fields produced by projecting matching events. */
+  outputFields?: StormField[];
   responseFields?: StormField[]; // Query cards only (Response fields)
   queryItems?: StormQueryItem[]; // State & Constraint cards (DCB Query)
   constraints?: StormConstraint[]; // Constraint cards only
