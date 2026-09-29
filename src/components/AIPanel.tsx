@@ -231,6 +231,7 @@ export function AIPanel() {
   const [keyInput, setKeyInput] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const { size, beginResize } = useResizablePanel();
 
   const aiSettings = useCanvasStore((s) => s.aiSettings);
@@ -274,13 +275,41 @@ export function AIPanel() {
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.code === "KeyN") {
+        event.preventDefault();
+        newAIConversation();
+        event.stopPropagation();
+        return;
+      }
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         handleSend();
       }
       event.stopPropagation();
     },
-    [handleSend],
+    [handleSend, newAIConversation],
+  );
+
+  // Cmd/Ctrl+N starts a new conversation whenever focus is inside the panel.
+  const handlePanelKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.code === "KeyN") {
+        event.preventDefault();
+        newAIConversation();
+      }
+      event.stopPropagation();
+    },
+    [newAIConversation],
+  );
+
+  // Clicking anywhere in the panel pulls focus onto the panel itself so that
+  // keyboard shortcuts (like Cmd/Ctrl+N) target it instead of the canvas.
+  const handlePanelMouseDown = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      panelRef.current?.focus({ preventScroll: true });
+    },
+    [],
   );
 
   const openSettings = useCallback(() => {
@@ -324,10 +353,12 @@ export function AIPanel() {
 
   return (
     <div
-      className="fixed right-6 bottom-6 z-40 flex max-h-[calc(100vh-5rem)] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-gray-900 border border-gray-700/80 shadow-2xl text-gray-200"
+      ref={panelRef}
+      tabIndex={-1}
+      className="fixed right-6 bottom-6 z-40 flex max-h-[calc(100vh-5rem)] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-gray-900 border border-gray-700/80 shadow-2xl text-gray-200 outline-none"
       style={{ width: size.width, height: size.height }}
-      onMouseDown={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
+      onMouseDown={handlePanelMouseDown}
+      onKeyDown={handlePanelKeyDown}
     >
       <ResizeHandles beginResize={beginResize} />
       {/* Header */}
