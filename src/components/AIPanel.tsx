@@ -189,6 +189,7 @@ export function AIPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [planOpen, setPlanOpen] = useState(true);
   const [baseUrlInput, setBaseUrlInput] = useState("");
   const [modelInput, setModelInput] = useState("");
   const [maxTokensInput, setMaxTokensInput] = useState("");
@@ -212,6 +213,10 @@ export function AIPanel() {
   const canSend = !!aiSettings.apiKey || isLocalEndpoint;
   const messages = aiConversation.messages;
   const plan = aiConversation.plan;
+  const planDone = useMemo(
+    () => plan.filter((step) => step.status === "done").length,
+    [plan],
+  );
 
   useEffect(() => {
     if (isOpen && canSend && inputRef.current) {
@@ -283,7 +288,7 @@ export function AIPanel() {
 
   return (
     <div
-      className="fixed right-6 bottom-6 z-40 flex h-160 max-h-[calc(100vh-5rem)] w-md max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-gray-900 border border-gray-700/80 shadow-2xl text-gray-200"
+      className="fixed right-6 bottom-6 z-40 flex h-176 max-h-[calc(100vh-5rem)] w-xl max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-gray-900 border border-gray-700/80 shadow-2xl text-gray-200"
       onMouseDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
@@ -444,15 +449,36 @@ export function AIPanel() {
 
       {/* Plan checklist */}
       {plan.length > 0 && (
-        <div className="border-b border-gray-800 bg-gray-950/40 px-4 py-3">
-          <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Working Plan
-          </div>
-          <ul className="flex flex-col gap-1.5">
-            {plan.map((step) => (
-              <PlanRow key={step.id} step={step} />
-            ))}
-          </ul>
+        <div className="shrink-0 border-b border-gray-800 bg-gray-950/40">
+          <button
+            type="button"
+            onClick={() => setPlanOpen((value) => !value)}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-gray-800/40"
+            title={planOpen ? "Collapse working plan" : "Expand working plan"}
+          >
+            <ChevronRight
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 text-gray-500 transition-transform",
+                planOpen && "rotate-90",
+              )}
+            />
+            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+              Working Plan
+            </span>
+            <span className="rounded-full bg-gray-800 px-2 py-0.5 font-mono text-[10.5px] text-gray-400">
+              {planDone}/{plan.length}
+            </span>
+            {aiRunning && planDone < plan.length && (
+              <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-violet-400" />
+            )}
+          </button>
+          {planOpen && (
+            <ul className="flex max-h-48 flex-col gap-1.5 overflow-y-auto px-4 pb-3">
+              {plan.map((step) => (
+                <PlanRow key={step.id} step={step} />
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
