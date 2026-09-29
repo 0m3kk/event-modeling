@@ -589,10 +589,28 @@ export const useCanvasStore = create<CanvasStore>()(
             : obj,
         );
 
+        // Recompute the destination group AND every group these objects are
+        // leaving, so a vacated boundary shrinks the moment a member moves.
+        const affectedGroupIds = new Set<string>([groupId]);
+        for (const obj of validObjects) {
+          if (obj.groupId && obj.groupId !== groupId) {
+            affectedGroupIds.add(obj.groupId);
+          }
+        }
+
+        // Source groups left without any member or child dissolve, matching
+        // removeFromGroup's behaviour.
+        const survivingGroups = state.groups.filter((g) => {
+          if (!affectedGroupIds.has(g.id)) return true;
+          const hasMembers = nextObjects.some((o) => o.groupId === g.id);
+          const hasChildren = state.groups.some((c) => c.parentId === g.id);
+          return hasMembers || hasChildren;
+        });
+
         const nextGroups = recomputeGroupBoundsForGroupIds(
           nextObjects,
-          state.groups,
-          [groupId],
+          survivingGroups,
+          affectedGroupIds,
         );
 
         set({
@@ -730,6 +748,15 @@ export const useCanvasStore = create<CanvasStore>()(
           targetIdSet.has(obj.id) ? { ...obj, groupId } : obj,
         );
 
+        // Any group these objects belonged to before must also shrink, since
+        // they are moving into the freshly created group.
+        const affectedGroupIds = new Set<string>([groupId]);
+        for (const obj of targetObjects) {
+          if (obj.groupId && obj.groupId !== groupId) {
+            affectedGroupIds.add(obj.groupId);
+          }
+        }
+
         const newGroupBase: import("@/types").GroupInfo = {
           id: groupId,
           name: name || "Group",
@@ -740,10 +767,18 @@ export const useCanvasStore = create<CanvasStore>()(
           tagColor: "#6366f1",
         };
 
+        // Source groups left empty dissolve, so no stale boundary lingers.
+        const survivingGroups = [...state.groups, newGroupBase].filter((g) => {
+          if (!affectedGroupIds.has(g.id)) return true;
+          const hasMembers = nextObjects.some((o) => o.groupId === g.id);
+          const hasChildren = state.groups.some((c) => c.parentId === g.id);
+          return hasMembers || hasChildren;
+        });
+
         const updatedGroups = recomputeGroupBoundsForGroupIds(
           nextObjects,
-          [...state.groups, newGroupBase],
-          [groupId],
+          survivingGroups,
+          affectedGroupIds,
         );
 
         set({
@@ -793,6 +828,25 @@ export const useCanvasStore = create<CanvasStore>()(
           return nextObjects.some((o) => o.groupId === g.id);
         });
 
+        // Groups that lost members (without being dissolved) must shrink, and
+        // dissolving a child group must also collapse its surviving parent.
+        const affectedGroupIds = new Set<string>();
+        for (const obj of state.objects) {
+          if (objectIdsToDetach.has(obj.id) && obj.groupId) {
+            affectedGroupIds.add(obj.groupId);
+          }
+        }
+        for (const id of groupIdsToDissolve) {
+          const dissolved = state.groups.find((g) => g.id === id);
+          if (dissolved?.parentId) affectedGroupIds.add(dissolved.parentId);
+        }
+
+        const recomputedGroups = recomputeGroupBoundsForGroupIds(
+          nextObjects,
+          remainingGroups,
+          affectedGroupIds,
+        );
+
         const liberatedIds = state.objects
           .filter(
             (o) =>
@@ -802,7 +856,7 @@ export const useCanvasStore = create<CanvasStore>()(
           .map((o) => o.id);
 
         set({
-          groups: remainingGroups,
+          groups: recomputedGroups,
           objects: nextObjects,
           selectedIds: liberatedIds.length > 0 ? liberatedIds : [],
         });

@@ -542,6 +542,109 @@ describe("useCanvasStore", () => {
     expect(useCanvasStore.getState().groups).toHaveLength(0);
   });
 
+  it("shrinks the source group immediately when a member moves to another group (addToGroup)", () => {
+    const makeCard = (
+      id: string,
+      x: number,
+      w: number,
+    ): CanvasObject => ({
+      id,
+      type: "storm",
+      x,
+      y: 100,
+      width: w,
+      height: 100,
+    });
+    useCanvasStore.getState().addObjects([
+      makeCard("c1", 100, 200),
+      makeCard("c2", 400, 100),
+      makeCard("c3", 1000, 100),
+    ]);
+
+    const groupA = useCanvasStore.getState().groupObjects(["c1", "c2"], "A")!;
+    const groupB = useCanvasStore.getState().groupObjects(["c3"], "B")!;
+
+    // Move c2 from group A into group B.
+    useCanvasStore.getState().addToGroup(groupB, ["c2"]);
+
+    const state = useCanvasStore.getState();
+    expect(state.objects.find((o) => o.id === "c2")?.groupId).toBe(groupB);
+
+    // Group A now only encloses c1 (100..300 => padded 76..324).
+    const boundsA = state.groups.find((g) => g.id === groupA)?.customBounds;
+    expect(boundsA).toEqual({ x: 76, y: 76, width: 248, height: 148 });
+
+    // Group B now encloses c3 (1000..1100) and c2 (400..500).
+    const boundsB = state.groups.find((g) => g.id === groupB)?.customBounds;
+    expect(boundsB).toEqual({ x: 376, y: 76, width: 748, height: 148 });
+  });
+
+  it("dissolves a source group that loses its last member (addToGroup)", () => {
+    useCanvasStore.getState().addObjects([
+      { id: "c1", type: "storm", x: 100, y: 100, width: 200, height: 100 },
+      { id: "c2", type: "storm", x: 400, y: 100, width: 100, height: 100 },
+    ]);
+    const source = useCanvasStore.getState().groupObjects(["c1"], "Source")!;
+    const target = useCanvasStore.getState().groupObjects(["c2"], "Target")!;
+
+    // c1 is the only member, so moving it out leaves the source group empty.
+    useCanvasStore.getState().addToGroup(target, ["c1"]);
+
+    const state = useCanvasStore.getState();
+    expect(state.groups.find((g) => g.id === source)).toBeUndefined();
+    expect(state.objects.find((o) => o.id === "c1")?.groupId).toBe(target);
+  });
+
+  it("shrinks both source groups when groupObjects creates a new group from their members", () => {
+    useCanvasStore.getState().addObjects([
+      { id: "c1", type: "storm", x: 0, y: 0, width: 100, height: 100 },
+      { id: "c2", type: "storm", x: 200, y: 0, width: 100, height: 100 },
+      { id: "c3", type: "storm", x: 1000, y: 0, width: 100, height: 100 },
+      { id: "c4", type: "storm", x: 1200, y: 0, width: 100, height: 100 },
+    ]);
+    const groupA = useCanvasStore.getState().groupObjects(["c1", "c2"], "A")!;
+    const groupB = useCanvasStore.getState().groupObjects(["c3", "c4"], "B")!;
+
+    // c2 (from A) and c3 (from B) form a brand-new group.
+    const merged = useCanvasStore
+      .getState()
+      .groupObjects(["c2", "c3"], "Merged")!;
+    expect(merged).not.toBe(groupA);
+    expect(merged).not.toBe(groupB);
+
+    const state = useCanvasStore.getState();
+    expect(
+      state.groups.find((g) => g.id === groupA)?.customBounds,
+    ).toEqual({ x: -24, y: -24, width: 148, height: 148 });
+    expect(
+      state.groups.find((g) => g.id === groupB)?.customBounds,
+    ).toEqual({ x: 1176, y: -24, width: 148, height: 148 });
+    expect(
+      state.groups.find((g) => g.id === merged)?.customBounds,
+    ).toEqual({ x: 176, y: -24, width: 948, height: 148 });
+  });
+
+  it("shrinks a group when a single member is detached via ungroupObjects", () => {
+    useCanvasStore.getState().addObjects([
+      { id: "c1", type: "storm", x: 100, y: 100, width: 200, height: 100 },
+      { id: "c2", type: "storm", x: 400, y: 100, width: 100, height: 100 },
+    ]);
+    const gid = useCanvasStore
+      .getState()
+      .groupObjects(["c1", "c2"], "Keep")!;
+
+    // Selecting just c2 and "ungrouping" detaches it but keeps the group.
+    useCanvasStore.getState().ungroupObjects(["c2"]);
+
+    const state = useCanvasStore.getState();
+    expect(state.groups.find((g) => g.id === gid)?.customBounds).toEqual({
+      x: 76,
+      y: 76,
+      width: 248,
+      height: 148,
+    });
+  });
+
   it("smart groupObjects: merges unassigned card when group is selected along with card", () => {
     const card1: CanvasObject = {
       id: "c1",
