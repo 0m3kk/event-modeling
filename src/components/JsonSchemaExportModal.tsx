@@ -9,11 +9,14 @@ import {
 interface JsonSchemaExportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Called after the schema file has been downloaded, so the app can confirm success. */
+  onExported?: (detail: string) => void;
 }
 
 export function JsonSchemaExportModal({
   isOpen,
   onClose,
+  onExported,
 }: JsonSchemaExportModalProps) {
   const objects = useCanvasStore((s) => s.objects);
   const [dialect, setDialect] = useState<JsonSchemaDialect>("draft-07");
@@ -56,6 +59,7 @@ export function JsonSchemaExportModal({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    onExported?.(`domain-schema-${dialect}.json`);
   };
 
   return (

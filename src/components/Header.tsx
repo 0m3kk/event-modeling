@@ -15,6 +15,7 @@ import {
   ChevronDown,
   CloudCheck,
   Pencil,
+  CheckCircle2,
 } from "lucide-react";
 import { useCanvasStore, undo, redo, canUndo, canRedo, clearHistory } from "@/store";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -77,6 +78,25 @@ export function Header() {
   const [isJsonSchemaModalOpen, setIsJsonSchemaModalOpen] = useState(false);
   const [isExportImageModalOpen, setIsExportImageModalOpen] = useState(false);
   const [isNewBoardModalOpen, setIsNewBoardModalOpen] = useState(false);
+
+  // Transient success toast shown after an export finishes.
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 3200);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -493,6 +513,9 @@ export function Header() {
       <JsonSchemaExportModal
         isOpen={isJsonSchemaModalOpen}
         onClose={() => setIsJsonSchemaModalOpen(false)}
+        onExported={(detail) =>
+          showToast(`JSON Schema exported successfully — ${detail}`)
+        }
       />
       <ExportImageModal
         isOpen={isExportImageModalOpen}
@@ -501,12 +524,31 @@ export function Header() {
           setIsExportImageModalOpen(false);
           setIsJsonSchemaModalOpen(true);
         }}
+        onExported={(format, detail) =>
+          showToast(
+            format === "png"
+              ? `PNG exported successfully — ${detail}`
+              : `SVG exported successfully — ${detail}`,
+          )
+        }
       />
       <NewBoardModal
         isOpen={isNewBoardModalOpen}
         onClose={() => setIsNewBoardModalOpen(false)}
         onConfirm={executeNewBoard}
       />
+
+      {/* Export success toast */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-[60] flex max-w-sm items-center gap-2.5 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-xs font-medium text-gray-700 shadow-xl animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
+        >
+          <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
+          <span>{toast}</span>
+        </div>
+      )}
     </>
   );
 }

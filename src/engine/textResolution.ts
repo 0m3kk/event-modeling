@@ -15,3 +15,17 @@ export function computeTextResolution(zoom: number, dpr: number): number {
   const deviceScale = Math.max(1, zoom) * Math.max(1, dpr);
   return Math.min(6, Math.ceil(deviceScale));
 }
+
+/**
+ * Text resolution to rasterize at for a raster export of `scale` device pixels
+ * per world unit.
+ *
+ * Unlike the live canvas, an export renders into a `RenderTexture` whose
+ * resolution *is* `scale` (it replaces the renderer's device pixel ratio rather
+ * than multiplying it). Text textures must therefore be rasterized at exactly
+ * `scale`; anything lower is magnified by the GPU (blurry) and anything higher
+ * is minified without mipmaps (also blurry).
+ */
+export function computeExportTextResolution(scale: number): number {
+  return Math.min(6, Math.max(1, Math.ceil(scale)));
+}

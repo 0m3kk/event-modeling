@@ -14,6 +14,7 @@ import {
 } from "./layers/ElbowConnectorLayer";
 import { VisualLinkLayer } from "./layers/VisualLinkLayer";
 import { CardLayer } from "./layers/CardLayer";
+import { computeExportTextResolution } from "./textResolution";
 import {
   GizmoLayer,
   getCursorForHandle,
@@ -1939,14 +1940,27 @@ export class PixiEngine {
     this.gizmoLayer.visible = false;
     this.visualLinkLayer.visible = false;
 
+    const scale = options?.scale ?? 2;
+    // Text is a pre-rasterized texture, so it must be rendered at the export's
+    // device scale — `zoom` only captures the live camera, which is irrelevant
+    // here. Without this, text is magnified from a low-res texture and looks
+    // blurry at every export resolution.
+    const textResolution = computeExportTextResolution(scale);
+
     // Render all cards, connectors and groups unculled. Cards may currently be
     // styled for the live selection/zoom, so force a full redraw for the export.
     this.cardLayer.invalidateAllCards();
-    this.cardLayer.renderCards(objects, 1, []);
+    this.cardLayer.renderCards(
+      objects,
+      1,
+      [],
+      undefined,
+      objects,
+      textResolution,
+    );
     this.connectorLayer.renderConnectors(objects, groups, []);
-    this.groupLayer.renderGroups(groups, objects, 1, []);
+    this.groupLayer.renderGroups(groups, objects, 1, [], textResolution);
 
-    const scale = options?.scale ?? 2;
     const frame = new Rectangle(
       bounds.minX,
       bounds.minY,
@@ -1959,6 +1973,10 @@ export class PixiEngine {
         target: this.viewport,
         frame,
         resolution: scale,
+        // Match the on-screen board background instead of emitting a
+        // transparent PNG, and keep vector edges smooth at the export scale.
+        clearColor: "#f9fafb",
+        antialias: true,
       });
 
       return await new Promise<Blob>((resolve, reject) => {

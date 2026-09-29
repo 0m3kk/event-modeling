@@ -89,12 +89,16 @@ export class CardLayer extends Container {
     selectedIds: string[] = [],
     selectedField?: string | { objectId: string; fieldId?: string } | null,
     allObjects: CanvasObject[] = objects,
+    textResolutionOverride?: number,
   ): void {
     const currentIds = new Set(objects.map((o) => o.id));
 
     const dpr =
       typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-    const textResolution = computeTextResolution(zoom, dpr);
+    // Export supplies an explicit resolution because it rasterizes into a
+    // RenderTexture whose resolution is independent of the device pixel ratio.
+    const textResolution =
+      textResolutionOverride ?? computeTextResolution(zoom, dpr);
 
     // Remove cards no longer in visible set
     for (const [id, container] of this.cardContainers.entries()) {

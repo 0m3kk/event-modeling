@@ -13,12 +13,15 @@ interface ExportImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenJsonSchema?: () => void;
+  /** Called after a file has been downloaded, so the app can confirm success. */
+  onExported?: (format: "png" | "svg", detail: string) => void;
 }
 
 export function ExportImageModal({
   isOpen,
   onClose,
   onOpenJsonSchema,
+  onExported,
 }: ExportImageModalProps) {
   const objects = useCanvasStore((s) => s.objects);
   const groups = useCanvasStore((s) => s.groups);
@@ -54,6 +57,10 @@ export function ExportImageModal({
       }
       const blob = await engine.exportPng({ scale, padding: 40 });
       downloadBlob(blob, projectName || "event-storming-board");
+      onExported?.(
+        "png",
+        `${Math.round(bounds.width * scale)}×${Math.round(bounds.height * scale)} px, ${scale}x`,
+      );
       onClose();
     } catch (err) {
       console.error("Failed to export PNG:", err);
@@ -66,6 +73,10 @@ export function ExportImageModal({
   const handleDownloadSvg = () => {
     const svg = exportCanvasToSvg(objects, groups, { padding: 40 });
     downloadSvg(svg, projectName || "event-storming-board");
+    onExported?.(
+      "svg",
+      `${Math.round(bounds.width)}×${Math.round(bounds.height)} vector`,
+    );
     onClose();
   };
 

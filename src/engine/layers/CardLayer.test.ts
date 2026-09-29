@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Text } from "pixi.js";
 import { CardLayer } from "./CardLayer";
 import type { CanvasObject } from "@/types";
 
@@ -91,6 +92,28 @@ describe("CardLayer incremental drawing", () => {
     layer.renderCards([card], 1, []);
 
     expect(containerOf(layer, "c1").children[0]).not.toBe(firstChild);
+
+    layer.destroy();
+  });
+
+  it("rasterizes text at an explicit export resolution", () => {
+    const layer = new CardLayer();
+    const card: CanvasObject = {
+      id: "t1",
+      type: "textBox",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 40,
+      text: "hello",
+    };
+
+    layer.renderCards([card], 1, [], undefined, [card], 4);
+
+    const text = containerOf(layer, "t1").children.find(
+      (child) => child instanceof Text,
+    ) as Text;
+    expect(text.resolution).toBe(4);
 
     layer.destroy();
   });

@@ -148,12 +148,15 @@ export class GroupLayer extends Container {
     objects: CanvasObject[],
     zoom: number = 1,
     selectedIds: string[] = [],
+    textResolutionOverride?: number,
   ): void {
     this.graphics.clear();
 
     const dpr =
       typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-    const textResolution = computeTextResolution(zoom, dpr);
+    // Export supplies an explicit resolution (see CardLayer.renderCards).
+    const textResolution =
+      textResolutionOverride ?? computeTextResolution(zoom, dpr);
 
     const activeLabelIds = new Set<string>();
 
