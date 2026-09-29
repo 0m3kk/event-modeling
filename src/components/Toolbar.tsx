@@ -18,6 +18,7 @@ import {
   Workflow,
   FolderPlus,
   ListChecks,
+  PenLine,
 } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import type {
@@ -271,6 +272,12 @@ export function Toolbar() {
           icon={<Workflow size={20} />}
           tooltip="Connector (L)"
           isActive={currentTool === "connector"}
+        />
+        <ToolButton
+          onClick={() => setTool("line")}
+          icon={<PenLine size={20} />}
+          tooltip="Line (D)"
+          isActive={currentTool === "line"}
         />
       </div>
 

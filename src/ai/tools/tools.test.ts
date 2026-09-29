@@ -693,6 +693,68 @@ describe("AI Model & Write Tools", () => {
     expect(conn.connectorData?.arrowEnd).toBe(true);
   });
 
+  it("create_objects creates a freeform line", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_objects",
+        arguments: JSON.stringify({
+          objects: [
+            { type: "line", x1: 0, y1: 50, x2: 300, y2: 50, lineStyle: "dashed" },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects).toHaveLength(1);
+    const line = fake.objects[0]!;
+    expect(line.type).toBe("line");
+    expect(line.width).toBe(300);
+    expect(line.height).toBe(0);
+    expect(line.lineData?.start).toEqual({ x: 0, y: 0 });
+    expect(line.lineData?.end).toEqual({ x: 300, y: 0 });
+    expect(line.lineData?.lineStyle).toBe("dashed");
+  });
+
+  it("separate_layers draws a separator line in each layer gap", async () => {
+    const fake = createFakeStore();
+    fake.objects.push(
+      { id: "cmd", type: "storm", x: 100, y: 0, width: 200, height: 100 },
+      { id: "con", type: "storm", x: 100, y: 200, width: 200, height: 100 },
+      { id: "evt", type: "storm", x: 100, y: 400, width: 200, height: 100 },
+    );
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "separate_layers",
+        arguments: JSON.stringify({
+          layers: [["cmd"], ["con"], ["evt"]],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const data = JSON.parse(res.content);
+    expect(data.count).toBe(2);
+
+    const lines = fake.objects.filter((o) => o.type === "line");
+    expect(lines).toHaveLength(2);
+    // First separator sits in the gap between Command (ends y=100) and
+    // Constraint (starts y=200), spanning both cards plus 40px padding.
+    expect(lines[0]!.x).toBe(60);
+    expect(lines[0]!.y).toBe(150);
+    expect(lines[0]!.width).toBe(280);
+    expect(lines[0]!.lineData?.lineStyle).toBe("dashed");
+  });
+
   it("group_objects and ungroup_objects manage sections", async () => {
     const fake = createFakeStore();
     fake.objects.push(

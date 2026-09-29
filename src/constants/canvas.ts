@@ -11,6 +11,12 @@ export const CONNECTOR_CONTACT_GAP = 5;
 /** Screen-space pick tolerance (px) for selecting a connector line. */
 export const CONNECTOR_HIT_SLOP = 8;
 
+/** Screen-space pick tolerance (px) for selecting a freeform line. */
+export const LINE_HIT_SLOP = 8;
+
+/** Minimum on-screen drag length (px) before a drawn line is kept. */
+export const LINE_MIN_DRAW_LENGTH = 4;
+
 export const DEFAULT_VIEWPORT: Viewport = {
   x: 0,
   y: 0,
@@ -23,6 +29,7 @@ export const Z_INDICES = {
   GRID: 0,
   GROUPS: 10,
   CONNECTORS: 20,
+  LINES: 22,
   VISUAL_LINKS: 25,
   CARDS: 30,
   GIZMOS: 40,

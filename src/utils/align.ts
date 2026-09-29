@@ -20,6 +20,7 @@ export interface Bounds {
 export function isAlignable(obj: CanvasObject): boolean {
   if (obj.locked) return false;
   if (obj.type === "connector") return false;
+  if (obj.type === "line") return false;
   return true;
 }
 

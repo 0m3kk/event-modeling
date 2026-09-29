@@ -6,13 +6,20 @@ import type { StormData } from "./storm";
 import type { ModelData } from "./model";
 
 import type { ElbowConnectorData } from "./connector";
+import type { LineData } from "./line";
 
 export type ObjectType =
-  "storm" | "model" | "connector" | "stickyNote" | "textBox";
+  | "storm"
+  | "model"
+  | "connector"
+  | "line"
+  | "stickyNote"
+  | "textBox";
 
 export type Tool =
   | "select"
   | "connector"
+  | "line"
   | "storm"
   | "model"
   | "stickyNote"
@@ -40,6 +47,7 @@ export interface CanvasObject {
   stormData?: StormData;
   modelData?: ModelData;
   connectorData?: ElbowConnectorData;
+  lineData?: LineData;
 
   // Minimal sticky/text fields
   text?: string;

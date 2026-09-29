@@ -377,11 +377,13 @@ export const useCanvasStore = create<CanvasStore>()(
           if (ids.length === 0) return {};
           const idSet = new Set(ids);
 
-          // Connectors carry per-instance geometry (endpoints, bends), so they
-          // cannot meaningfully share content — reference copies are for the
-          // content cards (storm, model, sticky note, text box).
+          // Connectors and lines carry per-instance geometry (endpoints,
+          // bends), so they cannot meaningfully share content — reference
+          // copies are for the content cards (storm, model, sticky, text).
           const copyable = (obj: CanvasObject) =>
-            idSet.has(obj.id) && obj.type !== "connector";
+            idSet.has(obj.id) &&
+            obj.type !== "connector" &&
+            obj.type !== "line";
 
           // First pass: make sure every source carries a referenceId. The copy
           // joins the source's set — if the source has never been referenced, it
@@ -1769,7 +1771,8 @@ export const useCanvasStore = create<CanvasStore>()(
             o1.stroke !== o2.stroke ||
             o1.stormData !== o2.stormData ||
             o1.modelData !== o2.modelData ||
-            o1.connectorData !== o2.connectorData
+            o1.connectorData !== o2.connectorData ||
+            o1.lineData !== o2.lineData
           ) {
             return false;
           }

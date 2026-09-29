@@ -204,6 +204,11 @@ export function PixiCanvas() {
         return;
       }
 
+      if (e.code === "KeyD" && !isCmdOrCtrl) {
+        useCanvasStore.getState().setTool("line");
+        return;
+      }
+
       if (isCmdOrCtrl && e.code === "KeyG") {
         e.preventDefault();
         if (e.shiftKey) {
@@ -322,7 +327,8 @@ export function PixiCanvas() {
       }
 
       if (e.code === "Escape") {
-        if (useCanvasStore.getState().tool === "connector") {
+        const tool = useCanvasStore.getState().tool;
+        if (tool === "connector" || tool === "line") {
           const handled = engine.handleEscape();
           if (!handled) {
             useCanvasStore.getState().setTool("select");

@@ -21,6 +21,7 @@ import {
 import { MODEL_KIND_COLORS } from "@/constants/model";
 import { findModelByName } from "./modelResolution";
 import { getActorPermissions } from "./stormAuth";
+import { getLineEndpoints } from "./lineGeometry";
 
 /**
  * Font stack for the SVG export. The canvas renders every label in the bundled
@@ -556,6 +557,7 @@ export function exportCanvasToSvg(
     for (const obj of objects) {
       if (
         obj.type !== "connector" &&
+        obj.type !== "line" &&
         obj.id !== data.start.objectId &&
         obj.id !== data.end.objectId
       ) {
@@ -602,9 +604,33 @@ export function exportCanvasToSvg(
     }
   }
 
-  // 3. Cards & Shapes
+  // 3. Freeform lines
   for (const obj of objects) {
-    if (obj.type === "connector") continue;
+    if (obj.type !== "line" || !obj.lineData) continue;
+    const ends = getLineEndpoints(obj);
+    if (!ends) continue;
+
+    const stroke = obj.lineData.stroke || "#475569";
+    const strokeWidth = obj.lineData.strokeWidth ?? 2;
+    const lineStyle = obj.lineData.lineStyle ?? "solid";
+    const strokeDash =
+      lineStyle === "dashed"
+        ? ' stroke-dasharray="8,6"'
+        : lineStyle === "dotted"
+          ? ' stroke-dasharray="2,5"'
+          : "";
+    const arrows =
+      (obj.lineData.arrowStart ? ' marker-start="url(#arrow)"' : "") +
+      (obj.lineData.arrowEnd ? ' marker-end="url(#arrow)"' : "");
+
+    elements.push(`
+    <!-- Line: ${obj.id} -->
+    <line x1="${ends.start.x}" y1="${ends.start.y}" x2="${ends.end.x}" y2="${ends.end.y}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round"${strokeDash}${arrows} />`);
+  }
+
+  // 4. Cards & Shapes
+  for (const obj of objects) {
+    if (obj.type === "connector" || obj.type === "line") continue;
 
     const x = obj.x;
     const y = obj.y;

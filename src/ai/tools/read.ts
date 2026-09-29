@@ -13,6 +13,7 @@ const OBJECT_TYPES = [
   "storm",
   "model",
   "connector",
+  "line",
   "stickyNote",
   "textBox",
 ] as const;

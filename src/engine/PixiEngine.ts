@@ -13,6 +13,7 @@ import {
   type AnchorMarker,
 } from "./layers/ElbowConnectorLayer";
 import { VisualLinkLayer } from "./layers/VisualLinkLayer";
+import { LineLayer } from "./layers/LineLayer";
 import { CardLayer } from "./layers/CardLayer";
 import { computeExportTextResolution } from "./textResolution";
 import {
@@ -33,7 +34,7 @@ import {
   getCardMinDimensions,
   type ResizeHandle,
 } from "@/utils/cardDimensions";
-import { MIN_ZOOM, MAX_ZOOM, CONNECTOR_HIT_SLOP } from "@/constants/canvas";
+import { MIN_ZOOM, MAX_ZOOM, CONNECTOR_HIT_SLOP, LINE_HIT_SLOP, LINE_MIN_DRAW_LENGTH } from "@/constants/canvas";
 import {
   getAllCardinalAnchors,
   findClosestAnchor,
@@ -45,6 +46,12 @@ import { collectMatchingEventIds } from "@/utils/stormQuery";
 import { getAuthorizedActors } from "@/utils/stormAuth";
 import { computeCanvasBounds } from "@/utils/imageExport";
 import { findModelByName } from "@/utils/modelResolution";
+import {
+  getLineEndpoints,
+  distanceToSegment,
+  createLineObject,
+  normalizeLineGeometry,
+} from "@/utils/lineGeometry";
 import type { CardHitZone } from "./renderers";
 import type { CanvasObject, ElbowBend, Point } from "@/types";
 
@@ -67,6 +74,7 @@ export class PixiEngine {
   public gridLayer: GridLayer;
   public groupLayer: GroupLayer;
   public connectorLayer: ElbowConnectorLayer;
+  public lineLayer: LineLayer;
   public visualLinkLayer: VisualLinkLayer;
   public cardLayer: CardLayer;
   public gizmoLayer: GizmoLayer;
@@ -125,6 +133,21 @@ export class PixiEngine {
     point: Point;
   } | null = null;
 
+  // Freeform Line Interaction State — the line tool drags out a new segment;
+  // the select tool moves a line body or drags one of its endpoints.
+  private isDrawingLine: boolean = false;
+  private lineDrawStart: Point | null = null;
+  private isDraggingLineEndpoint: boolean = false;
+  private activeLineEndpoint: {
+    lineId: string;
+    endpoint: "start" | "end";
+  } | null = null;
+  private lineEndpointFixed: Point | null = null;
+  private isDraggingLineBody: boolean = false;
+  private draggedLineId: string | null = null;
+  private lineBodyDragStartWorld: Point = { x: 0, y: 0 };
+  private lineBodyInitial: { x: number; y: number } | null = null;
+
   // Group Dragging & Click State
   private isDraggingGroup: boolean = false;
   private draggedGroupId: string | null = null;
@@ -158,6 +181,7 @@ export class PixiEngine {
     this.gridLayer = new GridLayer();
     this.groupLayer = new GroupLayer();
     this.connectorLayer = new ElbowConnectorLayer();
+    this.lineLayer = new LineLayer();
     this.visualLinkLayer = new VisualLinkLayer();
     this.cardLayer = new CardLayer();
     this.gizmoLayer = new GizmoLayer();
@@ -212,6 +236,7 @@ export class PixiEngine {
       this.viewport.addChild(this.gridLayer);
       this.viewport.addChild(this.groupLayer);
       this.viewport.addChild(this.connectorLayer);
+      this.viewport.addChild(this.lineLayer);
       this.viewport.addChild(this.visualLinkLayer);
       this.viewport.addChild(this.cardLayer);
       this.viewport.addChild(this.gizmoLayer);
@@ -318,7 +343,7 @@ export class PixiEngine {
       this.viewport.plugins.resume("drag");
       this.container.style.cursor = "grab";
       this.cardLayer.setCursor("grab");
-    } else if (tool === "connector") {
+    } else if (tool === "connector" || tool === "line") {
       this.viewport.plugins.pause("drag");
       this.container.style.cursor = "crosshair";
       this.cardLayer.setCursor("crosshair");
@@ -399,6 +424,89 @@ export class PixiEngine {
     useCanvasStore.getState().setTool("select");
   }
 
+  /** Commits a drawn line to the board. */
+  private createLine(start: Point, end: Point): void {
+    const id = `line-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    useCanvasStore.getState().addObject(createLineObject(id, start, end));
+  }
+
+  /** Clears an in-progress line drag (tool switched away, Escape, …). */
+  public cancelLineDrawing(): void {
+    if (!this.isDrawingLine) return;
+    this.isDrawingLine = false;
+    this.lineDrawStart = null;
+    this.lineLayer.renderPreview(null);
+  }
+
+  /**
+   * Topmost line whose segment lies within a screen-space pick tolerance of a
+   * world-space point, or null when the point is not near any line.
+   */
+  private findLineAtWorld(
+    worldX: number,
+    worldY: number,
+  ): CanvasObject | null {
+    const { objects } = useCanvasStore.getState();
+    const threshold = LINE_HIT_SLOP / (this.viewport.scaled || 1);
+    const point = { x: worldX, y: worldY };
+
+    let best: CanvasObject | null = null;
+    let bestDist = threshold;
+
+    // Later lines paint on top → scan backwards so the topmost wins.
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const obj = objects[i]!;
+      if (obj.type !== "line") continue;
+      const ends = getLineEndpoints(obj);
+      if (!ends) continue;
+      const dist = distanceToSegment(point, ends.start, ends.end);
+      if (dist <= bestDist) {
+        bestDist = dist;
+        best = obj;
+      }
+    }
+
+    return best;
+  }
+
+  /**
+   * Finds a line endpoint handle within hit radius of a world point, preferring
+   * currently selected lines so handles are easy to grab.
+   */
+  public findLineEndpointHandleAtWorld(
+    worldX: number,
+    worldY: number,
+    hitRadius: number = 14,
+  ): { lineId: string; endpoint: "start" | "end"; point: Point } | null {
+    const { objects, selectedIds } = useCanvasStore.getState();
+    const effectiveRadius = hitRadius / (this.viewport.scaled || 1);
+
+    const lines = objects.filter((o) => o.type === "line" && o.lineData);
+    if (lines.length === 0) return null;
+
+    const selectedLines = lines.filter((l) => selectedIds.includes(l.id));
+    const otherLines = lines.filter((l) => !selectedIds.includes(l.id));
+
+    for (const line of [...selectedLines, ...otherLines]) {
+      const ends = getLineEndpoints(line);
+      if (!ends) continue;
+
+      if (
+        Math.hypot(worldX - ends.start.x, worldY - ends.start.y) <=
+        effectiveRadius
+      ) {
+        return { lineId: line.id, endpoint: "start", point: ends.start };
+      }
+      if (
+        Math.hypot(worldX - ends.end.x, worldY - ends.end.y) <= effectiveRadius
+      ) {
+        return { lineId: line.id, endpoint: "end", point: ends.end };
+      }
+    }
+
+    return null;
+  }
+
   /** Clears a pending connector (source picked, destination not yet chosen). */
   public cancelConnectorCreation(): void {
     this.isCreatingConnector = false;
@@ -413,6 +521,10 @@ export class PixiEngine {
    * Returns true if the key press was consumed.
    */
   public handleEscape(): boolean {
+    if (this.isDrawingLine) {
+      this.cancelLineDrawing();
+      return true;
+    }
     if (this.isDraggingConnectorEndpoint) {
       this.cancelConnectorEndpointDrag();
       return true;
@@ -474,7 +586,12 @@ export class PixiEngine {
     // Later objects paint on top → scan backwards for the topmost hit
     for (let i = objects.length - 1; i >= 0; i--) {
       const obj = objects[i]!;
-      if (obj.type === "connector" || !candidateIds.has(obj.id)) continue;
+      if (
+        obj.type === "connector" ||
+        obj.type === "line" ||
+        !candidateIds.has(obj.id)
+      )
+        continue;
       const zone = this.cardLayer.getHitZoneAt(
         obj.id,
         worldX - obj.x,
@@ -834,7 +951,8 @@ export class PixiEngine {
     canvas.addEventListener("dblclick", (e: MouseEvent) => {
       const state = useCanvasStore.getState();
       if (this.isSpaceHeld) return;
-      if (state.tool === "connector" || state.isLocked) return;
+      if (state.tool === "connector" || state.tool === "line" || state.isLocked)
+        return;
       if (e.target !== canvas) return;
 
       if (state.modelPopupChain.length > 0) {
@@ -934,6 +1052,41 @@ export class PixiEngine {
         e.clientX - rect.left,
         e.clientY - rect.top,
       );
+
+      // Line Tool Mode — click the start point, then click the end point
+      // (like the connector tool; no drag required). Handled before the
+      // resize-handle check so a stale handle hover cannot hijack it.
+      if (state.tool === "line") {
+        if (e.button === 2) {
+          this.cancelLineDrawing();
+          return;
+        }
+        if (e.button !== 0) return;
+
+        if (!this.isDrawingLine || !this.lineDrawStart) {
+          this.isDrawingLine = true;
+          this.lineDrawStart = { x: worldPos.x, y: worldPos.y };
+          this.lineLayer.renderPreview({
+            start: this.lineDrawStart,
+            end: { ...worldPos },
+          });
+          return;
+        }
+
+        // Second click: commit the segment.
+        const start = this.lineDrawStart;
+        this.isDrawingLine = false;
+        this.lineDrawStart = null;
+        this.lineLayer.renderPreview(null);
+        const screenLength =
+          Math.hypot(worldPos.x - start.x, worldPos.y - start.y) *
+          (this.viewport.scaled || 1);
+        if (screenLength >= LINE_MIN_DRAW_LENGTH) {
+          this.createLine(start, { x: worldPos.x, y: worldPos.y });
+          useCanvasStore.getState().setTool("select");
+        }
+        return;
+      }
 
       if (this.hoveredHandle) {
         this.cardPointerDownHandled = true;
@@ -1040,10 +1193,60 @@ export class PixiEngine {
         }
       }
 
+      // 1.6. Line endpoint handle hit (drag to extend / shorten the line)
+      if (state.tool === "select" && !this.isSpaceHeld && !state.isLocked) {
+        const hitLineEndpoint = this.findLineEndpointHandleAtWorld(
+          worldPos.x,
+          worldPos.y,
+        );
+        if (hitLineEndpoint) {
+          if (state.modelPopupChain.length > 0) {
+            state.clearModelPopups();
+          }
+          state.setStormSelectedField(null);
+          state.selectObject(hitLineEndpoint.lineId, false);
+          this.isDraggingLineEndpoint = true;
+          this.activeLineEndpoint = {
+            lineId: hitLineEndpoint.lineId,
+            endpoint: hitLineEndpoint.endpoint,
+          };
+          const lineObj = state.objects.find(
+            (o) => o.id === hitLineEndpoint.lineId,
+          );
+          const ends = lineObj ? getLineEndpoints(lineObj) : null;
+          this.lineEndpointFixed = ends
+            ? hitLineEndpoint.endpoint === "start"
+              ? ends.end
+              : ends.start
+            : null;
+          return;
+        }
+      }
+
       // If a card is under the pointer, a card handler owns this event —
       // regardless of whether it ran before or after this native listener.
       if (this.findCardZoneAtWorld(worldPos.x, worldPos.y)) {
         return;
+      }
+
+      // 1.7. Line body hit — click-select, then drag to move the whole line.
+      if (state.tool === "select" && !this.isSpaceHeld && !state.isLocked) {
+        const hitLine = this.findLineAtWorld(worldPos.x, worldPos.y);
+        if (hitLine) {
+          if (state.modelPopupChain.length > 0) {
+            state.clearModelPopups();
+          }
+          state.setStormSelectedField(null);
+          state.selectObject(
+            hitLine.id,
+            e.shiftKey || e.metaKey || e.ctrlKey,
+          );
+          this.isDraggingLineBody = true;
+          this.draggedLineId = hitLine.id;
+          this.lineBodyDragStartWorld = { x: worldPos.x, y: worldPos.y };
+          this.lineBodyInitial = { x: hitLine.x, y: hitLine.y };
+          return;
+        }
       }
 
       // If card pointerdown was handled, do not clear selection or start marquee/group
@@ -1159,6 +1362,15 @@ export class PixiEngine {
 
       const state = useCanvasStore.getState();
       this.lastWorldPos = { ...worldPos };
+
+      // Line tool: live preview of the segment being dragged out.
+      if (this.isDrawingLine && this.lineDrawStart) {
+        this.lineLayer.renderPreview({
+          start: this.lineDrawStart,
+          end: { ...worldPos },
+        });
+        return;
+      }
 
       // Handle Connector Creation Live Preview (pending after the source click)
       if (this.isCreatingConnector && this.connectorStartAnchor) {
@@ -1291,6 +1503,44 @@ export class PixiEngine {
           this.container.style.cursor = "grabbing";
           this.cardLayer.setCursor("grabbing");
         }
+        return;
+      }
+
+      // Line endpoint dragging — the opposite endpoint stays anchored while
+      // the grabbed one follows the pointer.
+      if (
+        this.isDraggingLineEndpoint &&
+        this.activeLineEndpoint &&
+        this.lineEndpointFixed
+      ) {
+        const lineObj = state.objects.find(
+          (o) => o.id === this.activeLineEndpoint!.lineId,
+        );
+        if (lineObj && lineObj.lineData) {
+          const isStart = this.activeLineEndpoint.endpoint === "start";
+          const start = isStart ? worldPos : this.lineEndpointFixed;
+          const end = isStart ? this.lineEndpointFixed : worldPos;
+          state.updateObject(
+            lineObj.id,
+            normalizeLineGeometry(start, end, lineObj.lineData),
+          );
+        }
+        return;
+      }
+
+      // Line body dragging — translate x/y; endpoints ride along as local
+      // offsets, so the line keeps its size and angle.
+      if (
+        this.isDraggingLineBody &&
+        this.draggedLineId &&
+        this.lineBodyInitial
+      ) {
+        const dx = worldPos.x - this.lineBodyDragStartWorld.x;
+        const dy = worldPos.y - this.lineBodyDragStartWorld.y;
+        state.updateObject(this.draggedLineId, {
+          x: this.lineBodyInitial.x + dx,
+          y: this.lineBodyInitial.y + dy,
+        });
         return;
       }
 
@@ -1496,7 +1746,10 @@ export class PixiEngine {
         this.isCreatingConnector ||
         this.isPanningCanvas ||
         this.isResizingCard ||
-        this.isDraggingConnectorEndpoint;
+        this.isDraggingConnectorEndpoint ||
+        this.isDrawingLine ||
+        this.isDraggingLineEndpoint ||
+        this.isDraggingLineBody;
 
       // Check resize handle or connector endpoint handle hover when idle on select tool
       if (
@@ -1514,13 +1767,17 @@ export class PixiEngine {
           worldPos.x,
           worldPos.y,
         );
+        const hitLineEndpoint = this.findLineEndpointHandleAtWorld(
+          worldPos.x,
+          worldPos.y,
+        );
 
         if (hitHandle) {
           this.hoveredHandle = hitHandle;
           const cursor = getCursorForHandle(hitHandle.handle);
           this.container.style.cursor = cursor;
           this.cardLayer.setCursor(cursor);
-        } else if (hitEndpoint) {
+        } else if (hitEndpoint || hitLineEndpoint) {
           this.hoveredHandle = null;
           this.container.style.cursor = "grab";
           this.cardLayer.setCursor("grab");
@@ -1631,8 +1888,21 @@ export class PixiEngine {
         }
       }
 
-      // Connector creation is a two-click interaction finished on the next
-      // pointerdown, so pointerup only releases the other drag states.
+      // Connector creation and line drawing are two-click interactions
+      // finished on the next pointerdown, so pointerup only releases the
+      // other drag states.
+
+      // Finish Line Endpoint / Body Dragging (positions already committed)
+      if (this.isDraggingLineEndpoint) {
+        this.isDraggingLineEndpoint = false;
+        this.activeLineEndpoint = null;
+        this.lineEndpointFixed = null;
+      }
+      if (this.isDraggingLineBody) {
+        this.isDraggingLineBody = false;
+        this.draggedLineId = null;
+        this.lineBodyInitial = null;
+      }
 
       // Finish Group Dragging
       if (this.isDraggingGroup) {
@@ -1786,6 +2056,9 @@ export class PixiEngine {
         if (state.tool !== "connector") {
           this.cancelConnectorCreation();
         }
+        if (state.tool !== "line") {
+          this.cancelLineDrawing();
+        }
       }
 
       if (state.viewport !== prevViewport) {
@@ -1829,11 +2102,14 @@ export class PixiEngine {
     const objects = useCanvasStore.getState().objects;
     // Connectors are derived from their endpoint anchors and have no box of
     // their own, so they stay out of the card spatial index (hit-testing them
-    // happens against their resolved elbow path instead).
-    this.spatialIndex.load(objects.filter((o) => o.type !== "connector"));
+    // happens against their resolved elbow path instead). Freeform lines are
+    // likewise hit-tested against their segment, not a bounding box.
+    this.spatialIndex.load(
+      objects.filter((o) => o.type !== "connector" && o.type !== "line"),
+    );
     this.indexedGeometry.clear();
     for (const o of objects) {
-      if (o.type === "connector") continue;
+      if (o.type === "connector" || o.type === "line") continue;
       this.indexedGeometry.set(o.id, {
         x: o.x,
         y: o.y,
@@ -1852,7 +2128,7 @@ export class PixiEngine {
     const nextIds = new Set<string>();
 
     for (const obj of objects) {
-      if (obj.type === "connector") continue;
+      if (obj.type === "connector" || obj.type === "line") continue;
       nextIds.add(obj.id);
 
       const prev = this.indexedGeometry.get(obj.id);
@@ -1940,7 +2216,10 @@ export class PixiEngine {
         }),
       );
       const visibleObjects = objects.filter(
-        (o) => o.type !== "connector" && visibleIds.has(o.id),
+        (o) =>
+          o.type !== "connector" &&
+          o.type !== "line" &&
+          visibleIds.has(o.id),
       );
 
       this.cardLayer.renderCards(
@@ -1956,6 +2235,7 @@ export class PixiEngine {
     // viewport transform already moves them during a pan.
     if (contentDirty) {
       this.connectorLayer.renderConnectors(objects, groups, selectedIds);
+      this.lineLayer.renderLines(objects, selectedIds);
       this.groupLayer.renderGroups(groups, objects, zoom, selectedIds);
 
       // Visual Link Layer (Real-time DCB highlights or Actor Hover highlights)
@@ -2047,6 +2327,7 @@ export class PixiEngine {
       textResolution,
     );
     this.connectorLayer.renderConnectors(objects, groups, []);
+    this.lineLayer.renderLines(objects, []);
     this.groupLayer.renderGroups(groups, objects, 1, [], textResolution);
 
     const frame = new Rectangle(

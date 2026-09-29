@@ -9,9 +9,13 @@ import {
   getViewportCenter,
   objectLabel,
 } from "./helpers";
+import { createLineObject } from "@/utils/lineGeometry";
 
 const CARDINAL_ANCHORS = ["top", "right", "bottom", "left"] as const;
 const anchor = z.enum(CARDINAL_ANCHORS);
+
+const LINE_STYLES = ["solid", "dashed", "dotted"] as const;
+const lineStyle = z.enum(LINE_STYLES);
 
 const objectSpecs = z.discriminatedUnion("type", [
   z.object({
@@ -42,6 +46,22 @@ const objectSpecs = z.discriminatedUnion("type", [
     sourceAnchor: anchor.optional(),
     targetAnchor: anchor.optional(),
   }),
+  z.object({
+    type: z.literal("line"),
+    x1: z.number().describe("Start X in world coordinates."),
+    y1: z.number().describe("Start Y in world coordinates."),
+    x2: z.number().describe("End X in world coordinates."),
+    y2: z.number().describe("End Y in world coordinates."),
+    stroke: z.string().optional().describe("Stroke color (hex)."),
+    strokeWidth: z.number().positive().optional(),
+    lineStyle: lineStyle.optional().describe("solid, dashed (default), or dotted."),
+    arrowStart: z.boolean().optional(),
+    arrowEnd: z.boolean().optional(),
+    groupId: z
+      .string()
+      .optional()
+      .describe("Group ID or Section name to add this line to."),
+  }),
 ]);
 
 type ObjectSpec = z.output<typeof objectSpecs>;
@@ -49,7 +69,7 @@ type ObjectSpec = z.output<typeof objectSpecs>;
 export const createObjectsTool = defineTool({
   name: "create_objects",
   description:
-    "Create one or more basic canvas objects: sticky notes, text boxes, and orthogonal connectors.",
+    "Create one or more basic canvas objects: sticky notes, text boxes, orthogonal connectors, and freeform lines. Lines are the preferred way to separate the layers of a vertical slice (see separate_layers) instead of connecting every card.",
   schema: z.object({
     objects: z.array(objectSpecs).min(1).max(100),
   }),
@@ -74,6 +94,30 @@ export const createObjectsTool = defineTool({
     // Pass 1: non-connectors
     args.objects.forEach((spec, index) => {
       if (spec.type === "connector") return;
+
+      if (spec.type === "line") {
+        const obj = createLineObject(
+          `line-${nanoid()}`,
+          { x: spec.x1, y: spec.y1 },
+          { x: spec.x2, y: spec.y2 },
+          {
+            ...(spec.stroke ? { stroke: spec.stroke } : {}),
+            ...(spec.strokeWidth ? { strokeWidth: spec.strokeWidth } : {}),
+            ...(spec.lineStyle ? { lineStyle: spec.lineStyle } : {}),
+            ...(spec.arrowStart !== undefined
+              ? { arrowStart: spec.arrowStart }
+              : {}),
+            ...(spec.arrowEnd !== undefined ? { arrowEnd: spec.arrowEnd } : {}),
+          },
+        );
+        const resolvedGroupId = resolveGroupId(spec.groupId);
+        if (resolvedGroupId) obj.groupId = resolvedGroupId;
+        state.addObject(obj);
+        placed.push(obj);
+        idsByIndex[index] = obj.id;
+        created.push({ index, id: obj.id, type: obj.type });
+        return;
+      }
 
       const width = spec.width ?? (spec.type === "stickyNote" ? 180 : 200);
       const height = spec.height ?? (spec.type === "stickyNote" ? 140 : 40);
@@ -177,6 +221,7 @@ const objectPatch = z.object({
   stormData: z.unknown().optional(),
   modelData: z.unknown().optional(),
   connectorData: z.unknown().optional(),
+  lineData: z.unknown().optional(),
 });
 
 export const updateObjectsTool = defineTool({
@@ -229,7 +274,7 @@ export const deleteObjectsTool = defineTool({
 export const connectObjectsTool = defineTool({
   name: "connect_objects",
   description:
-    "Draw orthogonal 90° elbow connectors between cards/nodes. For Write Slices: connect Command -> Constraint and Constraint -> Event. For Read Slices: connect Event -> State and Query -> State. NEVER connect Actor to Command or Query (authorization is decoupled via action and permissions).",
+    "Draw orthogonal 90° elbow connectors between cards/nodes when a directional link is genuinely needed. Use sparingly: connecting every Command -> Constraint -> Event (or Event -> State) quickly clutters the board. For layer-to-layer flow prefer separate_layers, which draws horizontal separators instead. NEVER connect Actor to Command or Query (authorization is decoupled via action and permissions).",
   schema: z.object({
     connections: z
       .array(
@@ -482,11 +527,101 @@ export const focusViewportTool = defineTool({
   },
 });
 
+export const separateLayersTool = defineTool({
+  name: "separate_layers",
+  description:
+    "Draw horizontal separator lines between the layers of a vertical slice, so the board stays readable without a connector between every card. Pass the card ids grouped by layer, ordered top to bottom — e.g. Write Slice [[commandId], [constraintId, ...], [eventId, ...]] or Read Slice [[queryId], [stateId], [eventId, ...]]. One line is drawn in each vertical gap, spanning the widest cards of the two layers. Prefer this over connect_objects for the Command -> Constraint -> Event (and Query/State/Event) flow.",
+  schema: z.object({
+    layers: z
+      .array(z.array(z.string()).min(1))
+      .min(2)
+      .max(20)
+      .describe("Card ids per layer, ordered top to bottom."),
+    padding: z
+      .number()
+      .nonnegative()
+      .optional()
+      .describe("Horizontal overhang beyond the cards on each side (default 40)."),
+    stroke: z.string().optional().describe("Separator color (default #94a3b8)."),
+    strokeWidth: z.number().positive().optional(),
+    lineStyle: lineStyle
+      .optional()
+      .describe("solid, dashed (default), or dotted."),
+  }),
+  execute: (args, ctx) => {
+    const state = ctx.getState();
+    const byId = new Map(state.objects.map((o) => [o.id, o]));
+
+    const missing: string[] = [];
+    const resolvedLayers = args.layers
+      .map((ids) =>
+        ids
+          .map((id) => {
+            const obj = byId.get(id);
+            if (!obj) missing.push(id);
+            return obj;
+          })
+          .filter((o): o is CanvasObject => Boolean(o)),
+      )
+      .filter((layer) => layer.length > 0);
+
+    if (resolvedLayers.length < 2) {
+      return {
+        created: [],
+        count: 0,
+        error: "Need at least two non-empty layers to separate.",
+        ...(missing.length > 0 ? { notFound: missing } : {}),
+      };
+    }
+
+    const padding = args.padding ?? 40;
+    const boundsOf = (layer: CanvasObject[]) => getObjectsBounds(layer);
+
+    const lines: CanvasObject[] = [];
+    for (let i = 0; i < resolvedLayers.length - 1; i++) {
+      const upper = boundsOf(resolvedLayers[i]!);
+      const lower = boundsOf(resolvedLayers[i + 1]!);
+      if (!upper || !lower) continue;
+
+      const y = (upper.maxY + lower.minY) / 2;
+      const left = Math.min(upper.minX, lower.minX) - padding;
+      const right = Math.max(upper.maxX, lower.maxX) + padding;
+
+      lines.push(
+        createLineObject(
+          `line-${nanoid()}`,
+          { x: left, y },
+          { x: right, y },
+          {
+            stroke: args.stroke ?? "#94a3b8",
+            strokeWidth: args.strokeWidth ?? 1,
+            lineStyle: args.lineStyle ?? "dashed",
+            arrowStart: false,
+            arrowEnd: false,
+          },
+        ),
+      );
+    }
+
+    if (lines.length === 0) {
+      return { created: [], count: 0, error: "No separators could be placed." };
+    }
+
+    state.addObjects(lines);
+    return {
+      created: lines.map((l) => l.id),
+      count: lines.length,
+      ...(missing.length > 0 ? { notFound: missing } : {}),
+    };
+  },
+});
+
 export const writeTools = [
   createObjectsTool,
   updateObjectsTool,
   deleteObjectsTool,
   connectObjectsTool,
+  separateLayersTool,
   createReferenceCopiesTool,
   groupObjectsTool,
   ungroupObjectsTool,

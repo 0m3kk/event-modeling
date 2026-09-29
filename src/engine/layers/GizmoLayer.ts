@@ -66,9 +66,9 @@ export class GizmoLayer extends Container {
     const handleStrokeWidth = Math.max(1, 1.5 / zoom);
 
     for (const obj of selectedObjects) {
-      // Connectors have no box of their own — their selected state is drawn by
-      // the connector layer (thicker blue stroke).
-      if (obj.type === "connector") continue;
+      // Connectors and lines have no box of their own — their selected state
+      // is drawn by their own layer (glow + endpoint handles).
+      if (obj.type === "connector" || obj.type === "line") continue;
 
       const x = obj.x - padding;
       const y = obj.y - padding;
@@ -85,7 +85,8 @@ export class GizmoLayer extends Container {
     const resizable =
       selectedObjects.length === 1 &&
       !selectedObjects[0].locked &&
-      selectedObjects[0].type !== "connector"
+      selectedObjects[0].type !== "connector" &&
+      selectedObjects[0].type !== "line"
         ? selectedObjects[0]
         : null;
 
