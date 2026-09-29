@@ -110,15 +110,18 @@ export class ElbowConnectorLayer extends Container {
         lineStyle,
       );
 
+      // Endpoint handles first, arrowheads after: both sit on the same point,
+      // and a handle painted on top hid the arrow, so the arrow toggles on the
+      // options bar were impossible to verify.
+      if (isSelected) {
+        this.drawEndpointHandles(this.graphics, points);
+      }
+
       if (data.arrowStart) {
         this.drawArrowhead(this.graphics, points, strokeColor, strokeWidth, "start");
       }
       if (data.arrowEnd !== false) {
         this.drawArrowhead(this.graphics, points, strokeColor, strokeWidth, "end");
-      }
-
-      if (isSelected) {
-        this.drawEndpointHandles(this.graphics, points);
       }
     }
   }

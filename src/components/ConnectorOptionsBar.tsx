@@ -147,7 +147,9 @@ export function ConnectorOptionsBar() {
   // anchor and sits beside the segment (above a horizontal one, beside a
   // vertical one). A folded path instead anchors over the path's bounding
   // box and sits just outside it, so the bar never lands on its own bends.
-  const offset = 14;
+  // The gap grows with zoom so the endpoint handles and arrowheads the bar
+  // controls stay fully visible while toggling them.
+  const offset = 18 + 8 * barScale;
   const isStraight = connectorGeometry.points.length <= 2;
 
   let barClass: string;
