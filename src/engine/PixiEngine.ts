@@ -211,10 +211,13 @@ export class PixiEngine {
       this.viewport.addChild(this.cardLayer);
       this.viewport.addChild(this.gizmoLayer);
 
-      // Sync viewport position with store initial state
+      // Sync viewport position with store initial state. Apply the zoom first:
+      // moveCorner converts the world corner to a screen position using the
+      // current scale, so panning before zooming scales the corner by
+      // oldZoom / newZoom and the restored view lands off-center.
       const { viewport: savedVp, tool } = useCanvasStore.getState();
-      this.viewport.moveCorner(savedVp.x, savedVp.y);
       this.viewport.setZoom(savedVp.zoom);
+      this.viewport.moveCorner(savedVp.x, savedVp.y);
 
       // Publish the real canvas size so new objects can be centered on it.
       this.syncViewportToStore();
@@ -1723,8 +1726,12 @@ export class PixiEngine {
 
           if (zoomDiff > 0.001 || xDiff > 0.5 || yDiff > 0.5) {
             if (xDiff > 0.5 || yDiff > 0.5) {
-              this.viewport.moveCorner(vp.x, vp.y);
+              // Zoom first, then pan. moveCorner derives the screen position
+              // from the current scale, so setting the corner before the zoom
+              // leaves it scaled by oldZoom / newZoom and the target drifts
+              // (this is what made focus_viewport / search jumps land off-center).
               this.viewport.setZoom(vp.zoom);
+              this.viewport.moveCorner(vp.x, vp.y);
             } else {
               // Zoom changed only (e.g. Header Zoom buttons); keep center stable
               this.viewport.setZoom(vp.zoom, true);
