@@ -102,15 +102,20 @@ export function ConnectorOptionsBar() {
     return obj && obj.type === "connector" && obj.connectorData ? obj : null;
   }, [selectedIds, objects, isLocked]);
 
-  const midpointInfo = useMemo(() => {
+  // Resolve the drawn path once: the midpoint anchors the bar on a straight
+  // run, while the full point list bounds it so a folded path stays visible.
+  const connectorGeometry = useMemo(() => {
     if (!selectedConnector) return null;
     const points = resolveConnectorPoints(selectedConnector, objects, groups);
-    return points && points.length >= 2
-      ? getPolylineMidpointInfo(points)
-      : null;
+    if (!points || points.length < 2) return null;
+    return { points, midpoint: getPolylineMidpointInfo(points) };
   }, [selectedConnector, objects, groups]);
 
-  if (!selectedConnector || !selectedConnector.connectorData || !midpointInfo) {
+  if (
+    !selectedConnector ||
+    !selectedConnector.connectorData ||
+    !connectorGeometry
+  ) {
     return null;
   }
   if (isDragging) return null;
@@ -123,27 +128,52 @@ export function ConnectorOptionsBar() {
   const arrowEnd = data.arrowEnd !== false;
 
   const zoom = viewport.zoom;
-  const screenX = (midpointInfo.point.x - viewport.x) * zoom;
-  const screenY = (midpointInfo.point.y - viewport.y) * zoom;
-
   const barScale = Math.max(0.35, Math.min(2.0, zoom));
 
-  // Offset the bar clear of the line: above a horizontal run, beside a
-  // vertical one, so it never sits on top of the connector it controls.
+  const toScreenX = (x: number) => (x - viewport.x) * zoom;
+  const toScreenY = (y: number) => (y - viewport.y) * zoom;
+
+  // Screen-space bounds of the whole path, so the bar can clear every bend.
+  const screenPoints = connectorGeometry.points.map((p) => ({
+    x: toScreenX(p.x),
+    y: toScreenY(p.y),
+  }));
+  const minX = Math.min(...screenPoints.map((p) => p.x));
+  const maxX = Math.max(...screenPoints.map((p) => p.x));
+  const minY = Math.min(...screenPoints.map((p) => p.y));
+  const maxY = Math.max(...screenPoints.map((p) => p.y));
+
+  // Offset the bar clear of the line. A straight run keeps its midpoint
+  // anchor and sits beside the segment (above a horizontal one, beside a
+  // vertical one). A folded path instead anchors over the path's bounding
+  // box and sits just outside it, so the bar never lands on its own bends.
   const offset = 14;
-  const isHorizontal = midpointInfo.isHorizontal;
-  const placeAbove = isHorizontal && screenY >= 48 * barScale + offset;
-  const barClass = isHorizontal
-    ? `-translate-x-1/2 ${placeAbove ? "-translate-y-full" : ""}`
-    : "-translate-y-1/2";
-  const barX = isHorizontal
-    ? screenX
-    : screenX + offset;
-  const barY = isHorizontal
-    ? placeAbove
-      ? screenY - offset
-      : screenY + offset
-    : screenY;
+  const isStraight = connectorGeometry.points.length <= 2;
+
+  let barClass: string;
+  let barX: number;
+  let barY: number;
+
+  if (isStraight) {
+    const { point, isHorizontal } = connectorGeometry.midpoint;
+    const screenX = toScreenX(point.x);
+    const screenY = toScreenY(point.y);
+    const placeAbove = isHorizontal && screenY >= 48 * barScale + offset;
+    barClass = isHorizontal
+      ? `-translate-x-1/2 ${placeAbove ? "-translate-y-full" : ""}`
+      : "-translate-y-1/2";
+    barX = isHorizontal ? screenX : screenX + offset;
+    barY = isHorizontal
+      ? placeAbove
+        ? screenY - offset
+        : screenY + offset
+      : screenY;
+  } else {
+    const placeAbove = minY >= 48 * barScale + offset;
+    barClass = `-translate-x-1/2 ${placeAbove ? "-translate-y-full" : ""}`;
+    barX = (minX + maxX) / 2;
+    barY = placeAbove ? minY - offset : maxY + offset;
+  }
 
   const patchData = (partial: Partial<ElbowConnectorData>) => {
     updateObject(selectedConnector.id, {
