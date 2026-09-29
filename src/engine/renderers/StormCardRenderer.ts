@@ -402,13 +402,17 @@ export class StormCardRenderer {
         // Row badges sit just left of the type zone and mirror the ⓘ
         // description affordance:
         // - ⓘ shows whenever the row has a description or is selected
-        // - ✓ shows on the selected Command field / Query param only, dimmed
-        //   when no rules are set, so it doubles as an "add validation" cue
+        // - ✓ shows whenever the Command field / Query param has rules (or is
+        //   selected), dimmed when no rules are set so it doubles as an
+        //   "add validation" cue
+        const showDescBadge =
+          Boolean(field.description) || selectedFieldId === field.id;
         const showValidationBadge =
           stormHasValidation(kind) &&
           section === "params" &&
-          selectedFieldId === field.id;
-        if (field.description || selectedFieldId === field.id) {
+          (hasValidation || selectedFieldId === field.id);
+
+        if (showDescBadge || showValidationBadge) {
           const hasDesc = Boolean(field.description);
           const rowInfoX = (hasTag ? tagPillX : typeZoneX) - 14;
 
@@ -437,7 +441,7 @@ export class StormCardRenderer {
             });
           }
 
-          if (rowInfoX > 30) {
+          if (showDescBadge && rowInfoX > 30) {
             drawInfoBadge(g, container, rowInfoX, rowY + 13, {
               radius: 5,
               stroke: 0x94a3b8,

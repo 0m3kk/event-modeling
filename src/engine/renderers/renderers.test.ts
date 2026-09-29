@@ -50,7 +50,7 @@ describe("Pixi Card Renderers", () => {
     expect(fieldTypes.length).toBe(2);
   });
 
-  it("draws the validation check on selected Command fields and Query params only", () => {
+  it("draws the validation check on Command fields and Query params only", () => {
     const commandObj: CanvasObject = {
       id: "cmd-val",
       type: "storm",
@@ -73,9 +73,12 @@ describe("Pixi Card Renderers", () => {
       },
     };
 
-    // Unselected rows show no validation badge (it mirrors the ⓘ affordance).
+    // A validated row shows the ✓ badge even when it is not selected.
     const idleRes = StormCardRenderer.draw(new Container(), commandObj, 1, false);
-    expect(idleRes.hitZones.some((z) => z.type === "validation")).toBe(false);
+    const idleZones = idleRes.hitZones.filter((z) => z.type === "validation");
+    expect(idleZones).toHaveLength(1);
+    expect(idleZones[0].fieldId).toBe("f1");
+    expect(idleZones[0].currentText).toBe("min 1");
 
     // Selecting a validated field draws the ✓ badge with its rule summary.
     const commandContainer = new Container();
@@ -106,9 +109,16 @@ describe("Pixi Card Renderers", () => {
       true,
       "f2",
     );
-    const emptyZone = emptyRes.hitZones.find((z) => z.type === "validation");
-    expect(emptyZone?.fieldId).toBe("f2");
+    const emptyZone = emptyRes.hitZones.find(
+      (z) => z.type === "validation" && z.fieldId === "f2",
+    );
     expect(emptyZone?.currentText).toBe("Add validation rules");
+    // The validated sibling keeps its badge while f2 is selected.
+    expect(
+      emptyRes.hitZones.some(
+        (z) => z.type === "validation" && z.fieldId === "f1",
+      ),
+    ).toBe(true);
 
     // Query response fields are output, never validated — only Params are.
     const queryObj: CanvasObject = {
@@ -158,7 +168,7 @@ describe("Pixi Card Renderers", () => {
     expect(queryZones[0].fieldId).toBe("p1");
     expect(queryZones[0].section).toBe("params");
 
-    // Selecting a Response row yields no validation badge at all.
+    // A Response row never gets a validation badge, even when selected.
     const responseRes = StormCardRenderer.draw(
       new Container(),
       queryObj,
@@ -166,9 +176,17 @@ describe("Pixi Card Renderers", () => {
       true,
       "r1",
     );
-    expect(responseRes.hitZones.some((z) => z.type === "validation")).toBe(
-      false,
-    );
+    expect(
+      responseRes.hitZones.some(
+        (z) => z.type === "validation" && z.fieldId === "r1",
+      ),
+    ).toBe(false);
+    // The Params row keeps its badge regardless of selection.
+    expect(
+      responseRes.hitZones.some(
+        (z) => z.type === "validation" && z.fieldId === "p1",
+      ),
+    ).toBe(true);
   });
 
   it("allows wider card width so long titles and field names fit without truncation", () => {
