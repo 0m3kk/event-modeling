@@ -14,8 +14,10 @@ import { alignObjects, distributeObjects } from "@/utils/align";
 import { componentNameOf, ensureUniqueComponentName } from "@/utils/naming";
 import { arrangeStormLanes, type StormLaneCard } from "@/utils/stormLayout";
 import {
+  groupHasContent,
   recomputeGroupBoundsForObjects,
   recomputeGroupBoundsForGroupIds,
+  reparentChildrenOfRemovedGroups,
 } from "@/utils/groupBounds";
 import {
   computeStormCardHeight,
@@ -432,15 +434,26 @@ export const useCanvasStore = create<CanvasStore>()(
             }
           }
 
+          // Groups in the delete selection are dissolved: their member objects
+          // detach, their child groups re-parent to the nearest surviving
+          // ancestor, and connectors pointing at them are dropped.
+          const reparentedGroups = reparentChildrenOfRemovedGroups(
+            state.groups,
+            groupIdsToDelete,
+          );
+
           const nextObjects = pruneDanglingReferences(
             state.objects
               .filter((obj) => {
                 if (idSet.has(obj.id)) return false;
-                // Also delete connectors attached to deleted objects
+                // Also delete connectors attached to deleted objects or groups.
                 if (obj.type === "connector" && obj.connectorData) {
+                  const { start, end } = obj.connectorData;
                   if (
-                    idSet.has(obj.connectorData.start.objectId) ||
-                    idSet.has(obj.connectorData.end.objectId)
+                    idSet.has(start.objectId) ||
+                    idSet.has(end.objectId) ||
+                    groupIdsToDelete.has(start.objectId) ||
+                    groupIdsToDelete.has(end.objectId)
                   ) {
                     return false;
                   }
@@ -454,16 +467,23 @@ export const useCanvasStore = create<CanvasStore>()(
               ),
           );
 
-          // Retain groups that were not explicitly deleted and still have members or child groups
-          const survivingGroups = state.groups.filter((g) => {
-            if (groupIdsToDelete.has(g.id)) return false;
-            const hasMembers = nextObjects.some((o) => o.groupId === g.id);
-            const hasChildren = state.groups.some(
-              (child) =>
-                child.parentId === g.id && !groupIdsToDelete.has(child.id),
-            );
-            return hasMembers || hasChildren;
-          });
+          // Retain groups that still have members or child groups.
+          const groupsForContent = reparentedGroups.filter(
+            (g) => !groupIdsToDelete.has(g.id),
+          );
+          const survivingGroups = groupsForContent.filter((g) =>
+            groupHasContent(g.id, nextObjects, groupsForContent),
+          );
+
+          // A re-parented child changes its new parent's bounds.
+          for (const g of state.groups) {
+            if (g.parentId && groupIdsToDelete.has(g.parentId)) {
+              const reparented = reparentedGroups.find((r) => r.id === g.id);
+              if (reparented?.parentId) {
+                affectedGroupIds.add(reparented.parentId);
+              }
+            }
+          }
 
           const nextGroups = recomputeGroupBoundsForGroupIds(
             nextObjects,
@@ -553,17 +573,53 @@ export const useCanvasStore = create<CanvasStore>()(
       deleteGroup: (id) => {
         set((state) => {
           const target = state.groups.find((g) => g.id === id);
-          const remainingGroups = state.groups.filter((g) => g.id !== id);
-          const nextObjects = state.objects.map((obj) =>
-            obj.groupId === id ? { ...obj, groupId: undefined } : obj,
+          const groupIdsToDissolve = new Set<string>([id]);
+
+          // Child groups rise to the nearest surviving ancestor instead of
+          // being orphaned by their parent's removal.
+          const reparentedGroups = reparentChildrenOfRemovedGroups(
+            state.groups,
+            groupIdsToDissolve,
           );
-          const nextGroups = target?.parentId
-            ? recomputeGroupBoundsForGroupIds(
-                nextObjects,
-                remainingGroups,
-                [target.parentId],
-              )
-            : remainingGroups;
+
+          const nextObjects = state.objects
+            .filter((obj) => {
+              if (obj.type === "connector" && obj.connectorData) {
+                const { start, end } = obj.connectorData;
+                if (start.objectId === id || end.objectId === id) {
+                  return false;
+                }
+              }
+              return true;
+            })
+            .map((obj) =>
+              obj.groupId === id ? { ...obj, groupId: undefined } : obj,
+            );
+
+          const groupsForContent = reparentedGroups.filter(
+            (g) => g.id !== id,
+          );
+          const remainingGroups = groupsForContent.filter((g) =>
+            groupHasContent(g.id, nextObjects, groupsForContent),
+          );
+
+          const affectedGroupIds = new Set<string>();
+          if (target?.parentId) affectedGroupIds.add(target.parentId);
+          for (const g of state.groups) {
+            if (g.parentId === id) {
+              const reparented = reparentedGroups.find((r) => r.id === g.id);
+              if (reparented?.parentId) {
+                affectedGroupIds.add(reparented.parentId);
+              }
+            }
+          }
+
+          const nextGroups = recomputeGroupBoundsForGroupIds(
+            nextObjects,
+            remainingGroups,
+            affectedGroupIds,
+          );
+
           return {
             groups: nextGroups,
             objects: nextObjects,
@@ -702,6 +758,132 @@ export const useCanvasStore = create<CanvasStore>()(
           }
         }
 
+        // Nesting (cards): grouping only members of one existing group creates
+        // a child group inside it, so an existing Section can hold sub-Sections.
+        // A mixed selection (assigned + unassigned cards) still merges into the
+        // group as before.
+        if (explicitGroupIds.size === 0 && candidateObjectIds.length > 0) {
+          const memberGroupIds = new Set<string>();
+          const allInsideOneGroup = candidateObjectIds.every((id) => {
+            const obj = state.objects.find((o) => o.id === id);
+            if (!obj?.groupId) return false;
+            if (!state.groups.some((g) => g.id === obj.groupId)) return false;
+            memberGroupIds.add(obj.groupId);
+            return true;
+          });
+          const nameMatchesExisting = name
+            ? state.groups.some(
+                (g) => g.name.toLowerCase() === name.trim().toLowerCase(),
+              )
+            : false;
+
+          if (
+            allInsideOneGroup &&
+            memberGroupIds.size === 1 &&
+            !nameMatchesExisting
+          ) {
+            const parentId = Array.from(memberGroupIds)[0];
+            const childId = `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+            const childGroup: import("@/types").GroupInfo = {
+              id: childId,
+              name: name || "Group",
+              parentId,
+              stroke: "#6366f1",
+              fill: "#eef2ff",
+              strokeWidth: 2,
+              lineStyle: "dashed",
+              tagColor: "#6366f1",
+            };
+
+            const memberIdSet = new Set(candidateObjectIds);
+            const nextObjects = state.objects.map((obj) =>
+              memberIdSet.has(obj.id) ? { ...obj, groupId: childId } : obj,
+            );
+
+            const nextGroups = recomputeGroupBoundsForGroupIds(
+              nextObjects,
+              [...state.groups, childGroup],
+              new Set([childId, parentId]),
+            );
+
+            set({
+              groups: nextGroups,
+              objects: nextObjects,
+              selectedIds: [`__group:${childId}`],
+            });
+
+            return childId;
+          }
+        }
+
+        // Nesting: selecting two or more groups wraps them in a new parent
+        // group (group-in-group). Any selected cards that are not already
+        // inside one of those groups join the parent as direct members.
+        if (explicitGroupIds.size >= 2) {
+          const childGroupIds = Array.from(explicitGroupIds);
+          const childGroupIdSet = new Set(childGroupIds);
+          const parentMemberIds = candidateObjectIds.filter((id) => {
+            const obj = state.objects.find((o) => o.id === id);
+            return !obj?.groupId || !childGroupIdSet.has(obj.groupId);
+          });
+          const memberIdSet = new Set(parentMemberIds);
+
+          const groupId = `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+          const parentGroup: import("@/types").GroupInfo = {
+            id: groupId,
+            name: name || "Group",
+            stroke: "#6366f1",
+            fill: "#eef2ff",
+            strokeWidth: 2,
+            lineStyle: "dashed",
+            tagColor: "#6366f1",
+          };
+
+          const nextObjects = state.objects.map((obj) =>
+            memberIdSet.has(obj.id) ? { ...obj, groupId } : obj,
+          );
+
+          const affectedGroupIds = new Set<string>([
+            groupId,
+            ...childGroupIds,
+          ]);
+          for (const id of parentMemberIds) {
+            const obj = state.objects.find((o) => o.id === id);
+            if (obj?.groupId) affectedGroupIds.add(obj.groupId);
+          }
+          // A child leaving an existing parent must let that parent shrink.
+          for (const id of childGroupIds) {
+            const child = state.groups.find((g) => g.id === id);
+            if (child?.parentId) affectedGroupIds.add(child.parentId);
+          }
+
+          const reparented = state.groups.map((g) =>
+            childGroupIdSet.has(g.id) ? { ...g, parentId: groupId } : g,
+          );
+          const groupsWithParent = [...reparented, parentGroup];
+          // Keep the new parent plus any group that still holds content, so
+          // source groups emptied by the move dissolve.
+          const survivingGroups = groupsWithParent.filter(
+            (g) =>
+              g.id === groupId ||
+              groupHasContent(g.id, nextObjects, groupsWithParent),
+          );
+
+          const nextGroups = recomputeGroupBoundsForGroupIds(
+            nextObjects,
+            survivingGroups,
+            affectedGroupIds,
+          );
+
+          set({
+            groups: nextGroups,
+            objects: nextObjects,
+            selectedIds: [`__group:${groupId}`],
+          });
+
+          return groupId;
+        }
+
         // Check if there is an existing target group to add to
         let targetGroupId: string | undefined;
 
@@ -831,23 +1013,47 @@ export const useCanvasStore = create<CanvasStore>()(
           }
         }
 
-        const nextObjects = state.objects.map((obj) => {
-          if (
-            (obj.groupId && groupIdsToDissolve.has(obj.groupId)) ||
-            objectIdsToDetach.has(obj.id)
-          ) {
-            return { ...obj, groupId: undefined };
-          }
-          return obj;
-        });
+        // Child groups rise to the nearest surviving ancestor instead of being
+        // orphaned when their parent is dissolved.
+        const reparentedGroups = reparentChildrenOfRemovedGroups(
+          state.groups,
+          groupIdsToDissolve,
+        );
 
-        const remainingGroups = state.groups.filter((g) => {
-          if (groupIdsToDissolve.has(g.id)) return false;
-          return nextObjects.some((o) => o.groupId === g.id);
-        });
+        const nextObjects = state.objects
+          .filter((obj) => {
+            // Drop connectors whose endpoint group is being dissolved.
+            if (obj.type === "connector" && obj.connectorData) {
+              const { start, end } = obj.connectorData;
+              if (
+                groupIdsToDissolve.has(start.objectId) ||
+                groupIdsToDissolve.has(end.objectId)
+              ) {
+                return false;
+              }
+            }
+            return true;
+          })
+          .map((obj) => {
+            if (
+              (obj.groupId && groupIdsToDissolve.has(obj.groupId)) ||
+              objectIdsToDetach.has(obj.id)
+            ) {
+              return { ...obj, groupId: undefined };
+            }
+            return obj;
+          });
+
+        // A group that lost its last member (or only child) dissolves too.
+        const groupsForContent = reparentedGroups.filter(
+          (g) => !groupIdsToDissolve.has(g.id),
+        );
+        const remainingGroups = groupsForContent.filter((g) =>
+          groupHasContent(g.id, nextObjects, groupsForContent),
+        );
 
         // Groups that lost members (without being dissolved) must shrink, and
-        // dissolving a child group must also collapse its surviving parent.
+        // dissolving a child group must also collapse its surviving ancestor.
         const affectedGroupIds = new Set<string>();
         for (const obj of state.objects) {
           if (objectIdsToDetach.has(obj.id) && obj.groupId) {
@@ -855,8 +1061,17 @@ export const useCanvasStore = create<CanvasStore>()(
           }
         }
         for (const id of groupIdsToDissolve) {
-          const dissolved = state.groups.find((g) => g.id === id);
-          if (dissolved?.parentId) affectedGroupIds.add(dissolved.parentId);
+          let parentId = state.groups.find((g) => g.id === id)?.parentId;
+          const seen = new Set<string>();
+          while (
+            parentId &&
+            groupIdsToDissolve.has(parentId) &&
+            !seen.has(parentId)
+          ) {
+            seen.add(parentId);
+            parentId = state.groups.find((g) => g.id === parentId)?.parentId;
+          }
+          if (parentId) affectedGroupIds.add(parentId);
         }
 
         const recomputedGroups = recomputeGroupBoundsForGroupIds(

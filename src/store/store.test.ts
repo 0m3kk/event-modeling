@@ -1298,5 +1298,277 @@ describe("useCanvasStore", () => {
       height: 100 + 48,
     });
   });
+
+  it("creates a nested child group when grouping members of an existing group", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 200,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2]);
+    const parentId = useCanvasStore.getState().groupObjects(["c1", "c2"], "Parent")!;
+
+    // Group both members of the existing group again -> a nested child group.
+    const childId = useCanvasStore
+      .getState()
+      .groupObjects(["c1", "c2"], "Child")!;
+
+    const state = useCanvasStore.getState();
+    expect(childId).toBeDefined();
+    expect(childId).not.toBe(parentId);
+    expect(state.groups.find((g) => g.id === childId)?.parentId).toBe(parentId);
+    expect(state.objects.find((o) => o.id === "c1")?.groupId).toBe(childId);
+    expect(state.objects.find((o) => o.id === "c2")?.groupId).toBe(childId);
+    expect(state.selectedIds).toEqual([`__group:${childId}`]);
+    // Parent still exists and now encloses the child.
+    expect(state.groups.some((g) => g.id === parentId)).toBe(true);
+  });
+
+  it("does not nest when the selection mixes assigned and unassigned cards", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 400,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2]);
+    const groupId = useCanvasStore.getState().groupObjects(["c1"], "Group")!;
+
+    // c1 is in the group, c2 is not -> merge c2 into the group (no nesting).
+    useCanvasStore.getState().groupObjects(["c1", "c2"]);
+
+    const state = useCanvasStore.getState();
+    expect(state.groups).toHaveLength(1);
+    expect(state.groups[0].id).toBe(groupId);
+    expect(state.groups[0].parentId).toBeUndefined();
+    expect(state.objects.find((o) => o.id === "c2")?.groupId).toBe(groupId);
+  });
+
+  it("nests two selected groups under a new parent group (group-in-group)", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 400,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2]);
+    const groupA = useCanvasStore.getState().groupObjects(["c1"], "A")!;
+    const groupB = useCanvasStore.getState().groupObjects(["c2"], "B")!;
+
+    const parentId = useCanvasStore.getState().groupObjects(
+      [`__group:${groupA}`, `__group:${groupB}`],
+      "Parent",
+    )!;
+
+    expect(parentId).toBeDefined();
+    const state = useCanvasStore.getState();
+    expect(state.groups.find((g) => g.id === groupA)?.parentId).toBe(parentId);
+    expect(state.groups.find((g) => g.id === groupB)?.parentId).toBe(parentId);
+    expect(state.selectedIds).toEqual([`__group:${parentId}`]);
+
+    // Parent bounds enclose both child groups (each padded by 24).
+    expect(state.groups.find((g) => g.id === parentId)?.customBounds).toEqual({
+      x: -24 - 24,
+      y: -24 - 24,
+      width: 524 - -24 + 48,
+      height: 124 - -24 + 48,
+    });
+  });
+
+  it("re-parents child groups to the root when their parent is ungrouped", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 400,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2]);
+    const groupA = useCanvasStore.getState().groupObjects(["c1"], "A")!;
+    const groupB = useCanvasStore.getState().groupObjects(["c2"], "B")!;
+    const parentId = useCanvasStore.getState().groupObjects(
+      [`__group:${groupA}`, `__group:${groupB}`],
+      "Parent",
+    )!;
+
+    useCanvasStore.getState().ungroupObjects([`__group:${parentId}`]);
+
+    const state = useCanvasStore.getState();
+    expect(state.groups.some((g) => g.id === parentId)).toBe(false);
+    expect(state.groups.find((g) => g.id === groupA)?.parentId).toBeUndefined();
+    expect(state.groups.find((g) => g.id === groupB)?.parentId).toBeUndefined();
+    // Members are untouched.
+    expect(state.objects.find((o) => o.id === "c1")?.groupId).toBe(groupA);
+    expect(state.objects.find((o) => o.id === "c2")?.groupId).toBe(groupB);
+  });
+
+  it("re-parents child groups when their parent is deleted via deleteObjects", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 400,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2]);
+    const groupA = useCanvasStore.getState().groupObjects(["c1"], "A")!;
+    const groupB = useCanvasStore.getState().groupObjects(["c2"], "B")!;
+    const parentId = useCanvasStore.getState().groupObjects(
+      [`__group:${groupA}`, `__group:${groupB}`],
+      "Parent",
+    )!;
+
+    useCanvasStore.getState().deleteObjects([`__group:${parentId}`]);
+
+    const state = useCanvasStore.getState();
+    expect(state.groups.some((g) => g.id === parentId)).toBe(false);
+    expect(state.groups.find((g) => g.id === groupA)?.parentId).toBeUndefined();
+    expect(state.groups.find((g) => g.id === groupB)?.parentId).toBeUndefined();
+    expect(state.groups.some((g) => g.id === groupA)).toBe(true);
+    expect(state.groups.some((g) => g.id === groupB)).toBe(true);
+  });
+
+  it("removes connectors attached to a group when that group is deleted", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 400,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2]);
+    const gid = useCanvasStore.getState().groupObjects(["c2"], "Target")!;
+
+    const connector: CanvasObject = {
+      id: "conn-1",
+      type: "connector",
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      connectorData: {
+        start: { objectId: "c1", anchor: "right" },
+        end: { objectId: gid, anchor: "left" },
+      },
+    };
+    useCanvasStore.getState().addObject(connector);
+    expect(
+      useCanvasStore.getState().objects.some((o) => o.id === "conn-1"),
+    ).toBe(true);
+
+    useCanvasStore.getState().deleteObjects([`__group:${gid}`]);
+
+    expect(
+      useCanvasStore.getState().objects.some((o) => o.id === "conn-1"),
+    ).toBe(false);
+  });
+
+  it("keeps a connector between two groups when an unrelated object is deleted", () => {
+    const c1: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    const c2: CanvasObject = {
+      id: "c2",
+      type: "storm",
+      x: 400,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    const c3: CanvasObject = {
+      id: "c3",
+      type: "storm",
+      x: 800,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    useCanvasStore.getState().addObjects([c1, c2, c3]);
+    const groupA = useCanvasStore.getState().groupObjects(["c1"], "A")!;
+    const groupB = useCanvasStore.getState().groupObjects(["c2"], "B")!;
+
+    const connector: CanvasObject = {
+      id: "conn-1",
+      type: "connector",
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      connectorData: {
+        start: { objectId: groupA, anchor: "right" },
+        end: { objectId: groupB, anchor: "left" },
+      },
+    };
+    useCanvasStore.getState().addObject(connector);
+
+    useCanvasStore.getState().deleteObjects(["c3"]);
+
+    expect(
+      useCanvasStore.getState().objects.some((o) => o.id === "conn-1"),
+    ).toBe(true);
+  });
 });
 

@@ -93,18 +93,45 @@ export function Toolbar() {
   const groups = useCanvasStore((state) => state.groups);
 
   const groupTooltip = React.useMemo(() => {
-    const explicitGroup = selectedIds.some((id) => id.startsWith("__group:"));
-    const memberGroup = selectedIds.some((id) => {
+    const explicitGroupIds = new Set(
+      selectedIds
+        .filter((id) => id.startsWith("__group:"))
+        .map((id) => id.replace("__group:", "")),
+    );
+    const cardIds = selectedIds.filter((id) => !id.startsWith("__group:"));
+    const memberGroup = cardIds.some((id) => {
       const obj = objects.find((o) => o.id === id);
       return obj?.groupId && groups.some((g) => g.id === obj.groupId);
     });
-    const hasUnassigned = selectedIds.some((id) => {
-      if (id.startsWith("__group:")) return false;
+    const hasUnassigned = cardIds.some((id) => {
       const obj = objects.find((o) => o.id === id);
       return obj && !obj.groupId;
     });
 
-    if ((explicitGroup || memberGroup) && hasUnassigned) {
+    // Two or more selected groups wrap into a new parent group.
+    if (explicitGroupIds.size >= 2) {
+      return "Nest Groups (Cmd+G)";
+    }
+    // Every selected card already lives in the same group -> child group.
+    const memberGroupIds = new Set(
+      cardIds
+        .map((id) => objects.find((o) => o.id === id)?.groupId)
+        .filter((gid): gid is string => Boolean(gid)),
+    );
+    const allInExistingGroup =
+      cardIds.length > 0 &&
+      cardIds.every((id) => {
+        const gid = objects.find((o) => o.id === id)?.groupId;
+        return Boolean(gid) && groups.some((g) => g.id === gid);
+      });
+    if (
+      explicitGroupIds.size === 0 &&
+      allInExistingGroup &&
+      memberGroupIds.size === 1
+    ) {
+      return "Create Sub-group (Cmd+G)";
+    }
+    if ((explicitGroupIds.size === 1 || memberGroup) && hasUnassigned) {
       return "Add to Group (Cmd+G)";
     }
     return "Group (Cmd+G)";

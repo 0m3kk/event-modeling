@@ -61,6 +61,11 @@ export function computeGroupBounds(
 
 /**
  * Tests if a point hits a group's header badge, border, or interior.
+ *
+ * When groups are nested, the same point can land inside several boundaries.
+ * The deepest (most nested) group wins, so a child group stays clickable even
+ * though its parent's interior covers the same spot. A header badge always
+ * beats a boundary/interior hit so a group can be renamed from the header.
  */
 export function getGroupAt(
   worldX: number,
@@ -68,9 +73,29 @@ export function getGroupAt(
   groups: GroupInfo[],
   objects: CanvasObject[],
 ): GroupHitResult | null {
-  // Test from innermost / top groups first
-  for (let i = groups.length - 1; i >= 0; i--) {
-    const group = groups[i];
+  const groupsById = new Map(groups.map((g) => [g.id, g]));
+  const depthCache = new Map<string, number>();
+  const depthOf = (group: GroupInfo): number => {
+    const cached = depthCache.get(group.id);
+    if (cached !== undefined) return cached;
+    let depth = 0;
+    let current: GroupInfo | undefined = group;
+    const guard = new Set<string>();
+    while (current?.parentId && !guard.has(current.id)) {
+      guard.add(current.id);
+      current = groupsById.get(current.parentId);
+      depth += 1;
+    }
+    depthCache.set(group.id, depth);
+    return depth;
+  };
+
+  let headerHit: GroupHitResult | null = null;
+  let headerDepth = -1;
+  let bodyHit: GroupHitResult | null = null;
+  let bodyDepth = -1;
+
+  for (const group of groups) {
     const bounds = computeGroupBounds(group, objects, groups);
 
     // Approximate header badge bounds
@@ -83,6 +108,8 @@ export function getGroupAt(
       height: 24,
     };
 
+    const depth = depthOf(group);
+
     // 1. Check header badge hit
     if (
       worldX >= badgeBounds.x &&
@@ -90,7 +117,11 @@ export function getGroupAt(
       worldY >= badgeBounds.y &&
       worldY <= badgeBounds.y + badgeBounds.height
     ) {
-      return { group, hitType: "header", bounds, badgeBounds };
+      if (depth >= headerDepth) {
+        headerHit = { group, hitType: "header", bounds, badgeBounds };
+        headerDepth = depth;
+      }
+      continue;
     }
 
     // 2. Check border hit (within 8px tolerance)
@@ -107,21 +138,25 @@ export function getGroupAt(
       worldY <= bounds.y + bounds.height - tolerance;
 
     if (isNearOuter && !isInsideInner) {
-      return { group, hitType: "border", bounds, badgeBounds };
-    }
-
-    // 3. Check interior hit
-    if (
+      if (depth >= bodyDepth) {
+        bodyHit = { group, hitType: "border", bounds, badgeBounds };
+        bodyDepth = depth;
+      }
+    } else if (
       worldX >= bounds.x &&
       worldX <= bounds.x + bounds.width &&
       worldY >= bounds.y &&
       worldY <= bounds.y + bounds.height
     ) {
-      return { group, hitType: "interior", bounds, badgeBounds };
+      // 3. Check interior hit
+      if (depth >= bodyDepth) {
+        bodyHit = { group, hitType: "interior", bounds, badgeBounds };
+        bodyDepth = depth;
+      }
     }
   }
 
-  return null;
+  return headerHit ?? bodyHit;
 }
 
 export class GroupLayer extends Container {

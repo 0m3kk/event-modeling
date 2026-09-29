@@ -125,6 +125,59 @@ export function recomputeGroupBoundsForGroupIds(
 }
 
 /**
+ * True when a group still holds member objects or child groups. A group that
+ * loses both should be dissolved so no empty boundary lingers on the canvas.
+ */
+export function groupHasContent(
+  groupId: string,
+  objects: CanvasObject[],
+  groups: GroupInfo[],
+): boolean {
+  return (
+    objects.some((o) => o.groupId === groupId) ||
+    groups.some((g) => g.parentId === groupId)
+  );
+}
+
+/**
+ * Re-parents children of removed groups to the nearest surviving ancestor (or
+ * to the root when none exists), so dissolving or deleting a parent never
+ * leaves a dangling `parentId` behind.
+ *
+ * Removed groups are returned unchanged; callers filter them out afterwards.
+ */
+export function reparentChildrenOfRemovedGroups(
+  groups: GroupInfo[],
+  removedGroupIds: Iterable<string>,
+): GroupInfo[] {
+  const removed = new Set(removedGroupIds);
+  if (removed.size === 0) return groups;
+
+  const groupsById = new Map(groups.map((g) => [g.id, g]));
+
+  /** Nearest ancestor of `groupId` that is not itself being removed. */
+  const survivingAncestorOf = (groupId: string): string | undefined => {
+    let current = groupsById.get(groupId)?.parentId;
+    const guard = new Set<string>();
+    while (current && !guard.has(current)) {
+      if (!removed.has(current)) return current;
+      guard.add(current);
+      current = groupsById.get(current)?.parentId;
+    }
+    return undefined;
+  };
+
+  const survivors = new Map<string, string | undefined>();
+  for (const id of removed) survivors.set(id, survivingAncestorOf(id));
+
+  return groups.map((g) =>
+    g.parentId && removed.has(g.parentId)
+      ? { ...g, parentId: survivors.get(g.parentId) }
+      : g,
+  );
+}
+
+/**
  * Recomputes `customBounds` for every group that directly or transitively
  * contains one of the affected objects, so boundaries keep enclosing all of
  * their members after those objects move or resize.

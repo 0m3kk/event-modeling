@@ -108,6 +108,29 @@ describe("Phase 4: Groups, Elbow Connectors & Visual Links", () => {
       const outsideHit = getGroupAt(30, 30, [group], []);
       expect(outsideHit).toBeNull();
     });
+
+    it("prefers the innermost group when boundaries are nested", () => {
+      const parent: GroupInfo = {
+        id: "parent",
+        name: "Parent",
+        customBounds: { x: 0, y: 0, width: 600, height: 400 },
+      };
+      const child: GroupInfo = {
+        id: "child",
+        name: "Child",
+        parentId: "parent",
+        customBounds: { x: 200, y: 150, width: 150, height: 120 },
+      };
+
+      // Deep inside the child -> child wins even though the parent covers it.
+      const innerHit = getGroupAt(260, 210, [parent, child], []);
+      expect(innerHit?.group.id).toBe("child");
+      expect(innerHit?.hitType).toBe("interior");
+
+      // Inside the parent but outside the child -> parent wins.
+      const parentHit = getGroupAt(500, 350, [parent, child], []);
+      expect(parentHit?.group.id).toBe("parent");
+    });
   });
 
   describe("Elbow Connectors & Cardinal Magnetic Anchors", () => {
