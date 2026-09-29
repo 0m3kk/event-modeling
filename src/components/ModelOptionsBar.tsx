@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
-import type { ReactNode } from "react";
 import { useCanvasStore } from "@/store";
-import type { ModelField, ModelNodeKind } from "@/types";
-import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
+import type { ModelField } from "@/types";
+import { MODEL_KIND_LABELS } from "@/constants/model";
 import { DescriptionPopover } from "./DescriptionPopover";
 import { ValidationPopover } from "./ValidationPopover";
 import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
@@ -13,33 +12,18 @@ import {
   modelValidationScope,
 } from "@/utils/fieldValidation";
 import {
-  Box,
-  List,
-  Brackets,
-  Parentheses,
   Link2,
-  ChevronDown,
   Plus,
   Trash2,
   Info,
   ListChecks,
 } from "lucide-react";
 
-const MODEL_KIND_ICONS: Record<ModelNodeKind, ReactNode> = {
-  object: <Box size={16} />,
-  enum: <List size={16} />,
-  array: <Brackets size={16} />,
-  wrap: <Parentheses size={16} />,
-};
-
-const ALL_KINDS: ModelNodeKind[] = ["object", "enum", "array", "wrap"];
-
 export function ModelOptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const objects = useCanvasStore((s) => s.objects);
   const groups = useCanvasStore((s) => s.groups);
   const viewport = useCanvasStore((s) => s.viewport);
-  const updateObject = useCanvasStore((s) => s.updateObject);
   const deleteObjects = useCanvasStore((s) => s.deleteObjects);
   const deleteSelectedStormField = useCanvasStore(
     (s) => s.deleteSelectedStormField,
@@ -53,7 +37,6 @@ export function ModelOptionsBar() {
   const setValidationTarget = useCanvasStore((s) => s.setValidationTarget);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
-  const [showKindDropdown, setShowKindDropdown] = useState(false);
   const [showDescriptionPopover, setShowDescriptionPopover] = useState(false);
 
   const selectedModel = useMemo(() => {
@@ -85,17 +68,6 @@ export function ModelOptionsBar() {
   const barX = screenX + cardWidth / 2;
   const isAbove = screenY >= 48 * barScale + 10;
   const barY = isAbove ? screenY - 10 : screenY + cardHeight + 10;
-
-  const handleKindSelect = (nextKind: ModelNodeKind) => {
-    if (!selectedModel.modelData) return;
-    updateObject(selectedModel.id, {
-      modelData: {
-        ...selectedModel.modelData,
-        kind: nextKind,
-      },
-    });
-    setShowKindDropdown(false);
-  };
 
   const handleAddRow = () => {
     if (kind === "object") {
@@ -226,43 +198,9 @@ export function ModelOptionsBar() {
           }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-        {/* Kind Switcher Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setShowKindDropdown((v) => !v)}
-            title={`Type: ${MODEL_KIND_LABELS[kind]}`}
-            className="flex h-8 items-center gap-1 rounded-lg px-2 transition-all hover:bg-gray-100"
-            style={{ color: MODEL_KIND_COLORS[kind] }}
-          >
-            {MODEL_KIND_ICONS[kind]}
-            <ChevronDown size={13} className="text-gray-400" />
-          </button>
-
-          {showKindDropdown && (
-            <div className="absolute top-full left-0 z-50 mt-1 flex w-32 flex-col rounded-xl border border-gray-200 bg-white p-1 shadow-2xl">
-              {ALL_KINDS.map((k) => (
-                <button
-                  key={k}
-                  onClick={() => handleKindSelect(k)}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-all ${
-                    kind === k
-                      ? "bg-gray-100 font-bold"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                  style={{ color: MODEL_KIND_COLORS[k] }}
-                >
-                  <span className="shrink-0">{MODEL_KIND_ICONS[k]}</span>
-                  <span>{MODEL_KIND_LABELS[k]}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Add Field / Value */}
         {(kind === "object" || kind === "enum") && (
           <>
-            <div className="h-5 w-px bg-gray-200" />
             <button
               onClick={handleAddRow}
               title={kind === "object" ? "Add Field" : "Add Value"}
@@ -270,10 +208,9 @@ export function ModelOptionsBar() {
             >
               <Plus size={16} />
             </button>
+            <div className="h-5 w-px bg-gray-200" />
           </>
         )}
-
-        <div className="h-5 w-px bg-gray-200" />
 
         {/* Card or field description ⓘ — panel mirrored from the storm options bar */}
         <button
