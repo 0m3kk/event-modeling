@@ -551,10 +551,20 @@ export function exportCanvasToSvg(
         .join(" ");
       const stroke = data.stroke || "#475569";
       const strokeWidth = data.strokeWidth ?? 2;
+      const lineStyle = data.lineStyle ?? "solid";
+      const strokeDash =
+        lineStyle === "dashed"
+          ? ' stroke-dasharray="8,6"'
+          : lineStyle === "dotted"
+            ? ' stroke-dasharray="2,5"'
+            : "";
+      const arrows =
+        (data.arrowStart ? ' marker-start="url(#arrow)"' : "") +
+        (data.arrowEnd !== false ? ' marker-end="url(#arrow)"' : "");
 
       elements.push(`
     <!-- Connector: ${conn.id} -->
-    <path d="${pathData}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow)" />`);
+    <path d="${pathData}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round"${strokeDash}${arrows} />`);
     }
   }
 

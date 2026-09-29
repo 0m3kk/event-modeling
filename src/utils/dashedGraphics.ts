@@ -89,26 +89,31 @@ export interface LineSegment {
 }
 
 /**
- * Breaks a polyline of perimeter points into dashed or dotted visible line segments.
+ * Breaks an open or closed polyline into dashed/dotted visible line segments.
+ *
+ * `closed` wraps the final vertex back to the first (rectangles/borders);
+ * `false` stops at the last vertex (connectors, open paths).
  */
-export function calculateDashedSegments(
+export function calculateDashedPolyline(
   points: Point[],
   dashLength: number,
   gapLength: number,
+  closed = false,
 ): LineSegment[] {
   if (points.length < 2) return [];
 
+  const edgeCount = closed ? points.length : points.length - 1;
   const segments: LineSegment[] = [];
   let isDash = true;
   let remainingCurrent = dashLength;
   let currentPos: Point = { ...points[0] };
 
-  for (let i = 0; i < points.length; i++) {
+  for (let i = 0; i < edgeCount; i++) {
     const nextIdx = (i + 1) % points.length;
     const targetPoint = points[nextIdx];
 
-    let segDx = targetPoint.x - currentPos.x;
-    let segDy = targetPoint.y - currentPos.y;
+    let segDx = targetPoint!.x - currentPos.x;
+    let segDy = targetPoint!.y - currentPos.y;
     let segDist = Math.hypot(segDx, segDy);
 
     while (segDist > 0.001) {
@@ -116,11 +121,11 @@ export function calculateDashedSegments(
         if (isDash) {
           segments.push({
             p1: { ...currentPos },
-            p2: { ...targetPoint },
+            p2: { ...targetPoint! },
           });
         }
         remainingCurrent -= segDist;
-        currentPos = { ...targetPoint };
+        currentPos = { ...targetPoint! };
         segDist = 0;
 
         if (remainingCurrent <= 0.001) {
@@ -143,8 +148,8 @@ export function calculateDashedSegments(
         }
 
         currentPos = { ...stepPoint };
-        segDx = targetPoint.x - currentPos.x;
-        segDy = targetPoint.y - currentPos.y;
+        segDx = targetPoint!.x - currentPos.x;
+        segDy = targetPoint!.y - currentPos.y;
         segDist = Math.hypot(segDx, segDy);
 
         isDash = !isDash;
@@ -154,6 +159,109 @@ export function calculateDashedSegments(
   }
 
   return segments;
+}
+
+/**
+ * Breaks a polyline of perimeter points into dashed or dotted visible line segments.
+ */
+export function calculateDashedSegments(
+  points: Point[],
+  dashLength: number,
+  gapLength: number,
+): LineSegment[] {
+  return calculateDashedPolyline(points, dashLength, gapLength, true);
+}
+
+/**
+ * Flattens a polyline with rounded corners into a dense point list, matching
+ * the arc-shaped bends used when a solid elbow path is stroked. Dashing an open
+ * elbow path needs real vertices, since the stroke dash cannot follow `arcTo`.
+ */
+export function getRoundedPolylinePoints(
+  points: Point[],
+  radius: number,
+  arcSegments: number = 6,
+): Point[] {
+  if (points.length < 3 || radius <= 0) {
+    return points.map((p) => ({ ...p }));
+  }
+
+  const result: Point[] = [{ ...points[0] }];
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const next = points[i + 1];
+
+    const v1x = prev!.x - curr!.x;
+    const v1y = prev!.y - curr!.y;
+    const v2x = next!.x - curr!.x;
+    const v2y = next!.y - curr!.y;
+    const len1 = Math.hypot(v1x, v1y);
+    const len2 = Math.hypot(v2x, v2y);
+    if (len1 < 0.001 || len2 < 0.001) {
+      result.push({ ...curr! });
+      continue;
+    }
+
+    const u1x = v1x / len1;
+    const u1y = v1y / len1;
+    const u2x = v2x / len2;
+    const u2y = v2y / len2;
+    const dot = u1x * u2x + u1y * u2y;
+
+    // Straight-through corner: keep the vertex, there is no arc to draw.
+    if (dot <= -0.9999) {
+      result.push({ ...curr! });
+      continue;
+    }
+
+    const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+    const sinHalf = Math.sin(angle / 2);
+    const blen = Math.hypot(u1x + u2x, u1y + u2y);
+    if (sinHalf < 0.001 || blen < 0.001) {
+      result.push({ ...curr! });
+      continue;
+    }
+
+    // Shrink the corner radius when the adjacent segments are too short.
+    const maxOffset = Math.min(len1 / 2, len2 / 2);
+    let offset = radius / Math.tan(angle / 2);
+    let effRadius = radius;
+    if (offset > maxOffset) {
+      offset = maxOffset;
+      effRadius = offset * Math.tan(angle / 2);
+    }
+
+    const bx = (u1x + u2x) / blen;
+    const by = (u1y + u2y) / blen;
+    const centerDist = effRadius / sinHalf;
+    const center = {
+      x: curr!.x + bx * centerDist,
+      y: curr!.y + by * centerDist,
+    };
+    const t1 = { x: curr!.x + u1x * offset, y: curr!.y + u1y * offset };
+    const t2 = { x: curr!.x + u2x * offset, y: curr!.y + u2y * offset };
+
+    const startAngle = Math.atan2(t1.y - center.y, t1.x - center.x);
+    const endAngle = Math.atan2(t2.y - center.y, t2.x - center.x);
+    let sweep = endAngle - startAngle;
+    while (sweep > Math.PI) sweep -= Math.PI * 2;
+    while (sweep < -Math.PI) sweep += Math.PI * 2;
+
+    result.push(t1);
+    for (let s = 1; s < arcSegments; s++) {
+      const a = startAngle + sweep * (s / arcSegments);
+      result.push({
+        x: center.x + effRadius * Math.cos(a),
+        y: center.y + effRadius * Math.sin(a),
+      });
+    }
+    result.push(t2);
+  }
+
+  result.push({ ...points[points.length - 1]! });
+  return result;
 }
 
 /**

@@ -4,15 +4,30 @@ import type {
   CardinalAnchor,
   GroupInfo,
   GroupBounds,
+  LineStyle,
   Point,
 } from "@/types";
 import { Z_INDICES, CONNECTOR_CONTACT_GAP } from "@/constants/canvas";
 import {
   computeElbowPathWithBends,
-  computeResolvedConnectorPoints,
   getOppositeAnchor,
 } from "@/utils/elbowRouting";
-import { computeGroupBounds } from "./GroupLayer";
+import {
+  buildConnectorLookup,
+  findConnectorEndpointBounds,
+  resolveConnectorPoints,
+  type ConnectorLookup,
+} from "@/utils/connectorGeometry";
+import {
+  calculateDashedPolyline,
+  getRoundedPolylinePoints,
+} from "@/utils/dashedGraphics";
+
+export type { ConnectorLookup };
+export { buildConnectorLookup };
+
+/** Corner radius used for solid elbow paths; dashed paths flatten the same arc. */
+const ELBOW_CORNER_RADIUS = 8;
 
 export interface PreviewConnector {
   start: { objectId: string; anchor: CardinalAnchor; point: Point };
@@ -26,26 +41,6 @@ export interface AnchorMarker {
   anchor: CardinalAnchor;
   point: Point;
   isHovered?: boolean;
-}
-
-/**
- * Prebuilt id lookups so resolving many connectors stays O(C) instead of
- * O(C × N) when each endpoint would otherwise scan the objects/groups arrays.
- */
-export interface ConnectorLookup {
-  objectsById: Map<string, CanvasObject>;
-  groupsById: Map<string, GroupInfo>;
-}
-
-export function buildConnectorLookup(
-  objects: CanvasObject[],
-  groups: GroupInfo[],
-): ConnectorLookup {
-  const objectsById = new Map<string, CanvasObject>();
-  for (const o of objects) objectsById.set(o.id, o);
-  const groupsById = new Map<string, GroupInfo>();
-  for (const g of groups) groupsById.set(g.id, g);
-  return { objectsById, groupsById };
 }
 
 export class ElbowConnectorLayer extends Container {
@@ -88,19 +83,38 @@ export class ElbowConnectorLayer extends Container {
       if (!points) continue;
 
       const isSelected = selectedIds.includes(conn.id);
-      const strokeColor = isSelected
-        ? 0x2563eb
-        : data.stroke
-          ? parseInt(data.stroke.replace("#", "0x"), 16)
-          : 0x475569;
-      const strokeWidth = isSelected
-        ? (data.strokeWidth ?? 2) + 1.5
-        : (data.strokeWidth ?? 2);
+      const strokeColor = data.stroke
+        ? parseInt(data.stroke.replace("#", "0x"), 16)
+        : 0x475569;
+      const strokeWidth = data.strokeWidth ?? 2;
+      const lineStyle: LineStyle = data.lineStyle ?? "solid";
 
-      this.drawElbowPath(this.graphics, points, strokeColor, strokeWidth);
+      // Selection reads as a soft glow behind the line, so the connector keeps
+      // its own color/style and property edits are visible immediately.
+      if (isSelected) {
+        this.drawStyledElbowPath(
+          this.graphics,
+          points,
+          0x2563eb,
+          strokeWidth + 5,
+          "solid",
+          0.3,
+        );
+      }
 
+      this.drawStyledElbowPath(
+        this.graphics,
+        points,
+        strokeColor,
+        strokeWidth,
+        lineStyle,
+      );
+
+      if (data.arrowStart) {
+        this.drawArrowhead(this.graphics, points, strokeColor, strokeWidth, "start");
+      }
       if (data.arrowEnd !== false) {
-        this.drawArrowhead(this.graphics, points, strokeColor, strokeWidth);
+        this.drawArrowhead(this.graphics, points, strokeColor, strokeWidth, "end");
       }
 
       if (isSelected) {
@@ -133,70 +147,7 @@ export class ElbowConnectorLayer extends Container {
     groups: GroupInfo[] = [],
     lookup?: ConnectorLookup,
   ): Point[] | null {
-    const data = conn.connectorData;
-    if (!data) return null;
-
-    const resolved = lookup ?? buildConnectorLookup(objects, groups);
-
-    const startBounds = this.findBounds(
-      data.start.objectId,
-      objects,
-      groups,
-      resolved,
-    );
-    const endBounds = this.findBounds(
-      data.end.objectId,
-      objects,
-      groups,
-      resolved,
-    );
-    if (!startBounds || !endBounds) return null;
-
-    // Filter obstacles (all other objects/groups in proximity)
-    const obstacleBounds: GroupBounds[] = [];
-    const minX = Math.min(startBounds.x, endBounds.x) - 100;
-    const maxX =
-      Math.max(startBounds.x + startBounds.width, endBounds.x + endBounds.width) +
-      100;
-    const minY = Math.min(startBounds.y, endBounds.y) - 100;
-    const maxY =
-      Math.max(
-        startBounds.y + startBounds.height,
-        endBounds.y + endBounds.height,
-      ) + 100;
-
-    for (const obj of objects) {
-      if (
-        obj.type !== "connector" &&
-        obj.id !== data.start.objectId &&
-        obj.id !== data.end.objectId
-      ) {
-        if (
-          obj.x + obj.width >= minX &&
-          obj.x <= maxX &&
-          obj.y + obj.height >= minY &&
-          obj.y <= maxY
-        ) {
-          obstacleBounds.push({
-            x: obj.x,
-            y: obj.y,
-            width: obj.width,
-            height: obj.height,
-          });
-        }
-      }
-    }
-
-    return computeResolvedConnectorPoints(
-      conn,
-      startBounds,
-      endBounds,
-      obstacleBounds,
-      {
-        startGap: CONNECTOR_CONTACT_GAP,
-        endGap: CONNECTOR_CONTACT_GAP,
-      },
-    );
+    return resolveConnectorPoints(conn, objects, groups, lookup);
   }
 
   /**
@@ -264,13 +215,54 @@ export class ElbowConnectorLayer extends Container {
     }
   }
 
+  /**
+   * Paints a connector path in the requested stroke pattern. Solid paths keep
+   * Pixi's native arc corners; dashed/dotted paths are flattened so the dash
+   * run can follow the same rounded corners.
+   */
+  private drawStyledElbowPath(
+    g: Graphics,
+    points: Point[],
+    color: number,
+    width: number,
+    lineStyle: LineStyle,
+    alpha: number = 1,
+  ): void {
+    if (lineStyle === "solid") {
+      this.drawElbowPath(g, points, color, width, alpha);
+      return;
+    }
+
+    const flattened = getRoundedPolylinePoints(
+      points,
+      ELBOW_CORNER_RADIUS,
+      6,
+    );
+    const isDotted = lineStyle === "dotted";
+    const dashLength = isDotted ? Math.max(0.5, width * 0.75) : 8;
+    const gapLength = isDotted ? Math.max(3, width * 2) : 6;
+    const segments = calculateDashedPolyline(
+      flattened,
+      dashLength,
+      gapLength,
+      false,
+    );
+
+    for (const seg of segments) {
+      g.moveTo(seg.p1.x, seg.p1.y);
+      g.lineTo(seg.p2.x, seg.p2.y);
+    }
+    g.stroke({ color, width, alpha, cap: isDotted ? "round" : "butt" });
+  }
+
   private drawElbowPath(
     g: Graphics,
     points: Point[],
     color: number,
     width: number,
+    alpha: number = 1,
   ): void {
-    const cornerRadius = 8;
+    const cornerRadius = ELBOW_CORNER_RADIUS;
     g.moveTo(points[0].x, points[0].y);
 
     if (points.length === 2) {
@@ -284,7 +276,7 @@ export class ElbowConnectorLayer extends Container {
       g.lineTo(points[points.length - 1].x, points[points.length - 1].y);
     }
 
-    g.stroke({ color, width });
+    g.stroke({ color, width, alpha, cap: "round" });
   }
 
   private drawArrowhead(
@@ -292,9 +284,12 @@ export class ElbowConnectorLayer extends Container {
     points: Point[],
     color: number,
     _width: number,
+    at: "start" | "end" = "end",
   ): void {
-    const last = points[points.length - 1];
-    const prev = points[points.length - 2];
+    if (points.length < 2) return;
+
+    const last = at === "end" ? points[points.length - 1] : points[0];
+    const prev = at === "end" ? points[points.length - 2] : points[1];
     const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
     const arrowLength = 9;
     const arrowAngle = Math.PI / 6;
@@ -315,25 +310,11 @@ export class ElbowConnectorLayer extends Container {
 
   public findBounds(
     id: string,
-    objects: CanvasObject[],
-    groups: GroupInfo[],
+    _objects: CanvasObject[],
+    _groups: GroupInfo[],
     lookup: ConnectorLookup,
   ): GroupBounds | null {
-    const cleanId = id.startsWith("__group:") ? id.replace("__group:", "") : id;
-
-    // 1. Check objects
-    const obj = lookup.objectsById.get(cleanId);
-    if (obj) {
-      return { x: obj.x, y: obj.y, width: obj.width, height: obj.height };
-    }
-
-    // 2. Check groups
-    const grp = lookup.groupsById.get(cleanId);
-    if (grp) {
-      return computeGroupBounds(grp, objects, groups);
-    }
-
-    return null;
+    return findConnectorEndpointBounds(id, lookup);
   }
 
   public override destroy(

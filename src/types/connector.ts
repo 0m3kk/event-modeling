@@ -2,6 +2,8 @@
  * Orthogonal Elbow Connector definitions
  */
 
+import type { LineStyle } from "./group";
+
 export type CardinalAnchor = "top" | "right" | "bottom" | "left";
 
 export interface ConnectorEndpoint {
@@ -26,5 +28,10 @@ export interface ElbowConnectorData {
   bends?: ElbowBend[];
   stroke?: string;
   strokeWidth?: number;
+  /** Stroke pattern: solid (default), dashed, or dotted. */
+  lineStyle?: LineStyle;
+  /** Draw an arrowhead at the start endpoint (defaults to false). */
+  arrowStart?: boolean;
+  /** Draw an arrowhead at the end endpoint (defaults to true). */
   arrowEnd?: boolean;
 }

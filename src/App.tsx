@@ -8,6 +8,7 @@ import { ActionTooltip } from "@/components/ActionTooltip";
 import { StormOptionsBar } from "@/components/StormOptionsBar";
 import { ModelOptionsBar } from "@/components/ModelOptionsBar";
 import { GroupOptionsBar } from "@/components/GroupOptionsBar";
+import { ConnectorOptionsBar } from "@/components/ConnectorOptionsBar";
 import { AlignOptionsBar } from "@/components/AlignOptionsBar";
 import { RemoveFromGroupBar } from "@/components/RemoveFromGroupBar";
 import { ModelCardPopup } from "@/components/ModelCardPopup";
@@ -32,6 +33,7 @@ export function App() {
         <StormOptionsBar />
         <ModelOptionsBar />
         <GroupOptionsBar />
+        <ConnectorOptionsBar />
         <AlignOptionsBar />
         <RemoveFromGroupBar />
         <SearchModal
