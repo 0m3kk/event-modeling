@@ -21,3 +21,19 @@ body,
 * {
   font-family: "Geist Mono", monospace;
 }
+
+/* Success toast entrance: drops in from the top-right with a subtle scale. */
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-enter {
+  animation: toast-enter 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}

@@ -543,9 +543,11 @@ export function Header() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-5 right-5 z-[60] flex max-w-sm items-center gap-2.5 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-xs font-medium text-gray-700 shadow-xl animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
+          className="toast-enter fixed top-16 right-5 z-[60] flex max-w-md items-center gap-3 rounded-2xl border border-emerald-400/40 bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-500/40 ring-1 ring-emerald-900/10"
         >
-          <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20">
+            <CheckCircle2 size={20} className="text-white" />
+          </span>
           <span>{toast}</span>
         </div>
       )}
