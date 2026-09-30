@@ -11,7 +11,7 @@ export const STORM_KIND_COLORS: Record<StormKind, string> = {
   actor: "#db2777", // pink
   state: "#7c3aed", // violet
   constraint: "#0f766e", // teal
-  notify: "#0369a1", // sky
+  external: "#0369a1", // sky
   query: "#4338ca", // indigo
   bdd: "#0284c7", // sky (default Given) — replaced by the phase color
 };
@@ -23,7 +23,7 @@ export const STORM_KIND_LABELS: Record<StormKind, string> = {
   actor: "Actor",
   state: "State",
   constraint: "Constraint",
-  notify: "Notify",
+  external: "External",
   query: "Query",
   bdd: "Given/When/Then",
 };
@@ -112,7 +112,7 @@ export const BDD_STEP_REF_LABELS: Record<BddStepRef, string> = {
   query: "Query",
   state: "State",
   error: "Error",
-  notify: "Notify",
+  external: "External",
 };
 
 /** Accent color per scenario step ref (reuses kind colors, adds Error). */
@@ -122,7 +122,7 @@ export const BDD_STEP_REF_COLORS: Record<BddStepRef, string> = {
   query: STORM_KIND_COLORS.query,
   state: STORM_KIND_COLORS.state,
   error: "#dc2626", // Red 600
-  notify: STORM_KIND_COLORS.notify,
+  external: STORM_KIND_COLORS.external,
 };
 
 /**
@@ -132,7 +132,7 @@ export const BDD_STEP_REF_COLORS: Record<BddStepRef, string> = {
 const BDD_PHASE_REFS: Record<BddPhase, readonly BddStepRef[]> = {
   given: ["event"],
   when: ["command", "query"],
-  then: ["event", "state", "error", "notify"],
+  then: ["event", "state", "error", "external"],
 };
 
 /** The step refs allowed on a card's phase (fallback: Given events). */
@@ -161,8 +161,8 @@ export function stormHasTags(kind: StormKind): boolean {
   return STORM_TAGGABLE_KINDS.includes(kind);
 }
 
-/** Kinds without type zones on field rows (Notify names what is notified; Actor names permissions) */
-export const STORM_TYPELESS_KINDS: readonly StormKind[] = ["notify", "actor"];
+/** Kinds without type zones on field rows (External names the outside system / interaction; Actor names permissions) */
+export const STORM_TYPELESS_KINDS: readonly StormKind[] = ["external", "actor"];
 
 export function stormHasFieldTypes(kind: StormKind): boolean {
   return !STORM_TYPELESS_KINDS.includes(kind);

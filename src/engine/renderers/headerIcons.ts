@@ -94,13 +94,11 @@ export function drawHeaderKindIcon(
       break;
     }
 
-    case "notify": {
-      // Mail: envelope
-      g.roundRect(x0 + 2, y0 + 4, 12, 8.5, 1.5).stroke({ color, width: 1.2 });
-      g.moveTo(x0 + 2, y0 + 4)
-        .lineTo(cx, y0 + 8.5)
-        .lineTo(x0 + 14, y0 + 4)
-        .stroke({ color, width: 1.2, join: "round" });
+    case "external": {
+      // Globe: a system outside the current bounded context
+      g.circle(cx, cy, 6).stroke({ color, width: 1.2 });
+      g.ellipse(cx, cy, 2.9, 6).stroke({ color, width: 1 });
+      g.moveTo(cx - 6, cy).lineTo(cx + 6, cy).stroke({ color, width: 1 });
       break;
     }
 

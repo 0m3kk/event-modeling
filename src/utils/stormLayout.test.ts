@@ -58,7 +58,7 @@ describe("arrangeStormLanes", () => {
       "actor",
       "command",
       "event",
-      "notify",
+      "external",
       "query",
       "state",
       "constraint",

@@ -56,7 +56,7 @@ describe("storm kind helpers", () => {
       "event",
       "state",
       "error",
-      "notify",
+      "external",
     ]);
     expect(bddDefaultRefForPhase("given")).toBe("event");
     expect(bddDefaultRefForPhase("when")).toBe("command");

@@ -7,7 +7,7 @@ import {
   Database,
   Search,
   Ban,
-  Mail,
+  Globe,
   Box,
   List,
   Brackets,
@@ -144,7 +144,7 @@ export function Toolbar() {
   // the options bar, so the card carries no prefilled defaults.
   const handleAddStormCard = (kind: StormKind) => {
     const id = `storm-${kind}-${Date.now().toString(36)}`;
-    const width = kind === "actor" ? 220 : kind === "notify" ? 240 : 260;
+    const width = kind === "actor" ? 220 : kind === "external" ? 240 : 260;
 
     const stormData: StormData = {
       kind,
@@ -261,7 +261,7 @@ export function Toolbar() {
     state: <Database size={20} />,
     query: <Search size={20} />,
     constraint: <Ban size={20} />,
-    notify: <Mail size={20} />,
+    external: <Globe size={20} />,
     bdd: <ListChecks size={20} />,
   };
 
@@ -279,7 +279,7 @@ export function Toolbar() {
     "state",
     "query",
     "constraint",
-    "notify",
+    "external",
   ];
 
   const modelKinds: ModelNodeKind[] = ["object", "enum", "array", "wrap"];

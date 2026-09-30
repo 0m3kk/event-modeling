@@ -175,7 +175,7 @@ export function AlignOptionsBar() {
       {/* Arrange Storm Lanes Button */}
       <button
         onClick={() => arrangeLanes()}
-        title="Arrange Storm Lanes (Actor → Command → Event → Notify → Query → State → Constraint)"
+        title="Arrange Storm Lanes (Actor → Command → Event → External → Query → State → Constraint)"
         className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200/80 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95"
       >
         <Columns3 size={16} className="text-indigo-600" />

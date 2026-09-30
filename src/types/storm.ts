@@ -17,7 +17,7 @@ export type StormKind =
   | "actor"
   | "state"
   | "constraint"
-  | "notify"
+  | "external"
   | "query"
   | "bdd";
 
@@ -29,7 +29,7 @@ export type BddPhase = "given" | "when" | "then";
  *
  * - Given steps are Events ("the story so far")
  * - When steps are Commands or Queries (the action under test)
- * - Then steps are outcomes: Events, a State, an Error, or a Notify
+ * - Then steps are outcomes: Events, a State, an Error, or an External
  *
  * `error` is not a storm card kind — it is the failure outcome a scenario
  * asserts (e.g. a rejected command), so it only ever appears as a step ref.
@@ -40,7 +40,7 @@ export type BddStepRef =
   | "query"
   | "state"
   | "error"
-  | "notify";
+  | "external";
 
 /**
  * One concrete key/value pair in a scenario step payload.
@@ -138,7 +138,7 @@ export interface StormData {
    */
   phase?: BddPhase;
   description?: string;
-  /** Primary fields (payload on Command/Event/Notify/BDD; Query params). Empty on State/Constraint — use inputFields/outputFields. */
+  /** Primary fields (payload on Command/Event/External/BDD; Query params). Empty on State/Constraint — use inputFields/outputFields. */
   fields: StormField[];
   /** State & Constraint cards only: INPUT params; their tags feed Query Items. */
   inputFields?: StormField[];

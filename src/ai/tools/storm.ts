@@ -37,7 +37,7 @@ import { findFreeSpot, getObjectsBounds, getViewportCenter } from "./helpers";
 const STORM_KINDS = [
   "command",
   "event",
-  "notify",
+  "external",
   "query",
   "actor",
   "state",
@@ -52,7 +52,7 @@ const fieldSpec = z.object({
     .string()
     .optional()
     .describe(
-      "Type or Model node name (default 'string'). Notify cards ignore type.",
+      "Type or Model node name (default 'string'). External cards ignore type.",
     ),
   required: z.boolean().optional(),
   description: z
@@ -68,7 +68,7 @@ const fieldSpec = z.object({
   validation: validationSpec
     .optional()
     .describe(
-      "Input validation for Command payload fields and Query params only (ignored on Event/State/Constraint/Notify/Actor fields and on Command/Query responseFields). Maps to JSON Schema (minLength, format, pattern, minimum, enum).",
+      "Input validation for Command payload fields and Query params only (ignored on Event/State/Constraint/External/Actor fields and on Command/Query responseFields). Maps to JSON Schema (minLength, format, pattern, minimum, enum).",
     ),
 });
 
@@ -144,13 +144,13 @@ function buildFields(
 ): StormField[] {
   return (specs ?? []).map((spec) => {
     const fieldType =
-      kind === "notify" || kind === "actor"
+      kind === "external" || kind === "actor"
         ? ""
         : (spec.fieldType ?? "string");
     return createStormField(
       toDisplayName(spec.name),
       fieldType,
-      kind === "notify" || kind === "actor" ? false : (spec.required ?? false),
+      kind === "external" || kind === "actor" ? false : (spec.required ?? false),
       spec.description,
       spec.tag ? toDisplayName(spec.tag) : undefined,
       options.allowValidation ? normalizeValidation(spec.validation) : undefined,
@@ -327,7 +327,7 @@ export const createStormCardsTool = defineTool({
       .enum(["verticalSlice", "lanes", "none"])
       .optional()
       .describe(
-        "Layout arrangement: 'verticalSlice' (default for slices: Command/Query top -> Constraint/State middle -> Event/Notify bottom; a read-side Constraint stacks between Query and State) or 'lanes' (horizontal lanes).",
+        "Layout arrangement: 'verticalSlice' (default for slices: Command/Query top -> Constraint/State middle -> Event/External bottom; a read-side Constraint stacks between Query and State) or 'lanes' (horizontal lanes).",
       ),
     nearCardId: z
       .string()
@@ -724,7 +724,7 @@ export const updateStormCardTool = defineTool({
 export const arrangeStormLanesTool = defineTool({
   name: "arrange_storm_lanes",
   description:
-    "Re-arrange event-storming cards into Actor→Command→Event→Notify→Query→State→Constraint lanes.",
+    "Re-arrange event-storming cards into Actor→Command→Event→External→Query→State→Constraint lanes.",
   schema: z.object({
     cardIds: z.array(z.string()).optional(),
     origin: z

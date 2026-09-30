@@ -138,7 +138,7 @@ export function PixiCanvas() {
         Digit3: "actor",
         Digit4: "state",
         Digit5: "constraint",
-        Digit6: "notify",
+        Digit6: "external",
         Digit7: "query",
       };
       if (

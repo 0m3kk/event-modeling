@@ -39,7 +39,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
    - **Business Logic Invariants vs. Command Validation**:
      - Constraints evaluate **business logic / state invariants** against event history via \`queryItems\` (e.g., "Account has sufficient funds", "User must exist", "Order cannot be cancelled after shipping", "Email must be unique").
      - Constraints do **NOT perform command input validation**. Command input validation (such as checking required fields, string formats, not empty, email format, positive amounts) belongs to the Command schema/payload validation. NEVER write command input validation rules inside a Constraint!
-      - **Field validation lives on the Command payload / Query params**: use the optional "validation" object on a Command's "fields" or a Query's "fields" (params) — { minLength, maxLength, pattern, format, min, max, allowedValues } — together with the field's "required" flag. "format" accepts email, uuid, uri, hostname, ipv4, ipv6, date, date-time, or time. These rules map to JSON Schema and are IGNORED on any other kind (Event, State, Constraint, Notify, Actor) and on Command/Query "responseFields".
+      - **Field validation lives on the Command payload / Query params**: use the optional "validation" object on a Command's "fields" or a Query's "fields" (params) — { minLength, maxLength, pattern, format, min, max, allowedValues } — together with the field's "required" flag. "format" accepts email, uuid, uri, hostname, ipv4, ipv6, date, date-time, or time. These rules map to JSON Schema and are IGNORED on any other kind (Event, State, Constraint, External, Actor) and on Command/Query "responseFields".
    - **Constraint Evolution**: When introducing a new Event, ALWAYS consider whether existing Constraints need revision! A new event may affect previously defined invariants.
      - Example: If a constraint checks "User Exists", initially it only queries \`User Registered\`. When a \`User Deleted\` event is added later, the existing "User Exists" constraint MUST be updated to also query \`User Deleted\` so it can verify the user is not deleted. Call \`update_storm_card\` to update existing constraints when related new events are created.
 6. **Authorization (Actions & Permissions)**:
@@ -60,7 +60,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
 
 ## How the Canvas Works
 - Objects on the canvas have unique ids and types:
-  - storm: Event-storming cards (actor, command, event, notify, query, state, constraint)
+  - storm: Event-storming cards (actor, command, event, external, query, state, constraint)
   - model: Data-model nodes (object, array, wrap, enum)
   - connector: Orthogonal 90° elbow connectors linking cards and nodes
   - line: Freeform straight lines. For layer separators always create them through \`separate_layers\` (never hand-place them), because only that tool knows the true gap between layers.
@@ -93,7 +93,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
 - **event**: Immutable domain fact in past tense (orange) — bottom card in Write Slice (or feeding Read Slice). Fields carry tags (\`tag\`) defining dynamic consistency boundaries.
 - **state**: DCB read-model projection (green) — the projection card in a Read Slice, below the Query and any optional Constraint layer. Splits into \`inputFields\` (params, tags live here), \`queryItems\`, and \`outputFields\` (rehydrated read-model fields).
 - **query**: Read request (indigo) — top card in Read Slice. \`fields\` (query params), \`responseFields\` (output payload), and \`action\`.
-- **notify**: Outbound user notification / message (sky) — typeless payload fields.
+- **external**: Interaction with a system outside the bounded context (sky) — typeless payload fields; e.g. an outbound user notification / message.
 
 References must be valid:
 - Prefer every field in an Event to exist in the associated Command or Constraint payload; timestamp/audit fields (Created At, Updated At) are exempt and need no source.
@@ -154,7 +154,7 @@ Modeling Guidelines:
 - DCB Tags: Only tag key/unique identifier fields (IDs, unique email, code). NEVER tag non-key fields (amount, status, dates) or all fields in an event.
 - State & Constraint split: inputFields = INPUT params (only these carry tags and can be referenced by queryItems.tagFields); queryItems = which events feed the card; outputFields = OUTPUT fields projected by rehydrating those events (never tagged). inputFields may be empty when a query item filters by event type only.
 - Constraints: Reusable and independent components checking domain business invariants against historical events (queryItems). Never perform command input validation in constraints or bundle unrelated workflow checks.
-- Command/Query input validation: a Command's fields and a Query's params (fields) may include a "validation" object ({ minLength, maxLength, pattern, format, min, max, allowedValues }) for input validation that maps to JSON Schema. Never put input validation in Constraint rules, and never set validation on Event/State/Constraint/Notify/Actor fields or on Command/Query responseFields.
+- Command/Query input validation: a Command's fields and a Query's params (fields) may include a "validation" object ({ minLength, maxLength, pattern, format, min, max, allowedValues }) for input validation that maps to JSON Schema. Never put input validation in Constraint rules, and never set validation on Event/State/Constraint/External/Actor fields or on Command/Query responseFields.
 - Layer separation (PREFERRED): separate the layers of a slice with horizontal lines via separate_layers (layers ordered top to bottom) instead of connecting every card. Always use separate_layers — it computes each line's exact gap; never hand-place separator lines with create_objects. Write slice: Command / Constraint(s) / Event(s). Read slice: Query / State / Event(s), optionally Query / Constraint(s) / State / Event(s) when a Constraint layer is present. Too many connectors make the canvas messy.
 - Connectors: Use sourceAnchor: "bottom", targetAnchor: "top" only for a specific downward link that the layout does not already imply.
 - Groups: Group all Actors in an "Actors" group. Group all Model nodes in a "Shared Types" group.
