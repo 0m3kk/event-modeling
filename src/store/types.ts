@@ -27,6 +27,7 @@ export interface TypeSelectTarget {
 }
 
 import type { FieldClipboard } from "@/types";
+import type { ObjectClipboard } from "@/utils/objectClipboard";
 import type { AlignDirection, DistributeDirection } from "@/utils/align";
 
 export interface StormFieldSelection {
@@ -118,6 +119,8 @@ export interface CanvasStoreState {
   /** Hovered validation ✓ badge, used to anchor its tooltip. */
   validationHover: ValidationTarget | null;
   fieldClipboard: FieldClipboard | null;
+  /** Snapshot of the selected objects/groups, filled by Cmd/Ctrl+C. */
+  objectClipboard: ObjectClipboard | null;
   stormActionHover: string | null;
   isSearchOpen: boolean;
   descHover: DescTarget | null;
@@ -170,6 +173,10 @@ export interface CanvasStoreActions {
   deleteSelectedRow: (objectId: string, rowId: string) => void;
   copySelectedFields: () => void;
   pasteFields: (objectId: string) => void;
+  /** Copy the selected objects/groups (cards, models, lines, connectors, …). */
+  copySelectedObjects: () => void;
+  /** Paste the object clipboard as fresh, independent copies. */
+  pasteObjects: () => void;
   addStormField: (
     objectId: string,
     section?: "params" | "response",

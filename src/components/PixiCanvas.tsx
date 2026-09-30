@@ -263,19 +263,32 @@ export function PixiCanvas() {
       }
 
       if (isCmdOrCtrl && e.code === "KeyC") {
-        const stormSelectedField = useCanvasStore.getState().stormSelectedField;
+        const { stormSelectedField, selectedIds } = useCanvasStore.getState();
+        // A highlighted field row copies just that row; otherwise the whole
+        // selection (cards, models, lines, connectors, groups, …) is copied.
         if (stormSelectedField?.fieldId) {
           e.preventDefault();
           useCanvasStore.getState().copySelectedFields();
           return;
         }
+        if (selectedIds.length > 0) {
+          e.preventDefault();
+          useCanvasStore.getState().copySelectedObjects();
+          return;
+        }
       }
 
       if (isCmdOrCtrl && e.code === "KeyV") {
-        const { selectedIds, fieldClipboard } = useCanvasStore.getState();
+        const { selectedIds, fieldClipboard, objectClipboard } =
+          useCanvasStore.getState();
         if (selectedIds.length === 1 && fieldClipboard) {
           e.preventDefault();
           useCanvasStore.getState().pasteFields(selectedIds[0]);
+          return;
+        }
+        if (objectClipboard) {
+          e.preventDefault();
+          useCanvasStore.getState().pasteObjects();
           return;
         }
       }

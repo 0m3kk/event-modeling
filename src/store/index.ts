@@ -16,6 +16,10 @@ import {
 } from "@/constants/storm";
 import { moveModelRowInObject, moveStormRowInObject } from "@/utils/rowReorder";
 import { buildFieldClipboard, canPasteFields } from "@/utils/fieldClipboard";
+import {
+  buildObjectClipboard,
+  buildPastedObjects,
+} from "@/utils/objectClipboard";
 import { alignObjects, distributeObjects } from "@/utils/align";
 import { componentNameOf, ensureUniqueComponentName } from "@/utils/naming";
 import { arrangeStormLanes, type StormLaneCard } from "@/utils/stormLayout";
@@ -89,6 +93,7 @@ export const initialCanvasState: CanvasStoreState = {
   bddStepPopup: null,
   validationHover: null,
   fieldClipboard: null,
+  objectClipboard: null,
   stormActionHover: null,
   isSearchOpen: false,
   descHover: null,
@@ -1363,7 +1368,8 @@ export const useCanvasStore = create<CanvasStore>()(
           stormSelectedField.fieldId,
         ]);
         if (fieldClipboard) {
-          set({ fieldClipboard });
+          // Last copy wins: a field snapshot supersedes any object snapshot.
+          set({ fieldClipboard, objectClipboard: null });
         }
       },
 
@@ -1499,6 +1505,52 @@ export const useCanvasStore = create<CanvasStore>()(
             stormSelectedField: { objectId: obj.id, fieldId: newFields[0]!.id },
           });
         }
+      },
+
+      copySelectedObjects: () => {
+        const { selectedIds, objects, groups, isLocked } = get();
+        if (isLocked) return;
+        const objectClipboard = buildObjectClipboard(
+          selectedIds,
+          objects,
+          groups,
+        );
+        if (!objectClipboard) return;
+        // Last copy wins: an object snapshot supersedes any field rows.
+        set({ objectClipboard, fieldClipboard: null });
+      },
+
+      pasteObjects: () => {
+        const { objectClipboard, isLocked } = get();
+        if (isLocked || !objectClipboard) return;
+        const pasted = buildPastedObjects(objectClipboard);
+        if (!pasted) return;
+        set((state) => {
+          // Dedupe pasted titles against the board (and within the batch), so a
+          // copied "CreateOrder" lands as "CreateOrder 2".
+          const existing = [...state.objects];
+          const added = pasted.objects.map((obj) => {
+            const next = ensureUniqueComponentName(obj, existing);
+            existing.push(next);
+            return next;
+          });
+          const objects = [...state.objects, ...added];
+          const groups = recomputeGroupBoundsForGroupIds(
+            objects,
+            [...state.groups, ...pasted.groups],
+            new Set(pasted.groups.map((g) => g.id)),
+          );
+          return {
+            objects,
+            groups,
+            selectedIds: added.map((o) => o.id),
+            stormSelectedField: null,
+            objectClipboard: {
+              ...objectClipboard,
+              pasteIndex: objectClipboard.pasteIndex + 1,
+            },
+          };
+        });
       },
 
       addStormField: (objectId, section = "params") => {

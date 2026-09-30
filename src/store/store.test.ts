@@ -911,6 +911,113 @@ describe("useCanvasStore", () => {
     expect(updatedB?.stormData?.outputFields?.[0].tag).toBe("order");
   });
 
+  it("copies and pastes selected cards as independent duplicates", () => {
+    const cardA: CanvasObject = {
+      id: "storm-A",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 150,
+      stormData: { kind: "event", name: "OrderPlaced", fields: [] },
+    };
+    const cardB: CanvasObject = {
+      id: "model-B",
+      type: "model",
+      x: 400,
+      y: 100,
+      width: 220,
+      height: 120,
+      modelData: { kind: "object", name: "Order", fields: [] },
+    };
+    useCanvasStore.getState().addObjects([cardA, cardB]);
+    useCanvasStore.getState().setSelectedIds(["storm-A", "model-B"]);
+
+    useCanvasStore.getState().copySelectedObjects();
+    expect(useCanvasStore.getState().objectClipboard?.objects).toHaveLength(2);
+
+    useCanvasStore.getState().pasteObjects();
+    const state = useCanvasStore.getState();
+    expect(state.objects).toHaveLength(4);
+    expect(state.selectedIds).toHaveLength(2);
+
+    const pastedA = state.objects.find((o) => o.id === state.selectedIds[0]!);
+    const pastedB = state.objects.find((o) => o.id === state.selectedIds[1]!);
+    expect(pastedA?.id).not.toBe("storm-A");
+    // Pasted titles dedupe against the board.
+    expect(pastedA?.stormData?.name).toBe("OrderPlaced 2");
+    expect(pastedB?.modelData?.name).toBe("Order 2");
+    // Placement is offset from the source.
+    expect(pastedA?.x).toBe(132);
+
+    // The sources are untouched.
+    expect(
+      state.objects.find((o) => o.id === "storm-A")?.stormData?.name,
+    ).toBe("OrderPlaced");
+
+    // A second paste steps the offset so copies do not stack.
+    useCanvasStore.getState().pasteObjects();
+    const again = useCanvasStore.getState();
+    const secondA = again.objects.find((o) => o.id === again.selectedIds[0]!);
+    expect(secondA?.x).toBe(164);
+  });
+
+  it("copies a group together with its members", () => {
+    const card: CanvasObject = {
+      id: "storm-A",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 150,
+      stormData: { kind: "event", name: "OrderPlaced", fields: [] },
+      groupId: "g1",
+    };
+    useCanvasStore.getState().addGroup({ id: "g1", name: "Flow" });
+    useCanvasStore.getState().addObjects([card]);
+    useCanvasStore.getState().setSelectedIds(["__group:g1"]);
+
+    useCanvasStore.getState().copySelectedObjects();
+    useCanvasStore.getState().pasteObjects();
+
+    const state = useCanvasStore.getState();
+    expect(state.objects).toHaveLength(2);
+    expect(state.groups).toHaveLength(2);
+    const pastedCard = state.objects.find((o) => o.id === state.selectedIds[0]!);
+    expect(pastedCard?.groupId).toBeDefined();
+    expect(pastedCard?.groupId).not.toBe("g1");
+    expect(state.groups.some((g) => g.id === pastedCard?.groupId)).toBe(true);
+  });
+
+  it("keeps the field and object clipboards mutually exclusive", () => {
+    const card: CanvasObject = {
+      id: "storm-A",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 150,
+      stormData: {
+        kind: "event",
+        name: "OrderPlaced",
+        fields: [{ id: "f1", name: "id", fieldType: "uuid" }],
+      },
+    };
+    useCanvasStore.getState().addObjects([card]);
+
+    useCanvasStore
+      .getState()
+      .setStormSelectedField({ objectId: "storm-A", fieldId: "f1" });
+    useCanvasStore.getState().copySelectedFields();
+    expect(useCanvasStore.getState().fieldClipboard).not.toBeNull();
+    expect(useCanvasStore.getState().objectClipboard).toBeNull();
+
+    useCanvasStore.getState().setSelectedIds(["storm-A"]);
+    useCanvasStore.getState().copySelectedObjects();
+    expect(useCanvasStore.getState().fieldClipboard).toBeNull();
+    expect(useCanvasStore.getState().objectClipboard).not.toBeNull();
+  });
+
   it("routes addStormField to input/output bands on State and Constraint cards", () => {
     const state: CanvasObject = {
       id: "storm-S",
