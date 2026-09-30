@@ -12,6 +12,8 @@ import {
 } from "./helpers";
 import { groupAndAncestorIds } from "@/utils/groupBounds";
 import { createLineObject } from "@/utils/lineGeometry";
+import { computeStormCardHeight, getCardMinDimensions } from "@/utils/cardDimensions";
+import { snapToGrid } from "@/utils/snapping";
 
 const CARDINAL_ANCHORS = ["top", "right", "bottom", "left"] as const;
 const anchor = z.enum(CARDINAL_ANCHORS);
@@ -244,7 +246,8 @@ const objectPatch = z.object({
 
 export const updateObjectsTool = defineTool({
   name: "update_objects",
-  description: "Update existing objects by id with a partial patch.",
+  description:
+    "Update existing objects by id with a partial patch. To change a card's size, prefer resize_objects — it snaps, clamps, and pins the width; a width patch here is ignored when the user locked it by hand.",
   schema: z.object({
     updates: z
       .array(z.object({ id: z.string(), patch: objectPatch }))
@@ -270,6 +273,82 @@ export const updateObjectsTool = defineTool({
     }
 
     return { updated, updatedCount: updated.length, notFound };
+  },
+});
+
+const resizeSpec = z.object({
+  id: z.string(),
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+});
+
+export const resizeObjectsTool = defineTool({
+  name: "resize_objects",
+  description:
+    "Set an explicit width and/or height on cards (storm, model, stickyNote, textBox). Use it to widen a card so long content fits, or whenever the user asks to resize one. Sizes snap to the grid and are clamped to the card's minimum, and a storm card's height still follows the content height for the new width. A width set here is pinned (widthLocked) so later content refits keep it — this deliberately overrides a width the user resized by hand, which is what the user wants when they asked to resize. Connectors and lines cannot be resized.",
+  schema: z.object({
+    resizes: z.array(resizeSpec).min(1).max(100),
+  }),
+  execute: (args, ctx) => {
+    const state = ctx.getState();
+    const resized: Array<{ id: string; width: number; height: number }> = [];
+    const skipped: Array<{ id: string; reason: string }> = [];
+    const notFound: string[] = [];
+
+    for (const { id, width, height } of args.resizes) {
+      const target = state.objects.find((o) => o.id === id);
+      if (!target) {
+        notFound.push(id);
+        continue;
+      }
+      if (width === undefined && height === undefined) {
+        skipped.push({ id, reason: "Provide a width and/or height." });
+        continue;
+      }
+      if (target.type === "connector" || target.type === "line") {
+        skipped.push({
+          id,
+          reason: `${target.type} objects are not resizable.`,
+        });
+        continue;
+      }
+
+      const { minWidth, minHeight } = getCardMinDimensions(target);
+      const patch: Partial<CanvasObject> = {};
+
+      if (width !== undefined) {
+        const nextWidth = Math.max(minWidth, snapToGrid(width));
+        patch.width = nextWidth;
+        // An explicit width is a deliberate choice: pin it so later content
+        // refits do not shrink or grow it, mirroring a manual resize.
+        patch.widthLocked = true;
+        if (
+          height === undefined &&
+          target.type === "storm" &&
+          target.stormData
+        ) {
+          patch.height = computeStormCardHeight(target.stormData, nextWidth);
+        }
+      }
+      if (height !== undefined) {
+        patch.height = Math.max(minHeight, snapToGrid(height));
+      }
+
+      state.updateObject(id, patch);
+      const updated = ctx.getState().objects.find((o) => o.id === id);
+      resized.push({
+        id,
+        width: updated?.width ?? target.width,
+        height: updated?.height ?? target.height,
+      });
+    }
+
+    return {
+      resized,
+      resizedCount: resized.length,
+      notFound,
+      ...(skipped.length > 0 ? { skipped } : {}),
+    };
   },
 });
 
@@ -497,9 +576,25 @@ export const ungroupObjectsTool = defineTool({
   },
 });
 
+export const highlightObjectsTool = defineTool({
+  name: "highlight_objects",
+  description:
+    "Ring objects with a pulsing highlight so the user can see which ones you mean, WITHOUT selecting them. Prefer this over select_objects whenever you only want to point something out: it changes no selection and no object state, so it cannot cause unintended follow-up edits. Pass an empty ids list to clear the highlight.",
+  schema: z.object({ ids: z.array(z.string()).max(500) }),
+  execute: (args, ctx) => {
+    const state = ctx.getState();
+    const valid = args.ids.filter((id) =>
+      state.objects.some((o) => o.id === id),
+    );
+    state.setAIHighlight(valid);
+    return { highlighted: valid, count: valid.length };
+  },
+});
+
 export const selectObjectsTool = defineTool({
   name: "select_objects",
-  description: "Select objects on the canvas by id.",
+  description:
+    "Select objects on the canvas by id. This leaves a live selection the user did not make, so their next action may hit these objects. Only use it when the user asked for a selection or your very next step edits exactly these ids; to merely point objects out, use highlight_objects instead.",
   schema: z.object({ ids: z.array(z.string()).max(500) }),
   execute: (args, ctx) => {
     const state = ctx.getState();
@@ -692,12 +787,14 @@ export const separateLayersTool = defineTool({
 export const writeTools = [
   createObjectsTool,
   updateObjectsTool,
+  resizeObjectsTool,
   deleteObjectsTool,
   connectObjectsTool,
   separateLayersTool,
   createReferenceCopiesTool,
   groupObjectsTool,
   ungroupObjectsTool,
+  highlightObjectsTool,
   selectObjectsTool,
   focusViewportTool,
 ];

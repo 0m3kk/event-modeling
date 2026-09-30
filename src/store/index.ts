@@ -95,6 +95,7 @@ export const initialCanvasState: CanvasStoreState = {
   fieldClipboard: null,
   objectClipboard: null,
   stormActionHover: null,
+  aiHighlightIds: [],
   isSearchOpen: false,
   descHover: null,
   actionHover: null,
@@ -1247,6 +1248,17 @@ export const useCanvasStore = create<CanvasStore>()(
 
       setStormActionHover: (stormActionHover) => set({ stormActionHover }),
 
+      setAIHighlight: (ids) => {
+        const state = get();
+        if (
+          state.aiHighlightIds.length === ids.length &&
+          state.aiHighlightIds.every((id, idx) => id === ids[idx])
+        ) {
+          return;
+        }
+        set({ aiHighlightIds: ids });
+      },
+
       moveRow: (objectId, rowId, direction) => {
         const state = get();
         const obj = state.objects.find((o) => o.id === objectId);
@@ -1910,6 +1922,7 @@ export const useCanvasStore = create<CanvasStore>()(
           bddStepPopup: null,
           validationHover: null,
           stormActionHover: null,
+          aiHighlightIds: [],
           isSearchOpen: false,
           descHover: null,
           actionHover: null,
@@ -1953,6 +1966,7 @@ export const useCanvasStore = create<CanvasStore>()(
           aiError: null,
           aiStepUsed: 0,
           aiStepLimit: MAX_AGENT_ITERATIONS,
+          aiHighlightIds: [],
         });
 
         const controller = new AbortController();

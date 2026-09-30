@@ -5,6 +5,7 @@ import { executeToolCall } from "./index";
 import type { AIToolContext } from "./types";
 import { buildReferenceCopy, generateReferenceId } from "@/utils/reference";
 import { createLineObject } from "@/utils/lineGeometry";
+import { computeStormCardHeight } from "@/utils/cardDimensions";
 
 interface FakeStore {
   store: CanvasStore;
@@ -27,6 +28,7 @@ function createFakeStore(): FakeStore {
     stormSelectedField: null,
     fieldClipboard: null,
     stormActionHover: null,
+    aiHighlightIds: [] as string[],
     isSearchOpen: false,
     descHover: null,
     actionHover: null,
@@ -51,6 +53,9 @@ function createFakeStore(): FakeStore {
     },
     setSelectedIds: (ids: string[]) => {
       store.selectedIds = ids;
+    },
+    setAIHighlight: (ids: string[]) => {
+      store.aiHighlightIds = ids;
     },
     createReferenceCopy: (ids: string[]) => {
       const idSet = new Set(ids);
@@ -1213,6 +1218,167 @@ describe("AI Model & Write Tools", () => {
     const lines = fake.objects.filter((o) => o.type === "line");
     expect(lines).toHaveLength(1);
     expect(lines[0]!.groupId).toBe("slice");
+  });
+
+  it("highlight_objects rings objects without changing the selection", async () => {
+    const fake = createFakeStore();
+    fake.objects.push(
+      {
+        id: "e1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: { kind: "event", name: "Order Placed", fields: [] },
+      },
+      {
+        id: "e2",
+        type: "storm",
+        x: 300,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: { kind: "event", name: "Order Shipped", fields: [] },
+      },
+    );
+    fake.store.setSelectedIds(["e2"]);
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "highlight_objects",
+        arguments: JSON.stringify({ ids: ["e1", "missing"] }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const data = JSON.parse(res.content);
+    expect(data.highlighted).toEqual(["e1"]);
+    expect(data.count).toBe(1);
+    expect(fake.store.aiHighlightIds).toEqual(["e1"]);
+    // Pointing at objects must never touch the live selection.
+    expect(fake.store.selectedIds).toEqual(["e2"]);
+  });
+
+  it("resize_objects snaps, clamps and pins the width, and reflows a storm card height", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "e1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 120,
+      stormData: { kind: "event", name: "Order Placed", fields: [] },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "resize_objects",
+        arguments: JSON.stringify({ resizes: [{ id: "e1", width: 306 }] }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(JSON.parse(res.content).resizedCount).toBe(1);
+    const card = fake.objects[0]!;
+    // 306 snaps to the 10px grid; the new width is pinned so later content
+    // refits keep it.
+    expect(card.width).toBe(310);
+    expect(card.widthLocked).toBe(true);
+    expect(card.height).toBe(
+      computeStormCardHeight(card.stormData!, card.width),
+    );
+  });
+
+  it("resize_objects clamps to the card minimum", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "e1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 120,
+      stormData: { kind: "event", name: "Order Placed", fields: [] },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "resize_objects",
+        arguments: JSON.stringify({ resizes: [{ id: "e1", width: 100 }] }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects[0]!.width).toBe(180);
+  });
+
+  it("resize_objects overrides a width the user resized by hand", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "e1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 80,
+      widthLocked: true,
+      stormData: { kind: "event", name: "Order Placed", fields: [] },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "resize_objects",
+        arguments: JSON.stringify({ resizes: [{ id: "e1", width: 300 }] }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects[0]!.width).toBe(300);
+    expect(fake.objects[0]!.widthLocked).toBe(true);
+  });
+
+  it("resize_objects skips connectors/lines and reports unknown ids", async () => {
+    const fake = createFakeStore();
+    fake.objects.push(
+      { id: "c1", type: "connector", x: 0, y: 0, width: 0, height: 0 },
+      { id: "l1", type: "line", x: 0, y: 0, width: 10, height: 0 },
+    );
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "resize_objects",
+        arguments: JSON.stringify({
+          resizes: [
+            { id: "c1", width: 100 },
+            { id: "l1", height: 50 },
+            { id: "nope", width: 100 },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const data = JSON.parse(res.content);
+    expect(data.resizedCount).toBe(0);
+    expect(data.notFound).toEqual(["nope"]);
+    expect(data.skipped).toHaveLength(2);
   });
 
   it("group_objects and ungroup_objects manage sections", async () => {

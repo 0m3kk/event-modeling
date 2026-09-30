@@ -122,6 +122,8 @@ export interface CanvasStoreState {
   /** Snapshot of the selected objects/groups, filled by Cmd/Ctrl+C. */
   objectClipboard: ObjectClipboard | null;
   stormActionHover: string | null;
+  /** Objects the AI is pointing at; drawn as a pulsing ring, never a selection. */
+  aiHighlightIds: string[];
   isSearchOpen: boolean;
   descHover: DescTarget | null;
   actionHover: ActionTarget | null;
@@ -168,6 +170,8 @@ export interface CanvasStoreActions {
   // Row manipulations & field clipboard
   setStormSelectedField: (sel: StormFieldSelection | null) => void;
   setStormActionHover: (action: string | null) => void;
+  /** Ring the objects the AI wants to point out, without selecting them. */
+  setAIHighlight: (ids: string[]) => void;
   moveRow: (objectId: string, rowId: string, direction: "up" | "down") => void;
   deleteSelectedStormField: () => void;
   deleteSelectedRow: (objectId: string, rowId: string) => void;

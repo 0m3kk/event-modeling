@@ -1041,6 +1041,8 @@ export class PixiEngine {
 
     canvas.addEventListener("pointerdown", (e: PointerEvent) => {
       const state = useCanvasStore.getState();
+      // The user taking over clears the AI's highlight ring.
+      if (state.aiHighlightIds.length > 0) state.setAIHighlight([]);
       this.hadPopoverOnPointerDown = Boolean(
         state.typeSelect || state.inlineEdit,
       );
@@ -2061,6 +2063,7 @@ export class PixiEngine {
     let prevGroups = useCanvasStore.getState().groups;
     let prevStormSelectedField = useCanvasStore.getState().stormSelectedField;
     let prevStormActionHover = useCanvasStore.getState().stormActionHover;
+    let prevAIHighlightIds = useCanvasStore.getState().aiHighlightIds;
     let prevViewport = useCanvasStore.getState().viewport;
 
     this.storeUnsubscribe = useCanvasStore.subscribe((state) => {
@@ -2090,6 +2093,12 @@ export class PixiEngine {
       // Hovering an action badge toggles the authorized-actor highlights
       if (state.stormActionHover !== prevStormActionHover) {
         prevStormActionHover = state.stormActionHover;
+        contentChanged = true;
+      }
+
+      // The AI pointing at objects toggles its own highlight ring
+      if (state.aiHighlightIds !== prevAIHighlightIds) {
+        prevAIHighlightIds = state.aiHighlightIds;
         contentChanged = true;
       }
 
@@ -2283,6 +2292,7 @@ export class PixiEngine {
 
       // Visual Link Layer (Real-time DCB highlights or Actor Hover highlights)
       const stormActionHover = useCanvasStore.getState().stormActionHover;
+      const aiHighlightIds = useCanvasStore.getState().aiHighlightIds;
       const selectedStateCard = objects.find(
         (o) =>
           selectedIds.includes(o.id) &&
@@ -2293,6 +2303,12 @@ export class PixiEngine {
       if (stormActionHover) {
         const authorizedActors = getAuthorizedActors(objects, stormActionHover);
         this.visualLinkLayer.renderHighlights(authorizedActors);
+      } else if (aiHighlightIds.length > 0) {
+        // The AI is pointing at objects without selecting them.
+        const aiHighlighted = objects.filter((o) =>
+          aiHighlightIds.includes(o.id),
+        );
+        this.visualLinkLayer.renderHighlights(aiHighlighted, "ai");
       } else if (selectedStateCard) {
         const matchingIds = collectMatchingEventIds(objects, selectedStateCard);
         const matchingEvents = objects.filter((o) =>
