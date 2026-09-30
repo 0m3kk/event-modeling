@@ -295,7 +295,7 @@ export const deleteObjectsTool = defineTool({
 export const connectObjectsTool = defineTool({
   name: "connect_objects",
   description:
-    "Draw orthogonal 90° elbow connectors between cards/nodes when a directional link is genuinely needed. Use sparingly: connecting every Command -> Constraint -> Event (or Event -> State) quickly clutters the board. For layer-to-layer flow prefer separate_layers, which draws horizontal separators instead. NEVER connect Actor to Command or Query (authorization is decoupled via action and permissions).",
+    "Draw orthogonal 90° elbow connectors between cards/nodes when a directional link is genuinely needed. Use sparingly: connecting every Command -> Constraint -> Event (or Query -> State) quickly clutters the board. For layer-to-layer flow prefer separate_layers, which draws horizontal separators instead. NEVER connect Actor to Command or Query (authorization is decoupled via action and permissions).",
   schema: z.object({
     connections: z
       .array(
@@ -551,7 +551,7 @@ export const focusViewportTool = defineTool({
 export const separateLayersTool = defineTool({
   name: "separate_layers",
   description:
-    "Draw horizontal separator lines between the layers of a vertical slice, so the board stays readable without a connector between every card. Pass the card ids grouped by layer, ordered top to bottom — e.g. Write Slice [[commandId], [constraintId, ...], [eventId, ...]] or Read Slice [[queryId], [stateId], [eventId, ...]] (add a constraint layer: [[queryId], [constraintId, ...], [stateId], [eventId, ...]]). One line is drawn in each vertical gap, spanning the widest cards of the two layers. Prefer this over connect_objects for the Command -> Constraint -> Event (and Query/State/Event) flow.",
+    "Draw horizontal separator lines between the layers of a vertical slice, so the board stays readable without a connector between every card. Pass the card ids grouped by layer, ordered top to bottom — e.g. Write Slice [[commandId], [constraintId, ...], [eventId, ...]] or Read Slice [[queryId], [stateId]] (add a constraint layer: [[queryId], [constraintId, ...], [stateId]]). One line is drawn in each vertical gap, spanning the widest cards of the two layers. Prefer this over connect_objects for the Command -> Constraint -> Event (and Query -> State) flow.",
   schema: z.object({
     layers: z
       .array(z.array(z.string()).min(1))
