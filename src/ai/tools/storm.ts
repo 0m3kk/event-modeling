@@ -14,6 +14,7 @@ import {
   computeOptimalStormCardWidth,
 } from "@/utils/cardDimensions";
 import { toDisplayName } from "@/utils/naming";
+import { stormHasResponseFields } from "@/constants/storm";
 import { getActorPermissions } from "@/utils/stormAuth";
 import { normalizeValidation } from "@/utils/fieldValidation";
 import { fieldValidationSpec } from "./fieldValidationSpec";
@@ -67,7 +68,7 @@ const fieldSpec = z.object({
   validation: validationSpec
     .optional()
     .describe(
-      "Input validation for Command payload fields and Query params only (ignored on Event/State/Constraint/Notify/Actor fields and Query responseFields). Maps to JSON Schema (minLength, format, pattern, minimum, enum).",
+      "Input validation for Command payload fields and Query params only (ignored on Event/State/Constraint/Notify/Actor fields and on Command/Query responseFields). Maps to JSON Schema (minLength, format, pattern, minimum, enum).",
     ),
 });
 
@@ -159,7 +160,8 @@ function buildFields(
 
 /**
  * Whether a kind's PRIMARY field list (Command payload / Query params) may
- * carry input validation. Query responseFields and all other kinds cannot.
+ * carry input validation. Command/Query responseFields and all other kinds
+ * cannot.
  */
 function kindValidatesFields(kind: StormKind): boolean {
   return kind === "command" || kind === "query";
@@ -200,7 +202,7 @@ function buildStormData(input: {
       data.permissions = input.permissions.map((p) => p.trim()).filter(Boolean);
     }
   }
-  if (input.responseFields && input.kind === "query") {
+  if (input.responseFields && stormHasResponseFields(input.kind)) {
     data.responseFields = input.responseFields;
   }
 
@@ -252,7 +254,7 @@ function layoutSize(
 export const createStormCardsTool = defineTool({
   name: "create_storm_cards",
   description:
-    "Create event-storming cards. For Write Slices: Command (intent + action) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; prefer event fields that also appear in the Command or Constraint payload, though timestamp/audit fields like Created At/Updated At are exempt). For Read Slices: Query (params + responseFields + action) -> State (projection) <- Event, optionally with a Constraint layer between Query and State (Query -> Constraint(s) -> State <- Event) when the read needs to check an invariant or visibility rule. State and Constraint split fields into three parts: inputFields (INPUT params; only these may carry tags and feed queryItems.tagFields), queryItems (which events feed the card; leave inputFields empty if it filters by event type only), and outputFields (OUTPUT fields produced by rehydrating the matching events; never tag these). Command payload fields and Query params may set `validation` (minLength/maxLength/pattern/format/min/max/allowedValues) for input validation that maps to JSON Schema; never put validation rules in Constraint text. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
+    "Create event-storming cards. For Write Slices: Command (intent + action, optional responseFields for the handler's response) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; prefer event fields that also appear in the Command or Constraint payload, though timestamp/audit fields like Created At/Updated At are exempt). For Read Slices: Query (params + responseFields + action) -> State (projection) <- Event, optionally with a Constraint layer between Query and State (Query -> Constraint(s) -> State <- Event) when the read needs to check an invariant or visibility rule. State and Constraint split fields into three parts: inputFields (INPUT params; only these may carry tags and feed queryItems.tagFields), queryItems (which events feed the card; leave inputFields empty if it filters by event type only), and outputFields (OUTPUT fields produced by rehydrating the matching events; never tag these). Command payload fields and Query params may set `validation` (minLength/maxLength/pattern/format/min/max/allowedValues) for input validation that maps to JSON Schema; never put validation rules in Constraint text or on a responseFields row. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
   schema: z.object({
     cards: z
       .array(
@@ -280,7 +282,9 @@ export const createStormCardsTool = defineTool({
           responseFields: z
             .array(fieldSpec)
             .optional()
-            .describe("Query cards only (output fields)."),
+            .describe(
+              "Query & Command cards: the RESPONSE output payload (Query read result / Command handler response). Never carries input validation.",
+            ),
           queryItems: z
             .array(queryItemSpec)
             .optional()
@@ -585,7 +589,12 @@ export const updateStormCardTool = defineTool({
       .describe(
         "State & Constraint cards: replace the OUTPUT (rehydrated) fields. No tags.",
       ),
-    responseFields: z.array(fieldSpec).optional(),
+    responseFields: z
+      .array(fieldSpec)
+      .optional()
+      .describe(
+        "Query & Command cards: replace the RESPONSE payload. Never carries input validation.",
+      ),
     queryItems: z
       .array(queryItemSpec)
       .optional()

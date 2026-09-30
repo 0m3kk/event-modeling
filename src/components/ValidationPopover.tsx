@@ -45,7 +45,7 @@ type ValidationEditor =
  * - an array model node (item count only)
  * - a wrap model node (rules for the whole wrapped value)
  *
- * Enum nodes and Query response fields have no validation. Edits apply live;
+ * Enum nodes and Command/Query response fields have no validation. Edits apply live;
  * clearing every rule removes the validation object.
  */
 export function ValidationPopover({

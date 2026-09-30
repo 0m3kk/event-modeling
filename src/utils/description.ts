@@ -9,7 +9,7 @@ import type {
 /**
  * Finds a storm field row by id across every field band a card can carry:
  * primary fields, State/Constraint input params, projected output fields, and
- * Query response fields.
+ * Command/Query response fields.
  */
 function findStormField(
   data: StormData,

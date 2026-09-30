@@ -120,9 +120,14 @@ export interface StormField {
  * - `outputFields` — OUTPUT fields obtained after rehydrating / projecting the
  *   selected events (the read-model shape). Output fields never carry tags.
  *
- * Every other kind keeps using `fields` (and `responseFields` on Query cards).
+ * Every other kind keeps using `fields` (and `responseFields` on Query and
+ * Command cards).
  * State/Constraint do not reuse `fields`: it stays empty for them so input and
  * output never blur together.
+ *
+ * A Command's `fields` are its payload and `responseFields` the response the
+ * handler returns; unlike Query its payload band stays unlabeled (no PARAMS
+ * heading) while the RESPONSE band is always shown.
  */
 export interface StormData {
   kind: StormKind;
@@ -139,8 +144,8 @@ export interface StormData {
   inputFields?: StormField[];
   /** State & Constraint cards only: OUTPUT fields produced by projecting matching events. */
   outputFields?: StormField[];
-  /** Query cards only (Response fields) */
-  responseFields?: StormField[]; // Query cards only (Response fields)
+  /** Query & Command cards (Response fields) */
+  responseFields?: StormField[]; // Query & Command cards (Response fields)
   queryItems?: StormQueryItem[]; // State & Constraint cards (DCB Query)
   constraints?: StormConstraint[]; // Constraint cards only
   /**

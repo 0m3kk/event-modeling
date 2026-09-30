@@ -7,7 +7,7 @@ import type { CanvasObject, ModelData, StormData } from "@/types";
  * - model "object": modelData.fields
  * - model "enum": modelData.values
  * - storm (command/event/state/constraint/notify/query): stormData.fields
- * - storm query: stormData.responseFields
+ * - storm query/command: stormData.responseFields
  * - storm state/constraint: stormData.queryItems
  * - storm constraint: stormData.constraints
  *

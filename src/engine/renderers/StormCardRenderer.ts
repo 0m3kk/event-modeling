@@ -731,8 +731,9 @@ export class StormCardRenderer {
 
       renderFieldList(fields, "params", stormHasTags(kind));
 
-      // Render Response — the band is always present on Query cards, matching
-      // the Params band (the original keeps both sections visible even when empty).
+      // Render Response — the band is always present on Query/Command cards,
+      // matching the Params band (Query) so both sections stay visible even
+      // when empty.
       if (hasResponse) {
         const rLabel = new Text({
           text: "RESPONSE",

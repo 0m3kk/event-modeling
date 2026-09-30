@@ -214,15 +214,28 @@ export function stormHasQueryItems(kind: StormKind): boolean {
   return STORM_QUERY_ITEM_KINDS.includes(kind);
 }
 
-/** Kinds with dual sections: Params and Response */
-export const STORM_DUAL_SECTION_KINDS: readonly StormKind[] = ["query"];
+/**
+ * Kinds that carry a RESPONSE section (the output payload below their
+ * input band):
+ * - Query — the read-model output returned to the caller
+ * - Command — the response payload the handler returns
+ */
+export const STORM_RESPONSE_KINDS: readonly StormKind[] = ["query", "command"];
 
+/** Whether a kind renders the RESPONSE section below its payload/params */
 export function stormHasResponseFields(kind: StormKind): boolean {
-  return STORM_DUAL_SECTION_KINDS.includes(kind);
+  return STORM_RESPONSE_KINDS.includes(kind);
 }
 
+/**
+ * Kinds whose primary field list gets an explicit "PARAMS" label above it.
+ * Query only: a Command's primary list reads as its payload and stays
+ * unlabeled, even though a Command now also carries a RESPONSE section.
+ */
+export const STORM_PARAMS_SECTION_KINDS: readonly StormKind[] = ["query"];
+
 export function stormHasParamsSection(kind: StormKind): boolean {
-  return STORM_DUAL_SECTION_KINDS.includes(kind);
+  return STORM_PARAMS_SECTION_KINDS.includes(kind);
 }
 
 /** Kinds that can carry an authorization action */

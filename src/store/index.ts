@@ -6,6 +6,7 @@ import {
   bddDefaultRefForPhase,
   stormHasFieldTypes,
   stormHasInputFields,
+  stormHasResponseFields,
   stormHasValidation,
 } from "@/constants/storm";
 import { moveModelRowInObject, moveStormRowInObject } from "@/utils/rowReorder";
@@ -1500,7 +1501,7 @@ export const useCanvasStore = create<CanvasStore>()(
                   ...data,
                   inputFields: [...(data.inputFields ?? []), newField],
                 };
-        } else if (data.kind === "query" && section === "response") {
+        } else if (stormHasResponseFields(data.kind) && section === "response") {
           nextData = {
             ...data,
             responseFields: [...(data.responseFields ?? []), newField],

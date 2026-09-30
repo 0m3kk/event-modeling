@@ -28,8 +28,9 @@ describe("Pixi Card Renderers", () => {
     };
 
     const res = StormCardRenderer.draw(container, obj, 1, false);
-    // The action no longer occupies a row: only the header + two field rows.
-    expect(res.height).toBe(104);
+    // The action no longer occupies a row: header + two field rows + the
+    // always-present Command RESPONSE band (one section label).
+    expect(res.height).toBe(126);
     expect(res.hitZones.length).toBeGreaterThan(0);
 
     const headerZone = res.hitZones.find((z) => z.type === "header");
@@ -428,6 +429,36 @@ describe("Pixi Card Renderers", () => {
     expect(res.hitZones.filter((z) => z.type === "fieldName").length).toBe(2);
     expect(res.hitZones.some((z) => z.section === "params")).toBe(true);
     expect(res.hitZones.some((z) => z.section === "response")).toBe(true);
+  });
+
+  it("renders Storm command card with a RESPONSE band and an unlabeled payload", () => {
+    const container = new Container();
+    const obj: CanvasObject = {
+      id: "cmd-resp",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 180,
+      stormData: {
+        kind: "command",
+        name: "PlaceOrder",
+        action: "order:create:tenant",
+        fields: [{ id: "p1", name: "orderId", fieldType: "uuid" }],
+        responseFields: [{ id: "r1", name: "orderId", fieldType: "uuid" }],
+      },
+    };
+
+    const res = StormCardRenderer.draw(container, obj, 1, false);
+    expect(res.hitZones.filter((z) => z.type === "fieldName").length).toBe(2);
+    expect(res.hitZones.some((z) => z.section === "response")).toBe(true);
+
+    // Command payload rows stay unlabeled: RESPONSE shows, PARAMS does not.
+    const labels = container.children
+      .filter((c): c is Text => c instanceof Text)
+      .map((t) => t.text);
+    expect(labels).toContain("RESPONSE");
+    expect(labels).not.toContain("PARAMS");
   });
 
   it("renders Storm state card with DCB query items", () => {

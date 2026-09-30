@@ -390,6 +390,13 @@ describe("AI Storm Tools", () => {
                   validation: { min: 1, max: 10 },
                 },
               ],
+              responseFields: [
+                {
+                  name: "orderId",
+                  fieldType: "uuid",
+                  validation: { minLength: 1 },
+                },
+              ],
             },
             {
               kind: "query",
@@ -436,6 +443,11 @@ describe("AI Storm Tools", () => {
       maxLength: 255,
     });
     expect(command.stormData?.fields[1].validation).toEqual({ min: 1, max: 10 });
+    // Command response fields are stored but never carry input validation.
+    expect(command.stormData?.responseFields).toHaveLength(1);
+    expect(
+      command.stormData?.responseFields?.[0].validation,
+    ).toBeUndefined();
 
     const query = fake.objects.find((o) => o.stormData?.kind === "query")!;
     expect(query.stormData?.fields[0].validation).toEqual({

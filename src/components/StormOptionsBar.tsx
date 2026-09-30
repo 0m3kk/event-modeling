@@ -11,6 +11,7 @@ import {
   stormHasInputFields,
   stormHasPhase,
   stormHasQueryItems,
+  stormHasResponseFields,
   stormHasSteps,
   stormHasTags,
   stormHasValidation,
@@ -109,7 +110,7 @@ export function StormOptionsBar() {
       : null;
 
   // Only INPUT params (State/Constraint) or primary fields (Event/BDD) carry
-  // tags; projected output fields and Query responses never do.
+  // tags; projected output fields and Command/Query responses never do.
   const taggableField =
     selectedField && stormHasTags(kind)
       ? stormHasInputFields(kind)
@@ -118,8 +119,8 @@ export function StormOptionsBar() {
       : false;
 
   // Command payload fields and Query params are the only user input the board
-  // validates. Query Response fields live in `responseFields`, so a selected
-  // response row simply falls through to null here.
+  // validates. Command/Query Response fields live in `responseFields`, so a
+  // selected response row simply falls through to null here.
   const validationField =
     selectedField && stormHasValidation(kind)
       ? data.fields.some((f) => f.id === selectedField.id)
@@ -557,8 +558,8 @@ export function StormOptionsBar() {
           </button>
         )}
 
-        {/* Add Response Field Button (Query cards — the Response section) */}
-        {kind === "query" && (
+        {/* Add Response Field Button (Query / Command cards — the RESPONSE section) */}
+        {stormHasResponseFields(kind) && (
           <button
             onClick={() => addStormField(selectedStorm.id, "response")}
             title="Add Response Field"

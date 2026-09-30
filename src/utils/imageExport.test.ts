@@ -58,6 +58,9 @@ describe("imageExport", () => {
           name: "ProcessPayment",
           action: "payment:process:admin",
           fields: [],
+          responseFields: [
+            { id: "cr1", name: "paymentId", fieldType: "uuid" },
+          ],
         },
       },
       {
@@ -89,6 +92,8 @@ describe("imageExport", () => {
     expect(svg).toContain("</svg>");
     expect(svg).toContain("OrderPlaced");
     expect(svg).toContain("ProcessPayment");
+    // A Command's RESPONSE payload is part of the exported body too.
+    expect(svg).toContain("paymentId");
     expect(svg).toContain("Ordering Domain");
     expect(svg).toContain("path d=");
     expect(svg).toContain("marker-end=\"url(#arrow)\"");

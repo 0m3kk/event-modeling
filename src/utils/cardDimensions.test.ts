@@ -25,9 +25,10 @@ describe("cardDimensions", () => {
     };
 
     // The authorization action is a header badge and adds no height, so the
-    // base is measured from the header plus the two field rows.
+    // base is measured from the header plus the two field rows plus the
+    // always-present Command RESPONSE band (one section label).
     const h1 = computeStormCardHeight(data);
-    expect(h1).toBe(36 + 6 + 2 * 26 + 10);
+    expect(h1).toBe(36 + 6 + 2 * 26 + 22 + 10);
 
     const withMoreFields: StormData = {
       ...data,
@@ -72,6 +73,26 @@ describe("cardDimensions", () => {
     // adds exactly one row.
     expect(computeStormCardHeight(withResponse)).toBe(
       computeStormCardHeight(paramsOnly) + 26,
+    );
+  });
+
+  it("gives a Command a RESPONSE band without a PARAMS label", () => {
+    const command: StormData = {
+      kind: "command",
+      name: "PlaceOrder",
+      fields: [{ id: "p1", name: "orderId", fieldType: "uuid" }],
+      responseFields: [],
+    };
+    // Command payload is unlabeled: no PARAMS section label is added, but the
+    // RESPONSE band (one section label) is always present.
+    expect(computeStormCardHeight(command)).toBe(36 + 6 + 26 + 22 + 10);
+
+    const withResponse: StormData = {
+      ...command,
+      responseFields: [{ id: "r1", name: "orderId", fieldType: "uuid" }],
+    };
+    expect(computeStormCardHeight(withResponse)).toBe(
+      computeStormCardHeight(command) + 26,
     );
   });
 

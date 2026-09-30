@@ -378,6 +378,39 @@ describe("Phase 5 - Floating Options Bars, Alignment & Domain Utilities", () => 
       ]);
     });
 
+    it("adds Command payload and response fields into their separate sections", () => {
+      const commandCard: CanvasObject = {
+        id: "cmd-1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "command",
+          name: "Place Order",
+          action: "order:create:scope",
+          fields: [],
+          responseFields: [],
+        },
+      };
+      useCanvasStore.getState().addObject(commandCard);
+
+      useCanvasStore.getState().addStormField("cmd-1", "params");
+      const r1 = useCanvasStore.getState().addStormField("cmd-1", "response");
+      const r2 = useCanvasStore.getState().addStormField("cmd-1", "response");
+
+      const updated = useCanvasStore
+        .getState()
+        .objects.find((o) => o.id === "cmd-1");
+      expect(updated?.stormData?.fields).toHaveLength(1);
+      expect(updated?.stormData?.responseFields).toHaveLength(2);
+      expect(updated?.stormData?.responseFields?.map((f) => f.id)).toEqual([
+        r1,
+        r2,
+      ]);
+    });
+
     it("supports adding model fields and enum values", () => {
       const objModel: CanvasObject = {
         id: "m-obj",

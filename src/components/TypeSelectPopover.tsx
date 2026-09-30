@@ -29,7 +29,7 @@ const PRIMITIVES = [
 
 /**
  * Which StormData field list a type change targets. State/Constraint split
- * fields into input params/output fields; Query uses params/response.
+ * fields into input params/output fields; Query and Command use params/response.
  */
 function stormFieldListKey(
   data: StormData,
