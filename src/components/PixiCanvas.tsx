@@ -194,12 +194,12 @@ export function PixiCanvas() {
         return;
       }
 
-      if (e.code === "KeyV") {
+      if (e.code === "KeyV" && !isCmdOrCtrl) {
         useCanvasStore.getState().setTool("select");
         return;
       }
 
-      if (e.code === "KeyL") {
+      if (e.code === "KeyL" && !isCmdOrCtrl) {
         useCanvasStore.getState().setTool("connector");
         return;
       }
