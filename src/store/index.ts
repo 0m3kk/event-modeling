@@ -14,6 +14,8 @@ import { alignObjects, distributeObjects } from "@/utils/align";
 import { componentNameOf, ensureUniqueComponentName } from "@/utils/naming";
 import { arrangeStormLanes, type StormLaneCard } from "@/utils/stormLayout";
 import {
+  findAdoptableLines,
+  getObjectUnionBounds,
   groupHasContent,
   recomputeGroupBoundsForObjects,
   recomputeGroupBoundsForGroupIds,
@@ -657,6 +659,21 @@ export const useCanvasStore = create<CanvasStore>()(
         );
         if (validObjects.length === 0) return;
 
+        // Separator lines already drawn across this section join it, so the
+        // frame grows to enclose them instead of leaving them stranded outside.
+        const existingMembers = state.objects.filter(
+          (o) => o.groupId === groupId && o.type !== "connector",
+        );
+        const region = getObjectUnionBounds([
+          ...existingMembers,
+          ...validObjects,
+        ]);
+        if (region) {
+          for (const line of findAdoptableLines(state.objects, region)) {
+            targetIdSet.add(line.id);
+          }
+        }
+
         const nextObjects = state.objects.map((obj) =>
           targetIdSet.has(obj.id) && obj.type !== "connector"
             ? { ...obj, groupId }
@@ -937,13 +954,23 @@ export const useCanvasStore = create<CanvasStore>()(
         }
 
         // Otherwise create a new group from candidate objects
-        const targetObjects = state.objects.filter(
+        const baseTargetObjects = state.objects.filter(
           (o) => candidateObjectIds.includes(o.id) && o.type !== "connector",
         );
-        if (targetObjects.length === 0) return;
+        if (baseTargetObjects.length === 0) return;
+
+        // Separator lines already drawn across this slice join the new
+        // section, so its frame encloses them and they move with it.
+        const targetIdSet = new Set(baseTargetObjects.map((o) => o.id));
+        const adoptRegion = getObjectUnionBounds(baseTargetObjects);
+        if (adoptRegion) {
+          for (const line of findAdoptableLines(state.objects, adoptRegion)) {
+            targetIdSet.add(line.id);
+          }
+        }
+        const targetObjects = state.objects.filter((o) => targetIdSet.has(o.id));
 
         const groupId = `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-        const targetIdSet = new Set(targetObjects.map((o) => o.id));
         const nextObjects = state.objects.map((obj) =>
           targetIdSet.has(obj.id) ? { ...obj, groupId } : obj,
         );

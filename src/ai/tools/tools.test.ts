@@ -4,6 +4,7 @@ import type { CanvasStore } from "@/store/types";
 import { executeToolCall } from "./index";
 import type { AIToolContext } from "./types";
 import { buildReferenceCopy, generateReferenceId } from "@/utils/reference";
+import { createLineObject } from "@/utils/lineGeometry";
 
 interface FakeStore {
   store: CanvasStore;
@@ -752,7 +753,165 @@ describe("AI Model & Write Tools", () => {
     expect(lines[0]!.x).toBe(60);
     expect(lines[0]!.y).toBe(150);
     expect(lines[0]!.width).toBe(280);
-    expect(lines[0]!.lineData?.lineStyle).toBe("dashed");
+    // No style requested and no lines on the canvas yet, so the separators use
+    // the solid default instead of a forced dash.
+    expect(lines[0]!.lineData?.lineStyle).toBe("solid");
+  });
+
+  it("separate_layers orders layers by real geometry, not argument order", async () => {
+    const fake = createFakeStore();
+    fake.objects.push(
+      { id: "cmd", type: "storm", x: 100, y: 0, width: 200, height: 100 },
+      { id: "evt", type: "storm", x: 100, y: 400, width: 200, height: 100 },
+    );
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "separate_layers",
+        // Deliberately reversed: Event listed before Command.
+        arguments: JSON.stringify({ layers: [["evt"], ["cmd"]] }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const lines = fake.objects.filter((o) => o.type === "line");
+    expect(lines).toHaveLength(1);
+    // Still placed in the gap (100..400), not inside either card.
+    expect(lines[0]!.y).toBe(250);
+  });
+
+  it("separate_layers pins the line below the upper layer when layers overlap", async () => {
+    const fake = createFakeStore();
+    fake.objects.push(
+      { id: "cmd", type: "storm", x: 100, y: 0, width: 200, height: 100 },
+      // Constraint starts before Command ends -> vertical overlap.
+      { id: "con", type: "storm", x: 100, y: 80, width: 200, height: 120 },
+    );
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "separate_layers",
+        arguments: JSON.stringify({ layers: [["cmd"], ["con"]] }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const data = JSON.parse(res.content);
+    expect(data.overlapping).toBe(true);
+    const lines = fake.objects.filter((o) => o.type === "line");
+    expect(lines).toHaveLength(1);
+    // Command ends at y=100; the line is pinned just below it, not buried
+    // inside the card.
+    expect(lines[0]!.y).toBe(106);
+  });
+
+  it("separate_layers inherits the line style already on the canvas", async () => {
+    const fake = createFakeStore();
+    fake.objects.push(
+      { id: "cmd", type: "storm", x: 100, y: 0, width: 200, height: 100 },
+      { id: "evt", type: "storm", x: 100, y: 400, width: 200, height: 100 },
+      createLineObject(
+        "l-existing",
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { lineStyle: "dotted" },
+      ),
+    );
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "separate_layers",
+        arguments: JSON.stringify({ layers: [["cmd"], ["evt"]] }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const created = JSON.parse(res.content).created as string[];
+    const separator = fake.objects.find((o) => o.id === created[0]);
+    expect(separator?.lineData?.lineStyle).toBe("dotted");
+  });
+
+  it("separate_layers lets an explicit line style override the canvas default", async () => {
+    const fake = createFakeStore();
+    fake.objects.push(
+      { id: "cmd", type: "storm", x: 100, y: 0, width: 200, height: 100 },
+      { id: "evt", type: "storm", x: 100, y: 400, width: 200, height: 100 },
+      createLineObject(
+        "l-existing",
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { lineStyle: "dotted" },
+      ),
+    );
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "separate_layers",
+        arguments: JSON.stringify({
+          layers: [["cmd"], ["evt"]],
+          lineStyle: "dashed",
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const created = JSON.parse(res.content).created as string[];
+    const separator = fake.objects.find((o) => o.id === created[0]);
+    expect(separator?.lineData?.lineStyle).toBe("dashed");
+  });
+
+  it("separate_layers joins the slice's section so its frame encloses the lines", async () => {
+    const fake = createFakeStore();
+    fake.groups.push({ id: "slice", name: "Write Slice" });
+    fake.objects.push(
+      {
+        id: "cmd",
+        type: "storm",
+        x: 100,
+        y: 0,
+        width: 200,
+        height: 100,
+        groupId: "slice",
+      },
+      {
+        id: "evt",
+        type: "storm",
+        x: 100,
+        y: 400,
+        width: 200,
+        height: 100,
+        groupId: "slice",
+      },
+    );
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "separate_layers",
+        arguments: JSON.stringify({ layers: [["cmd"], ["evt"]] }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const data = JSON.parse(res.content);
+    expect(data.groupId).toBe("slice");
+    const lines = fake.objects.filter((o) => o.type === "line");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.groupId).toBe("slice");
   });
 
   it("group_objects and ungroup_objects manage sections", async () => {

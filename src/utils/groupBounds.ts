@@ -1,7 +1,56 @@
 import type { CanvasObject, GroupBounds, GroupInfo } from "@/types";
+import { getLineMidpoint } from "./lineGeometry";
 
 /** Padding between a group's boundary and its contents, in world units. */
 export const GROUP_PADDING = 24;
+
+/**
+ * Tight, unpadded bounds around a set of member objects, ignoring connectors.
+ * Returns `null` when there is nothing measurable.
+ */
+export function getObjectUnionBounds(
+  objects: CanvasObject[],
+): GroupBounds | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let hasContent = false;
+
+  for (const obj of objects) {
+    if (obj.type === "connector") continue;
+    hasContent = true;
+    minX = Math.min(minX, obj.x);
+    minY = Math.min(minY, obj.y);
+    maxX = Math.max(maxX, obj.x + obj.width);
+    maxY = Math.max(maxY, obj.y + obj.height);
+  }
+
+  if (!hasContent) return null;
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+/**
+ * Free (ungrouped, unlocked) lines whose midpoint falls inside `bounds`. These
+ * are the layer separators drawn across a section, so grouping that section
+ * should adopt them — the frame then encloses them and they move with it.
+ */
+export function findAdoptableLines(
+  objects: CanvasObject[],
+  bounds: GroupBounds,
+): CanvasObject[] {
+  return objects.filter((obj) => {
+    if (obj.type !== "line" || obj.groupId || obj.locked) return false;
+    const mid = getLineMidpoint(obj);
+    if (!mid) return false;
+    return (
+      mid.x >= bounds.x &&
+      mid.x <= bounds.x + bounds.width &&
+      mid.y >= bounds.y &&
+      mid.y <= bounds.y + bounds.height
+    );
+  });
+}
 
 /**
  * Tight bounds that enclose a group's member objects and child groups,

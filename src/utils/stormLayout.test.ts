@@ -113,5 +113,25 @@ describe("arrangeVerticalSlice", () => {
     expect(byId.get("st1")!.y).toBe(100 + 50);
     expect(byId.get("evt1")!.y).toBe(100 + 50 + 120 + 50);
   });
+
+  it("stacks a read-side Constraint between Query and State", () => {
+    const cards = [
+      card("qry1", "query", 200, 100),
+      card("cst1", "constraint", 200, 120),
+      card("st1", "state", 200, 120),
+      card("evt1", "event", 200, 100),
+    ];
+    const positions = arrangeVerticalSlice(cards, {
+      origin: { x: 0, y: 0 },
+      rowGap: 50,
+    });
+
+    const byId = new Map(positions.map((p) => [p.id, p]));
+    // Each card occupies its own layer, top to bottom.
+    expect(byId.get("qry1")!.y).toBe(0);
+    expect(byId.get("cst1")!.y).toBe(150);
+    expect(byId.get("st1")!.y).toBe(150 + 120 + 50);
+    expect(byId.get("evt1")!.y).toBe(150 + 120 + 50 + 120 + 50);
+  });
 });
 

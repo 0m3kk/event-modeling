@@ -98,10 +98,18 @@ export interface VerticalSliceLayoutOptions {
 /**
  * Arranges cards in a Vertical Slice from top to bottom:
  * - Layer 0 (Top): Command, Query
- * - Layer 1 (Middle): Constraint, State
- * - Layer 2 (Bottom): Event, Notify
+ * - Layer 1 (Middle): Constraint — and State when the slice has no read-side
+ *   Constraint
+ * - Layer 2 (Bottom): Event, Notify — or State when a read-side Constraint
+ *   occupies layer 1
  * - Layer 3: Actor, etc.
- * Cards within each layer are arranged horizontally with colGap and centered relative to the widest layer.
+ *
+ * A Constraint is treated as read-side (sitting between Query and State) when
+ * the batch models a read path — it contains a State and no Command. Otherwise
+ * it is a write-side Constraint, as before.
+ *
+ * Cards within each layer are arranged horizontally with colGap and centered
+ * relative to the widest layer.
  */
 export function arrangeVerticalSlice(
   cards: StormLaneCard[],
@@ -111,16 +119,28 @@ export function arrangeVerticalSlice(
   const colGap = options.colGap ?? 40;
   const origin = options.origin ?? { x: 0, y: 0 };
 
-  const layers: StormLaneCard[][] = [[], [], [], []];
+  const hasCommand = cards.some((c) => c.kind === "command");
+  const hasState = cards.some((c) => c.kind === "state");
+  const hasConstraint = cards.some((c) => c.kind === "constraint");
+  // Read-side constraints push State (and everything below) down one layer.
+  const readSideConstraint = hasState && !hasCommand && hasConstraint;
+  const offset = readSideConstraint ? 1 : 0;
+
+  const layers: StormLaneCard[][] = Array.from(
+    { length: 4 + offset },
+    (): StormLaneCard[] => [],
+  );
   for (const card of cards) {
     if (card.kind === "command" || card.kind === "query") {
       layers[0].push(card);
-    } else if (card.kind === "constraint" || card.kind === "state") {
+    } else if (card.kind === "constraint") {
       layers[1].push(card);
+    } else if (card.kind === "state") {
+      layers[1 + offset].push(card);
     } else if (card.kind === "event" || card.kind === "notify") {
-      layers[2].push(card);
+      layers[2 + offset].push(card);
     } else {
-      layers[3].push(card);
+      layers[3 + offset].push(card);
     }
   }
 

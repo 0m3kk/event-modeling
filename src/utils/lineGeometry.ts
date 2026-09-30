@@ -19,6 +19,19 @@ export function getLineEndpoints(
 }
 
 /**
+ * World-space midpoint of a line object's segment, or null when it carries no
+ * line payload. Used to decide whether a separator sits inside a section.
+ */
+export function getLineMidpoint(obj: CanvasObject): Point | null {
+  const ends = getLineEndpoints(obj);
+  if (!ends) return null;
+  return {
+    x: (ends.start.x + ends.end.x) / 2,
+    y: (ends.start.y + ends.end.y) / 2,
+  };
+}
+
+/**
  * True when the segment a→b touches the axis-aligned rectangle. Uses the
  * Liang–Barsky slab clip so a segment fully inside, fully crossing, or merely
  * grazing a corner all count as a hit.

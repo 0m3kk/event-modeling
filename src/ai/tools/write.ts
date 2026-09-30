@@ -54,7 +54,9 @@ const objectSpecs = z.discriminatedUnion("type", [
     y2: z.number().describe("End Y in world coordinates."),
     stroke: z.string().optional().describe("Stroke color (hex)."),
     strokeWidth: z.number().positive().optional(),
-    lineStyle: lineStyle.optional().describe("solid, dashed (default), or dotted."),
+    lineStyle: lineStyle
+      .optional()
+      .describe("Stroke pattern: solid, dashed, or dotted."),
     arrowStart: z.boolean().optional(),
     arrowEnd: z.boolean().optional(),
     groupId: z
@@ -69,7 +71,7 @@ type ObjectSpec = z.output<typeof objectSpecs>;
 export const createObjectsTool = defineTool({
   name: "create_objects",
   description:
-    "Create one or more basic canvas objects: sticky notes, text boxes, orthogonal connectors, and freeform lines. Lines are the preferred way to separate the layers of a vertical slice (see separate_layers) instead of connecting every card.",
+    "Create one or more basic canvas objects: sticky notes, text boxes, orthogonal connectors, and one-off freeform lines. For separating the layers of a vertical slice, do NOT use this tool — call separate_layers instead, which places each separator exactly in the gap between two layers. Hand-placed lines typically land under a card and get hidden.",
   schema: z.object({
     objects: z.array(objectSpecs).min(1).max(100),
   }),
@@ -530,7 +532,7 @@ export const focusViewportTool = defineTool({
 export const separateLayersTool = defineTool({
   name: "separate_layers",
   description:
-    "Draw horizontal separator lines between the layers of a vertical slice, so the board stays readable without a connector between every card. Pass the card ids grouped by layer, ordered top to bottom — e.g. Write Slice [[commandId], [constraintId, ...], [eventId, ...]] or Read Slice [[queryId], [stateId], [eventId, ...]]. One line is drawn in each vertical gap, spanning the widest cards of the two layers. Prefer this over connect_objects for the Command -> Constraint -> Event (and Query/State/Event) flow.",
+    "Draw horizontal separator lines between the layers of a vertical slice, so the board stays readable without a connector between every card. Pass the card ids grouped by layer, ordered top to bottom — e.g. Write Slice [[commandId], [constraintId, ...], [eventId, ...]] or Read Slice [[queryId], [stateId], [eventId, ...]] (add a constraint layer: [[queryId], [constraintId, ...], [stateId], [eventId, ...]]). One line is drawn in each vertical gap, spanning the widest cards of the two layers. Prefer this over connect_objects for the Command -> Constraint -> Event (and Query/State/Event) flow.",
   schema: z.object({
     layers: z
       .array(z.array(z.string()).min(1))
@@ -546,7 +548,9 @@ export const separateLayersTool = defineTool({
     strokeWidth: z.number().positive().optional(),
     lineStyle: lineStyle
       .optional()
-      .describe("solid, dashed (default), or dotted."),
+      .describe(
+        "Stroke pattern: solid, dashed, or dotted. Defaults to the style already used by lines on the canvas.",
+      ),
   }),
   execute: (args, ctx) => {
     const state = ctx.getState();
@@ -577,13 +581,44 @@ export const separateLayersTool = defineTool({
     const padding = args.padding ?? 40;
     const boundsOf = (layer: CanvasObject[]) => getObjectsBounds(layer);
 
+    // Match the stroke pattern already used by lines on the board instead of
+    // forcing dashes, so AI separators blend with whatever is already drawn.
+    const styleCounts = new Map<(typeof LINE_STYLES)[number], number>();
+    for (const obj of state.objects) {
+      const style = obj.type === "line" ? obj.lineData?.lineStyle : undefined;
+      if (!style) continue;
+      styleCounts.set(style, (styleCounts.get(style) ?? 0) + 1);
+    }
+    let inheritedLineStyle: (typeof LINE_STYLES)[number] | undefined;
+    let mostSeen = 0;
+    for (const [style, count] of styleCounts) {
+      // Ties resolve to the most recently inserted style.
+      if (count >= mostSeen) {
+        mostSeen = count;
+        inheritedLineStyle = style;
+      }
+    }
+    const lineStyleToUse = args.lineStyle ?? inheritedLineStyle ?? "solid";
+
+    // Order layers top-to-bottom from their real geometry, so a mis-ordered
+    // `layers` argument can never bury a separator inside a card.
+    const orderedLayers = [...resolvedLayers].sort(
+      (a, b) => (boundsOf(a)?.minY ?? 0) - (boundsOf(b)?.minY ?? 0),
+    );
+
     const lines: CanvasObject[] = [];
-    for (let i = 0; i < resolvedLayers.length - 1; i++) {
-      const upper = boundsOf(resolvedLayers[i]!);
-      const lower = boundsOf(resolvedLayers[i + 1]!);
+    let overlapping = false;
+    for (let i = 0; i < orderedLayers.length - 1; i++) {
+      const upper = boundsOf(orderedLayers[i]!);
+      const lower = boundsOf(orderedLayers[i + 1]!);
       if (!upper || !lower) continue;
 
-      const y = (upper.maxY + lower.minY) / 2;
+      // Sit in the whitespace between the layers. When the layers overlap there
+      // is no gap, so pin the line just below the upper layer instead of
+      // burying it inside a card (where cards would cover it).
+      const gap = lower.minY - upper.maxY;
+      if (gap <= 0) overlapping = true;
+      const y = gap > 0 ? upper.maxY + gap / 2 : upper.maxY + 6;
       const left = Math.min(upper.minX, lower.minX) - padding;
       const right = Math.max(upper.maxX, lower.maxX) + padding;
 
@@ -595,7 +630,7 @@ export const separateLayersTool = defineTool({
           {
             stroke: args.stroke ?? "#94a3b8",
             strokeWidth: args.strokeWidth ?? 1,
-            lineStyle: args.lineStyle ?? "dashed",
+            lineStyle: lineStyleToUse,
             arrowStart: false,
             arrowEnd: false,
           },
@@ -607,10 +642,29 @@ export const separateLayersTool = defineTool({
       return { created: [], count: 0, error: "No separators could be placed." };
     }
 
+    // When every card of the slice lives in the same Section, the separators
+    // belong to it too: the frame then encloses them and they move together.
+    const cardGroupIds = resolvedLayers.flat().map((obj) => obj.groupId);
+    const commonGroupId =
+      cardGroupIds.length > 0 &&
+      cardGroupIds.every((id) => id && id === cardGroupIds[0])
+        ? cardGroupIds[0]
+        : undefined;
+    if (commonGroupId) {
+      for (const line of lines) line.groupId = commonGroupId;
+    }
+
     state.addObjects(lines);
     return {
       created: lines.map((l) => l.id),
       count: lines.length,
+      ...(commonGroupId ? { groupId: commonGroupId } : {}),
+      ...(overlapping
+        ? {
+            overlapping: true,
+            note: "Some layers overlap vertically; separators were pinned just below the upper layer. Re-arrange the slice so layers have a clear gap for a centered line.",
+          }
+        : {}),
       ...(missing.length > 0 ? { notFound: missing } : {}),
     };
   },

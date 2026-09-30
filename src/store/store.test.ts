@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useCanvasStore, undo, redo, clearHistory } from "./index";
 import type { CanvasObject } from "@/types";
+import { createLineObject } from "@/utils/lineGeometry";
 
 describe("useCanvasStore", () => {
   beforeEach(() => {
@@ -531,6 +532,89 @@ describe("useCanvasStore", () => {
     // minX = 100-24=76, maxX = 550+24=574 => width = 498
     expect(groupAfter?.customBounds?.x).toBe(76);
     expect(groupAfter?.customBounds?.width).toBe(574 - 76);
+  });
+
+  it("adopts separator lines drawn across a slice when grouping it", () => {
+    const command: CanvasObject = {
+      id: "cmd",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    };
+    const event: CanvasObject = {
+      id: "evt",
+      type: "storm",
+      x: 100,
+      y: 400,
+      width: 200,
+      height: 100,
+    };
+    const acrossLine = createLineObject(
+      "line-1",
+      { x: 60, y: 300 },
+      { x: 340, y: 300 },
+    );
+    // A separator belonging to a different slice stays out of this group.
+    const farLine = createLineObject(
+      "line-2",
+      { x: 600, y: 300 },
+      { x: 880, y: 300 },
+    );
+    useCanvasStore.getState().addObjects([command, event, acrossLine, farLine]);
+
+    const gid = useCanvasStore
+      .getState()
+      .groupObjects(["cmd", "evt"], "Write Slice")!;
+    const state = useCanvasStore.getState();
+
+    expect(state.objects.find((o) => o.id === "line-1")?.groupId).toBe(gid);
+    expect(state.objects.find((o) => o.id === "line-2")?.groupId).toBeUndefined();
+
+    // The frame now spans the separator (60..340), not just the cards (100..300).
+    const bounds = state.groups.find((g) => g.id === gid)?.customBounds;
+    expect(bounds?.x).toBe(36);
+    expect(bounds?.width).toBe(340 - 60 + 48);
+  });
+
+  it("adopts separator lines when adding members to an existing group (addToGroup)", () => {
+    const command: CanvasObject = {
+      id: "cmd",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    };
+    const event: CanvasObject = {
+      id: "evt",
+      type: "storm",
+      x: 100,
+      y: 400,
+      width: 200,
+      height: 100,
+    };
+    const separator = createLineObject(
+      "line-1",
+      { x: 60, y: 300 },
+      { x: 340, y: 300 },
+    );
+    useCanvasStore.getState().addObjects([command, event, separator]);
+
+    const gid = useCanvasStore.getState().groupObjects(["cmd"], "Write Slice")!;
+    // The line sits outside the single-card section, so it stays free.
+    expect(
+      useCanvasStore.getState().objects.find((o) => o.id === "line-1")?.groupId,
+    ).toBeUndefined();
+
+    useCanvasStore.getState().addToGroup(gid, ["evt"]);
+
+    const state = useCanvasStore.getState();
+    expect(state.objects.find((o) => o.id === "line-1")?.groupId).toBe(gid);
+    const bounds = state.groups.find((g) => g.id === gid)?.customBounds;
+    expect(bounds?.x).toBe(36);
+    expect(bounds?.width).toBe(340 - 60 + 48);
   });
 
   it("removes objects from a group without destroying the group (removeFromGroup)", () => {
