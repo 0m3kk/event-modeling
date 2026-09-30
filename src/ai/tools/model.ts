@@ -12,8 +12,14 @@ import {
   computeOptimalModelNodeWidth,
 } from "@/utils/cardDimensions";
 import { toDisplayName } from "@/utils/naming";
+import { DEFAULT_FIELD_TYPE } from "@/constants/fieldType";
 import { normalizeValidation } from "@/utils/fieldValidation";
 import { fieldValidationSpec } from "./fieldValidationSpec";
+import {
+  buildFieldTypeEnvironment,
+  fieldTypeError,
+  resolveFieldType,
+} from "./fieldTypes";
 import { defineTool } from "./schema";
 import { findFreeSpot, getGroupObstacleRects, getViewportCenter } from "./helpers";
 import { groupAndAncestorIds } from "@/utils/groupBounds";
@@ -53,7 +59,12 @@ export const createModelNodesTool = defineTool({
             .array(
               z.object({
                 name: z.string(),
-                fieldType: z.string().optional(),
+                fieldType: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "Primitive type (String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void) or the name of a Model node (existing or created in this batch); append '[]' for an array. Defaults to String. Invalid types are rejected.",
+                  ),
                 required: z.boolean().optional(),
                 description: z.string().optional(),
                 validation: fieldValidationSpec
@@ -62,8 +73,18 @@ export const createModelNodesTool = defineTool({
               }),
             )
             .optional(),
-          itemType: z.string().optional(),
-          innerType: z.string().optional(),
+          itemType: z
+            .string()
+            .optional()
+            .describe(
+              "Array nodes: element type. A primitive (String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void) or a Model node name (existing or in this batch). Defaults to String.",
+            ),
+          innerType: z
+            .string()
+            .optional()
+            .describe(
+              "Wrap nodes: wrapped type. A primitive (String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void) or a Model node name (existing or in this batch). Defaults to String.",
+            ),
           validation: fieldValidationSpec
             .optional()
             .describe(
@@ -103,6 +124,37 @@ export const createModelNodesTool = defineTool({
 
     const placed: CanvasObject[] = [];
 
+    // A field type must be a primitive or a Model node — existing on the board
+    // or created in this same batch. Reject everything else with a fixable
+    // message before any node is added.
+    const typeEnv = buildFieldTypeEnvironment(
+      state.objects,
+      args.nodes.map((node) => toDisplayName(node.name)),
+    );
+    const typeErrors: string[] = [];
+    for (const spec of args.nodes) {
+      const label = `"${toDisplayName(spec.name)}" (${spec.kind})`;
+      if (spec.kind === "object") {
+        for (const field of spec.fields ?? []) {
+          const { error } = resolveFieldType(field.fieldType, typeEnv);
+          if (error) {
+            typeErrors.push(
+              `${label} field "${toDisplayName(field.name)}" ${error}`,
+            );
+          }
+        }
+      } else if (spec.kind === "array") {
+        const { error } = resolveFieldType(spec.itemType, typeEnv);
+        if (error) typeErrors.push(`${label} itemType ${error}`);
+      } else if (spec.kind === "wrap") {
+        const { error } = resolveFieldType(spec.innerType, typeEnv);
+        if (error) typeErrors.push(`${label} innerType ${error}`);
+      }
+    }
+    if (typeErrors.length > 0) {
+      throw new Error(fieldTypeError(typeErrors));
+    }
+
     for (const spec of args.nodes) {
       const hasPosition = spec.x !== undefined && spec.y !== undefined;
       const displayName = toDisplayName(spec.name);
@@ -119,18 +171,21 @@ export const createModelNodesTool = defineTool({
           return {
             id: nanoid(),
             name: toDisplayName(f.name),
-            fieldType: f.fieldType ?? "string",
+            fieldType:
+              resolveFieldType(f.fieldType, typeEnv).type || DEFAULT_FIELD_TYPE,
             required: f.required ?? false,
             description: f.description,
             ...(validation ? { validation } : {}),
           };
         });
       } else if (spec.kind === "array") {
-        data.itemType = spec.itemType ?? "string";
+        data.itemType =
+          resolveFieldType(spec.itemType, typeEnv).type || DEFAULT_FIELD_TYPE;
         const validation = modelValidation(spec.validation, "array");
         if (validation) data.validation = validation;
       } else if (spec.kind === "wrap") {
-        data.innerType = spec.innerType ?? "string";
+        data.innerType =
+          resolveFieldType(spec.innerType, typeEnv).type || DEFAULT_FIELD_TYPE;
         const validation = modelValidation(spec.validation, "wrap");
         if (validation) data.validation = validation;
       } else {

@@ -3,6 +3,11 @@ import { temporal } from "zundo";
 import { nanoid } from "nanoid";
 import { DEFAULT_VIEWPORT, GRID_SIZE } from "@/constants/canvas";
 import {
+  DEFAULT_FIELD_TYPE,
+  normalizeFieldType,
+  normalizeObjectFieldTypes,
+} from "@/constants/fieldType";
+import {
   bddDefaultRefForPhase,
   stormHasFieldTypes,
   stormHasInputFields,
@@ -1417,7 +1422,7 @@ export const useCanvasStore = create<CanvasStore>()(
           const newFields = fieldClipboard.entries.map((e) => ({
             id: nanoid(),
             name: e.name,
-            fieldType: e.fieldType || "string",
+            fieldType: normalizeFieldType(e.fieldType) || DEFAULT_FIELD_TYPE,
             required: e.required,
             description: e.description,
             ...(e.validation ? { validation: e.validation } : {}),
@@ -1464,7 +1469,7 @@ export const useCanvasStore = create<CanvasStore>()(
           const newFields = fieldClipboard.entries.map((e) => ({
             id: nanoid(),
             name: e.name,
-            fieldType: e.fieldType || "string",
+            fieldType: normalizeFieldType(e.fieldType) || DEFAULT_FIELD_TYPE,
             required: e.required,
             description: e.description,
             ...(e.tag ? { tag: e.tag } : {}),
@@ -1505,7 +1510,9 @@ export const useCanvasStore = create<CanvasStore>()(
         const newField = {
           id: newFieldId,
           name: "",
-          fieldType: stormHasFieldTypes(obj.stormData.kind) ? "string" : "",
+          fieldType: stormHasFieldTypes(obj.stormData.kind)
+            ? DEFAULT_FIELD_TYPE
+            : "",
           required: false,
         };
 
@@ -1680,7 +1687,7 @@ export const useCanvasStore = create<CanvasStore>()(
         const newField = {
           id: newId,
           name: "",
-          fieldType: "string",
+          fieldType: DEFAULT_FIELD_TYPE,
         };
         const nextFields = [...(obj.modelData.fields ?? []), newField];
         const nextData = { ...obj.modelData, fields: nextFields };
@@ -1838,7 +1845,9 @@ export const useCanvasStore = create<CanvasStore>()(
       ) => {
         set((state) => ({
           projectName,
-          objects,
+          // Canonicalize primitive field types on load so legacy boards
+          // ("uuid", "datetime") surface as "UUID", "DateTime" everywhere.
+          objects: objects.map(normalizeObjectFieldTypes),
           groups,
           selectedIds: [],
           alignmentGuides: [],

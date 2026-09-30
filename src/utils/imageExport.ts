@@ -19,6 +19,7 @@ import {
   stormHasTags,
 } from "@/constants/storm";
 import { MODEL_KIND_COLORS } from "@/constants/model";
+import { DEFAULT_ANY_TYPE, DEFAULT_FIELD_TYPE } from "@/constants/fieldType";
 import { findModelByName } from "./modelResolution";
 import { getActorPermissions } from "./stormAuth";
 import { getLineEndpoints } from "./lineGeometry";
@@ -249,7 +250,7 @@ function svgFieldRow(
   const nameX = rawTag ? x + 12 + tagPillW + 8 : x + 14;
   const requiredMark = field.required ? `<tspan fill="#ef4444">*</tspan>` : "";
   const typePill = showType
-    ? svgTypePill(objects, x, w, rowY, field.fieldType || "string")
+    ? svgTypePill(objects, x, w, rowY, field.fieldType || DEFAULT_FIELD_TYPE)
     : "";
   return `<g>${tagPill}<text x="${nameX}" y="${rowY + 2}" font-size="11" font-family="${SVG_FONT}" font-weight="500" fill="#1e293b">${escapeXml(field.name)}${requiredMark}</text>${typePill}</g>`;
 }
@@ -459,7 +460,7 @@ function svgModelBody(
     for (const f of model.fields ?? []) {
       const requiredMark = f.required ? `<tspan fill="#ef4444">*</tspan>` : "";
       parts.push(
-        `<text x="${x + 14}" y="${rowY + 2}" font-size="11" font-family="${SVG_FONT}" font-weight="500" fill="#1e293b">• ${escapeXml(f.name)}${requiredMark}</text>${svgTypePill(objects, x, w, rowY, f.fieldType || "string")}`,
+        `<text x="${x + 14}" y="${rowY + 2}" font-size="11" font-family="${SVG_FONT}" font-weight="500" fill="#1e293b">• ${escapeXml(f.name)}${requiredMark}</text>${svgTypePill(objects, x, w, rowY, f.fieldType || DEFAULT_FIELD_TYPE)}`,
       );
       rowY += 22;
     }
@@ -472,7 +473,7 @@ function svgModelBody(
       rowY += 22;
     }
   } else if (model.kind === "array") {
-    const itemType = model.itemType || "any";
+    const itemType = model.itemType || DEFAULT_ANY_TYPE;
     const target = findModelByName(objects, itemType);
     const isModel = Boolean(target?.modelData);
     const color = isModel
@@ -483,7 +484,7 @@ function svgModelBody(
     );
     rowY += 26;
   } else if (model.kind === "wrap") {
-    const innerType = model.innerType || "any";
+    const innerType = model.innerType || DEFAULT_ANY_TYPE;
     const target = findModelByName(objects, innerType);
     const isModel = Boolean(target?.modelData);
     const color = isModel

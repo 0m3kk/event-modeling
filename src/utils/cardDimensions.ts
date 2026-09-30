@@ -17,6 +17,7 @@ import {
   stormHasAction,
 } from "@/constants/storm";
 import { GRID_SIZE } from "@/constants/canvas";
+import { DEFAULT_FIELD_TYPE } from "@/constants/fieldType";
 import { snapToGrid } from "./snapping";
 import { resolveTargetModel } from "./modelResolution";
 import { getActorPermissions } from "./stormAuth";
@@ -377,7 +378,7 @@ export function computeOptimalStormCardWidth(
   ];
 
   for (const f of allFields) {
-    const rawType = f.fieldType || "string";
+    const rawType = f.fieldType || DEFAULT_FIELD_TYPE;
     const targetModel = objects ? resolveTargetModel(objects, rawType) : null;
     const isModel = Boolean(targetModel && targetModel.modelData);
     const typeZoneW = hasTypes
@@ -471,7 +472,7 @@ export function computeOptimalModelNodeWidth(
   }
 
   for (const f of data.fields ?? []) {
-    const rawType = f.fieldType || "string";
+    const rawType = f.fieldType || DEFAULT_FIELD_TYPE;
     const targetModel = objects ? resolveTargetModel(objects, rawType) : null;
     const isModel = Boolean(targetModel && targetModel.modelData);
     const typeZoneW = Math.max(isModel ? 72 : 65, rawType.length * 6.5 + (isModel ? 24 : 14));

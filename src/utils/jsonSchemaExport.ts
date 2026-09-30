@@ -30,6 +30,11 @@ export interface JsonSchemaDefinition {
   definitions?: Record<string, JsonSchemaDefinition>;
 }
 
+/**
+ * Keyed by the lowercased canonical primitive name, so both the stored
+ * canonical spelling ("UUID", "DateTime") and legacy lowercase input resolve
+ * to the same JSON Schema shape.
+ */
 const JSON_SCHEMA_PRIMITIVES: Record<string, JsonSchemaProperty> = {
   string: { type: "string" },
   number: { type: "number" },
@@ -39,8 +44,10 @@ const JSON_SCHEMA_PRIMITIVES: Record<string, JsonSchemaProperty> = {
   uuid: { type: "string", format: "uuid" },
   email: { type: "string", format: "email" },
   url: { type: "string", format: "uri" },
+  uri: { type: "string", format: "uri" },
   json: {},
   any: {},
+  void: {},
 };
 
 export type JsonSchemaDialect = "draft-07" | "2020-12";

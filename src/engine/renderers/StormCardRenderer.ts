@@ -1,6 +1,7 @@
 import { Container, Graphics, Text } from "pixi.js";
 import type { CanvasObject, StormData, StormField, StormKind } from "@/types";
 import { APP_FONT_FAMILY } from "@/constants/canvas";
+import { DEFAULT_FIELD_TYPE } from "@/constants/fieldType";
 import {
   STORM_KIND_LABELS,
   STORM_PHASE_COLORS,
@@ -258,7 +259,7 @@ export class StormCardRenderer {
         }
 
         // Dynamic widths for type zone and tag pill
-        const rawType = field.fieldType || "string";
+        const rawType = field.fieldType || DEFAULT_FIELD_TYPE;
         const targetModel = resolveTargetModel(allObjects, rawType);
         const isModel = Boolean(targetModel && targetModel.modelData);
         const typeZoneW = hasTypes

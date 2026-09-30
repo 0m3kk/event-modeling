@@ -2,6 +2,7 @@ import { Container, Graphics, Text } from "pixi.js";
 import type { CanvasObject, ModelData, ModelNodeKind } from "@/types";
 import { APP_FONT_FAMILY } from "@/constants/canvas";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
+import { DEFAULT_ANY_TYPE, DEFAULT_FIELD_TYPE } from "@/constants/fieldType";
 import type { CardHitZone, RenderResult } from "./types";
 import { drawHeaderKindIcon } from "./headerIcons";
 import { drawInfoBadge } from "./infoBadge";
@@ -143,7 +144,7 @@ export class ModelNodeRenderer {
         }
 
         // Dynamic width for type zone
-        const rawType = field.fieldType || "string";
+        const rawType = field.fieldType || DEFAULT_FIELD_TYPE;
         const targetModel = resolveTargetModel(allObjects, rawType);
         const isModel = Boolean(targetModel && targetModel.modelData);
         const typeZoneW = computeTypeZoneWidth(rawType, isModel);
@@ -343,7 +344,7 @@ export class ModelNodeRenderer {
       }
     } else if (kind === "array") {
       const rowY = renderY;
-      const itemType = data.itemType || "any";
+      const itemType = data.itemType || DEFAULT_ANY_TYPE;
       const targetModel = resolveTargetModel(allObjects, itemType);
       const isModel = Boolean(targetModel && targetModel.modelData);
       const targetKind = targetModel?.modelData?.kind || "object";
@@ -413,7 +414,7 @@ export class ModelNodeRenderer {
       }
     } else if (kind === "wrap") {
       const rowY = renderY;
-      const innerType = data.innerType || "any";
+      const innerType = data.innerType || DEFAULT_ANY_TYPE;
       const targetModel = resolveTargetModel(allObjects, innerType);
       const isModel = Boolean(targetModel && targetModel.modelData);
       const targetKind = targetModel?.modelData?.kind || "object";

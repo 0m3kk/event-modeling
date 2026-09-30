@@ -3,6 +3,12 @@ import { useCanvasStore } from "@/store";
 import type { StormData } from "@/types";
 import { stormHasInputFields } from "@/constants/storm";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
+import {
+  DEFAULT_FIELD_TYPE,
+  PRIMITIVE_TYPES,
+  canonicalPrimitiveType,
+  normalizeFieldType,
+} from "@/constants/fieldType";
 import { findModelByName } from "@/utils/modelResolution";
 import {
   Box,
@@ -14,18 +20,6 @@ import {
   Search,
   X,
 } from "lucide-react";
-
-const PRIMITIVES = [
-  "string",
-  "number",
-  "boolean",
-  "uuid",
-  "datetime",
-  "date",
-  "json",
-  "any",
-  "void",
-];
 
 /**
  * Which StormData field list a type change targets. State/Constraint split
@@ -72,7 +66,7 @@ export function TypeSelectPopover() {
     const obj = objects.find((o) => o.id === typeSelect.objectId);
     if (!obj) return null;
 
-    let currentType = "string";
+    let currentType = DEFAULT_FIELD_TYPE;
     let isRequired = false;
     let showRequired = false;
 
@@ -81,21 +75,21 @@ export function TypeSelectPopover() {
       const list = obj.stormData[key] ?? [];
       const field = list.find((f) => f.id === typeSelect.fieldId);
       if (field) {
-        currentType = field.fieldType || "string";
+        currentType = field.fieldType || DEFAULT_FIELD_TYPE;
         isRequired = Boolean(field.required);
         showRequired = true;
       }
     } else if (obj.type === "model" && obj.modelData) {
       if (obj.modelData.kind === "array") {
-        currentType = obj.modelData.itemType || "string";
+        currentType = obj.modelData.itemType || DEFAULT_FIELD_TYPE;
       } else if (obj.modelData.kind === "wrap") {
-        currentType = obj.modelData.innerType || "string";
+        currentType = obj.modelData.innerType || DEFAULT_FIELD_TYPE;
       } else {
         const field = obj.modelData.fields?.find(
           (f) => f.id === typeSelect.fieldId,
         );
         if (field) {
-          currentType = field.fieldType || "string";
+          currentType = field.fieldType || DEFAULT_FIELD_TYPE;
           isRequired = Boolean(field.required);
           showRequired = true;
         }
@@ -103,7 +97,9 @@ export function TypeSelectPopover() {
     }
 
     const isArray = currentType.endsWith("[]");
-    const baseType = isArray ? currentType.slice(0, -2) : currentType;
+    const baseType = normalizeFieldType(
+      isArray ? currentType.slice(0, -2) : currentType,
+    );
 
     return {
       obj,
@@ -188,7 +184,8 @@ export function TypeSelectPopover() {
   }
 
   const handleSelectType = (selectedBase: string) => {
-    const finalType = isArray ? `${selectedBase}[]` : selectedBase;
+    const base = normalizeFieldType(selectedBase);
+    const finalType = isArray ? `${base}[]` : base;
     commitTypeChange(finalType, isRequired);
     setTypeSelect(null);
   };
@@ -250,14 +247,14 @@ export function TypeSelectPopover() {
   };
 
   const trimmedSearch = search.trim();
-  const filteredPrimitives = PRIMITIVES.filter((p) =>
+  const filteredPrimitives = PRIMITIVE_TYPES.filter((p) =>
     p.toLowerCase().includes(trimmedSearch.toLowerCase()),
   );
   const filteredModels = modelNames.filter((m) =>
     m.toLowerCase().includes(trimmedSearch.toLowerCase()),
   );
 
-  const isExactPrimitive = PRIMITIVES.includes(trimmedSearch.toLowerCase());
+  const isExactPrimitive = canonicalPrimitiveType(trimmedSearch) !== null;
   const isExactModel = modelNames.includes(trimmedSearch);
   const showCustomOption =
     trimmedSearch.length > 0 && !isExactPrimitive && !isExactModel;

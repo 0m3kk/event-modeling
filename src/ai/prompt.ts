@@ -113,7 +113,13 @@ Data-model nodes use create_model_nodes (always place in the "Shared Types" grou
 - array: collection of itemType
 - wrap: value-object wrapper around innerType
 Validation on model nodes: an object field may set the full rule set (minLength, maxLength, pattern, format, min, max, allowedValues); an array node accepts only minItems/maxItems (item count); a wrap node validates the whole wrapped value with the full rule set; enum never validates.
-Model node names can be referenced as field types on Storm cards and other Model nodes.`;
+Model node names can be referenced as field types on Storm cards and other Model nodes.
+
+## Field Types (Strict)
+Every \`fieldType\`, \`itemType\` and \`innerType\` MUST be either:
+1. A primitive type — use the canonical spelling: \`String\`, \`Number\`, \`Boolean\`, \`UUID\`, \`DateTime\`, \`Date\`, \`Email\`, \`URL\`, \`URI\`, \`JSON\`, \`Any\`, \`Void\`. Append \`[]\` for an array (e.g. \`String[]\`).
+2. The name of a Model node that already exists on the canvas or is created in the same batch (e.g. \`OrderLine\`, \`OrderStatus\`). Model types keep their own names.
+Do NOT invent types (e.g. \`money\`, \`int\`, \`date-time\`). Writing a type that is neither a primitive nor a known Model node is REJECTED by the tool with the list of valid types; fix the type and retry.`;
 
 export const AGENT_FALLBACK_PROMPT = `You are an AI assistant for an Event Storming & Data Modeling canvas using CQRS and Event Sourcing with DCB (https://dcb.events/). The endpoint you run on does not support tool calling, so you MUST respond with a single JSON object and nothing else.
 
@@ -137,6 +143,7 @@ Available tools:
 - separate_layers { layers: [[ids...], ...], padding?, stroke?, strokeWidth?, lineStyle? }  // horizontal separators between slice layers (top to bottom). ALWAYS use this for layer separators; never hand-place them via create_objects.
 - create_model_nodes { nodes: [{ ..., groupId? }] }
 - create_model_nodes validation: object fields and array/wrap nodes may include "validation" (object field: full rules; array: minItems/maxItems only; wrap: full rules for the wrapped value; enum: none).
+- Field types (strict): every fieldType/itemType/innerType must be a primitive — String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void (append "[]" for arrays) — or the name of an existing/new Model node. Invented types are rejected.
 - create_reference_copies { ids: [...] }  // copies are placed in free space, ungrouped; group them with the new slice afterwards
 - group_objects { ids: [...], name?, groupId? }
 - ungroup_objects { groupIds: [...] }

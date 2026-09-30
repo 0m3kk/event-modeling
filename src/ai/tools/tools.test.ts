@@ -580,6 +580,72 @@ describe("AI Storm Tools", () => {
     expect(updated.stormData?.fields).toHaveLength(2);
     expect(updated.height).toBeGreaterThan(80);
   });
+
+  it("canonicalizes primitive field types when writing cards", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          arrange: false,
+          cards: [
+            {
+              kind: "event",
+              name: "Order Placed",
+              fields: [
+                { name: "Order ID", fieldType: "uuid", tag: "order" },
+                { name: "Amount", fieldType: "number" },
+                { name: "Placed At", fieldType: "date-time" },
+              ],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const event = fake.objects.find(
+      (o) => o.stormData?.name === "Order Placed",
+    )!;
+    expect(event.stormData?.fields.map((f) => f.fieldType)).toEqual([
+      "UUID",
+      "Number",
+      "DateTime",
+    ]);
+  });
+
+  it("rejects a field type that is neither a primitive nor a Model", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          arrange: false,
+          cards: [
+            {
+              kind: "event",
+              name: "Bad Event",
+              fields: [{ name: "Total", fieldType: "money" }],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBe(true);
+    const parsed = JSON.parse(res.content);
+    expect(parsed.error).toContain("invalid field types");
+    expect(parsed.error).toContain('"money"');
+    expect(fake.objects).toHaveLength(0);
+  });
 });
 
 describe("AI Model & Write Tools", () => {
@@ -676,6 +742,65 @@ describe("AI Model & Write Tools", () => {
     expect(byName("Nickname").modelData?.validation).toEqual({ maxLength: 20 });
     // Enum never validates.
     expect(byName("Status").modelData?.validation).toBeUndefined();
+  });
+
+  it("resolves model references within the same batch and canonicalizes primitives", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_model_nodes",
+        arguments: JSON.stringify({
+          nodes: [
+            {
+              kind: "object",
+              name: "Order Line",
+              fields: [{ name: "SKU", fieldType: "string" }],
+            },
+            {
+              kind: "object",
+              name: "Cart",
+              fields: [{ name: "Lines", fieldType: "order line[]" }],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const cart = fake.objects.find((o) => o.modelData?.name === "Cart")!;
+    expect(cart.modelData?.fields?.[0].fieldType).toBe("Order Line[]");
+    const line = fake.objects.find((o) => o.modelData?.name === "Order Line")!;
+    expect(line.modelData?.fields?.[0].fieldType).toBe("String");
+  });
+
+  it("rejects an invalid model node field/item type", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_model_nodes",
+        arguments: JSON.stringify({
+          nodes: [
+            {
+              kind: "object",
+              name: "Broken",
+              fields: [{ name: "Total", fieldType: "money" }],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content).error).toContain('"money"');
+    expect(fake.objects).toHaveLength(0);
   });
 
   it("connect_objects creates orthogonal elbow connector between cards", async () => {

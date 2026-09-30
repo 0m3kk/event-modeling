@@ -15,9 +15,16 @@ import {
 } from "@/utils/cardDimensions";
 import { toDisplayName } from "@/utils/naming";
 import { stormHasResponseFields } from "@/constants/storm";
+import { DEFAULT_FIELD_TYPE, normalizeFieldType } from "@/constants/fieldType";
 import { getActorPermissions } from "@/utils/stormAuth";
 import { normalizeValidation } from "@/utils/fieldValidation";
 import { fieldValidationSpec } from "./fieldValidationSpec";
+import {
+  buildFieldTypeEnvironment,
+  fieldTypeError,
+  resolveFieldType,
+  type FieldTypeEnvironment,
+} from "./fieldTypes";
 import {
   arrangeStormLanes,
   arrangeVerticalSlice,
@@ -58,7 +65,7 @@ const fieldSpec = z.object({
     .string()
     .optional()
     .describe(
-      "Type or Model node name (default 'string'). External cards ignore type.",
+      "Primitive type (String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void) or the name of a Model node on the canvas; append '[]' for an array. Defaults to String. Invalid types are rejected. External/Actor cards ignore type.",
     ),
   required: z.boolean().optional(),
   description: z
@@ -98,7 +105,7 @@ type QueryItemSpec = z.output<typeof queryItemSpec>;
 
 function createStormField(
   name: string,
-  fieldType = "string",
+  fieldType = DEFAULT_FIELD_TYPE,
   required = false,
   description?: string,
   tag?: string,
@@ -146,17 +153,35 @@ function assertValidStormWrite(input: StormValidationInput): void {
 function buildFields(
   specs: FieldSpec[] | undefined,
   kind: StormKind,
-  options: { allowValidation?: boolean } = {},
+  options: {
+    allowValidation?: boolean;
+    env?: FieldTypeEnvironment;
+    errors?: string[];
+    label?: string;
+  } = {},
 ): StormField[] {
+  const typeless = kind === "external" || kind === "actor";
   return (specs ?? []).map((spec) => {
-    const fieldType =
-      kind === "external" || kind === "actor"
-        ? ""
-        : (spec.fieldType ?? "string");
+    let fieldType: string;
+    if (typeless) {
+      fieldType = "";
+    } else if (options.env) {
+      const resolved = resolveFieldType(spec.fieldType, options.env);
+      fieldType = resolved.type || DEFAULT_FIELD_TYPE;
+      if (resolved.error) {
+        options.errors?.push(
+          `${options.label ? `${options.label} ` : ""}field "${toDisplayName(
+            spec.name,
+          )}" ${resolved.error}`,
+        );
+      }
+    } else {
+      fieldType = normalizeFieldType(spec.fieldType) || DEFAULT_FIELD_TYPE;
+    }
     return createStormField(
       toDisplayName(spec.name),
       fieldType,
-      kind === "external" || kind === "actor" ? false : (spec.required ?? false),
+      typeless ? false : (spec.required ?? false),
       spec.description,
       spec.tag ? toDisplayName(spec.tag) : undefined,
       options.allowValidation ? normalizeValidation(spec.validation) : undefined,
@@ -356,7 +381,12 @@ export const createStormCardsTool = defineTool({
       return byName?.id;
     };
 
+    const typeEnv = buildFieldTypeEnvironment(state.objects);
+    const typeErrors: string[] = [];
+
     const built = args.cards.map((spec) => {
+      const label = `"${toDisplayName(spec.name)}" (${spec.kind})`;
+      const fieldOptions = { env: typeEnv, errors: typeErrors, label };
       const data = buildStormData({
         kind: spec.kind,
         name: spec.name,
@@ -365,19 +395,20 @@ export const createStormCardsTool = defineTool({
         action: spec.action,
         permissions: spec.permissions,
         fields: buildFields(spec.fields, spec.kind, {
+          ...fieldOptions,
           allowValidation: kindValidatesFields(spec.kind),
         }),
         inputFields:
           spec.inputFields !== undefined
-            ? buildFields(spec.inputFields, spec.kind)
+            ? buildFields(spec.inputFields, spec.kind, fieldOptions)
             : undefined,
         outputFields:
           spec.outputFields !== undefined
-            ? buildFields(spec.outputFields, spec.kind)
+            ? buildFields(spec.outputFields, spec.kind, fieldOptions)
             : undefined,
         responseFields:
           spec.responseFields !== undefined
-            ? buildFields(spec.responseFields, spec.kind)
+            ? buildFields(spec.responseFields, spec.kind, fieldOptions)
             : undefined,
         queryItems: spec.queryItems,
         constraints: spec.constraints,
@@ -398,6 +429,10 @@ export const createStormCardsTool = defineTool({
       };
       return { spec, obj };
     });
+
+    if (typeErrors.length > 0) {
+      throw new Error(fieldTypeError(typeErrors));
+    }
 
     const validationInput: StormValidationInput = {
       existing: state.objects,
@@ -646,23 +681,31 @@ export const updateStormCardTool = defineTool({
     const existing = object.stormData;
     const isProjection =
       existing.kind === "state" || existing.kind === "constraint";
+    const typeEnv = buildFieldTypeEnvironment(state.objects);
+    const typeErrors: string[] = [];
+    const fieldOptions = {
+      env: typeEnv,
+      errors: typeErrors,
+      label: `"${existing.name}" (${existing.kind})`,
+    };
     const fields =
       args.fields !== undefined
         ? buildFields(args.fields, existing.kind, {
+            ...fieldOptions,
             allowValidation: kindValidatesFields(existing.kind),
           })
         : existing.fields;
     const inputFields =
       args.inputFields !== undefined
-        ? buildFields(args.inputFields, existing.kind)
+        ? buildFields(args.inputFields, existing.kind, fieldOptions)
         : existing.inputFields;
     const outputFields =
       args.outputFields !== undefined
-        ? buildFields(args.outputFields, existing.kind)
+        ? buildFields(args.outputFields, existing.kind, fieldOptions)
         : existing.outputFields;
     const responseFields =
       args.responseFields !== undefined
-        ? buildFields(args.responseFields, existing.kind)
+        ? buildFields(args.responseFields, existing.kind, fieldOptions)
         : undefined;
 
     const writtenPermissions =
@@ -701,6 +744,9 @@ export const updateStormCardTool = defineTool({
         },
       ],
     };
+    if (typeErrors.length > 0) {
+      throw new Error(fieldTypeError(typeErrors));
+    }
     assertValidStormWrite(validationInput);
     const warnings = collectStormWarnings(validationInput);
 

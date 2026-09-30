@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useCanvasStore } from "@/store";
 import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
+import { DEFAULT_ANY_TYPE, DEFAULT_FIELD_TYPE } from "@/constants/fieldType";
 import { findModelByName } from "@/utils/modelResolution";
 import { computeOptimalModelNodeWidth } from "@/utils/cardDimensions";
 import { getActivePixiEngine } from "@/engine/PixiEngine";
@@ -451,7 +452,7 @@ function SingleModelPopupCard({
                         </div>
                       ) : (
                         <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
-                          {field.fieldType || "string"}
+                          {field.fieldType || DEFAULT_FIELD_TYPE}
                         </span>
                       )}
                     </div>
@@ -490,7 +491,7 @@ function SingleModelPopupCard({
         {kind === "array" && (
           <div className="p-3">
             {(() => {
-              const itemType = data.itemType || "any";
+              const itemType = data.itemType || DEFAULT_ANY_TYPE;
               const targetModel = findModelByName(allObjects, itemType);
               const isModel = Boolean(targetModel);
               const targetKind = targetModel?.modelData?.kind;
@@ -553,7 +554,7 @@ function SingleModelPopupCard({
         {kind === "wrap" && (
           <div className="p-3">
             {(() => {
-              const innerType = data.innerType || "any";
+              const innerType = data.innerType || DEFAULT_ANY_TYPE;
               const targetModel = findModelByName(allObjects, innerType);
               const isModel = Boolean(targetModel);
               const targetKind = targetModel?.modelData?.kind;
