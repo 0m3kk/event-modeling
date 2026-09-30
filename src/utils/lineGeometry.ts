@@ -18,6 +18,63 @@ export function getLineEndpoints(
   };
 }
 
+/**
+ * True when the segment a→b touches the axis-aligned rectangle. Uses the
+ * Liang–Barsky slab clip so a segment fully inside, fully crossing, or merely
+ * grazing a corner all count as a hit.
+ */
+export function segmentIntersectsRect(
+  a: Point,
+  b: Point,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+
+  const clip = (p: number, q: number): boolean => {
+    // Parallel to this edge: inside only when q keeps it within the slab.
+    if (p === 0) return q >= 0;
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  };
+
+  return (
+    clip(-dx, a.x - minX) &&
+    clip(dx, maxX - a.x) &&
+    clip(-dy, a.y - minY) &&
+    clip(dy, maxY - a.y)
+  );
+}
+
+/**
+ * True when a line object's segment crosses an axis-aligned rectangle. Used by
+ * marquee selection, where lines are matched by their actual stroke rather than
+ * a bounding box.
+ */
+export function lineIntersectsRect(
+  obj: CanvasObject,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+): boolean {
+  const ends = getLineEndpoints(obj);
+  if (!ends) return false;
+  return segmentIntersectsRect(ends.start, ends.end, minX, minY, maxX, maxY);
+}
+
 /** Shortest distance from a point to the segment a→b. */
 export function distanceToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x;

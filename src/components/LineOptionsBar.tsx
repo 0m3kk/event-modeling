@@ -3,6 +3,7 @@ import { useCanvasStore } from "@/store";
 import type { LineData, LineStyle } from "@/types";
 import { getLineEndpoints } from "@/utils/lineGeometry";
 import { Trash2 } from "lucide-react";
+import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 
 const LINE_COLORS = [
   "#475569", // Slate (default)
@@ -86,6 +87,7 @@ function ArrowIcon({ direction }: { direction: "start" | "end" }) {
 export function LineOptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const objects = useCanvasStore((s) => s.objects);
+  const groups = useCanvasStore((s) => s.groups);
   const viewport = useCanvasStore((s) => s.viewport);
   const updateObject = useCanvasStore((s) => s.updateObject);
   const deleteObjects = useCanvasStore((s) => s.deleteObjects);
@@ -108,6 +110,11 @@ export function LineOptionsBar() {
 
   const data = selectedLine.lineData;
   const lineStyle: LineStyle = data.lineStyle ?? "solid";
+
+  // Membership shows a one-click way to detach this line from its group.
+  const parentGroup = selectedLine.groupId
+    ? groups.find((g) => g.id === selectedLine.groupId)
+    : undefined;
   const strokeWidth = data.strokeWidth ?? 2;
   const color = data.stroke ?? "#475569";
   const arrowStart = data.arrowStart === true;
@@ -231,6 +238,17 @@ export function LineOptionsBar() {
         </div>
 
         <div className="h-5 w-px bg-gray-200" />
+
+        {/* Remove from Group — detaches just this line, keeping the group */}
+        {parentGroup && !parentGroup.locked && (
+          <>
+            <RemoveFromGroupButton
+              objectId={selectedLine.id}
+              groupName={parentGroup.name}
+            />
+            <div className="h-5 w-px bg-gray-200" />
+          </>
+        )}
 
         {/* Delete Line */}
         <button

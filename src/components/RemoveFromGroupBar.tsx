@@ -4,8 +4,8 @@ import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 
 /**
  * Floating "Remove from Group" button for grouped annotations (sticky notes,
- * text boxes) that have no options bar of their own. Storm cards and model
- * nodes expose the same action inside their dedicated options bars.
+ * text boxes) that have no options bar of their own. Storm cards, model nodes
+ * and lines expose the same action inside their dedicated options bars.
  */
 export function RemoveFromGroupBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
@@ -19,8 +19,10 @@ export function RemoveFromGroupBar() {
     if (selectedIds.length !== 1 || isLocked) return null;
     const obj = objects.find((o) => o.id === selectedIds[0]);
     if (!obj || !obj.groupId || obj.type === "connector") return null;
-    // Storm cards and model nodes already show this action in their own bars.
-    if (obj.type === "storm" || obj.type === "model") return null;
+    // Cards, model nodes and lines already show this action in their own bars.
+    if (obj.type === "storm" || obj.type === "model" || obj.type === "line") {
+      return null;
+    }
     return obj;
   }, [selectedIds, objects, isLocked]);
 

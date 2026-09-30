@@ -51,6 +51,7 @@ import {
   distanceToSegment,
   createLineObject,
   normalizeLineGeometry,
+  lineIntersectsRect,
 } from "@/utils/lineGeometry";
 import type { CardHitZone } from "./renderers";
 import type { CanvasObject, ElbowBend, Point } from "@/types";
@@ -169,6 +170,8 @@ export class PixiEngine {
   } | null = null;
   private hoveredHandle: { handle: ResizeHandle; objectId: string } | null =
     null;
+  /** True while the pointer sits on a connector/line endpoint handle. */
+  private hoveringEndpoint: boolean = false;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -1052,6 +1055,9 @@ export class PixiEngine {
         e.clientX - rect.left,
         e.clientY - rect.top,
       );
+      // Cmd/Ctrl/Shift marks a click as multi-select: it must only toggle the
+      // object, never start a handle drag that would replace the selection.
+      const isMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey;
 
       // Line Tool Mode — click the start point, then click the end point
       // (like the connector tool; no drag required). Handled before the
@@ -1181,6 +1187,11 @@ export class PixiEngine {
             state.clearModelPopups();
           }
           state.setStormSelectedField(null);
+          // A modified click just toggles membership; the endpoint stays put.
+          if (isMultiSelect) {
+            state.selectObject(hitEndpoint.connectorId, true);
+            return;
+          }
           state.selectObject(hitEndpoint.connectorId, false);
           this.isDraggingConnectorEndpoint = true;
           this.activeConnectorEndpoint = hitEndpoint;
@@ -1204,6 +1215,11 @@ export class PixiEngine {
             state.clearModelPopups();
           }
           state.setStormSelectedField(null);
+          // A modified click just toggles membership; the endpoint stays put.
+          if (isMultiSelect) {
+            state.selectObject(hitLineEndpoint.lineId, true);
+            return;
+          }
           state.selectObject(hitLineEndpoint.lineId, false);
           this.isDraggingLineEndpoint = true;
           this.activeLineEndpoint = {
@@ -1727,6 +1743,18 @@ export class PixiEngine {
         const maxY = Math.max(my, my + mh);
 
         const hits = this.spatialIndex.search({ minX, minY, maxX, maxY });
+
+        // Freeform lines stay out of the card spatial index (clicks hit-test
+        // their segment instead), so add any line the marquee actually crosses.
+        for (const obj of useCanvasStore.getState().objects) {
+          if (
+            obj.type === "line" &&
+            lineIntersectsRect(obj, minX, minY, maxX, maxY)
+          ) {
+            hits.push(obj.id);
+          }
+        }
+
         if (this.marqueeInitialSelectedIds.length > 0) {
           const merged = Array.from(
             new Set([...this.marqueeInitialSelectedIds, ...hits]),
@@ -1774,15 +1802,22 @@ export class PixiEngine {
 
         if (hitHandle) {
           this.hoveredHandle = hitHandle;
+          this.hoveringEndpoint = false;
           const cursor = getCursorForHandle(hitHandle.handle);
           this.container.style.cursor = cursor;
           this.cardLayer.setCursor(cursor);
         } else if (hitEndpoint || hitLineEndpoint) {
           this.hoveredHandle = null;
-          this.container.style.cursor = "grab";
-          this.cardLayer.setCursor("grab");
-        } else if (this.hoveredHandle) {
+          this.hoveringEndpoint = true;
+          // With a selection modifier held a click toggles the object rather
+          // than grabbing the handle, so keep the pointer cursor.
+          const cursor =
+            e.shiftKey || e.metaKey || e.ctrlKey ? "default" : "grab";
+          this.container.style.cursor = cursor;
+          this.cardLayer.setCursor(cursor);
+        } else if (this.hoveredHandle || this.hoveringEndpoint) {
           this.hoveredHandle = null;
+          this.hoveringEndpoint = false;
           this.container.style.cursor = "default";
           this.cardLayer.setCursor("default");
         }
