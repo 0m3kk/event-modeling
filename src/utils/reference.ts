@@ -26,6 +26,7 @@ import type { CanvasObject, ModelData, StormData } from "@/types";
 const SYNCED_REFERENCE_FIELDS = [
   "width",
   "height",
+  "widthLocked",
   "text",
   "fill",
   "stroke",

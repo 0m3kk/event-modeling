@@ -257,12 +257,15 @@ export const updateObjectsTool = defineTool({
     const notFound: string[] = [];
 
     for (const { id, patch } of args.updates) {
-      const exists = state.objects.some((o) => o.id === id);
-      if (!exists) {
+      const target = state.objects.find((o) => o.id === id);
+      if (!target) {
         notFound.push(id);
         continue;
       }
-      state.updateObject(id, patch as Partial<CanvasObject>);
+      const nextPatch = { ...patch } as Partial<CanvasObject>;
+      // Keep a width the user resized by hand, even if the patch carries one.
+      if (target.widthLocked) delete nextPatch.width;
+      state.updateObject(id, nextPatch);
       updated.push(id);
     }
 

@@ -37,6 +37,13 @@ export interface CanvasObject {
   groupId?: string; // Group membership
 
   /**
+   * Set when the user manually resizes the card's width. Automated (AI)
+   * updates then leave the width untouched so a hand-tuned width survives,
+   * while height still reflows to the content.
+   */
+  widthLocked?: boolean;
+
+  /**
    * Reference-copy set id. Objects sharing a `referenceId` are linked
    * duplicates: content/style/size stay in sync across the set while position
    * and group membership stay independent (see utils/reference.ts).

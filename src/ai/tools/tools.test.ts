@@ -581,6 +581,103 @@ describe("AI Storm Tools", () => {
     expect(updated.height).toBeGreaterThan(80);
   });
 
+  it("update_storm_card preserves a width the user resized", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "evt-lock",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 420,
+      height: 80,
+      widthLocked: true,
+      stormData: { kind: "event", name: "Old Name", fields: [] },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "update_storm_card",
+        arguments: JSON.stringify({
+          id: "evt-lock",
+          name: "Payment Completed",
+          fields: [
+            { name: "txId", fieldType: "string" },
+            { name: "amount", fieldType: "number" },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const updated = fake.objects[0]!;
+    expect(updated.width).toBe(420);
+    expect(updated.height).toBeGreaterThan(80);
+  });
+
+  it("update_objects keeps a width the user resized", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "note-lock",
+      type: "stickyNote",
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 140,
+      widthLocked: true,
+      text: "Note",
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "update_objects",
+        arguments: JSON.stringify({
+          updates: [
+            { id: "note-lock", patch: { width: 100, text: "Updated" } },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const updated = fake.objects[0]!;
+    expect(updated.width).toBe(300);
+    expect(updated.text).toBe("Updated");
+  });
+
+  it("update_objects still applies width when the card is not locked", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "note-free",
+      type: "stickyNote",
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 140,
+      text: "Note",
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "update_objects",
+        arguments: JSON.stringify({
+          updates: [{ id: "note-free", patch: { width: 100 } }],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects[0]!.width).toBe(100);
+  });
+
   it("canonicalizes primitive field types when writing cards", async () => {
     const fake = createFakeStore();
     const { ctx } = createContext(fake);

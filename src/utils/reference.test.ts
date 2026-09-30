@@ -98,6 +98,17 @@ describe("syncReferenceSet", () => {
     expect(next[1].y).toBe(500);
   });
 
+  it("propagates a user-resized width lock across the set", () => {
+    const objects = [
+      storm({ id: "a", referenceId: "ref-1", width: 300, widthLocked: true }),
+      storm({ id: "b", referenceId: "ref-1", width: 100 }),
+    ];
+
+    const next = syncReferenceSet(objects, "a")!;
+    expect(next[1].width).toBe(300);
+    expect(next[1].widthLocked).toBe(true);
+  });
+
   it("does not share nested arrays between synced siblings", () => {
     const source = storm({
       id: "a",

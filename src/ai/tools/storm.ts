@@ -773,11 +773,12 @@ export const updateStormCardTool = defineTool({
     if (args.queryItems === undefined) data.queryItems = existing.queryItems;
     if (args.constraints === undefined) data.constraints = existing.constraints;
 
-    const newHeight = computeStormCardHeight(data);
-    const newWidth = Math.max(
-      object.width || 200,
-      computeOptimalStormCardWidth(data),
-    );
+    // A width the user resized by hand is preserved (height still reflows to
+    // the new content); otherwise the card refits to its content width.
+    const newWidth = object.widthLocked
+      ? object.width || 200
+      : Math.max(object.width || 200, computeOptimalStormCardWidth(data));
+    const newHeight = computeStormCardHeight(data, newWidth);
     state.updateObject(args.id, {
       stormData: data,
       width: newWidth,

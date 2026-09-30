@@ -1620,6 +1620,14 @@ export class PixiEngine {
             y: newBounds.y,
             width: newBounds.width,
           };
+          // A deliberate width drag is a user choice: flag it so later AI
+          // edits keep this width instead of refitting the card to content.
+          if (
+            this.resizingHandle.includes("e") ||
+            this.resizingHandle.includes("w")
+          ) {
+            patch.widthLocked = true;
+          }
           if (
             this.resizingHandle.includes("n") ||
             this.resizingHandle.includes("s")
