@@ -114,6 +114,28 @@ export function computeGroupContentBounds(
 }
 
 /**
+ * A group id plus every ancestor group id. Used when placing content *into* a
+ * group: the target and all of its ancestors must be excluded from the group
+ * obstacles so they don't block their own members.
+ */
+export function groupAndAncestorIds(
+  groupId: string,
+  groups: GroupInfo[],
+): Set<string> {
+  const groupsById = new Map<string, GroupInfo>(
+    groups.map((g) => [g.id, g]),
+  );
+  const ids = new Set<string>();
+  let current: string | undefined = groupId;
+  while (current && !ids.has(current)) {
+    ids.add(current);
+    const parent: string | undefined = groupsById.get(current)?.parentId;
+    current = parent && groupsById.has(parent) ? parent : undefined;
+  }
+  return ids;
+}
+
+/**
  * Recomputes `customBounds` for a set of affected groups and their ancestors,
  * so boundaries keep enclosing all of their members.
  *

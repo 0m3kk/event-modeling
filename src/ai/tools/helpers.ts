@@ -1,6 +1,19 @@
 import type { CanvasObject } from "@/types";
 import type { CanvasStore } from "@/store/types";
 import { getViewportCenter as calcViewportCenter } from "@/utils/viewport";
+import type { Rect } from "@/utils/placement";
+
+// Placement geometry lives in `@/utils/placement` so the store (reference
+// copies) and the AI tools share one set of collision rules. Re-exported here
+// for the existing tool imports.
+export {
+  PLACEMENT_PADDING,
+  findFreeSpot,
+  getGroupObstacleRects,
+  getOccupiedRects,
+  rectsOverlap,
+} from "@/utils/placement";
+export type { Rect } from "@/utils/placement";
 
 /** Best-effort human label for an object. */
 export function objectLabel(obj: CanvasObject): string {
@@ -59,13 +72,6 @@ export function getViewportCenter(state: CanvasStore): {
   return calcViewportCenter(state.viewport);
 }
 
-export interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 export function getViewportRect(state: CanvasStore): Rect {
   const { viewport } = state;
   const screenWidth = viewport.screenWidth > 0 ? viewport.screenWidth : 1200;
@@ -95,62 +101,4 @@ export function getObjectsBounds(
   }
   if (!Number.isFinite(minX)) return null;
   return { minX, minY, maxX, maxY };
-}
-
-export const PLACEMENT_PADDING = 40;
-const PLACEMENT_STEP = 80;
-const MAX_PLACEMENT_RINGS = 25;
-
-export function rectsOverlap(a: Rect, b: Rect, padding = 0): boolean {
-  return (
-    a.x < b.x + b.width + padding &&
-    a.x + a.width + padding > b.x &&
-    a.y < b.y + b.height + padding &&
-    a.y + a.height + padding > b.y
-  );
-}
-
-export function getOccupiedRects(objects: CanvasObject[]): Rect[] {
-  return objects
-    .filter((obj) => obj.type !== "connector")
-    .map((obj) => ({
-      x: obj.x,
-      y: obj.y,
-      width: obj.width ?? 0,
-      height: obj.height ?? 0,
-    }));
-}
-
-export function findFreeSpot(
-  objects: CanvasObject[],
-  size: { width: number; height: number },
-  anchor: { x: number; y: number },
-  options: { padding?: number; step?: number; maxRings?: number } = {},
-): { x: number; y: number } {
-  const padding = options.padding ?? PLACEMENT_PADDING;
-  const step = options.step ?? PLACEMENT_STEP;
-  const maxRings = options.maxRings ?? MAX_PLACEMENT_RINGS;
-  const occupied = getOccupiedRects(objects);
-
-  const isFree = (x: number, y: number): boolean => {
-    const candidate: Rect = { x, y, width: size.width, height: size.height };
-    return !occupied.some((rect) => rectsOverlap(candidate, rect, padding));
-  };
-
-  if (isFree(anchor.x, anchor.y)) return { x: anchor.x, y: anchor.y };
-
-  for (let ring = 1; ring <= maxRings; ring++) {
-    for (let dx = -ring; dx <= ring; dx++) {
-      for (let dy = -ring; dy <= ring; dy++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
-        const x = anchor.x + dx * step;
-        const y = anchor.y + dy * step;
-        if (isFree(x, y)) return { x, y };
-      }
-    }
-  }
-
-  const bounds = getObjectsBounds(objects);
-  if (!bounds) return { x: anchor.x, y: anchor.y };
-  return { x: bounds.maxX + padding, y: bounds.minY };
 }

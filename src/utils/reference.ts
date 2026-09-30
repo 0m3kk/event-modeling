@@ -159,6 +159,11 @@ export function generateReferenceId(): string {
  * source's reference set (assigning one if the source isn't linked yet —
  * the caller is responsible for also persisting that referenceId on the
  * source object).
+ *
+ * Group membership is per-instance, so the copy starts detached: it is meant
+ * to be reused in a new context (e.g. a new slice) and will be grouped there.
+ * Keeping the source's `groupId` would stretch the source's Section frame
+ * across the board when the copy is placed in free space.
  */
 export function buildReferenceCopy(source: CanvasObject): CanvasObject {
   const copy: CanvasObject = {
@@ -170,6 +175,7 @@ export function buildReferenceCopy(source: CanvasObject): CanvasObject {
     // Per-instance state starts fresh
     locked: false,
   };
+  delete copy.groupId;
   // Never share nested mutable data with the source
   if (copy.stormData) copy.stormData = cloneStormData(copy.stormData);
   if (copy.modelData) copy.modelData = cloneModelData(copy.modelData);

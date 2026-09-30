@@ -32,7 +32,13 @@ import {
   type StormValidationInput,
 } from "@/utils/stormValidation";
 import { defineTool } from "./schema";
-import { findFreeSpot, getObjectsBounds, getViewportCenter } from "./helpers";
+import {
+  findFreeSpot,
+  getGroupObstacleRects,
+  getObjectsBounds,
+  getViewportCenter,
+} from "./helpers";
+import { groupAndAncestorIds } from "@/utils/groupBounds";
 
 const STORM_KINDS = [
   "command",
@@ -488,7 +494,17 @@ export const createStormCardsTool = defineTool({
         }
       }
 
-      const origin = findFreeSpot(state.objects, size, groupOriginCenter);
+      const origin = findFreeSpot(state.objects, size, groupOriginCenter, {
+        // Steer the whole slice around existing Section frames so it does not
+        // land inside a neighbouring group; the target group (when set) is
+        // exempt so its members are not treated as obstacles to themselves.
+        obstacles: getGroupObstacleRects(
+          state.groups,
+          commonGroupId
+            ? groupAndAncestorIds(commonGroupId, state.groups)
+            : undefined,
+        ),
+      });
       const byId = new Map(
         arranger(layoutCards, { origin }).map((pos) => [pos.id, pos]),
       );
@@ -538,6 +554,14 @@ export const createStormCardsTool = defineTool({
             [...state.objects, ...placed],
             { width: obj.width ?? 200, height: obj.height ?? 120 },
             searchCenter,
+            {
+              obstacles: getGroupObstacleRects(
+                state.groups,
+                obj.groupId
+                  ? groupAndAncestorIds(obj.groupId, state.groups)
+                  : undefined,
+              ),
+            },
           );
           obj.x = spot.x;
           obj.y = spot.y;

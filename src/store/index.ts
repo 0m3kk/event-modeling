@@ -23,6 +23,11 @@ import {
   reparentChildrenOfRemovedGroups,
 } from "@/utils/groupBounds";
 import {
+  findFreeSpot,
+  getGroupObstacleRects,
+  type Rect,
+} from "@/utils/placement";
+import {
   computeStormCardHeight,
   computeModelNodeHeight,
 } from "@/utils/cardDimensions";
@@ -399,15 +404,33 @@ export const useCanvasStore = create<CanvasStore>()(
               : obj,
           );
 
-          // Second pass: build the copies from the updated sources
+          // Second pass: build the copies and drop each one into genuinely
+          // free space. A fixed offset would land the copy on top of the source
+          // (and, for a flow reusing it, on top of an existing Section frame).
+          const groupObstacles = getGroupObstacleRects(state.groups);
+          const placedRects: Rect[] = [];
           const clones: CanvasObject[] = [];
           const cloneIds: string[] = [];
-          objects.forEach((obj) => {
-            if (!copyable(obj)) return;
+          for (const obj of objects) {
+            if (!copyable(obj)) continue;
             const clone = buildReferenceCopy(obj);
+            const spot = findFreeSpot(
+              objects,
+              { width: clone.width ?? 0, height: clone.height ?? 0 },
+              { x: clone.x, y: clone.y },
+              { obstacles: [...groupObstacles, ...placedRects] },
+            );
+            clone.x = spot.x;
+            clone.y = spot.y;
+            placedRects.push({
+              x: spot.x,
+              y: spot.y,
+              width: clone.width ?? 0,
+              height: clone.height ?? 0,
+            });
             clones.push(clone);
             cloneIds.push(clone.id);
-          });
+          }
 
           if (clones.length === 0) return {};
 

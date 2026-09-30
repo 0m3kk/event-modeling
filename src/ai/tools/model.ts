@@ -15,7 +15,8 @@ import { toDisplayName } from "@/utils/naming";
 import { normalizeValidation } from "@/utils/fieldValidation";
 import { fieldValidationSpec } from "./fieldValidationSpec";
 import { defineTool } from "./schema";
-import { findFreeSpot, getViewportCenter } from "./helpers";
+import { findFreeSpot, getGroupObstacleRects, getViewportCenter } from "./helpers";
+import { groupAndAncestorIds } from "@/utils/groupBounds";
 
 /**
  * Reduce a normalized validation object to the rules a model kind understands:
@@ -174,6 +175,14 @@ export const createModelNodesTool = defineTool({
           [...state.objects, ...placed],
           { width, height },
           searchCenter,
+          {
+            obstacles: getGroupObstacleRects(
+              state.groups,
+              resolvedGroupId
+                ? groupAndAncestorIds(resolvedGroupId, state.groups)
+                : undefined,
+            ),
+          },
         );
       }
 

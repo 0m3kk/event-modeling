@@ -5,10 +5,12 @@ import { defineTool } from "./schema";
 import { toDisplayName } from "@/utils/naming";
 import {
   findFreeSpot,
+  getGroupObstacleRects,
   getObjectsBounds,
   getViewportCenter,
   objectLabel,
 } from "./helpers";
+import { groupAndAncestorIds } from "@/utils/groupBounds";
 import { createLineObject } from "@/utils/lineGeometry";
 
 const CARDINAL_ANCHORS = ["top", "right", "bottom", "left"] as const;
@@ -152,7 +154,21 @@ export const createObjectsTool = defineTool({
 
       const pos = hasPos
         ? { x: spec.x!, y: spec.y! }
-        : findFreeSpot([...state.objects, ...placed], { width, height }, searchCenter);
+        : findFreeSpot(
+            [...state.objects, ...placed],
+            { width, height },
+            searchCenter,
+            {
+              // Keep the card clear of every Section frame except the one it
+              // is being added to (and that frame's ancestors).
+              obstacles: getGroupObstacleRects(
+                state.groups,
+                resolvedGroupId
+                  ? groupAndAncestorIds(resolvedGroupId, state.groups)
+                  : undefined,
+              ),
+            },
+          );
 
       const obj: CanvasObject = {
         id: `${spec.type}-${nanoid()}`,
@@ -342,7 +358,7 @@ export const connectObjectsTool = defineTool({
 export const createReferenceCopiesTool = defineTool({
   name: "create_reference_copies",
   description:
-    "Create linked reference copies of existing cards/nodes by id. Synced duplicates stay in sync across the set.",
+    "Create linked reference copies of existing cards/nodes by id. Synced duplicates stay in sync across the set. Copies are placed in free canvas space, clear of existing cards and Section frames (they start ungrouped so they can be grouped into the new slice).",
   schema: z.object({
     ids: z.array(z.string()).min(1).max(200),
   }),

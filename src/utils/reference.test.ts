@@ -7,6 +7,7 @@ import {
 } from "./reference";
 import { useCanvasStore, clearHistory } from "@/store";
 import type { CanvasObject, StormData } from "@/types";
+import { rectsOverlap } from "./placement";
 
 function storm(overrides: Partial<CanvasObject> = {}): CanvasObject {
   return {
@@ -140,6 +141,13 @@ describe("buildReferenceCopy", () => {
     copy.modelData!.fields![0].name = "changed";
     expect(source.modelData?.fields![0].name).toBe("id");
   });
+
+  it("starts the copy detached from the source's Section", () => {
+    const source = storm({ id: "a", groupId: "g1" });
+    const copy = buildReferenceCopy(source);
+    expect(source.groupId).toBe("g1");
+    expect(copy.groupId).toBeUndefined();
+  });
 });
 
 describe("pruneDanglingReferences", () => {
@@ -203,5 +211,46 @@ describe("createReferenceCopy (store)", () => {
     state = useCanvasStore.getState();
     expect(state.objects).toHaveLength(1);
     expect(state.objects[0].referenceId).toBeUndefined();
+  });
+
+  it("places the copy in free space instead of on top of the source", () => {
+    const store = useCanvasStore.getState();
+    store.addObject(storm({ id: "s1", x: 100, y: 100 }));
+    useCanvasStore.getState().createReferenceCopy(["s1"]);
+
+    const state = useCanvasStore.getState();
+    const copy = state.objects.find((o) => o.id !== "s1")!;
+    expect(
+      rectsOverlap(
+        { x: copy.x, y: copy.y, width: copy.width!, height: copy.height! },
+        { x: 100, y: 100, width: 240, height: 120 },
+        40,
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps a copy clear of an existing Section frame and detaches it", () => {
+    const store = useCanvasStore.getState();
+    store.addObject(storm({ id: "s1", x: 0, y: 0, groupId: "g1" }));
+    store.setGroups([
+      {
+        id: "g1",
+        name: "Domain",
+        customBounds: { x: -24, y: -24, width: 288, height: 168 },
+      },
+    ]);
+
+    useCanvasStore.getState().createReferenceCopy(["s1"]);
+
+    const state = useCanvasStore.getState();
+    const copy = state.objects.find((o) => o.id !== "s1")!;
+    expect(copy.groupId).toBeUndefined();
+    expect(
+      rectsOverlap(
+        { x: copy.x, y: copy.y, width: copy.width!, height: copy.height! },
+        { x: -24, y: -24, width: 288, height: 168 },
+        40,
+      ),
+    ).toBe(false);
   });
 });
