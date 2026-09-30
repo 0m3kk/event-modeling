@@ -840,8 +840,70 @@ export const arrangeStormLanesTool = defineTool({
   },
 });
 
+export const arrangeStormSliceTool = defineTool({
+  name: "arrange_storm_slice",
+  description:
+    "Re-center an existing vertical slice in place. Call this after adding, removing, or reordering cards in a slice (or whenever a lane grows, e.g. an extra Constraint appears in the middle layer) and BEFORE drawing the separators: it re-lays the slice out top-to-bottom and centers every layer (Command/Query, Constraint(s), Event(s)/State) on the widest layer, so the upper and lower lanes are no longer left shifted left when the middle layer widens. Then redraw the separators with separate_layers.",
+  schema: z.object({
+    cardIds: z
+      .array(z.string())
+      .min(1)
+      .max(100)
+      .describe(
+        "Ids of every card in the slice (Command/Query, Constraint(s), Event(s)/State).",
+      ),
+    layout: z
+      .enum(["verticalSlice", "lanes"])
+      .optional()
+      .describe(
+        "'verticalSlice' (default, top-to-bottom slice) or 'lanes' (horizontal Actor→…→Constraint lanes).",
+      ),
+    origin: z
+      .object({ x: z.number(), y: z.number() })
+      .optional()
+      .describe("Top-left anchor. Defaults to the slice's current top-left."),
+  }),
+  execute: (args, ctx) => {
+    const state = ctx.getState();
+    const wanted = new Set(args.cardIds);
+    const cards = state.objects.filter(
+      (o): o is CanvasObject & { stormData: StormData } =>
+        o.type === "storm" && Boolean(o.stormData) && wanted.has(o.id),
+    );
+    if (cards.length === 0) {
+      return { arranged: 0, positions: [] };
+    }
+
+    const bounds = getObjectsBounds(cards);
+    const origin =
+      args.origin ??
+      (bounds ? { x: bounds.minX, y: bounds.minY } : { x: 0, y: 0 });
+
+    const arranger =
+      (args.layout ?? "verticalSlice") === "lanes"
+        ? arrangeStormLanes
+        : arrangeVerticalSlice;
+    const positions = arranger(
+      cards.map((o) => ({
+        id: o.id,
+        kind: o.stormData.kind,
+        width: o.width ?? 200,
+        height: o.height ?? 120,
+      })),
+      { origin },
+    );
+
+    for (const pos of positions) {
+      state.updateObject(pos.id, { x: pos.x, y: pos.y });
+    }
+
+    return { arranged: positions.length, positions };
+  },
+});
+
 export const stormTools = [
   createStormCardsTool,
   updateStormCardTool,
   arrangeStormLanesTool,
+  arrangeStormSliceTool,
 ];

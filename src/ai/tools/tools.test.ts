@@ -267,6 +267,73 @@ describe("AI Storm Tools", () => {
     expect(cmd.x).toBeLessThan(evt.x);
   });
 
+  it("arrange_storm_slice re-centers every layer on the widest layer", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const created = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          arrange: false,
+          cards: [
+            { kind: "command", name: "Place Order", x: 120, y: 0 },
+            { kind: "constraint", name: "Check Stock", x: 0, y: 160 },
+            { kind: "constraint", name: "Check Funds", x: 600, y: 160 },
+            { kind: "event", name: "Order Placed", x: 120, y: 340 },
+          ],
+        }),
+      },
+      ctx,
+    );
+    expect(created.isError).toBeFalsy();
+    const ids = (JSON.parse(created.content).created as { id: string }[]).map(
+      (c) => c.id,
+    );
+    const [cmdId, cst1Id, cst2Id, evtId] = ids;
+
+    const res = await executeToolCall(
+      {
+        id: "2",
+        name: "arrange_storm_slice",
+        arguments: JSON.stringify({ cardIds: ids }),
+      },
+      ctx,
+    );
+    expect(res.isError).toBeFalsy();
+    expect(JSON.parse(res.content).arranged).toBe(4);
+
+    const cmd = fake.objects.find((o) => o.id === cmdId)!;
+    const cst1 = fake.objects.find((o) => o.id === cst1Id)!;
+    const cst2 = fake.objects.find((o) => o.id === cst2Id)!;
+    const evt = fake.objects.find((o) => o.id === evtId)!;
+
+    const cmdCenter = cmd.x + (cmd.width ?? 0) / 2;
+    const midCenter = (cst1.x + (cst2.x + (cst2.width ?? 0))) / 2;
+    const evtCenter = evt.x + (evt.width ?? 0) / 2;
+    expect(Math.round(cmdCenter)).toBe(Math.round(midCenter));
+    expect(Math.round(evtCenter)).toBe(Math.round(midCenter));
+    expect(cmd.y).toBeLessThan(cst1.y);
+    expect(cst1.y).toBeLessThan(evt.y);
+  });
+
+  it("arrange_storm_slice ignores unknown ids", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "arrange_storm_slice",
+        arguments: JSON.stringify({ cardIds: ["nope"] }),
+      },
+      ctx,
+    );
+    expect(res.isError).toBeFalsy();
+    expect(JSON.parse(res.content).arranged).toBe(0);
+  });
+
   it("rejects unknown event references in State query items", async () => {
     const fake = createFakeStore();
     const { ctx } = createContext(fake);

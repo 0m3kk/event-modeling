@@ -34,6 +34,7 @@ const TOOL_LABELS: Record<string, string> = {
   create_storm_cards: "Created storm cards",
   update_storm_card: "Updated storm card",
   arrange_storm_lanes: "Arranged lanes",
+  arrange_storm_slice: "Re-centered slice",
   create_model_nodes: "Created model nodes",
   create_reference_copies: "Created reference copies",
   group_objects: "Grouped objects",
