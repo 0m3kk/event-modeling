@@ -79,6 +79,7 @@ function patchTouchesGeometry(patch: Partial<CanvasObject>): boolean {
 
 export const initialCanvasState: CanvasStoreState = {
   projectName: "Untitled",
+  googleDriveFileId: null,
   objects: [],
   groups: [],
   selectedIds: [],
@@ -1901,14 +1902,17 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       setProjectName: (projectName) => set({ projectName }),
+      setGoogleDriveFileId: (googleDriveFileId) => set({ googleDriveFileId }),
 
       resetBoard: (
         objects = [],
         groups = [],
         projectName = "Untitled",
+        googleDriveFileId = null,
       ) => {
         set((state) => ({
           projectName,
+          googleDriveFileId,
           // Canonicalize primitive field types on load so legacy boards
           // ("uuid", "datetime") surface as "UUID", "DateTime" everywhere.
           objects: objects.map(normalizeObjectFieldTypes),

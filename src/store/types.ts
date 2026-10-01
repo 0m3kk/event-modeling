@@ -102,6 +102,7 @@ export interface ModelPopupEntry {
 
 export interface CanvasStoreState {
   projectName: string;
+  googleDriveFileId: string | null;
   objects: CanvasObject[];
   groups: GroupInfo[];
   selectedIds: string[];
@@ -259,12 +260,14 @@ export interface CanvasStoreActions {
 
   // Project metadata
   setProjectName: (name: string) => void;
+  setGoogleDriveFileId: (fileId: string | null) => void;
 
   // Whole board reset / load
   resetBoard: (
     objects?: CanvasObject[],
     groups?: GroupInfo[],
     projectName?: string,
+    googleDriveFileId?: string | null,
   ) => void;
 
   // AI Assistant Actions

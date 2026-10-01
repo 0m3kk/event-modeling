@@ -14,6 +14,8 @@ import {
   FileCode2,
   ChevronDown,
   CloudCheck,
+  Cloud,
+  CloudUpload,
   Pencil,
   CheckCircle2,
 } from "lucide-react";
@@ -32,6 +34,7 @@ import { DEFAULT_VIEWPORT } from "@/constants/canvas";
 import { JsonSchemaExportModal } from "./JsonSchemaExportModal";
 import { ExportImageModal } from "./ExportImageModal";
 import { NewBoardModal } from "./NewBoardModal";
+import { GoogleDriveModal } from "./GoogleDriveModal";
 
 export function Header() {
   const objectCount = useCanvasStore((state) => state.objects.length);
@@ -42,6 +45,7 @@ export function Header() {
 
   const projectName = useCanvasStore((state) => state.projectName);
   const setProjectName = useCanvasStore((state) => state.setProjectName);
+  const googleDriveFileId = useCanvasStore((state) => state.googleDriveFileId);
 
   const [titleInput, setTitleInput] = useState(projectName);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -75,6 +79,22 @@ export function Header() {
   const [isJsonSchemaModalOpen, setIsJsonSchemaModalOpen] = useState(false);
   const [isExportImageModalOpen, setIsExportImageModalOpen] = useState(false);
   const [isNewBoardModalOpen, setIsNewBoardModalOpen] = useState(false);
+  const [isGoogleDriveModalOpen, setIsGoogleDriveModalOpen] = useState(false);
+  const [googleDriveModalTab, setGoogleDriveModalTab] = useState<"save" | "open">("save");
+
+  const handleOpenGoogleDriveSave = useCallback(() => {
+    setIsFileMenuOpen(false);
+    setIsExportMenuOpen(false);
+    setGoogleDriveModalTab("save");
+    setIsGoogleDriveModalOpen(true);
+  }, []);
+
+  const handleOpenGoogleDriveOpen = useCallback(() => {
+    setIsFileMenuOpen(false);
+    setIsExportMenuOpen(false);
+    setGoogleDriveModalTab("open");
+    setIsGoogleDriveModalOpen(true);
+  }, []);
 
   // Transient success toast shown after an export finishes.
   const [toast, setToast] = useState<string | null>(null);
@@ -323,6 +343,16 @@ export function Header() {
               <CloudCheck size={12} className="text-emerald-600" />
               <span>{saveStatus === "saving" ? "Saving..." : "Saved"}</span>
             </div>
+
+            <button
+              type="button"
+              onClick={handleOpenGoogleDriveSave}
+              title={googleDriveFileId ? "Đã liên kết Google Drive (Bấm để quản lý)" : "Lưu vào Google Drive"}
+              className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              <Cloud size={12} className={googleDriveFileId ? "text-blue-600" : "text-gray-400"} />
+              <span>{googleDriveFileId ? "Drive Linked" : "Drive"}</span>
+            </button>
           </div>
 
           <div className="mx-1 h-4 w-px bg-gray-200" />
@@ -341,7 +371,7 @@ export function Header() {
             </button>
 
             {isFileMenuOpen && (
-              <div className="absolute top-full left-0 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
+              <div className="absolute top-full left-0 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
                 <button
                   onClick={handleNewBoard}
                   className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
@@ -357,17 +387,32 @@ export function Header() {
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
                 >
                   <FolderOpen size={14} className="text-gray-400" />
-                  <span>Open</span>
+                  <span>Open Local</span>
                 </button>
+                <button
+                  onClick={handleOpenGoogleDriveOpen}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  <Cloud size={14} className="text-blue-500" />
+                  <span>Open from Drive</span>
+                </button>
+                <div className="my-1 border-t border-gray-100" />
                 <button
                   onClick={handleSaveFile}
                   className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
                     <Save size={14} className="text-gray-400" />
-                    <span>Save</span>
+                    <span>Save Local</span>
                   </div>
                   <span className="text-[10px] text-gray-400 font-mono">⌘S</span>
+                </button>
+                <button
+                  onClick={handleOpenGoogleDriveSave}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  <CloudUpload size={14} className="text-blue-500" />
+                  <span>Save to Drive</span>
                 </button>
                 <div className="my-1 border-t border-gray-100" />
                 <button
@@ -396,7 +441,7 @@ export function Header() {
             </button>
 
             {isExportMenuOpen && (
-              <div className="absolute top-full left-0 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
+              <div className="absolute top-full left-0 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
                 <button
                   onClick={() => {
                     setIsExportMenuOpen(false);
@@ -418,6 +463,14 @@ export function Header() {
                   <span className="font-medium text-blue-600">
                     JSON Schema
                   </span>
+                </button>
+                <div className="my-1 border-t border-gray-100" />
+                <button
+                  onClick={handleOpenGoogleDriveSave}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  <CloudUpload size={14} className="text-blue-500" />
+                  <span>Google Drive</span>
                 </button>
               </div>
             )}
@@ -540,6 +593,12 @@ export function Header() {
         isOpen={isNewBoardModalOpen}
         onClose={() => setIsNewBoardModalOpen(false)}
         onConfirm={executeNewBoard}
+      />
+      <GoogleDriveModal
+        isOpen={isGoogleDriveModalOpen}
+        initialTab={googleDriveModalTab}
+        onClose={() => setIsGoogleDriveModalOpen(false)}
+        onSuccessToast={showToast}
       />
 
       {/* Export success toast */}
