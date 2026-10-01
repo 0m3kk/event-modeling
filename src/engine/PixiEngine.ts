@@ -2333,6 +2333,26 @@ export class PixiEngine {
     if (!this.viewport || this.isDestroyed) return;
 
     const zoom = this.viewport.scaled || 1;
+
+    // Text rasterization must follow the zoom level. During a wheel/pinch
+    // gesture the zoom-settle timer keeps the last settled resolution (blur is
+    // cheaper than re-rasterizing at every threshold) and refreshes once the
+    // gesture stops. Any other zoom change — store-driven jumps like
+    // focus_viewport, the zoom buttons or search jumps, which emit no "zoomed"
+    // event — refreshes immediately, or the text would stay blurry at the old
+    // resolution forever.
+    const neededTextResolution = computeTextResolution(
+      zoom,
+      typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1,
+    );
+    if (
+      this.zoomSettleTimer === null &&
+      this.activeTextResolution !== neededTextResolution
+    ) {
+      this.activeTextResolution = neededTextResolution;
+      this.contentDirty = true;
+    }
+
     // Zoom does not force content: the camera matrix scales the existing scene
     // and the zoom-settle timer rebuilds zoom-dependent rasterization once.
     const viewDirty = this.viewDirty;
@@ -2380,21 +2400,13 @@ export class PixiEngine {
           visibleIds.has(o.id),
       );
 
-      // Cards rasterize their text at the last settled resolution while a zoom
-      // gesture is running; the settle handler bumps it once afterwards.
-      if (this.activeTextResolution === null) {
-        this.activeTextResolution = computeTextResolution(
-          zoom,
-          typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1,
-        );
-      }
       this.cardLayer.renderCards(
         visibleObjects,
         zoom,
         selectedIds,
         stormSelectedField,
         objects,
-        this.activeTextResolution,
+        this.activeTextResolution ?? neededTextResolution,
         !contentDirty,
       );
     }
@@ -2409,7 +2421,7 @@ export class PixiEngine {
         objects,
         zoom,
         selectedIds,
-        this.activeTextResolution ?? undefined,
+        this.activeTextResolution ?? neededTextResolution,
       );
 
       // Visual Link Layer (Real-time DCB highlights or Actor Hover highlights)
