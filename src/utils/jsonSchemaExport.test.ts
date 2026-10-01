@@ -150,6 +150,48 @@ describe("jsonSchemaExport", () => {
     });
   });
 
+  it("exports Command and Query response fields as their own group", () => {
+    const command: StormData = {
+      kind: "command",
+      name: "PlaceOrder",
+      fields: [{ id: "1", name: "orderId", fieldType: "uuid", required: true }],
+      responseFields: [
+        { id: "r1", name: "orderId", fieldType: "uuid", required: true },
+        { id: "r2", name: "status", fieldType: "string" },
+      ],
+    };
+
+    const schema = generateStormCardJsonSchema(command);
+    expect(schema.required).toEqual(["orderId"]);
+    expect((schema.properties?.orderId as { format?: string }).format).toBe(
+      "uuid",
+    );
+
+    const response = schema.properties?.responseFields as {
+      type?: string;
+      required?: string[];
+      properties: Record<string, { type?: string; format?: string }>;
+    };
+    expect(response.type).toBe("object");
+    expect(response.required).toEqual(["orderId"]);
+    expect(response.properties.orderId.format).toBe("uuid");
+    expect(response.properties.status.type).toBe("string");
+
+    const query: StormData = {
+      kind: "query",
+      name: "GetOrder",
+      fields: [{ id: "1", name: "orderId", fieldType: "uuid" }],
+      responseFields: [{ id: "r1", name: "total", fieldType: "number" }],
+    };
+    const qSchema = generateStormCardJsonSchema(query);
+    const qResponse = qSchema.properties?.responseFields as {
+      type?: string;
+      properties: Record<string, { type?: string }>;
+    };
+    expect(qResponse.type).toBe("object");
+    expect(qResponse.properties.total.type).toBe("number");
+  });
+
   it("exports model node validation for object fields, arrays and wraps", () => {
     const objectModel: ModelData = {
       kind: "object",
@@ -381,6 +423,136 @@ describe("jsonSchemaExport", () => {
     expect(parsed.$defs).toBeDefined();
     expect(parsed.$defs.Item.properties.price.type).toBe("number");
     expect(parsed.$defs.Cart.properties.item.$ref).toBe("#/$defs/Item");
+  });
+
+  it("marks every exported definition with its x-kind", () => {
+    expect(
+      generateModelJsonSchema({ kind: "object", name: "M", fields: [] })["x-kind"],
+    ).toBe("object");
+    expect(
+      generateModelJsonSchema({ kind: "enum", name: "E", values: [] })["x-kind"],
+    ).toBe("enum");
+    expect(
+      generateModelJsonSchema({ kind: "array", name: "A", itemType: "string" })[
+        "x-kind"
+      ],
+    ).toBe("array");
+    expect(
+      generateModelJsonSchema({ kind: "wrap", name: "W", innerType: "string" })[
+        "x-kind"
+      ],
+    ).toBe("wrap");
+
+    const stormKinds: StormData["kind"][] = [
+      "command",
+      "event",
+      "state",
+      "constraint",
+      "query",
+      "actor",
+      "external",
+      "bdd",
+    ];
+    for (const kind of stormKinds) {
+      expect(generateStormCardJsonSchema({ kind, name: kind, fields: [] })[
+        "x-kind"
+      ]).toBe(kind);
+    }
+  });
+
+  it("exports Query, Actor, External and BDD cards with their x-kind", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "q",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "query",
+          name: "GetOrder",
+          fields: [{ id: "qf", name: "orderId", fieldType: "uuid" }],
+          responseFields: [{ id: "qr", name: "total", fieldType: "number" }],
+        },
+      },
+      {
+        id: "a",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "actor",
+          name: "Admin",
+          fields: [],
+          permissions: ["order:*"],
+        },
+      },
+      {
+        id: "x",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "external",
+          name: "PaymentGateway",
+          fields: [{ id: "xf", name: "provider", fieldType: "string" }],
+        },
+      },
+      {
+        id: "b",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "bdd",
+          name: "Given",
+          phase: "given",
+          fields: [],
+          steps: [
+            {
+              id: "s1",
+              ref: "event",
+              name: "OrderPlaced",
+              payload: [{ id: "p1", key: "orderId", value: "123" }],
+            },
+          ],
+        },
+      },
+    ];
+
+    const parsed = JSON.parse(exportCanvasJsonSchema(objects));
+
+    expect(parsed.definitions.GetOrder["x-kind"]).toBe("query");
+    expect(parsed.definitions.GetOrder.properties.orderId.format).toBe("uuid");
+    expect(
+      parsed.definitions.GetOrder.properties.responseFields.properties.total
+        .type,
+    ).toBe("number");
+
+    expect(parsed.definitions.Admin["x-kind"]).toBe("actor");
+    expect(parsed.definitions.Admin.properties.permissions.type).toBe("array");
+
+    expect(parsed.definitions.PaymentGateway["x-kind"]).toBe("external");
+    expect(parsed.definitions.PaymentGateway.properties.provider.type).toBe(
+      "string",
+    );
+
+    expect(parsed.definitions.Given["x-kind"]).toBe("bdd");
+    expect(parsed.definitions.Given.properties.phase.enum).toEqual([
+      "given",
+      "when",
+      "then",
+    ]);
+    expect(
+      parsed.definitions.Given.properties.steps.items.properties.ref.enum,
+    ).toContain("error");
   });
 });
 

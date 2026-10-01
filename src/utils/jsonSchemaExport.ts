@@ -4,7 +4,10 @@ import type {
   StormField,
   FieldValidation,
   CanvasObject,
+  ModelNodeKind,
+  StormKind,
 } from "@/types";
+import { BDD_STEP_REF_LABELS, STORM_PHASE_LABELS } from "@/constants/storm";
 
 export interface JsonSchemaProperty {
   type?: string;
@@ -18,6 +21,12 @@ export interface JsonSchemaProperty {
 
 export interface JsonSchemaDefinition {
   $schema?: string;
+  /**
+   * Custom vendor-extension marker (ignored by standard validators) naming the
+   * source domain kind: object/enum/array/wrap for Model nodes, or
+   * command/event/state/constraint/query/actor/external/bdd for Storm cards.
+   */
+  "x-kind"?: ModelNodeKind | StormKind;
   title: string;
   description?: string;
   type?: string;
@@ -88,6 +97,7 @@ export function generateModelJsonSchema(
 ): JsonSchemaDefinition {
   const title = sanitizeIdentifier(model.name);
   const def: JsonSchemaDefinition = {
+    "x-kind": model.kind,
     title,
     description: model.description,
   };
@@ -122,6 +132,7 @@ export function generateModelJsonSchema(
             allModelNames,
             defsKey,
           ),
+          "x-kind": model.kind,
           title,
           description: model.description,
         },
@@ -309,10 +320,84 @@ function generateProjectionCardJsonSchema(
   }
 
   return {
+    "x-kind": storm.kind,
     title,
     description: storm.description,
     type: "object",
     properties,
+  };
+}
+
+/**
+ * JSON schema for a BDD (Given/When/Then) card. Instead of typed fields it
+ * carries a phase plus scenario steps, each a named Event/Command/Query/State/
+ * Error with concrete example payload values.
+ */
+function generateBddCardJsonSchema(storm: StormData): JsonSchemaDefinition {
+  return {
+    "x-kind": "bdd",
+    title: sanitizeIdentifier(storm.name),
+    description: storm.description,
+    type: "object",
+    properties: {
+      phase: {
+        type: "string",
+        enum: Object.keys(STORM_PHASE_LABELS),
+        description: "Given/When/Then step this card represents.",
+      },
+      steps: {
+        type: "array",
+        description:
+          "Scenario steps: a named ref plus the concrete payload example.",
+        items: {
+          type: "object",
+          properties: {
+            ref: {
+              type: "string",
+              enum: Object.keys(BDD_STEP_REF_LABELS),
+              description:
+                "What the step stands for (Event, Command, Query, State, Error, External).",
+            },
+            name: {
+              type: "string",
+              description: "Name of the referenced card.",
+            },
+            payload: {
+              type: "array",
+              description: "Concrete key/value example values for this step.",
+              items: {
+                type: "object",
+                properties: {
+                  key: { type: "string" },
+                  value: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+/**
+ * JSON schema for an Actor card. An actor is fieldless: its payload is the set
+ * of authorization permissions (wildcard patterns) granted to the role.
+ */
+function generateActorCardJsonSchema(storm: StormData): JsonSchemaDefinition {
+  return {
+    "x-kind": "actor",
+    title: sanitizeIdentifier(storm.name),
+    description: storm.description,
+    type: "object",
+    properties: {
+      permissions: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Authorization permissions (resource:verb:scope wildcard patterns) granted to this actor.",
+      },
+    },
   };
 }
 
@@ -324,6 +409,12 @@ export function generateStormCardJsonSchema(
   if (storm.kind === "state" || storm.kind === "constraint") {
     return generateProjectionCardJsonSchema(storm, allModelNames, defsKey);
   }
+  if (storm.kind === "bdd") {
+    return generateBddCardJsonSchema(storm);
+  }
+  if (storm.kind === "actor") {
+    return generateActorCardJsonSchema(storm);
+  }
 
   const title = sanitizeIdentifier(storm.name);
   const { properties, required } = buildFieldProperties(
@@ -333,6 +424,7 @@ export function generateStormCardJsonSchema(
   );
 
   const def: JsonSchemaDefinition = {
+    "x-kind": storm.kind,
     title,
     description: storm.description,
     type: "object",
@@ -341,6 +433,19 @@ export function generateStormCardJsonSchema(
 
   if (required.length > 0) {
     def.required = required;
+  }
+
+  // Command and Query carry a RESPONSE section below their payload/params.
+  // It is exported as its own object group, mirroring State's OUTPUT split.
+  if (storm.kind === "command" || storm.kind === "query") {
+    def.properties!.responseFields = buildFieldGroup(
+      storm.responseFields ?? [],
+      storm.kind === "query"
+        ? "RESPONSE read-model fields returned to the caller."
+        : "RESPONSE fields the handler returns.",
+      allModelNames,
+      defsKey,
+    );
   }
 
   return def;
@@ -359,12 +464,7 @@ export function exportCanvasJsonSchema(
   );
   const stormObjects = objects.filter(
     (o): o is CanvasObject & { stormData: StormData } =>
-      o.type === "storm" &&
-      !!o.stormData &&
-      (o.stormData.kind === "command" ||
-        o.stormData.kind === "event" ||
-        o.stormData.kind === "state" ||
-        o.stormData.kind === "constraint"),
+      o.type === "storm" && !!o.stormData,
   );
 
   const modelNames = new Set(modelObjects.map((m) => m.modelData.name.trim()));
