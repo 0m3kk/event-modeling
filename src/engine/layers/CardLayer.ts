@@ -11,6 +11,13 @@ import {
   type CardHitZone,
 } from "../renderers";
 
+/**
+ * How many cards may be fully (re)drawn in one frame. Drawing a card
+ * re-rasterizes every one of its Text nodes, so a zoom refine or a burst of
+ * newly revealed cards is spread over a few frames instead of blocking one.
+ */
+export const CARD_DRAWS_PER_FRAME = 6;
+
 export class CardLayer extends Container {
   private cardContainers: Map<string, Container> = new Map();
   private cardZones: Map<string, CardHitZone[]> = new Map();
@@ -22,6 +29,8 @@ export class CardLayer extends Container {
   private cardDrawKeys: Map<string, string> = new Map();
   /** Cursor shown while hovering a card; driven by the active tool. */
   private cardCursor: string = "default";
+  /** Set when the draw budget cut a render short; the caller refines next frame. */
+  private pendingDraws: boolean = false;
 
   // Stable identity tokens for storm/model data objects. Store updates replace
   // these objects on edit, so an identity change is exactly a content change.
@@ -99,7 +108,9 @@ export class CardLayer extends Container {
     allObjects: CanvasObject[] = objects,
     textResolutionOverride?: number,
     geometryOnly: boolean = false,
+    maxDraws: number = Infinity,
   ): void {
+    this.pendingDraws = false;
     const currentIds = new Set(objects.map((o) => o.id));
 
     const dpr =
@@ -138,6 +149,7 @@ export class CardLayer extends Container {
     const modelsKey = modelsCache.key;
 
     // Render or update each card
+    let draws = 0;
     for (const obj of objects) {
       if (obj.type === "connector") continue;
 
@@ -199,6 +211,14 @@ export class CardLayer extends Container {
 
       if (this.cardDrawKeys.get(obj.id) === drawKey) continue;
 
+      // Drawing re-rasterizes every Text of the card — cap it per frame and let
+      // the remaining cards follow on the next ones.
+      if (draws >= maxDraws) {
+        this.pendingDraws = true;
+        continue;
+      }
+      draws++;
+
       // Delegate drawing to specialized renderers
       let result;
       if (obj.type === "storm") {
@@ -234,6 +254,11 @@ export class CardLayer extends Container {
         }
       }
     }
+  }
+
+  /** True when the draw budget left cards undrawn; render again next frame. */
+  public hasPendingDraws(): boolean {
+    return this.pendingDraws;
   }
 
   public getHitZoneAt(

@@ -14,7 +14,7 @@ import {
 } from "./layers/ElbowConnectorLayer";
 import { VisualLinkLayer } from "./layers/VisualLinkLayer";
 import { LineLayer } from "./layers/LineLayer";
-import { CardLayer } from "./layers/CardLayer";
+import { CardLayer, CARD_DRAWS_PER_FRAME } from "./layers/CardLayer";
 import {
   computeExportTextResolution,
   computeTextResolution,
@@ -61,8 +61,9 @@ import type { CanvasObject, ElbowBend, Point } from "@/types";
 
 let activePixiEngine: PixiEngine | null = null;
 
-/** Idle time after the last zoom event before zoom-dependent redraw happens. */
-const ZOOM_SETTLE_MS = 150;
+/** Idle time after the last zoom event before zoom-dependent redraw happens.
+ * Long enough to coalesce a sequence of scroll flicks into one refine. */
+const ZOOM_SETTLE_MS = 250;
 
 export function getActivePixiEngine(): PixiEngine | null {
   return activePixiEngine;
@@ -99,6 +100,8 @@ export class PixiEngine {
   private renderQueued: boolean = false;
   private viewDirty: boolean = false;
   private contentDirty: boolean = false;
+  /** Zoom-dependent rasterization (card text, group labels, handles) is stale. */
+  private cardRefineDirty: boolean = false;
 
   // Zoom-settle: while a zoom gesture runs, the camera matrix scales the
   // existing scene for free. Zoom-dependent rasterization (text resolution,
@@ -341,8 +344,11 @@ export class PixiEngine {
     }
     this.zoomSettleTimer = setTimeout(() => {
       this.zoomSettleTimer = null;
-      this.activeTextResolution = null;
-      this.invalidateContent();
+      // Only the zoom-dependent rasterization needs refining: card text, group
+      // labels and handle sizes. Connector and line geometry is world-space —
+      // re-routing every path here is what used to hitch after scrolling.
+      this.cardRefineDirty = true;
+      this.scheduleRender();
     }, ZOOM_SETTLE_MS);
   }
 
@@ -2243,9 +2249,12 @@ export class PixiEngine {
               // Zoom changed only (e.g. Header Zoom buttons); keep center stable
               this.viewport.setZoom(vp.zoom, true);
             }
-            // An external camera change (zoom controls, search jump, restore)
-            // repaints everything.
-            this.invalidateAll();
+            // A camera-only change needs no content rebuild — re-cull and
+            // refine the zoom-dependent rasterization (card text, group
+            // labels, handle sizes).
+            this.invalidateView();
+            this.cardRefineDirty = true;
+            this.scheduleRender();
             return;
           }
         }
@@ -2336,10 +2345,10 @@ export class PixiEngine {
 
     // Text rasterization must follow the zoom level. During a wheel/pinch
     // gesture the zoom-settle timer keeps the last settled resolution (blur is
-    // cheaper than re-rasterizing at every threshold) and refreshes once the
+    // cheaper than re-rasterizing at every threshold) and refines once the
     // gesture stops. Any other zoom change — store-driven jumps like
     // focus_viewport, the zoom buttons or search jumps, which emit no "zoomed"
-    // event — refreshes immediately, or the text would stay blurry at the old
+    // event — refines immediately, or the text would stay blurry at the old
     // resolution forever.
     const neededTextResolution = computeTextResolution(
       zoom,
@@ -2349,14 +2358,17 @@ export class PixiEngine {
       this.zoomSettleTimer === null &&
       this.activeTextResolution !== neededTextResolution
     ) {
+      this.cardRefineDirty = true;
+    }
+    if (this.cardRefineDirty && this.zoomSettleTimer === null) {
       this.activeTextResolution = neededTextResolution;
-      this.contentDirty = true;
     }
 
     // Zoom does not force content: the camera matrix scales the existing scene
-    // and the zoom-settle timer rebuilds zoom-dependent rasterization once.
+    // and the zoom-settle timer refines zoom-dependent rasterization once.
     const viewDirty = this.viewDirty;
     const contentDirty = this.contentDirty;
+    const refineDirty = this.cardRefineDirty;
 
     this.viewDirty = false;
     this.contentDirty = false;
@@ -2383,7 +2395,7 @@ export class PixiEngine {
     // 3. Cull cards, then render. A viewport-and-a-half of margin keeps
     // off-screen cards alive across small pans so they don't get destroyed and
     // re-rasterized every frame; only newly revealed cards are drawn.
-    if (viewDirty || contentDirty) {
+    if (viewDirty || contentDirty || refineDirty) {
       const margin = Math.max(vb.width, vb.height) * 0.5;
       const visibleIds = new Set(
         this.spatialIndex.search({
@@ -2407,22 +2419,23 @@ export class PixiEngine {
         stormSelectedField,
         objects,
         this.activeTextResolution ?? neededTextResolution,
-        !contentDirty,
+        !contentDirty && !refineDirty,
+        // A content repaint restores everything at once (undo, export return);
+        // view/refine frames trickle heavy re-rasterization across frames.
+        contentDirty ? Infinity : CARD_DRAWS_PER_FRAME,
       );
+
+      // Card drawing is budgeted — keep refining on the next frames instead of
+      // blocking one long frame.
+      this.cardRefineDirty = this.cardLayer.hasPendingDraws();
+      if (this.cardRefineDirty) this.scheduleRender();
     }
 
-    // 4. Connectors, groups, links and gizmos only depend on content — the
-    // viewport transform already moves them during a pan.
+    // 4. Connector, line and highlight geometry is world-space and rides on
+    // the camera transform — only content changes rebuild it.
     if (contentDirty) {
       this.connectorLayer.renderConnectors(objects, groups, selectedIds);
       this.lineLayer.renderLines(objects, selectedIds);
-      this.groupLayer.renderGroups(
-        groups,
-        objects,
-        zoom,
-        selectedIds,
-        this.activeTextResolution ?? neededTextResolution,
-      );
 
       // Visual Link Layer (Real-time DCB highlights or Actor Hover highlights)
       const stormActionHover = useCanvasStore.getState().stormActionHover;
@@ -2452,6 +2465,19 @@ export class PixiEngine {
       } else {
         this.visualLinkLayer.clearHighlights();
       }
+
+    }
+
+    // 5. Group labels and selection handles depend on the zoom level, so they
+    // are re-drawn when a zoom settles as well.
+    if (contentDirty || refineDirty) {
+      this.groupLayer.renderGroups(
+        groups,
+        objects,
+        zoom,
+        selectedIds,
+        this.activeTextResolution ?? neededTextResolution,
+      );
 
       // Selection gizmos for cards
       const selectedObjects = objects.filter((o) => selectedIds.includes(o.id));
