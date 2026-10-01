@@ -344,8 +344,8 @@ export function calculateResizedBounds({
 
 /**
  * Calculates the optimal pixel width required to display all text
- * (title, field names, types, tags, constraints, query items)
- * without truncation.
+ * (title, field names, types, tags, query items) without truncation.
+ * Constraint rules are excluded; their free text wraps instead.
  */
 export function computeOptimalStormCardWidth(
   data: StormData,
@@ -435,11 +435,10 @@ export function computeOptimalStormCardWidth(
     requiredWidth = Math.max(requiredWidth, qWidth);
   }
 
-  // 4. Constraints
-  for (const c of data.constraints ?? []) {
-    const cWidth = c.text.length * 6.0 + 44;
-    requiredWidth = Math.max(requiredWidth, cWidth);
-  }
+  // Constraints are intentionally left out of the width fit: their free-text
+  // rule wraps freely inside the card (see computeStormConstraintItemHeight),
+  // so it only grows the height. Width follows the structured content above so
+  // query items always render in full.
 
   // 5. Actor permissions
   if (kind === "actor") {

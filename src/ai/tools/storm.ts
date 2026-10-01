@@ -414,8 +414,8 @@ export const createStormCardsTool = defineTool({
         constraints: spec.constraints,
       });
 
-      const height = computeStormCardHeight(data);
       const width = computeOptimalStormCardWidth(data);
+      const height = computeStormCardHeight(data, width);
       const resolvedGroupId = resolveGroupId(spec.groupId);
       const obj: CanvasObject = {
         id: `storm-${nanoid()}`,
