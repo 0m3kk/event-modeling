@@ -34,12 +34,9 @@ import { ExportImageModal } from "./ExportImageModal";
 import { NewBoardModal } from "./NewBoardModal";
 
 export function Header() {
-  const objects = useCanvasStore((state) => state.objects);
-  const groups = useCanvasStore((state) => state.groups);
-  const objectCount = objects.length;
+  const objectCount = useCanvasStore((state) => state.objects.length);
   const selectedCount = useCanvasStore((state) => state.selectedIds.length);
   const zoom = useCanvasStore((state) => state.viewport.zoom);
-  const viewport = useCanvasStore((state) => state.viewport);
   const isSearchOpen = useCanvasStore((state) => state.isSearchOpen);
   const setSearchOpen = useCanvasStore((state) => state.setSearchOpen);
 
@@ -136,8 +133,11 @@ export function Header() {
     useCanvasStore.getState().setViewport({ zoom: 1 });
   };
 
+  // Board data and the camera are read at call time so the save/backup actions
+  // don't re-render the header on every camera move or drag frame.
   const executeNewBoard = useCallback(() => {
     setIsNewBoardModalOpen(false);
+    const { objects, groups, viewport } = useCanvasStore.getState();
     if (objects.length > 0 || groups.length > 0) {
       createBackup({ objects, groups, viewport, name: projectName });
     }
@@ -153,16 +153,17 @@ export function Header() {
       },
       name: "Untitled",
     });
-  }, [objects, groups, viewport, projectName]);
+  }, [projectName]);
 
   const handleNewBoard = useCallback(() => {
     setIsFileMenuOpen(false);
+    const { objects, groups } = useCanvasStore.getState();
     if (objects.length > 0 || groups.length > 0) {
       setIsNewBoardModalOpen(true);
     } else {
       executeNewBoard();
     }
-  }, [objects.length, groups.length, executeNewBoard]);
+  }, [executeNewBoard]);
 
   const handleSaveFile = useCallback(() => {
     setIsFileMenuOpen(false);
@@ -173,6 +174,7 @@ export function Header() {
       setTitleInput(saveName);
       setIsEditingTitle(false);
     }
+    const { objects, groups, viewport } = useCanvasStore.getState();
     const serialized = serializeStormFile({
       objects,
       groups,
@@ -180,7 +182,7 @@ export function Header() {
       name: saveName,
     });
     downloadStormFile(JSON.parse(serialized), saveName);
-  }, [isEditingTitle, titleInput, projectName, objects, groups, viewport, setProjectName]);
+  }, [isEditingTitle, titleInput, projectName, setProjectName]);
 
   // Keyboard shortcuts: Cmd+S / Ctrl+S to save, Cmd+N / Ctrl+N for new board
   useEffect(() => {
@@ -219,6 +221,7 @@ export function Header() {
     try {
       const project = await readStormFile(file);
       // Create backup before applying
+      const { objects, groups, viewport } = useCanvasStore.getState();
       createBackup({ objects, groups, viewport, name: projectName });
       const loadedName =
         project.name?.trim() ||
@@ -248,6 +251,7 @@ export function Header() {
     }
 
     try {
+      const { objects, groups, viewport } = useCanvasStore.getState();
       const restored = restoreBackup({
         objects,
         groups,

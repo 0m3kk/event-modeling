@@ -15,7 +15,10 @@ import {
 import { VisualLinkLayer } from "./layers/VisualLinkLayer";
 import { LineLayer } from "./layers/LineLayer";
 import { CardLayer } from "./layers/CardLayer";
-import { computeExportTextResolution } from "./textResolution";
+import {
+  computeExportTextResolution,
+  computeTextResolution,
+} from "./textResolution";
 import {
   GizmoLayer,
   getCursorForHandle,
@@ -58,6 +61,9 @@ import type { CanvasObject, ElbowBend, Point } from "@/types";
 
 let activePixiEngine: PixiEngine | null = null;
 
+/** Idle time after the last zoom event before zoom-dependent redraw happens. */
+const ZOOM_SETTLE_MS = 150;
+
 export function getActivePixiEngine(): PixiEngine | null {
   return activePixiEngine;
 }
@@ -93,7 +99,13 @@ export class PixiEngine {
   private renderQueued: boolean = false;
   private viewDirty: boolean = false;
   private contentDirty: boolean = false;
-  private lastRenderZoom: number = -1;
+
+  // Zoom-settle: while a zoom gesture runs, the camera matrix scales the
+  // existing scene for free. Zoom-dependent rasterization (text resolution,
+  // handle sizes) is rebuilt in one pass shortly after the gesture stops, so
+  // crossing a text-resolution threshold mid-gesture never tears cards down.
+  private zoomSettleTimer: ReturnType<typeof setTimeout> | null = null;
+  private activeTextResolution: number | null = null;
 
   // Snapshot of the geometry currently inside the spatial index, so moving a
   // handful of cards updates those entries instead of rebuilding the tree.
@@ -101,6 +113,29 @@ export class PixiEngine {
     string,
     { x: number; y: number; width: number; height: number }
   > = new Map();
+
+  // Cached container rect: measuring it per pointermove forces a synchronous
+  // layout read, so it is refreshed only on resize/scroll and gesture start.
+  private cachedContainerRect: DOMRect | null = null;
+
+  // Idle-hover hit-testing is coalesced to at most one pass per frame.
+  private hoverRaf: number | null = null;
+  private pendingHover: {
+    worldPos: Point;
+    shiftKey: boolean;
+    metaKey: boolean;
+    ctrlKey: boolean;
+    target: EventTarget | null;
+  } | null = null;
+
+  // Snapshot of the non-dragged boxes used for magnetic snapping, built once
+  // per drag — only the dragged cards move while a drag is running.
+  private dragSnapBoxes: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }[] | null = null;
 
   // Interaction State
   private isSpaceHeld: boolean = false;
@@ -285,11 +320,30 @@ export class PixiEngine {
       this.invalidateView();
     });
 
-    // A zoom changes zoom-dependent things too (text rasterization, handle
-    // sizes), so treat it as a full content invalidation.
+    // A zoom only changes the camera matrix — every layer rides along. Zoom-
+    // dependent rasterization (text resolution, handle sizes) is deferred to a
+    // single rebuild once the gesture settles.
     this.viewport.on("zoomed", () => {
-      this.invalidateAll();
+      this.invalidateView();
+      this.armZoomSettle();
     });
+  }
+
+  /**
+   * Coalesces a burst of zoom events into one deferred content rebuild. Until
+   * it fires, text keeps the last settled rasterization (slightly soft while
+   * zooming, re-sharpened once the gesture ends) instead of being re-rasterized
+   * every time the resolution threshold flips.
+   */
+  private armZoomSettle(): void {
+    if (this.zoomSettleTimer !== null) {
+      clearTimeout(this.zoomSettleTimer);
+    }
+    this.zoomSettleTimer = setTimeout(() => {
+      this.zoomSettleTimer = null;
+      this.activeTextResolution = null;
+      this.invalidateContent();
+    }, ZOOM_SETTLE_MS);
   }
 
   /** Flags a camera-only change (pan/resize). */
@@ -362,6 +416,17 @@ export class PixiEngine {
     if (this.isSpaceHeld === held) return;
     this.isSpaceHeld = held;
     this.updateToolMode(useCanvasStore.getState().tool);
+  }
+
+  private getContainerRect(): DOMRect {
+    if (!this.cachedContainerRect) {
+      this.cachedContainerRect = this.container.getBoundingClientRect();
+    }
+    return this.cachedContainerRect;
+  }
+
+  private invalidateContainerRect(): void {
+    this.cachedContainerRect = null;
   }
 
   private collectAllAnchors(): AnchorMarker[] {
@@ -614,10 +679,9 @@ export class PixiEngine {
     worldX: number,
     worldY: number,
   ): CanvasObject | null {
-    const { objects, groups } = useCanvasStore.getState();
+    const { objects } = useCanvasStore.getState();
     const threshold = CONNECTOR_HIT_SLOP / (this.viewport.scaled || 1);
     const point = { x: worldX, y: worldY };
-    const lookup = buildConnectorLookup(objects, groups);
 
     let best: CanvasObject | null = null;
     let bestDist = threshold;
@@ -626,12 +690,7 @@ export class PixiEngine {
     for (let i = objects.length - 1; i >= 0; i--) {
       const obj = objects[i]!;
       if (obj.type !== "connector") continue;
-      const points = this.connectorLayer.getConnectorPoints(
-        obj,
-        objects,
-        groups,
-        lookup,
-      );
+      const points = this.connectorLayer.getCachedConnectorPoints(obj.id);
       if (!points) continue;
 
       const dist = distanceToPolyline(point, points);
@@ -653,9 +712,8 @@ export class PixiEngine {
     worldY: number,
     hitRadius: number = 14,
   ): { connectorId: string; endpoint: "start" | "end"; point: Point } | null {
-    const { objects, groups, selectedIds } = useCanvasStore.getState();
+    const { objects, selectedIds } = useCanvasStore.getState();
     const effectiveRadius = hitRadius / (this.viewport.scaled || 1);
-    const lookup = buildConnectorLookup(objects, groups);
 
     const connectors = objects.filter(
       (o) => o.type === "connector" && o.connectorData,
@@ -670,12 +728,7 @@ export class PixiEngine {
     );
 
     for (const conn of [...selectedConnectors, ...otherConnectors]) {
-      const points = this.connectorLayer.getConnectorPoints(
-        conn,
-        objects,
-        groups,
-        lookup,
-      );
+      const points = this.connectorLayer.getCachedConnectorPoints(conn.id);
       if (!points || points.length < 2) continue;
 
       const startPt = points[0]!;
@@ -707,7 +760,8 @@ export class PixiEngine {
 
       this.cardPointerDownHandled = true;
 
-      const rect = this.container.getBoundingClientRect();
+      this.invalidateContainerRect();
+      const rect = this.getContainerRect();
       const worldPos = this.viewport.toWorld(
         e.clientX - rect.left,
         e.clientY - rect.top,
@@ -1052,7 +1106,8 @@ export class PixiEngine {
         return;
       }
 
-      const rect = this.container.getBoundingClientRect();
+      this.invalidateContainerRect();
+      const rect = this.getContainerRect();
       const worldPos = this.viewport.toWorld(
         e.clientX - rect.left,
         e.clientY - rect.top,
@@ -1372,7 +1427,7 @@ export class PixiEngine {
     });
 
     window.addEventListener("pointermove", (e: PointerEvent) => {
-      const rect = this.container.getBoundingClientRect();
+      const rect = this.getContainerRect();
       const worldPos = this.viewport.toWorld(
         e.clientX - rect.left,
         e.clientY - rect.top,
@@ -1695,14 +1750,23 @@ export class PixiEngine {
             height: primaryObj.height,
           };
 
-          // Target boxes for magnetic alignment
-          const selectedIds = useCanvasStore.getState().selectedIds;
-          const otherBoxes = useCanvasStore
-            .getState()
-            .objects.filter(
-              (o) => !selectedIds.includes(o.id) && o.type !== "connector",
-            )
-            .map((o) => ({ x: o.x, y: o.y, width: o.width, height: o.height }));
+          // Target boxes for magnetic alignment — non-selected boxes cannot
+          // move during a drag, so the list is built once per drag.
+          if (!this.dragSnapBoxes) {
+            const selectedIds = useCanvasStore.getState().selectedIds;
+            this.dragSnapBoxes = useCanvasStore
+              .getState()
+              .objects.filter(
+                (o) => !selectedIds.includes(o.id) && o.type !== "connector",
+              )
+              .map((o) => ({
+                x: o.x,
+                y: o.y,
+                width: o.width,
+                height: o.height,
+              }));
+          }
+          const otherBoxes = this.dragSnapBoxes;
 
           const snapResult = calculateSnapping(
             candidateMovingBox,
@@ -1775,138 +1839,14 @@ export class PixiEngine {
         }
       }
 
-      // Description ⓘ / authorization-action hover tooltips — only while idle
-      // on the select tool.
-      const isBusy =
-        this.isDraggingCards ||
-        this.isDraggingGroup ||
-        this.isMarqueeDragging ||
-        this.isCreatingConnector ||
-        this.isPanningCanvas ||
-        this.isResizingCard ||
-        this.isDraggingConnectorEndpoint ||
-        this.isDrawingLine ||
-        this.isDraggingLineEndpoint ||
-        this.isDraggingLineBody;
-
-      // Check resize handle or connector endpoint handle hover when idle on select tool
-      if (
-        !isBusy &&
-        !this.isSpaceHeld &&
-        state.tool === "select" &&
-        !state.isLocked
-      ) {
-        const hitHandle = this.gizmoLayer.getHandleAt(
-          worldPos.x,
-          worldPos.y,
-          this.viewport.scaled || 1,
-        );
-        const hitEndpoint = this.findConnectorEndpointHandleAtWorld(
-          worldPos.x,
-          worldPos.y,
-        );
-        const hitLineEndpoint = this.findLineEndpointHandleAtWorld(
-          worldPos.x,
-          worldPos.y,
-        );
-
-        if (hitHandle) {
-          this.hoveredHandle = hitHandle;
-          this.hoveringEndpoint = false;
-          const cursor = getCursorForHandle(hitHandle.handle);
-          this.container.style.cursor = cursor;
-          this.cardLayer.setCursor(cursor);
-        } else if (hitEndpoint || hitLineEndpoint) {
-          this.hoveredHandle = null;
-          this.hoveringEndpoint = true;
-          // With a selection modifier held a click toggles the object rather
-          // than grabbing the handle, so keep the pointer cursor.
-          const cursor =
-            e.shiftKey || e.metaKey || e.ctrlKey ? "default" : "grab";
-          this.container.style.cursor = cursor;
-          this.cardLayer.setCursor(cursor);
-        } else if (this.hoveredHandle || this.hoveringEndpoint) {
-          this.hoveredHandle = null;
-          this.hoveringEndpoint = false;
-          this.container.style.cursor = "default";
-          this.cardLayer.setCursor("default");
-        }
-      }
-
-      let nextHover: DescTarget | null = null;
-      let nextActionHover: ActionTarget | null = null;
-      let nextValidationHover: ValidationTarget | null = null;
-      if (
-        !isBusy &&
-        !this.isSpaceHeld &&
-        state.tool === "select" &&
-        e.target === this.app.canvas
-      ) {
-        const hit = this.findCardZoneAtWorld(worldPos.x, worldPos.y);
-        const zone = hit?.zone;
-        if (hit && zone?.type === "desc" && zone.currentText) {
-          nextHover = {
-            objectId: hit.obj.id,
-            fieldId: zone.fieldId || zone.valueId,
-            iconBounds: zone.bounds,
-          };
-        } else if (hit && zone?.type === "action" && zone.currentText) {
-          nextActionHover = {
-            objectId: hit.obj.id,
-            action: zone.currentText,
-            iconBounds: zone.bounds,
-          };
-        } else if (
-          hit &&
-          zone?.type === "validation" &&
-          zone.currentText
-        ) {
-          nextValidationHover = {
-            objectId: hit.obj.id,
-            fieldId: zone.fieldId,
-            text: zone.currentText,
-            iconBounds: zone.bounds,
-          };
-        }
-      }
-      const current = useCanvasStore.getState().descHover;
-      const same =
-        current && nextHover
-          ? current.objectId === nextHover.objectId &&
-            current.fieldId === nextHover.fieldId
-          : current === null && nextHover === null;
-      if (!same) {
-        useCanvasStore.getState().setDescHover(nextHover);
-      }
-
-      // Hovering the action badge also highlights the authorized actors on the
-      // canvas (stormActionHover drives the visual link layer).
-      const currentAction = useCanvasStore.getState().actionHover;
-      const sameAction =
-        currentAction && nextActionHover
-          ? currentAction.objectId === nextActionHover.objectId &&
-            currentAction.action === nextActionHover.action
-          : currentAction === null && nextActionHover === null;
-      if (!sameAction) {
-        useCanvasStore.getState().setActionHover(nextActionHover);
-        useCanvasStore
-          .getState()
-          .setStormActionHover(nextActionHover ? nextActionHover.action : null);
-      }
-
-      const currentValidation = useCanvasStore.getState().validationHover;
-      const sameValidation =
-        currentValidation && nextValidationHover
-          ? currentValidation.objectId === nextValidationHover.objectId &&
-            currentValidation.fieldId === nextValidationHover.fieldId
-          : currentValidation === null && nextValidationHover === null;
-      if (!sameValidation) {
-        useCanvasStore.getState().setValidationHover(nextValidationHover);
-      }
+      // Cursor/handle and tooltip hover hit-testing is coalesced to one pass
+      // per frame so a high-rate mouse doesn't re-run it on every raw event.
+      this.scheduleIdleHover(worldPos, e);
     });
 
     const handlePointerUp = () => {
       this.cardPointerDownHandled = false;
+      this.dragSnapBoxes = null;
 
       if (useCanvasStore.getState().isDragging) {
         useCanvasStore.getState().setIsDragging(false);
@@ -2042,11 +1982,172 @@ export class PixiEngine {
     window.addEventListener("pointercancel", handlePointerUp);
   }
 
+  /**
+   * Coalesces idle-hover hit-testing to at most one pass per animation frame,
+   * always using the most recent pointer position.
+   */
+  private scheduleIdleHover(worldPos: Point, e: PointerEvent): void {
+    this.pendingHover = {
+      worldPos: { x: worldPos.x, y: worldPos.y },
+      shiftKey: e.shiftKey,
+      metaKey: e.metaKey,
+      ctrlKey: e.ctrlKey,
+      target: e.target,
+    };
+    if (this.hoverRaf !== null) return;
+    this.hoverRaf = requestAnimationFrame(() => {
+      this.hoverRaf = null;
+      const pending = this.pendingHover;
+      this.pendingHover = null;
+      if (!pending || this.isDestroyed) return;
+      this.updateIdleHover(pending);
+    });
+  }
+
+  /**
+   * Resize-handle / connector-endpoint cursor and description ⓘ / action /
+   * validation tooltip hover hit-testing — only while idle on the select tool.
+   */
+  private updateIdleHover(p: {
+    worldPos: Point;
+    shiftKey: boolean;
+    metaKey: boolean;
+    ctrlKey: boolean;
+    target: EventTarget | null;
+  }): void {
+    const state = useCanvasStore.getState();
+    const worldPos = p.worldPos;
+
+    const isBusy =
+      this.isDraggingCards ||
+      this.isDraggingGroup ||
+      this.isMarqueeDragging ||
+      this.isCreatingConnector ||
+      this.isPanningCanvas ||
+      this.isResizingCard ||
+      this.isDraggingConnectorEndpoint ||
+      this.isDrawingLine ||
+      this.isDraggingLineEndpoint ||
+      this.isDraggingLineBody;
+
+    // Check resize handle or connector endpoint handle hover when idle on select tool
+    if (
+      !isBusy &&
+      !this.isSpaceHeld &&
+      state.tool === "select" &&
+      !state.isLocked
+    ) {
+      const hitHandle = this.gizmoLayer.getHandleAt(
+        worldPos.x,
+        worldPos.y,
+        this.viewport.scaled || 1,
+      );
+      const hitEndpoint = this.findConnectorEndpointHandleAtWorld(
+        worldPos.x,
+        worldPos.y,
+      );
+      const hitLineEndpoint = this.findLineEndpointHandleAtWorld(
+        worldPos.x,
+        worldPos.y,
+      );
+
+      if (hitHandle) {
+        this.hoveredHandle = hitHandle;
+        this.hoveringEndpoint = false;
+        const cursor = getCursorForHandle(hitHandle.handle);
+        this.container.style.cursor = cursor;
+        this.cardLayer.setCursor(cursor);
+      } else if (hitEndpoint || hitLineEndpoint) {
+        this.hoveredHandle = null;
+        this.hoveringEndpoint = true;
+        // With a selection modifier held a click toggles the object rather
+        // than grabbing the handle, so keep the pointer cursor.
+        const cursor =
+          p.shiftKey || p.metaKey || p.ctrlKey ? "default" : "grab";
+        this.container.style.cursor = cursor;
+        this.cardLayer.setCursor(cursor);
+      } else if (this.hoveredHandle || this.hoveringEndpoint) {
+        this.hoveredHandle = null;
+        this.hoveringEndpoint = false;
+        this.container.style.cursor = "default";
+        this.cardLayer.setCursor("default");
+      }
+    }
+
+    let nextHover: DescTarget | null = null;
+    let nextActionHover: ActionTarget | null = null;
+    let nextValidationHover: ValidationTarget | null = null;
+    if (
+      !isBusy &&
+      !this.isSpaceHeld &&
+      state.tool === "select" &&
+      p.target === this.app.canvas
+    ) {
+      const hit = this.findCardZoneAtWorld(worldPos.x, worldPos.y);
+      const zone = hit?.zone;
+      if (hit && zone?.type === "desc" && zone.currentText) {
+        nextHover = {
+          objectId: hit.obj.id,
+          fieldId: zone.fieldId || zone.valueId,
+          iconBounds: zone.bounds,
+        };
+      } else if (hit && zone?.type === "action" && zone.currentText) {
+        nextActionHover = {
+          objectId: hit.obj.id,
+          action: zone.currentText,
+          iconBounds: zone.bounds,
+        };
+      } else if (hit && zone?.type === "validation" && zone.currentText) {
+        nextValidationHover = {
+          objectId: hit.obj.id,
+          fieldId: zone.fieldId,
+          text: zone.currentText,
+          iconBounds: zone.bounds,
+        };
+      }
+    }
+    const current = useCanvasStore.getState().descHover;
+    const same =
+      current && nextHover
+        ? current.objectId === nextHover.objectId &&
+          current.fieldId === nextHover.fieldId
+        : current === null && nextHover === null;
+    if (!same) {
+      useCanvasStore.getState().setDescHover(nextHover);
+    }
+
+    // Hovering the action badge also highlights the authorized actors on the
+    // canvas (stormActionHover drives the visual link layer).
+    const currentAction = useCanvasStore.getState().actionHover;
+    const sameAction =
+      currentAction && nextActionHover
+        ? currentAction.objectId === nextActionHover.objectId &&
+          currentAction.action === nextActionHover.action
+        : currentAction === null && nextActionHover === null;
+    if (!sameAction) {
+      useCanvasStore.getState().setActionHover(nextActionHover);
+      useCanvasStore
+        .getState()
+        .setStormActionHover(nextActionHover ? nextActionHover.action : null);
+    }
+
+    const currentValidation = useCanvasStore.getState().validationHover;
+    const sameValidation =
+      currentValidation && nextValidationHover
+        ? currentValidation.objectId === nextValidationHover.objectId &&
+          currentValidation.fieldId === nextValidationHover.fieldId
+        : currentValidation === null && nextValidationHover === null;
+    if (!sameValidation) {
+      useCanvasStore.getState().setValidationHover(nextValidationHover);
+    }
+  }
+
   private setupResizeObserver(): void {
     this.resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
         if (width > 0 && height > 0) {
+          this.invalidateContainerRect();
           this.app.renderer.resize(width, height);
           this.viewport.resize(width, height);
           this.invalidateAll();
@@ -2054,6 +2155,12 @@ export class PixiEngine {
       }
     });
     this.resizeObserver.observe(this.container);
+    window.addEventListener("resize", () => this.invalidateContainerRect());
+    window.addEventListener(
+      "scroll",
+      () => this.invalidateContainerRect(),
+      true,
+    );
   }
 
   private setupStoreSubscription(): void {
@@ -2226,14 +2333,13 @@ export class PixiEngine {
     if (!this.viewport || this.isDestroyed) return;
 
     const zoom = this.viewport.scaled || 1;
-    // Zoom changes text rasterization and handle sizes, so it forces content.
-    const zoomChanged = Math.abs(zoom - this.lastRenderZoom) > 0.0005;
+    // Zoom does not force content: the camera matrix scales the existing scene
+    // and the zoom-settle timer rebuilds zoom-dependent rasterization once.
     const viewDirty = this.viewDirty;
-    const contentDirty = this.contentDirty || zoomChanged;
+    const contentDirty = this.contentDirty;
 
     this.viewDirty = false;
     this.contentDirty = false;
-    this.lastRenderZoom = zoom;
 
     const vb = this.viewport.getVisibleBounds();
     const visibleBounds = {
@@ -2244,7 +2350,7 @@ export class PixiEngine {
     };
 
     // 1. Grid follows the visible region.
-    this.gridLayer.renderGrid(visibleBounds, zoom);
+    this.gridLayer.renderGrid(visibleBounds, zoom, this.app.renderer);
 
     // 2. Publish the camera once per frame (coalesced).
     if (viewDirty) {
@@ -2274,12 +2380,22 @@ export class PixiEngine {
           visibleIds.has(o.id),
       );
 
+      // Cards rasterize their text at the last settled resolution while a zoom
+      // gesture is running; the settle handler bumps it once afterwards.
+      if (this.activeTextResolution === null) {
+        this.activeTextResolution = computeTextResolution(
+          zoom,
+          typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1,
+        );
+      }
       this.cardLayer.renderCards(
         visibleObjects,
         zoom,
         selectedIds,
         stormSelectedField,
         objects,
+        this.activeTextResolution,
+        !contentDirty,
       );
     }
 
@@ -2288,7 +2404,13 @@ export class PixiEngine {
     if (contentDirty) {
       this.connectorLayer.renderConnectors(objects, groups, selectedIds);
       this.lineLayer.renderLines(objects, selectedIds);
-      this.groupLayer.renderGroups(groups, objects, zoom, selectedIds);
+      this.groupLayer.renderGroups(
+        groups,
+        objects,
+        zoom,
+        selectedIds,
+        this.activeTextResolution ?? undefined,
+      );
 
       // Visual Link Layer (Real-time DCB highlights or Actor Hover highlights)
       const stormActionHover = useCanvasStore.getState().stormActionHover;
@@ -2327,6 +2449,16 @@ export class PixiEngine {
 
   public async destroy(): Promise<void> {
     this.isDestroyed = true;
+
+    if (this.zoomSettleTimer !== null) {
+      clearTimeout(this.zoomSettleTimer);
+      this.zoomSettleTimer = null;
+    }
+    if (this.hoverRaf !== null) {
+      cancelAnimationFrame(this.hoverRaf);
+      this.hoverRaf = null;
+    }
+    this.pendingHover = null;
 
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();

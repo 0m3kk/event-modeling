@@ -2074,6 +2074,7 @@ export const useCanvasStore = create<CanvasStore>()(
         for (let i = 0; i < pastState.groups.length; i++) {
           const g1 = pastState.groups[i];
           const g2 = currentState.groups[i];
+          if (g1 === g2) continue;
           if (
             g1.id !== g2.id ||
             g1.name !== g2.name ||
@@ -2099,6 +2100,7 @@ export const useCanvasStore = create<CanvasStore>()(
         for (let i = 0; i < pastState.objects.length; i++) {
           const o1 = pastState.objects[i];
           const o2 = currentState.objects[i];
+          if (o1 === o2) continue;
           if (
             o1.id !== o2.id ||
             o1.x !== o2.x ||

@@ -28,6 +28,14 @@ export class CardLayer extends Container {
   private dataTokens: WeakMap<object, number> = new WeakMap();
   private nextDataToken: number = 0;
 
+  // Model lookup + fingerprint keyed by the source array reference. Pan frames
+  // pass the same `allObjects`, so the O(all) map build is skipped entirely.
+  private modelsCache: {
+    source: CanvasObject[];
+    map: ReturnType<typeof buildModelMap>;
+    key: string;
+  } | null = null;
+
   public onCardPointerDown?: (
     id: string,
     event: PointerEvent,
@@ -90,6 +98,7 @@ export class CardLayer extends Container {
     selectedField?: string | { objectId: string; fieldId?: string } | null,
     allObjects: CanvasObject[] = objects,
     textResolutionOverride?: number,
+    geometryOnly: boolean = false,
   ): void {
     const currentIds = new Set(objects.map((o) => o.id));
 
@@ -116,8 +125,17 @@ export class CardLayer extends Container {
     // Model lookup is built from every object — not just the visible ones — so
     // a card styles its field pills correctly even when the model it points at
     // is off-screen, and so the key below stays stable while panning.
-    const modelsMap = buildModelMap(allObjects);
-    const modelsKey = this.computeModelsKey(allObjects);
+    let modelsCache = this.modelsCache;
+    if (modelsCache?.source !== allObjects) {
+      modelsCache = {
+        source: allObjects,
+        map: buildModelMap(allObjects),
+        key: this.computeModelsKey(allObjects),
+      };
+      this.modelsCache = modelsCache;
+    }
+    const modelsMap = modelsCache.map;
+    const modelsKey = modelsCache.key;
 
     // Render or update each card
     for (const obj of objects) {
@@ -146,6 +164,10 @@ export class CardLayer extends Container {
       // Moving a card is just a transform change — no need to redraw it.
       card.x = obj.x;
       card.y = obj.y;
+
+      // View-only frames (pan) cannot change anything else about an already
+      // drawn card — skip the draw-key work; newly revealed cards fall through.
+      if (geometryOnly && this.cardDrawKeys.has(obj.id)) continue;
 
       const isSelected = selectedIds.includes(obj.id);
       const cardSelectedFieldId =

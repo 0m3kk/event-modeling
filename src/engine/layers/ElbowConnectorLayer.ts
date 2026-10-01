@@ -47,6 +47,12 @@ export class ElbowConnectorLayer extends Container {
   private graphics: Graphics;
   private previewGraphics: Graphics;
   private anchorsGraphics: Graphics;
+  /**
+   * Resolved elbow path of every drawn connector from the last renderConnectors
+   * pass. Hit-testing reuses these instead of re-running the obstacle-avoiding
+   * routing for every connector on every pointer move.
+   */
+  private resolvedPoints: Map<string, Point[]> = new Map();
 
   constructor() {
     super();
@@ -67,6 +73,7 @@ export class ElbowConnectorLayer extends Container {
     hiddenConnectorId?: string | null,
   ): void {
     this.graphics.clear();
+    this.resolvedPoints.clear();
 
     const connectors = objects.filter(
       (o) => o.type === "connector" && o.connectorData,
@@ -81,6 +88,7 @@ export class ElbowConnectorLayer extends Container {
       const data = conn.connectorData!;
       const points = this.getConnectorPoints(conn, objects, groups, lookup);
       if (!points) continue;
+      this.resolvedPoints.set(conn.id, points);
 
       const isSelected = selectedIds.includes(conn.id);
       const strokeColor = data.stroke
@@ -151,6 +159,14 @@ export class ElbowConnectorLayer extends Container {
     lookup?: ConnectorLookup,
   ): Point[] | null {
     return resolveConnectorPoints(conn, objects, groups, lookup);
+  }
+
+  /**
+   * Path of a connector as drawn by the last renderConnectors pass, or null
+   * when it was not drawn (missing endpoints, hidden, or no render yet).
+   */
+  public getCachedConnectorPoints(id: string): Point[] | null {
+    return this.resolvedPoints.get(id) ?? null;
   }
 
   /**

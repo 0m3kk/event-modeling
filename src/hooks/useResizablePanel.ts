@@ -114,7 +114,9 @@ export function useResizablePanel() {
   const dragRef = useRef<DragState | null>(null);
 
   useEffect(() => {
-    storePanelSize(size);
+    // Debounced so a resize drag doesn't hit localStorage on every pointermove.
+    const timer = setTimeout(() => storePanelSize(size), 200);
+    return () => clearTimeout(timer);
   }, [size]);
 
   // Keep the panel inside the viewport when the window shrinks.

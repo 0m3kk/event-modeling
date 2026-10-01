@@ -43,13 +43,13 @@ export function useAutoSave() {
   // Listen to store updates and auto-save (debounced)
   useEffect(() => {
     const unsub = useCanvasStore.subscribe((state, prevState) => {
+      // Viewport is intentionally excluded: panning/zooming must not schedule
+      // a whole-project serialization. The latest camera still lands in the
+      // file because it is read at save time.
       if (
         state.projectName === prevState.projectName &&
         state.objects === prevState.objects &&
-        state.groups === prevState.groups &&
-        state.viewport.x === prevState.viewport.x &&
-        state.viewport.y === prevState.viewport.y &&
-        state.viewport.zoom === prevState.viewport.zoom
+        state.groups === prevState.groups
       ) {
         return;
       }
