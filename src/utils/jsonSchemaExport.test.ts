@@ -3,6 +3,8 @@ import {
   exportCanvasJsonSchema,
   generateModelJsonSchema,
   generateStormCardJsonSchema,
+  resolveFieldSchema,
+  toCamelCaseIdentifier,
 } from "./jsonSchemaExport";
 import type { CanvasObject, ModelData, StormData } from "@/types";
 
@@ -19,7 +21,7 @@ describe("jsonSchemaExport", () => {
     };
 
     const schema = generateModelJsonSchema(model);
-    expect(schema.title).toBe("UserProfile");
+    expect(schema.title).toBe("userProfile");
     expect(schema.type).toBe("object");
     expect(schema.required).toEqual(["userId", "email"]);
     expect(schema.properties?.userId).toEqual({
@@ -50,7 +52,7 @@ describe("jsonSchemaExport", () => {
     };
 
     const schema = generateModelJsonSchema(model);
-    expect(schema.title).toBe("OrderStatus");
+    expect(schema.title).toBe("orderStatus");
     expect(schema.type).toBe("string");
     expect(schema.enum).toEqual(["PENDING", "CONFIRMED", "SHIPPED"]);
   });
@@ -65,9 +67,36 @@ describe("jsonSchemaExport", () => {
 
     const schema = generateModelJsonSchema(model, modelNames);
     expect(schema.properties?.shippingAddress).toEqual({
-      $ref: "#/definitions/Address",
+      $ref: "#/definitions/address",
       description: undefined,
     });
+  });
+
+  it("normalizes component and field names to camelCase", () => {
+    expect(toCamelCaseIdentifier("Order Summary")).toBe("orderSummary");
+    expect(toCamelCaseIdentifier("order_status")).toBe("orderStatus");
+    expect(toCamelCaseIdentifier("order-status")).toBe("orderStatus");
+    expect(toCamelCaseIdentifier("OrderStatus")).toBe("orderStatus");
+    expect(toCamelCaseIdentifier("User ID")).toBe("userId");
+    expect(toCamelCaseIdentifier("2 Fast")).toBe("_2Fast");
+
+    const model: ModelData = {
+      kind: "object",
+      name: "Order Summary",
+      fields: [
+        { id: "1", name: "order_id", fieldType: "string" },
+        { id: "2", name: "User Name", fieldType: "string" },
+      ],
+    };
+    const schema = generateModelJsonSchema(model);
+    expect(schema.title).toBe("orderSummary");
+    expect(schema.properties?.orderId).toBeDefined();
+    expect(schema.properties?.userName).toBeDefined();
+
+    // The $ref target uses the same camelCase component name as the key.
+    expect(resolveFieldSchema("Order Summary", new Set(["Order Summary"]))).toEqual(
+      { $ref: "#/definitions/orderSummary" },
+    );
   });
 
   it("generates schema for a storm card payload", () => {
@@ -81,7 +110,7 @@ describe("jsonSchemaExport", () => {
     };
 
     const schema = generateStormCardJsonSchema(storm);
-    expect(schema.title).toBe("InvoiceIssued");
+    expect(schema.title).toBe("invoiceIssued");
     expect(schema.required).toEqual(["invoiceId"]);
     expect(schema.properties?.invoiceId).toEqual({
       type: "string",
@@ -229,7 +258,7 @@ describe("jsonSchemaExport", () => {
       maxLength?: number;
       pattern?: string;
     };
-    expect(wrapSchema.title).toBe("Nickname");
+    expect(wrapSchema.title).toBe("nickname");
     expect(wrapSchema.maxLength).toBe(20);
     expect(wrapSchema.pattern).toBe("^[a-z]+$");
   });
@@ -272,8 +301,8 @@ describe("jsonSchemaExport", () => {
     const parsed = JSON.parse(json);
 
     expect(parsed.$schema).toBe("http://json-schema.org/draft-07/schema#");
-    expect(parsed.definitions.Item.properties.price.type).toBe("number");
-    expect(parsed.definitions.OrderPlaced.properties.orderId.format).toBe(
+    expect(parsed.definitions.item.properties.price.type).toBe("number");
+    expect(parsed.definitions.orderPlaced.properties.orderId.format).toBe(
       "uuid",
     );
   });
@@ -297,7 +326,7 @@ describe("jsonSchemaExport", () => {
     };
 
     const schema = generateStormCardJsonSchema(state);
-    expect(schema.title).toBe("OrderSummary");
+    expect(schema.title).toBe("orderSummary");
     const props = schema.properties!;
     const inputFields = props.inputFields as {
       type?: string;
@@ -372,10 +401,10 @@ describe("jsonSchemaExport", () => {
 
     const parsed = JSON.parse(exportCanvasJsonSchema(objects));
     expect(
-      parsed.definitions.OrderSummary.properties.outputFields.properties.total
+      parsed.definitions.orderSummary.properties.outputFields.properties.total
         .type,
     ).toBe("number");
-    expect(parsed.definitions.OrderRules.properties.constraints.type).toBe(
+    expect(parsed.definitions.orderRules.properties.constraints.type).toBe(
       "array",
     );
   });
@@ -421,8 +450,8 @@ describe("jsonSchemaExport", () => {
       "https://json-schema.org/draft/2020-12/schema",
     );
     expect(parsed.$defs).toBeDefined();
-    expect(parsed.$defs.Item.properties.price.type).toBe("number");
-    expect(parsed.$defs.Cart.properties.item.$ref).toBe("#/$defs/Item");
+    expect(parsed.$defs.item.properties.price.type).toBe("number");
+    expect(parsed.$defs.cart.properties.item.$ref).toBe("#/$defs/item");
   });
 
   it("marks every exported definition with its x-kind", () => {
@@ -529,29 +558,29 @@ describe("jsonSchemaExport", () => {
 
     const parsed = JSON.parse(exportCanvasJsonSchema(objects));
 
-    expect(parsed.definitions.GetOrder["x-kind"]).toBe("query");
-    expect(parsed.definitions.GetOrder.properties.orderId.format).toBe("uuid");
+    expect(parsed.definitions.getOrder["x-kind"]).toBe("query");
+    expect(parsed.definitions.getOrder.properties.orderId.format).toBe("uuid");
     expect(
-      parsed.definitions.GetOrder.properties.responseFields.properties.total
+      parsed.definitions.getOrder.properties.responseFields.properties.total
         .type,
     ).toBe("number");
 
-    expect(parsed.definitions.Admin["x-kind"]).toBe("actor");
-    expect(parsed.definitions.Admin.properties.permissions.type).toBe("array");
+    expect(parsed.definitions.admin["x-kind"]).toBe("actor");
+    expect(parsed.definitions.admin.properties.permissions.type).toBe("array");
 
-    expect(parsed.definitions.PaymentGateway["x-kind"]).toBe("external");
-    expect(parsed.definitions.PaymentGateway.properties.provider.type).toBe(
+    expect(parsed.definitions.paymentGateway["x-kind"]).toBe("external");
+    expect(parsed.definitions.paymentGateway.properties.provider.type).toBe(
       "string",
     );
 
-    expect(parsed.definitions.Given["x-kind"]).toBe("bdd");
-    expect(parsed.definitions.Given.properties.phase.enum).toEqual([
+    expect(parsed.definitions.given["x-kind"]).toBe("bdd");
+    expect(parsed.definitions.given.properties.phase.enum).toEqual([
       "given",
       "when",
       "then",
     ]);
     expect(
-      parsed.definitions.Given.properties.steps.items.properties.ref.enum,
+      parsed.definitions.given.properties.steps.items.properties.ref.enum,
     ).toContain("error");
   });
 });

@@ -8,6 +8,7 @@ import type {
   StormKind,
 } from "@/types";
 import { BDD_STEP_REF_LABELS, STORM_PHASE_LABELS } from "@/constants/storm";
+import { splitWords } from "@/utils/naming";
 
 export interface JsonSchemaProperty {
   type?: string;
@@ -65,10 +66,21 @@ export interface JsonSchemaExportOptions {
   dialect?: JsonSchemaDialect;
 }
 
-export function sanitizeIdentifier(name: string): string {
-  const cleaned = name.trim().replace(/[^A-Za-z0-9_$]/g, "_");
-  if (!cleaned || /^[0-9]/.test(cleaned)) return `_${cleaned || "Model"}`;
-  return cleaned;
+/**
+ * Normalize a human-readable name into a camelCase identifier for the exported
+ * schema: definition keys (component names), property names (field names) and
+ * `$ref` targets all share it, so references stay consistent.
+ */
+export function toCamelCaseIdentifier(name: string): string {
+  const camel = splitWords(name.trim())
+    .map((word, index) => {
+      const lower = word.toLowerCase();
+      return index === 0 ? lower : lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join("")
+    .replace(/[^A-Za-z0-9_$]/g, "");
+  if (!camel || /^[0-9]/.test(camel)) return `_${camel || "Model"}`;
+  return camel;
 }
 
 export function resolveFieldSchema(
@@ -84,7 +96,7 @@ export function resolveFieldSchema(
 
   // Model reference
   if (modelNames.has(fieldType.trim())) {
-    return { $ref: `#/${defsKey}/${sanitizeIdentifier(fieldType.trim())}` };
+    return { $ref: `#/${defsKey}/${toCamelCaseIdentifier(fieldType.trim())}` };
   }
 
   return { type: "string" };
@@ -95,7 +107,7 @@ export function generateModelJsonSchema(
   allModelNames = new Set<string>(),
   defsKey: "definitions" | "$defs" = "definitions",
 ): JsonSchemaDefinition {
-  const title = sanitizeIdentifier(model.name);
+  const title = toCamelCaseIdentifier(model.name);
   const def: JsonSchemaDefinition = {
     "x-kind": model.kind,
     title,
@@ -146,7 +158,7 @@ export function generateModelJsonSchema(
       const required: string[] = [];
 
       for (const field of model.fields ?? []) {
-        const propName = sanitizeIdentifier(field.name);
+        const propName = toCamelCaseIdentifier(field.name);
         def.properties[propName] = applyFieldValidation(
           {
             ...resolveFieldSchema(field.fieldType, allModelNames, defsKey),
@@ -222,7 +234,7 @@ function buildFieldProperties(
   const properties: Record<string, JsonSchemaProperty> = {};
   const required: string[] = [];
   for (const field of fields) {
-    const propName = sanitizeIdentifier(field.name);
+    const propName = toCamelCaseIdentifier(field.name);
     properties[propName] = applyFieldValidation(
       {
         ...resolveFieldSchema(field.fieldType, allModelNames, defsKey),
@@ -269,7 +281,7 @@ function generateProjectionCardJsonSchema(
   allModelNames: Set<string>,
   defsKey: "definitions" | "$defs",
 ): JsonSchemaDefinition {
-  const title = sanitizeIdentifier(storm.name);
+  const title = toCamelCaseIdentifier(storm.name);
   const inputFields = storm.inputFields ?? [];
   const outputFields = storm.outputFields ?? [];
 
@@ -336,7 +348,7 @@ function generateProjectionCardJsonSchema(
 function generateBddCardJsonSchema(storm: StormData): JsonSchemaDefinition {
   return {
     "x-kind": "bdd",
-    title: sanitizeIdentifier(storm.name),
+    title: toCamelCaseIdentifier(storm.name),
     description: storm.description,
     type: "object",
     properties: {
@@ -387,7 +399,7 @@ function generateBddCardJsonSchema(storm: StormData): JsonSchemaDefinition {
 function generateActorCardJsonSchema(storm: StormData): JsonSchemaDefinition {
   return {
     "x-kind": "actor",
-    title: sanitizeIdentifier(storm.name),
+    title: toCamelCaseIdentifier(storm.name),
     description: storm.description,
     type: "object",
     properties: {
@@ -416,7 +428,7 @@ export function generateStormCardJsonSchema(
     return generateActorCardJsonSchema(storm);
   }
 
-  const title = sanitizeIdentifier(storm.name);
+  const title = toCamelCaseIdentifier(storm.name);
   const { properties, required } = buildFieldProperties(
     storm.fields,
     allModelNames,
@@ -472,12 +484,12 @@ export function exportCanvasJsonSchema(
   const definitions: Record<string, JsonSchemaDefinition> = {};
 
   for (const obj of modelObjects) {
-    const id = sanitizeIdentifier(obj.modelData.name);
+    const id = toCamelCaseIdentifier(obj.modelData.name);
     definitions[id] = generateModelJsonSchema(obj.modelData, modelNames, defsKey);
   }
 
   for (const obj of stormObjects) {
-    const id = sanitizeIdentifier(obj.stormData.name);
+    const id = toCamelCaseIdentifier(obj.stormData.name);
     definitions[id] = generateStormCardJsonSchema(
       obj.stormData,
       modelNames,
