@@ -36,8 +36,11 @@ import { ExportImageModal } from "./ExportImageModal";
 import { NewBoardModal } from "./NewBoardModal";
 import { GoogleDriveModal } from "./GoogleDriveModal";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageToggle } from "./LanguageToggle";
+import { useTranslation } from "react-i18next";
 
 export function Header() {
+  const { t } = useTranslation();
   const objectCount = useCanvasStore((state) => state.objects.length);
   const selectedCount = useCanvasStore((state) => state.selectedIds.length);
   const zoom = useCanvasStore((state) => state.viewport.zoom);
@@ -320,18 +323,18 @@ export function Header() {
                   }
                 }}
                 className="h-7 max-w-50 sm:max-w-70 md:max-w-90 rounded px-1.5 text-sm font-semibold text-gray-800 dark:text-zinc-100 bg-white dark:bg-zinc-800 focus:outline-none focus:ring-1 focus:ring-blue-500 border border-blue-500 transition-colors"
-                title="Project name"
-                placeholder="Untitled"
+                title={t("header.projectName")}
+                placeholder={t("common.untitled")}
               />
             ) : (
               <button
                 type="button"
                 onClick={() => setIsEditingTitle(true)}
                 className="group flex items-center gap-1.5 h-7 rounded px-1.5 text-sm font-semibold text-gray-800 dark:text-zinc-100 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-left shrink-0"
-                title="Click to rename project"
+                title={t("header.clickToRename")}
               >
                 <span className="truncate max-w-50 sm:max-w-70 md:max-w-90">
-                  {projectName || "Untitled"}
+                  {projectName || t("common.untitled")}
                 </span>
                 <Pencil
                   size={11}
@@ -342,17 +345,17 @@ export function Header() {
 
             <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
               <CloudCheck size={12} className="text-emerald-600" />
-              <span>{saveStatus === "saving" ? "Saving..." : "Saved"}</span>
+              <span>{saveStatus === "saving" ? t("common.saving") : t("common.saved")}</span>
             </div>
 
             <button
               type="button"
               onClick={handleOpenGoogleDriveSave}
-              title={googleDriveFileId ? "Đã liên kết Google Drive (Bấm để quản lý)" : "Lưu vào Google Drive"}
+              title={googleDriveFileId ? t("header.driveLinkedTooltip") : t("header.saveToDriveTooltip")}
               className="flex items-center gap-1 rounded-full border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
             >
               <Cloud size={12} className={googleDriveFileId ? "text-blue-600" : "text-gray-400"} />
-              <span>{googleDriveFileId ? "Drive Linked" : "Drive"}</span>
+              <span>{googleDriveFileId ? t("header.driveLinked") : t("header.drive")}</span>
             </button>
           </div>
 
@@ -367,7 +370,7 @@ export function Header() {
               }}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
             >
-              <span>File</span>
+              <span>{t("header.fileMenu")}</span>
               <ChevronDown size={12} className="text-gray-400" />
             </button>
 
@@ -379,7 +382,7 @@ export function Header() {
                 >
                   <div className="flex items-center gap-2">
                     <FilePlus size={14} className="text-gray-400" />
-                    <span>New</span>
+                    <span>{t("header.newBoard")}</span>
                   </div>
                   <span className="text-[10px] text-gray-400 font-mono">⌘N</span>
                 </button>
@@ -388,14 +391,14 @@ export function Header() {
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
                 >
                   <FolderOpen size={14} className="text-gray-400" />
-                  <span>Open Local</span>
+                  <span>{t("header.openLocal")}</span>
                 </button>
                 <button
                   onClick={handleOpenGoogleDriveOpen}
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
                 >
                   <Cloud size={14} className="text-blue-500" />
-                  <span>Open from Drive</span>
+                  <span>{t("header.openDrive")}</span>
                 </button>
                 <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
                 <button
@@ -404,7 +407,7 @@ export function Header() {
                 >
                   <div className="flex items-center gap-2">
                     <Save size={14} className="text-gray-400" />
-                    <span>Save Local</span>
+                    <span>{t("header.saveLocal")}</span>
                   </div>
                   <span className="text-[10px] text-gray-400 font-mono">⌘S</span>
                 </button>
@@ -413,7 +416,7 @@ export function Header() {
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
                 >
                   <CloudUpload size={14} className="text-blue-500" />
-                  <span>Save to Drive</span>
+                  <span>{t("header.saveDrive")}</span>
                 </button>
                 <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
                 <button
@@ -422,7 +425,7 @@ export function Header() {
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40"
                 >
                   <History size={14} className="text-gray-400" />
-                  <span>Restore</span>
+                  <span>{t("header.restoreBackup")}</span>
                 </button>
               </div>
             )}
@@ -437,7 +440,7 @@ export function Header() {
               }}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
             >
-              <span>Export</span>
+              <span>{t("header.exportMenu")}</span>
               <ChevronDown size={12} className="text-gray-400" />
             </button>
 
@@ -451,7 +454,7 @@ export function Header() {
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
                 >
                   <Download size={14} className="text-gray-400" />
-                  <span>Image</span>
+                  <span>{t("header.exportImage")}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -462,7 +465,7 @@ export function Header() {
                 >
                   <FileCode2 size={14} className="text-blue-500" />
                   <span className="font-medium text-blue-600 dark:text-blue-400">
-                    JSON Schema
+                    {t("header.exportJsonSchema")}
                   </span>
                 </button>
                 <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
@@ -471,32 +474,32 @@ export function Header() {
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
                 >
                   <CloudUpload size={14} className="text-blue-500" />
-                  <span>Google Drive</span>
+                  <span>{t("header.exportDrive")}</span>
                 </button>
               </div>
             )}
           </div>
 
           <div className="hidden items-center gap-2 border-l border-gray-200 dark:border-zinc-800 pl-3 text-xs text-gray-500 dark:text-zinc-400 sm:flex">
-            <span>{objectCount} objects</span>
+            <span>{t("common.objects", { count: objectCount })}</span>
             {selectedCount > 0 && (
               <span className="font-medium text-blue-600 dark:text-blue-400">
-                ({selectedCount} selected)
+                {t("common.selected", { count: selectedCount })}
               </span>
             )}
           </div>
         </div>
 
-        {/* Right Side: Tools, Search, Undo/Redo & Zoom */}
+        {/* Right Side: Tools, Search, Undo/Redo, Zoom & Language/Theme */}
         <div className="flex items-center gap-2">
           {/* Search button */}
           <button
             onClick={() => setSearchOpen(!isSearchOpen)}
-            title="Search (Cmd+F)"
+            title={t("header.searchTooltip")}
             className="flex items-center gap-1.5 rounded-lg border border-gray-200/90 dark:border-zinc-700/80 bg-gray-50/80 dark:bg-zinc-800/80 px-2.5 py-1 text-xs text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 hover:text-gray-800 dark:hover:text-zinc-200 cursor-pointer"
           >
             <Search size={14} />
-            <span>Search...</span>
+            <span>{t("common.search")}</span>
             <kbd className="py-0.2 rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-1 font-mono text-[10px] text-gray-400 dark:text-zinc-400">
               ⌘F
             </kbd>
@@ -509,7 +512,7 @@ export function Header() {
             <button
               onClick={() => undo()}
               disabled={!canUndo()}
-              title="Undo (Cmd+Z)"
+              title={t("header.undoTooltip")}
               className="rounded p-1.5 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
             >
               <Undo2 size={16} />
@@ -517,7 +520,7 @@ export function Header() {
             <button
               onClick={() => redo()}
               disabled={!canRedo()}
-              title="Redo (Cmd+Shift+Z)"
+              title={t("header.redoTooltip")}
               className="rounded p-1.5 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
             >
               <Redo2 size={16} />
@@ -528,28 +531,28 @@ export function Header() {
           <div className="flex items-center gap-1">
             <button
               onClick={handleZoomOut}
-              title="Zoom Out"
+              title={t("header.zoomOutTooltip")}
               className="rounded p-1.5 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-200 cursor-pointer"
             >
               <ZoomOut size={16} />
             </button>
             <button
               onClick={handleResetZoom}
-              title="Reset Zoom to 100%"
+              title={t("header.resetZoomTooltip")}
               className="w-14 text-center font-mono text-xs text-gray-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
             >
               {Math.round(zoom * 100)}%
             </button>
             <button
               onClick={handleZoomIn}
-              title="Zoom In"
+              title={t("header.zoomInTooltip")}
               className="rounded p-1.5 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-200 cursor-pointer"
             >
               <ZoomIn size={16} />
             </button>
             <button
               onClick={handleResetZoom}
-              title="Reset View"
+              title={t("header.resetViewTooltip")}
               className="rounded p-1.5 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-200 cursor-pointer"
             >
               <RotateCcw size={14} />
@@ -557,6 +560,9 @@ export function Header() {
           </div>
 
           <div className="mx-1 h-5 w-px bg-gray-200 dark:bg-zinc-800" />
+
+          {/* Language Toggle */}
+          <LanguageToggle />
 
           {/* Theme Toggle */}
           <ThemeToggle />

@@ -223,7 +223,10 @@ function ResizeHandles({
   );
 }
 
+import { useTranslation } from "react-i18next";
+
 export function AIPanel() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -348,11 +351,11 @@ export function AIPanel() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed right-6 bottom-6 z-40 flex items-center gap-2 rounded-full bg-violet-600 px-4 py-2.5 text-[14px] font-semibold text-white shadow-xl transition-all hover:bg-violet-700 hover:shadow-violet-600/30 active:scale-95"
-        title="Open Event Storming & Modeling AI Assistant"
+        className="fixed right-6 bottom-6 z-40 flex items-center gap-2 rounded-full bg-violet-600 px-4 py-2.5 text-[14px] font-semibold text-white shadow-xl transition-all hover:bg-violet-700 hover:shadow-violet-600/30 active:scale-95 cursor-pointer"
+        title={t("ai.title")}
       >
         <Sparkles className="h-4.5 w-4.5" />
-        AI Studio
+        {t("ai.aiStudio")}
       </button>
     );
   }
@@ -374,14 +377,14 @@ export function AIPanel() {
             <Sparkles className="h-4 w-4 shrink-0" />
           </div>
           <span className="truncate text-[14px] font-semibold tracking-tight text-white">
-            {aiConversation.title}
+            {aiConversation.title === "New chat" ? t("ai.newChat") : aiConversation.title}
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={newAIConversation}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
-            title="New conversation"
+            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white cursor-pointer"
+            title={t("ai.newConversation")}
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -422,13 +425,13 @@ export function AIPanel() {
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-violet-400" />
               <span className="text-[14px] font-semibold text-white">
-                Model & API Settings
+                {t("ai.settingsTitle")}
               </span>
             </div>
             <button
               onClick={() => setShowSettings(false)}
               className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
-              title="Close settings"
+              title={t("common.close")}
             >
               <X className="h-4 w-4" />
             </button>
@@ -437,7 +440,7 @@ export function AIPanel() {
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
             <label className="flex flex-col gap-1.5">
               <span className="text-[12.5px] font-medium text-gray-300">
-                Base URL
+                {t("ai.baseUrl")}
               </span>
               <input
                 type="text"
@@ -447,11 +450,11 @@ export function AIPanel() {
                 className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-[13px] text-white outline-none focus:border-violet-500 font-mono"
               />
               <span className="text-[11px] text-gray-500">
-                Any OpenAI-compatible endpoint (Ollama, LM Studio, OpenAI, OpenRouter)
+                {t("ai.baseUrlHelp")}
               </span>
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12.5px] font-medium text-gray-300">Model</span>
+              <span className="text-[12.5px] font-medium text-gray-300">{t("ai.model")}</span>
               <input
                 type="text"
                 value={modelInput}
@@ -462,7 +465,7 @@ export function AIPanel() {
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-[12.5px] font-medium text-gray-300">
-                Max output tokens
+                {t("ai.maxTokens")}
               </span>
               <input
                 type="number"
@@ -477,13 +480,13 @@ export function AIPanel() {
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-[12.5px] font-medium text-gray-300">
-                API Key
+                {t("ai.apiKey")}
               </span>
               <input
                 type="password"
                 value={keyInput}
                 onChange={(e) => setKeyInput(e.target.value)}
-                placeholder="Bearer token (optional for local Ollama / LM Studio)"
+                placeholder={t("ai.apiKeyHelp")}
                 className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-[13px] text-white outline-none focus:border-violet-500 font-mono"
               />
             </label>
@@ -494,13 +497,13 @@ export function AIPanel() {
               onClick={() => setShowSettings(false)}
               className="rounded-lg px-3 py-1.5 text-[13px] text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               onClick={handleSaveSettings}
               className="rounded-lg bg-violet-600 px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-violet-700"
             >
-              Save settings
+              {t("ai.saveSettings")}
             </button>
           </div>
         </div>
@@ -529,7 +532,6 @@ export function AIPanel() {
             type="button"
             onClick={() => setPlanOpen((value) => !value)}
             className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-gray-800/40"
-            title={planOpen ? "Collapse working plan" : "Expand working plan"}
           >
             <ChevronRight
               className={cn(
@@ -538,7 +540,7 @@ export function AIPanel() {
               )}
             />
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-              Working Plan
+              {t("ai.workingPlan")}
             </span>
             <span className="rounded-full bg-gray-800 px-2 py-0.5 font-mono text-[10.5px] text-gray-400">
               {planDone}/{plan.length}
@@ -570,7 +572,7 @@ export function AIPanel() {
         {aiRunning && (
           <div className="flex items-center gap-2.5 text-[12.5px] text-violet-400 bg-gray-800/40 rounded-xl p-2.5 border border-gray-800">
             <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-            <span>AI Assistant is working on the canvas…</span>
+            <span>{t("ai.thinking")}</span>
             <span
               className={cn(
                 "ml-auto shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10.5px]",
@@ -578,9 +580,8 @@ export function AIPanel() {
                   ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
                   : "border-violet-500/30 bg-violet-500/10 text-violet-300",
               )}
-              title={`Agent budget: ${aiStepUsed} of ${aiStepLimit} steps used this turn`}
             >
-              {stepsRemaining} step{stepsRemaining === 1 ? "" : "s"} left
+              {t("ai.stepsLeft", { count: stepsRemaining })}
             </span>
           </div>
         )}
@@ -596,8 +597,8 @@ export function AIPanel() {
             onKeyDown={handleKeyDown}
             placeholder={
               canSend
-                ? "Describe flow or models… (Enter to send, Shift+Enter for newline)"
-                : "Set API key or local endpoint in settings to begin"
+                ? t("ai.placeholder")
+                : t("ai.noKeyPlaceholder")
             }
             disabled={!canSend || aiRunning}
             rows={2}
@@ -607,7 +608,7 @@ export function AIPanel() {
             <button
               onClick={stopAI}
               className="absolute right-2.5 bottom-3 rounded-lg p-1.5 text-red-400 transition-colors hover:bg-gray-700"
-              title="Stop generation"
+              title={t("ai.stop")}
             >
               <Square className="h-4 w-4" />
             </button>
@@ -616,7 +617,7 @@ export function AIPanel() {
               onClick={handleSend}
               disabled={!prompt.trim() || !canSend}
               className="absolute right-2.5 bottom-3 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white disabled:opacity-30"
-              title="Send"
+              title={t("ai.send")}
             >
               <Send className="h-4 w-4" />
             </button>
@@ -636,12 +637,11 @@ export function AIPanel() {
                     ? "bg-amber-500/10 text-amber-300"
                     : "text-gray-400",
                 )}
-                title={`Agent budget this turn: ${aiStepUsed} of ${aiStepLimit} steps used`}
               >
                 {aiStepUsed}/{aiStepLimit} steps
               </span>
             )}
-            <span className="text-gray-600">Single Cmd+Z undo per turn</span>
+            <span className="text-gray-600">{t("ai.undoTurnInfo")}</span>
           </div>
         </div>
       </div>

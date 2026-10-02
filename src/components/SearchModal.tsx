@@ -100,7 +100,10 @@ interface SearchModalProps {
   onClose: () => void;
 }
 
+import { useTranslation } from "react-i18next";
+
 export function SearchModal({ isOpen, onClose }: SearchModalProps) {
+  const { t } = useTranslation();
   const objects = useCanvasStore((s) => s.objects);
   const setViewport = useCanvasStore((s) => s.setViewport);
   const setSelectedIds = useCanvasStore((s) => s.setSelectedIds);
@@ -217,7 +220,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
             setCurrentIndex(0);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Search cards, fields, tags, rules..."
+          placeholder={t("modals.search.placeholder")}
           className="w-64 text-xs text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 bg-transparent focus:outline-none"
         />
       </div>
@@ -225,8 +228,8 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
       {query && (
         <span className="font-mono text-xs text-gray-400 dark:text-zinc-500">
           {matches.length === 0
-            ? "0 of 0"
-            : `${currentIndex + 1} of ${matches.length}`}
+            ? t("modals.search.matchesCount", { current: 0, total: 0 })
+            : t("modals.search.matchesCount", { current: currentIndex + 1, total: matches.length })}
         </span>
       )}
 
@@ -234,7 +237,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
         <button
           onClick={handlePrev}
           disabled={matches.length === 0}
-          title="Previous (Shift+Enter)"
+          title={t("modals.search.prevTooltip")}
           className="rounded p-1 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-700 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
         >
           <ChevronUp size={15} />
@@ -242,7 +245,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
         <button
           onClick={handleNext}
           disabled={matches.length === 0}
-          title="Next (Enter)"
+          title={t("modals.search.nextTooltip")}
           className="rounded p-1 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-700 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
         >
           <ChevronDown size={15} />
@@ -254,6 +257,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
       <button
         onClick={onClose}
         className="rounded p-1 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-700 dark:hover:text-zinc-200 cursor-pointer"
+        title={t("common.close")}
       >
         <X size={15} />
       </button>

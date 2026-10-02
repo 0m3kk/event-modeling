@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { CanvasObject, StormQueryItem } from "@/types";
 import { Filter, X, Trash2, Plus } from "lucide-react";
@@ -16,6 +17,7 @@ export function QueryItemPopover({
   onClose,
   anchorPosition,
 }: QueryItemPopoverProps) {
+  const { t } = useTranslation();
   const objects = useCanvasStore((s) => s.objects);
   const updateObject = useCanvasStore((s) => s.updateObject);
   const setStormSelectedField = useCanvasStore((s) => s.setStormSelectedField);
@@ -216,7 +218,7 @@ export function QueryItemPopover({
         <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-100">
           <Filter size={15} className="shrink-0 text-violet-600 dark:text-violet-400" />
           <span className="truncate">
-            {isEditMode ? "Edit Query Item" : "Add Query Item"}
+            {t("popovers.queryItem.title")}
           </span>
         </div>
         <button
@@ -240,7 +242,7 @@ export function QueryItemPopover({
                 onClick={handleClearAllTypes}
                 className="text-[10px] text-gray-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"
               >
-                Clear (Match Any)
+                {t("popovers.queryItem.clearMatchAny")}
               </button>
             )}
           </div>
@@ -249,18 +251,18 @@ export function QueryItemPopover({
           <div className="mb-1.5 flex min-h-7 flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1.5 dark:border-zinc-800 dark:bg-zinc-800/50">
             {selectedTypes.length === 0 ? (
               <span className="text-[11px] italic text-gray-400 px-1 dark:text-zinc-500">
-                * (Matches all event types)
+                {t("popovers.queryItem.matchesAllEvents")}
               </span>
             ) : (
-              selectedTypes.map((t) => (
+              selectedTypes.map((tItem) => (
                 <span
-                  key={t}
+                  key={tItem}
                   className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-800 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300"
                 >
-                  <span>{t}</span>
+                  <span>{tItem}</span>
                   <button
                     type="button"
-                    onClick={() => handleToggleEvent(t)}
+                    onClick={() => handleToggleEvent(tItem)}
                     className="hover:text-red-600 dark:hover:text-red-400"
                   >
                     <X size={10} />
@@ -274,7 +276,7 @@ export function QueryItemPopover({
           {existingEvents.length > 0 && (
             <div className="mb-1.5">
               <div className="mb-1 text-[10px] text-gray-400 dark:text-zinc-500">
-                Click event to toggle:
+                {t("popovers.queryItem.clickToToggle")}
               </div>
               <div className="flex max-h-20 flex-wrap gap-1 overflow-y-auto">
                 {existingEvents.map((eventName) => {
@@ -315,7 +317,7 @@ export function QueryItemPopover({
                   }
                 }
               }}
-              placeholder="Or type event name..."
+              placeholder={t("popovers.queryItem.placeholder")}
               className="flex-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 placeholder-gray-400 focus:border-violet-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
             />
             {customTypeInput.trim() && (
@@ -325,7 +327,7 @@ export function QueryItemPopover({
                 className="flex items-center gap-0.5 rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
                 <Plus size={12} />
-                <span>Add</span>
+                <span>{t("popovers.queryItem.addEvent")}</span>
               </button>
             )}
           </div>
@@ -343,14 +345,14 @@ export function QueryItemPopover({
                 onClick={handleClearAllTags}
                 className="text-[10px] text-gray-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"
               >
-                Clear (Match Any)
+                {t("popovers.queryItem.clearMatchAny")}
               </button>
             )}
           </div>
 
           {taggedFields.length === 0 ? (
             <div className="text-[11px] italic text-gray-400 dark:text-zinc-500">
-              No tagged input params on this card (matches any tag).
+              {t("popovers.queryItem.noTaggedParams")}
             </div>
           ) : (
             <div className="flex flex-wrap gap-1">
@@ -387,7 +389,7 @@ export function QueryItemPopover({
               <button
                 type="button"
                 onClick={handleDelete}
-                title="Delete query item"
+                title={t("popovers.queryItem.deleteItem")}
                 className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
               >
                 <Trash2 size={13} />
@@ -398,7 +400,7 @@ export function QueryItemPopover({
               onClick={handleApply}
               className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors"
             >
-              Apply
+              {t("common.apply")}
             </button>
           </div>
         </div>

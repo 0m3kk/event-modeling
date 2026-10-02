@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { StormData } from "@/types";
 import { stormHasInputFields } from "@/constants/storm";
@@ -36,6 +37,7 @@ function stormFieldListKey(
 }
 
 export function TypeSelectPopover() {
+  const { t } = useTranslation();
   const typeSelect = useCanvasStore((s) => s.typeSelect);
   const setTypeSelect = useCanvasStore((s) => s.setTypeSelect);
   const objects = useCanvasStore((s) => s.objects);
@@ -283,7 +285,7 @@ export function TypeSelectPopover() {
     >
       <div className="mb-2 flex items-center justify-between border-b border-gray-100 pb-2 dark:border-zinc-800">
         <span className="text-xs font-semibold text-gray-700 dark:text-zinc-200">
-          Select Field Type
+          {t("popovers.typeSelect.title")}
         </span>
         <button
           onClick={() => setTypeSelect(null)}
@@ -327,7 +329,7 @@ export function TypeSelectPopover() {
         <input
           ref={searchInputRef}
           type="text"
-          placeholder="Search or enter type..."
+          placeholder={t("popovers.typeSelect.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={handleKeyDownSearch}
@@ -340,7 +342,7 @@ export function TypeSelectPopover() {
         {showCustomOption && (
           <div>
             <div className="px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
-              Custom Type
+              {t("popovers.typeSelect.customType")}
             </div>
             <button
               onClick={() => handleSelectType(trimmedSearch)}

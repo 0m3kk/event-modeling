@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { ModelField } from "@/types";
 import { MODEL_KIND_LABELS } from "@/constants/model";
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 
 export function ModelOptionsBar() {
+  const { t } = useTranslation();
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const objects = useCanvasStore((s) => s.objects);
   const groups = useCanvasStore((s) => s.groups);
@@ -252,7 +254,7 @@ export function ModelOptionsBar() {
         {/* Create Reference Copy — linked duplicate, content stays in sync */}
         <button
           onClick={() => createReferenceCopy([selectedModel.id])}
-          title="Create Reference Copy"
+          title={t("popovers.optionsBar.createRef")}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 cursor-pointer"
         >
           <Link2 size={16} />

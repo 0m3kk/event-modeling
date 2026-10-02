@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { nanoid } from "nanoid";
 import { useCanvasStore } from "@/store";
 import type { BddPayloadField, BddStepRef, CanvasObject } from "@/types";
@@ -30,6 +31,7 @@ export function BddStepPopover({
   onClose,
   anchorPosition,
 }: BddStepPopoverProps) {
+  const { t } = useTranslation();
   const addBddStep = useCanvasStore((s) => s.addBddStep);
   const updateBddStep = useCanvasStore((s) => s.updateBddStep);
   const updateObject = useCanvasStore((s) => s.updateObject);
@@ -142,7 +144,7 @@ export function BddStepPopover({
         <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-100">
           <ListChecks size={15} className="shrink-0 text-sky-600 dark:text-sky-400" />
           <span className="truncate">
-            {isEditMode ? "Edit Step" : "Add Step"}
+            {t("popovers.bddStep.title")}
           </span>
         </div>
         <button
@@ -157,7 +159,7 @@ export function BddStepPopover({
         {/* What the step stands for */}
         <div>
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
-            Step
+            {t("popovers.bddStep.stepType")}
           </div>
           <div className="flex flex-wrap gap-1">
             {allowedRefs.map((r) => {
@@ -188,7 +190,7 @@ export function BddStepPopover({
         {/* Name of the referenced card */}
         <div>
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
-            Name
+            {t("popovers.bddStep.stepTitle")}
           </div>
           <input
             ref={nameRef}
@@ -274,7 +276,7 @@ export function BddStepPopover({
             <button
               type="button"
               onClick={handleDelete}
-              title="Delete step"
+              title={t("popovers.bddStep.deleteStep")}
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-400 dark:text-zinc-400 transition-colors hover:border-red-200 dark:hover:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
             >
               <Trash2 size={13} />
@@ -285,7 +287,7 @@ export function BddStepPopover({
             onClick={handleApply}
             className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-700 cursor-pointer"
           >
-            Apply
+            {t("common.apply")}
           </button>
         </div>
       </div>

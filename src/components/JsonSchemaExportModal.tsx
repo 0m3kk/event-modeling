@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { X, Copy, Check, Download, FileCode2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import {
   exportCanvasJsonSchema,
@@ -18,6 +19,7 @@ export function JsonSchemaExportModal({
   onClose,
   onExported,
 }: JsonSchemaExportModalProps) {
+  const { t } = useTranslation();
   const objects = useCanvasStore((s) => s.objects);
   const [dialect, setDialect] = useState<JsonSchemaDialect>("draft-07");
   const [copied, setCopied] = useState(false);
@@ -78,17 +80,17 @@ export function JsonSchemaExportModal({
             </div>
             <div>
               <h2 className="text-sm font-semibold text-gray-800 dark:text-zinc-100">
-                Export JSON Schema
+                {t("modals.jsonSchema.title")}
               </h2>
               <p className="text-[11px] text-gray-500 dark:text-zinc-400">
-                Standard JSON Schema for all Model nodes & Storm card payloads
+                {t("modals.jsonSchema.subtitle")}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-            title="Close"
+            title={t("common.close")}
           >
             <X size={18} />
           </button>
@@ -98,7 +100,7 @@ export function JsonSchemaExportModal({
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-2.5 bg-white dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-gray-600 mr-1 dark:text-zinc-400">
-              Dialect:
+              {t("modals.jsonSchema.dialect")}
             </span>
             <button
               onClick={() => setDialect("draft-07")}
@@ -130,12 +132,12 @@ export function JsonSchemaExportModal({
               {copied ? (
                 <>
                   <Check size={13} className="text-green-600 dark:text-green-400" />
-                  <span className="text-green-600 dark:text-green-400">Copied!</span>
+                  <span className="text-green-600 dark:text-green-400">{t("modals.jsonSchema.copiedJson")}</span>
                 </>
               ) : (
                 <>
                   <Copy size={13} />
-                  <span>Copy JSON</span>
+                  <span>{t("modals.jsonSchema.copyJson")}</span>
                 </>
               )}
             </button>
@@ -144,7 +146,7 @@ export function JsonSchemaExportModal({
               className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-2xs"
             >
               <Download size={13} />
-              <span>Download .json</span>
+              <span>{t("modals.jsonSchema.downloadJson")}</span>
             </button>
           </div>
         </div>
@@ -157,10 +159,12 @@ export function JsonSchemaExportModal({
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-gray-100 px-5 py-2.5 text-[11px] text-gray-400 bg-gray-50/50 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-500">
           <span>
-            {schemaString.split("\n").length} lines •{" "}
-            {(new Blob([schemaString]).size / 1024).toFixed(1)} KB
+            {t("modals.jsonSchema.linesCount", {
+              lines: schemaString.split("\n").length,
+              size: (new Blob([schemaString]).size / 1024).toFixed(1),
+            })}
           </span>
-          <span>Compatible with OpenAPI, AJV, and standard validators</span>
+          <span>{t("modals.jsonSchema.compatibility")}</span>
         </div>
       </div>
     </div>

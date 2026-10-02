@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import {
   AlignStartVertical,
@@ -14,6 +15,7 @@ import {
 import type { AlignDirection } from "@/utils/align";
 
 export function AlignOptionsBar() {
+  const { t } = useTranslation();
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const objects = useCanvasStore((s) => s.objects);
   const viewport = useCanvasStore((s) => s.viewport);
@@ -175,7 +177,7 @@ export function AlignOptionsBar() {
       {/* Arrange Storm Lanes Button */}
       <button
         onClick={() => arrangeLanes()}
-        title="Arrange Storm Lanes (Actor → Command → Event → External → Query → State → Constraint)"
+        title={t("popovers.optionsBar.arrangeLanes")}
         className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 active:scale-95 cursor-pointer"
       >
         <Columns3 size={16} className="text-indigo-600 dark:text-indigo-400" />

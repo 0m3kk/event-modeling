@@ -85,7 +85,10 @@ function ToolButton({
   );
 }
 
+import { useTranslation } from "react-i18next";
+
 export function Toolbar() {
+  const { t } = useTranslation();
   const currentTool = useCanvasStore((state) => state.tool);
   const setTool = useCanvasStore((state) => state.setTool);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
@@ -110,7 +113,7 @@ export function Toolbar() {
 
     // Two or more selected groups wrap into a new parent group.
     if (explicitGroupIds.size >= 2) {
-      return "Nest Groups (Cmd+G)";
+      return t("toolbar.nestGroups");
     }
     // Every selected card already lives in the same group -> child group.
     const memberGroupIds = new Set(
@@ -129,13 +132,13 @@ export function Toolbar() {
       allInExistingGroup &&
       memberGroupIds.size === 1
     ) {
-      return "Create Sub-group (Cmd+G)";
+      return t("toolbar.createSubgroup");
     }
     if ((explicitGroupIds.size === 1 || memberGroup) && hasUnassigned) {
-      return "Add to Group (Cmd+G)";
+      return t("toolbar.addToGroup");
     }
-    return "Group (Cmd+G)";
-  }, [selectedIds, objects, groups]);
+    return t("toolbar.group");
+  }, [selectedIds, objects, groups, t]);
 
   // Add specific Storm Card
   //
@@ -291,19 +294,19 @@ export function Toolbar() {
         <ToolButton
           onClick={() => setTool("select")}
           icon={<MousePointer size={20} />}
-          tooltip="Select Tool (V)"
+          tooltip={t("toolbar.select")}
           isActive={currentTool === "select"}
         />
         <ToolButton
           onClick={() => setTool("connector")}
           icon={<Workflow size={20} />}
-          tooltip="Connector (L)"
+          tooltip={t("toolbar.connector")}
           isActive={currentTool === "connector"}
         />
         <ToolButton
           onClick={() => setTool("line")}
           icon={<PenLine size={20} />}
-          tooltip="Line (D)"
+          tooltip={t("toolbar.line")}
           isActive={currentTool === "line"}
         />
       </div>
@@ -317,7 +320,7 @@ export function Toolbar() {
             key={kind}
             onClick={() => handleAddStormCard(kind)}
             icon={stormIcons[kind]}
-            tooltip={`${STORM_KIND_LABELS[kind]}`}
+            tooltip={t(`toolbar.kinds.${kind}`, { defaultValue: STORM_KIND_LABELS[kind] })}
             color={STORM_KIND_COLORS[kind]}
           />
         ))}
@@ -330,7 +333,7 @@ export function Toolbar() {
         <ToolButton
           onClick={() => handleAddStormCard("bdd")}
           icon={stormIcons.bdd}
-          tooltip={STORM_KIND_LABELS.bdd}
+          tooltip={t("toolbar.kinds.bdd", { defaultValue: STORM_KIND_LABELS.bdd })}
           color={STORM_KIND_COLORS.bdd}
         />
       </div>
@@ -344,7 +347,7 @@ export function Toolbar() {
             key={kind}
             onClick={() => handleAddModelNode(kind)}
             icon={modelIcons[kind]}
-            tooltip={`${MODEL_KIND_LABELS[kind]}`}
+            tooltip={t(`toolbar.kinds.${kind}`, { defaultValue: MODEL_KIND_LABELS[kind] })}
             color={MODEL_KIND_COLORS[kind]}
           />
         ))}
@@ -357,13 +360,13 @@ export function Toolbar() {
         <ToolButton
           onClick={handleAddSticky}
           icon={<StickyIcon size={20} />}
-          tooltip="Note (S)"
+          tooltip={t("toolbar.note")}
           color="#b45309"
         />
         <ToolButton
           onClick={handleAddText}
           icon={<Type size={20} />}
-          tooltip="Text (T)"
+          tooltip={t("toolbar.text")}
         />
         <ToolButton
           onClick={() => useCanvasStore.getState().groupObjects()}
@@ -379,7 +382,7 @@ export function Toolbar() {
       <ToolButton
         onClick={handleClearBoard}
         icon={<Trash2 size={20} />}
-        tooltip="Clear Canvas"
+        tooltip={t("toolbar.clearCanvas")}
         danger
       />
     </div>

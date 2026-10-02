@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, Image as ImageIcon, Download, Copy, Check, Sparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import { getActivePixiEngine } from "@/engine/PixiEngine";
 import {
@@ -23,6 +24,7 @@ export function ExportImageModal({
   onOpenJsonSchema,
   onExported,
 }: ExportImageModalProps) {
+  const { t } = useTranslation();
   const objects = useCanvasStore((s) => s.objects);
   const groups = useCanvasStore((s) => s.groups);
   const projectName = useCanvasStore((s) => s.projectName);
@@ -110,17 +112,17 @@ export function ExportImageModal({
             </div>
             <div>
               <h2 className="text-sm font-semibold text-gray-800 dark:text-zinc-100">
-                Export Image
+                {t("modals.exportImage.title")}
               </h2>
               <p className="text-[11px] text-gray-500 dark:text-zinc-400">
-                Download high-resolution image of your board
+                {t("modals.exportImage.subtitle")}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-            title="Close"
+            title={t("common.close")}
           >
             <X size={18} />
           </button>
@@ -136,7 +138,7 @@ export function ExportImageModal({
                 : "border-transparent text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
-            PNG Image
+            {t("modals.exportImage.tabPng")}
           </button>
           <button
             onClick={() => setTab("svg")}
@@ -146,7 +148,7 @@ export function ExportImageModal({
                 : "border-transparent text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
-            SVG Vector
+            {t("modals.exportImage.tabSvg")}
           </button>
         </div>
 
@@ -156,13 +158,13 @@ export function ExportImageModal({
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1.5 dark:text-zinc-300">
-                  Resolution Scale
+                  {t("modals.exportImage.resolutionScale")}
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { val: 1, label: "1x", desc: "Standard" },
-                    { val: 2, label: "2x", desc: "High-Res (Retina)" },
-                    { val: 3, label: "3x", desc: "Print / Ultra" },
+                    { val: 1, label: "1x", desc: t("modals.exportImage.scaleStandard") },
+                    { val: 2, label: "2x", desc: t("modals.exportImage.scaleRetina") },
+                    { val: 3, label: "3x", desc: t("modals.exportImage.scalePrint") },
                   ].map((item) => (
                     <button
                       key={item.val}
@@ -182,15 +184,15 @@ export function ExportImageModal({
 
               <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 space-y-1 border border-gray-100 dark:bg-zinc-800/50 dark:text-zinc-400 dark:border-zinc-800">
                 <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-zinc-400">Output Dimensions:</span>
+                  <span className="text-gray-500 dark:text-zinc-400">{t("modals.exportImage.outputDimensions")}</span>
                   <span className="font-mono font-medium text-gray-700 dark:text-zinc-200">
                     {estimatedWidth} × {estimatedHeight} px
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-zinc-400">Elements:</span>
+                  <span className="text-gray-500 dark:text-zinc-400">{t("modals.exportImage.elements")}</span>
                   <span className="font-medium text-gray-700 dark:text-zinc-200">
-                    {objects.length} cards & connectors, {groups.length} groups
+                    {t("modals.exportImage.elementsInfo", { cards: objects.length, groups: groups.length })}
                   </span>
                 </div>
               </div>
@@ -203,12 +205,12 @@ export function ExportImageModal({
                 {isExporting ? (
                   <>
                     <Sparkles size={14} className="animate-spin" />
-                    <span>Rendering Canvas...</span>
+                    <span>{t("modals.exportImage.renderingCanvas")}</span>
                   </>
                 ) : (
                   <>
                     <Download size={14} />
-                    <span>Download PNG ({estimatedWidth}×{estimatedHeight})</span>
+                    <span>{t("modals.exportImage.downloadPng", { width: estimatedWidth, height: estimatedHeight })}</span>
                   </>
                 )}
               </button>
@@ -217,10 +219,10 @@ export function ExportImageModal({
             <div className="space-y-4">
               <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 border border-gray-100 space-y-1 dark:bg-zinc-800/50 dark:text-zinc-400 dark:border-zinc-800">
                 <p className="font-medium text-gray-800 dark:text-zinc-200">
-                  Scalable Vector Graphics (SVG)
+                  {t("modals.exportImage.svgTitle")}
                 </p>
                 <p className="text-[11px] text-gray-500 dark:text-zinc-400">
-                  Infinitely scalable vector file containing crisp text, cards, connectors, and groups. Perfect for embedding in docs or importing into Figma/Illustrator.
+                  {t("modals.exportImage.svgDesc")}
                 </p>
               </div>
 
@@ -232,12 +234,12 @@ export function ExportImageModal({
                   {copiedSvg ? (
                     <>
                       <Check size={14} className="text-green-600 dark:text-green-400" />
-                      <span className="text-green-600 dark:text-green-400">Copied SVG Code!</span>
+                      <span className="text-green-600 dark:text-green-400">{t("modals.exportImage.copiedSvg")}</span>
                     </>
                   ) : (
                     <>
                       <Copy size={14} />
-                      <span>Copy SVG Markup</span>
+                      <span>{t("modals.exportImage.copySvg")}</span>
                     </>
                   )}
                 </button>
@@ -246,7 +248,7 @@ export function ExportImageModal({
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2.5 text-xs font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-2xs"
                 >
                   <Download size={14} />
-                  <span>Download .svg</span>
+                  <span>{t("modals.exportImage.downloadSvg")}</span>
                 </button>
               </div>
             </div>
@@ -261,7 +263,7 @@ export function ExportImageModal({
                 }}
                 className="text-xs text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
               >
-                Looking for domain schemas? Export JSON Schema instead →
+                {t("modals.exportImage.jsonSchemaLink")}
               </button>
             </div>
           )}

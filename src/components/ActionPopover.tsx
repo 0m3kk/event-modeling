@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { CanvasObject, StormKind } from "@/types";
 import {
@@ -23,6 +24,7 @@ export function ActionPopover({
   onClose,
   anchorPosition,
 }: ActionPopoverProps) {
+  const { t } = useTranslation();
   const objects = useCanvasStore((s) => s.objects);
   const updateObject = useCanvasStore((s) => s.updateObject);
   const setStormActionHover = useCanvasStore((s) => s.setStormActionHover);
@@ -112,7 +114,7 @@ export function ActionPopover({
       <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2.5">
         <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 dark:text-zinc-100">
           <Shield size={16} className="text-blue-600 dark:text-blue-400" />
-          <span>RBAC Authorization Action</span>
+          <span>{t("popovers.action.title")}</span>
         </div>
         <button
           onClick={onClose}
@@ -128,16 +130,16 @@ export function ActionPopover({
             type="text"
             value={actionInput}
             onChange={(e) => handleApplyAction(e.target.value)}
-            placeholder="resource:verb:scope"
+            placeholder={t("popovers.action.placeholder")}
             className="flex-1 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-blue-500 focus:outline-none"
           />
           <button
             onClick={handleSuggest}
-            title="Auto-suggest action from title"
+            title={t("popovers.action.autoSuggest")}
             className="flex items-center gap-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-2 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 cursor-pointer"
           >
             <Sparkles size={13} />
-            Suggest
+            {t("popovers.action.suggest")}
           </button>
         </div>
 
@@ -189,7 +191,7 @@ export function ActionPopover({
         {existingActions.length > 0 && (
           <div className="mt-1">
             <div className="text-[11px] font-medium tracking-wider text-gray-500 dark:text-zinc-400 uppercase">
-              Used on Canvas
+              {t("popovers.action.usedOnCanvas")}
             </div>
             <div className="mt-1 flex max-h-24 flex-col gap-1 overflow-y-auto pr-1">
               {existingActions.map((act) => (
@@ -211,7 +213,7 @@ export function ActionPopover({
         {/* Authorized Actors Inspection */}
         <div className="mt-2 rounded-lg border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/60 p-2.5">
           <div className="flex items-center justify-between text-xs text-gray-600 dark:text-zinc-300">
-            <span className="font-medium">Authorized Actors</span>
+            <span className="font-medium">{t("popovers.action.authorizedActors")}</span>
             <span className="py-0.2 rounded-full bg-blue-100 dark:bg-blue-950/60 px-1.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
               {authorizedActors.length}
             </span>
@@ -220,7 +222,7 @@ export function ActionPopover({
           <div className="mt-1.5 max-h-20 overflow-y-auto">
             {authorizedActors.length === 0 ? (
               <div className="text-[11px] text-gray-400 dark:text-zinc-500 italic">
-                No actor on canvas has permissions matching this action
+                {t("popovers.action.noMatchingActors")}
               </div>
             ) : (
               <div className="flex flex-wrap gap-1">

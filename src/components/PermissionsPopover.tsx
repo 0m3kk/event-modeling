@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { CanvasObject } from "@/types";
 import { getActorPermissions } from "@/utils/stormAuth";
@@ -15,6 +16,7 @@ export function PermissionsPopover({
   onClose,
   anchorPosition,
 }: PermissionsPopoverProps) {
+  const { t } = useTranslation();
   const updateObject = useCanvasStore((s) => s.updateObject);
 
   const permissions = useMemo(() => {
@@ -82,7 +84,7 @@ export function PermissionsPopover({
       <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2.5">
         <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 dark:text-zinc-100">
           <Shield size={16} className="text-pink-600 dark:text-pink-400" />
-          <span>Actor Permissions</span>
+          <span>{t("popovers.permissions.title")}</span>
         </div>
         <button
           onClick={onClose}
@@ -99,7 +101,7 @@ export function PermissionsPopover({
           value={customInput}
           onChange={(e) => setCustomInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAddCustom()}
-          placeholder="e.g. *:register:public or order:*"
+          placeholder={t("popovers.permissions.placeholder")}
           className="flex-1 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-pink-500 focus:outline-none"
         />
         <button
@@ -108,19 +110,19 @@ export function PermissionsPopover({
           className="flex items-center gap-1 rounded-lg bg-pink-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-pink-700 disabled:opacity-40 cursor-pointer"
         >
           <Plus size={13} />
-          Add
+          {t("popovers.permissions.addRole")}
         </button>
       </div>
 
       {/* Current Permissions */}
       <div className="mt-3">
         <div className="flex items-center justify-between text-[11px] font-medium tracking-wider text-gray-500 dark:text-zinc-400 uppercase">
-          <span>Granted Permissions ({permissions.length})</span>
+          <span>{t("popovers.permissions.grantedPermissions")} ({permissions.length})</span>
         </div>
         <div className="mt-1.5 flex max-h-48 flex-col gap-1 overflow-y-auto pr-1">
           {permissions.length === 0 ? (
             <div className="py-4 text-center text-xs text-gray-400 dark:text-zinc-500 italic">
-              No permissions granted
+              {t("popovers.permissions.noPermissions")}
             </div>
           ) : (
             permissions.map((perm) => (
@@ -137,7 +139,7 @@ export function PermissionsPopover({
                 <button
                   onClick={() => handleRemove(perm)}
                   className="rounded p-1 text-gray-400 dark:text-zinc-500 hover:bg-pink-100 dark:hover:bg-pink-900/50 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
-                  title="Remove permission"
+                  title={t("popovers.permissions.removeRole")}
                 >
                   <Trash2 size={12} />
                 </button>

@@ -18,6 +18,7 @@ import {
   parseAndValidateStormFile,
   createBackup,
 } from "@/utils/fileIO";
+import { useTranslation } from "react-i18next";
 import {
   getGoogleAuthConfig,
   setSessionGoogleAuth,
@@ -46,6 +47,7 @@ export function GoogleDriveModal({
   onClose,
   onSuccessToast,
 }: GoogleDriveModalProps) {
+  const { t } = useTranslation();
   const currentProjectName = useCanvasStore((s) => s.projectName);
   const setProjectName = useCanvasStore((s) => s.setProjectName);
   const googleDriveFileId = useCanvasStore((s) => s.googleDriveFileId);
@@ -125,9 +127,7 @@ export function GoogleDriveModal({
 
     const targetClientId = authConfig.clientId.trim();
     if (!targetClientId) {
-      setErrorMsg(
-        "Chưa có VITE_GOOGLE_CLIENT_ID trong file .env. Vui lòng cấu hình VITE_GOOGLE_CLIENT_ID để đăng nhập.",
-      );
+      setErrorMsg(t("modals.gdrive.missingClientId"));
       setIsAuthenticating(false);
       return;
     }
@@ -165,7 +165,7 @@ export function GoogleDriveModal({
       setAuthConfig(newConfig);
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Đăng nhập Google thất bại";
+        err instanceof Error ? err.message : t("modals.gdrive.errorUpload");
       setErrorMsg(msg);
     } finally {
       setIsAuthenticating(false);
@@ -182,11 +182,11 @@ export function GoogleDriveModal({
   // Perform Save to Drive
   const handleSaveToDrive = async () => {
     if (!authConfig.accessToken || !isAuthenticated) {
-      setErrorMsg("Vui lòng đăng nhập Google Drive trước khi lưu.");
+      setErrorMsg(t("modals.gdrive.errorRequireLogin"));
       return;
     }
 
-    const trimmedName = saveName.trim() || "Untitled";
+    const trimmedName = saveName.trim() || t("common.untitled");
     if (trimmedName !== currentProjectName) {
       setProjectName(trimmedName);
     }
@@ -217,11 +217,11 @@ export function GoogleDriveModal({
       setGoogleDriveFileId(result.id);
       setSaveSuccessResult(result);
       onSuccessToast?.(
-        `Đã lưu dự án "${result.name}" vào Google Drive thành công!`,
+        t("modals.gdrive.toastSaved", { name: result.name }),
       );
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Lỗi khi tải file lên Google Drive";
+        err instanceof Error ? err.message : t("modals.gdrive.errorUpload");
       setErrorMsg(msg);
     } finally {
       setIsSaving(false);
@@ -249,7 +249,7 @@ export function GoogleDriveModal({
       const loadedName =
         project.name?.trim() ||
         file.name.replace(/\.(storm|json)$/i, "").trim() ||
-        "Untitled";
+        t("common.untitled");
 
       useCanvasStore
         .getState()
@@ -260,13 +260,13 @@ export function GoogleDriveModal({
       }
       clearHistory();
 
-      onSuccessToast?.(`Đã tải dự án "${loadedName}" từ Google Drive!`);
+      onSuccessToast?.(t("modals.gdrive.toastLoaded", { name: loadedName }));
       onClose();
     } catch (err: unknown) {
       const msg =
         err instanceof Error
           ? err.message
-          : "Không thể đọc file dự án từ Google Drive";
+          : t("modals.gdrive.errorDownload");
       setErrorMsg(msg);
     } finally {
       setLoadingFileId(null);
@@ -309,10 +309,10 @@ export function GoogleDriveModal({
             </div>
             <div>
               <h2 className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
-                Google Drive
+                {t("modals.gdrive.title")}
               </h2>
               <p className="text-xs text-gray-500 dark:text-zinc-400">
-                Lưu trữ và đồng bộ hóa dự án Event Modeling
+                {t("modals.gdrive.subtitle")}
               </p>
             </div>
           </div>
@@ -361,7 +361,7 @@ export function GoogleDriveModal({
           ) : (
             <div className="flex items-center gap-1.5 text-gray-500 dark:text-zinc-400">
               <span className="h-2 w-2 rounded-full bg-amber-400" />
-              <span>Chưa kết nối tài khoản Google</span>
+              <span>{t("modals.gdrive.notConnected")}</span>
             </div>
           )}
 
@@ -371,10 +371,10 @@ export function GoogleDriveModal({
                 type="button"
                 onClick={handleSignOut}
                 className="flex items-center gap-1 rounded-md px-2 py-1 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
-                title="Đăng xuất khỏi Google Drive"
+                title={t("modals.gdrive.signOutTooltip")}
               >
                 <LogOut size={13} />
-                <span>Đăng xuất</span>
+                <span>{t("modals.gdrive.signOut")}</span>
               </button>
             ) : (
               <button
@@ -384,7 +384,7 @@ export function GoogleDriveModal({
                 className="flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1 text-white hover:bg-blue-700 transition-colors font-medium shadow-xs disabled:opacity-50"
               >
                 <LogIn size={13} />
-                <span>{isAuthenticating ? "Đang kết nối..." : "Đăng nhập Google"}</span>
+                <span>{isAuthenticating ? t("modals.gdrive.signingIn") : t("modals.gdrive.signIn")}</span>
               </button>
             )}
           </div>
@@ -395,10 +395,10 @@ export function GoogleDriveModal({
           <div className="mx-5 mt-3 rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-800 shrink-0 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
             <div className="font-semibold mb-1 flex items-center gap-1.5">
               <AlertCircle size={14} className="text-amber-600 dark:text-amber-400" />
-              Chưa cấu hình biến môi trường Google Drive
+              {t("modals.gdrive.missingEnvNotice")}
             </div>
             <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
-              Vui lòng khai báo trong file <code>.env</code> (hoặc <code>.env.local</code>):
+              {t("modals.gdrive.missingEnvGuide")} <code>.env</code> (hoặc <code>.env.local</code>):
             </p>
             <pre className="mt-1.5 font-mono text-[10px] text-amber-900 bg-white/80 p-2 rounded border border-amber-200 overflow-x-auto dark:bg-zinc-950 dark:border-zinc-800 dark:text-amber-200">
               VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com{"\n"}
@@ -423,7 +423,7 @@ export function GoogleDriveModal({
             }`}
           >
             <CloudUpload size={14} />
-            <span>Lưu vào Drive</span>
+            <span>{t("modals.gdrive.saveTab")}</span>
           </button>
           <button
             type="button"
@@ -438,7 +438,7 @@ export function GoogleDriveModal({
             }`}
           >
             <FolderOpen size={14} />
-            <span>Mở từ Drive</span>
+            <span>{t("modals.gdrive.openTab")}</span>
           </button>
         </div>
 
@@ -460,7 +460,7 @@ export function GoogleDriveModal({
                   htmlFor={saveNameId}
                   className="block text-xs font-medium text-gray-700 mb-1 dark:text-zinc-300"
                 >
-                  Tên file dự án (.storm)
+                  {t("modals.gdrive.filenameLabel")}
                 </label>
                 <div className="flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800">
                   <input
@@ -468,7 +468,7 @@ export function GoogleDriveModal({
                     type="text"
                     value={saveName}
                     onChange={(e) => setSaveName(e.target.value)}
-                    placeholder="Untitled"
+                    placeholder={t("common.untitled")}
                     className="flex-1 text-xs text-gray-900 focus:outline-none dark:text-zinc-100 dark:bg-transparent"
                     disabled={isSaving}
                   />
@@ -479,7 +479,7 @@ export function GoogleDriveModal({
               {googleDriveFileId && (
                 <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50 space-y-2 dark:border-zinc-700 dark:bg-zinc-800/40">
                   <span className="block text-xs font-medium text-gray-700 dark:text-zinc-300">
-                    Tùy chọn lưu:
+                    {t("modals.gdrive.saveOptions")}
                   </span>
                   <div className="space-y-1.5">
                     <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-zinc-300 cursor-pointer">
@@ -490,7 +490,7 @@ export function GoogleDriveModal({
                         onChange={() => setSaveMode("update")}
                         className="text-blue-600 focus:ring-blue-500"
                       />
-                      <span>Cập nhật file hiện tại trên Google Drive</span>
+                      <span>{t("modals.gdrive.updateExisting")}</span>
                     </label>
                     <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-zinc-300 cursor-pointer">
                       <input
@@ -500,7 +500,7 @@ export function GoogleDriveModal({
                         onChange={() => setSaveMode("new")}
                         className="text-blue-600 focus:ring-blue-500"
                       />
-                      <span>Lưu thành bản sao mới trên Google Drive</span>
+                      <span>{t("modals.gdrive.saveAsNew")}</span>
                     </label>
                   </div>
                 </div>
@@ -511,7 +511,7 @@ export function GoogleDriveModal({
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-800 space-y-2 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
                   <div className="flex items-center gap-2 font-medium">
                     <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
-                    <span>Lưu file lên Google Drive thành công!</span>
+                    <span>{t("modals.gdrive.saveSuccess")}</span>
                   </div>
                   <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
                     File: <strong>{saveSuccessResult.name}</strong>
@@ -524,7 +524,7 @@ export function GoogleDriveModal({
                       className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
                     >
                       <ExternalLink size={12} />
-                      Mở trong Google Drive
+                      {t("modals.gdrive.openInDrive")}
                     </a>
                   )}
                 </div>
@@ -539,7 +539,7 @@ export function GoogleDriveModal({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm kiếm file .storm..."
+                  placeholder={t("modals.gdrive.searchPlaceholder")}
                   className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-800 focus:border-blue-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
                 />
                 <button
@@ -547,7 +547,7 @@ export function GoogleDriveModal({
                   onClick={loadFiles}
                   disabled={isLoadingFiles || !isAuthenticated}
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                  title="Làm mới danh sách"
+                  title={t("modals.gdrive.refreshList")}
                 >
                   <RefreshCw
                     size={14}
@@ -560,10 +560,10 @@ export function GoogleDriveModal({
                 <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-gray-500 dark:text-zinc-400">
                   <Cloud size={32} className="text-gray-300 dark:text-zinc-600 mb-2" />
                   <p className="font-medium text-gray-700 dark:text-zinc-300">
-                    Chưa kết nối Google Drive
+                    {t("modals.gdrive.notConnectedMsg")}
                   </p>
                   <p className="mt-1 text-[11px] text-gray-400 dark:text-zinc-500 max-w-xs">
-                    Vui lòng đăng nhập Google để xem và mở các dự án Event Modeling đã lưu trên Drive của bạn.
+                    {t("modals.gdrive.notConnectedDesc")}
                   </p>
                   {authConfig.clientId && (
                     <button
@@ -572,23 +572,23 @@ export function GoogleDriveModal({
                       className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 shadow-xs"
                     >
                       <LogIn size={13} />
-                      <span>Đăng nhập ngay</span>
+                      <span>{t("modals.gdrive.signInNow")}</span>
                     </button>
                   )}
                 </div>
               ) : isLoadingFiles ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-gray-500 dark:text-zinc-400">
                   <RefreshCw size={24} className="animate-spin text-blue-600 dark:text-blue-400 mb-2" />
-                  <span>Đang tải danh sách file từ Google Drive...</span>
+                  <span>{t("modals.gdrive.loadingFiles")}</span>
                 </div>
               ) : filteredFiles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-gray-500 dark:text-zinc-400">
                   <FileCode size={30} className="text-gray-300 dark:text-zinc-600 mb-2" />
                   <p className="font-medium text-gray-600 dark:text-zinc-300">
-                    Không tìm thấy file .storm nào
+                    {t("modals.gdrive.noFilesFound")}
                   </p>
                   <p className="text-[11px] text-gray-400 dark:text-zinc-500 mt-0.5">
-                    Hãy chuyển sang tab "Lưu vào Drive" để lưu dự án hiện tại lên Google Drive.
+                    {t("modals.gdrive.noFilesDesc")}
                   </p>
                 </div>
               ) : (
@@ -618,7 +618,7 @@ export function GoogleDriveModal({
                         disabled={loadingFileId === file.id}
                         className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-400 dark:hover:bg-blue-900/60 transition-colors disabled:opacity-50 shrink-0"
                       >
-                        {loadingFileId === file.id ? "Đang nạp..." : "Mở"}
+                        {loadingFileId === file.id ? t("modals.gdrive.loadingBtn") : t("common.open")}
                       </button>
                     </div>
                   ))}
@@ -636,7 +636,7 @@ export function GoogleDriveModal({
             disabled={isSaving}
             className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
           >
-            Đóng
+            {t("common.close")}
           </button>
           {activeTab === "save" && (
             <button
@@ -646,7 +646,7 @@ export function GoogleDriveModal({
               className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
             >
               <CloudUpload size={14} />
-              <span>{isSaving ? "Đang lưu..." : "Lưu vào Google Drive"}</span>
+              <span>{isSaving ? t("modals.gdrive.savingBtn") : t("modals.gdrive.saveBtn")}</span>
             </button>
           )}
         </div>

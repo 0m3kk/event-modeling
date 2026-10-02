@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { CanvasObject } from "@/types";
 import {
@@ -28,6 +29,7 @@ export function DescriptionPopover({
   onClose,
   anchorPosition,
 }: DescriptionPopoverProps) {
+  const { t } = useTranslation();
   const updateObject = useCanvasStore((s) => s.updateObject);
   const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -81,7 +83,7 @@ export function DescriptionPopover({
   const isEnumValue =
     target.type === "model" && target.modelData?.kind === "enum" && !!fieldId;
   const scopeLabel = !fieldId
-    ? "Card Description"
+    ? t("popovers.description.title")
     : `${isEnumValue ? "Value" : "Field"}: ${rowName ?? "—"}`;
 
   return (
@@ -100,7 +102,7 @@ export function DescriptionPopover({
         </div>
         <button
           onClick={onClose}
-          title="Close"
+          title={t("common.close")}
           className="rounded-lg p-1 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
         >
           <X size={15} />
@@ -112,11 +114,7 @@ export function DescriptionPopover({
         rows={4}
         value={text}
         onChange={(e) => apply(e.target.value)}
-        placeholder={
-          fieldId
-            ? "Add context for this row — shown on its row ⓘ"
-            : "Add context — shown when hovering the ⓘ badge"
-        }
+        placeholder={t("popovers.description.placeholder")}
         className="mt-3 w-full resize-none rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-2 text-xs leading-relaxed text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-sky-500 focus:outline-none"
       />
 
@@ -130,7 +128,7 @@ export function DescriptionPopover({
           className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-gray-500 dark:text-zinc-400 transition-all hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-red-500 dark:hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           <Trash2 size={13} />
-          Clear
+          {t("common.delete")}
         </button>
       </div>
     </div>

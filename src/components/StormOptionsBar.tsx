@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { BddPhase } from "@/types";
 import {
@@ -47,6 +48,7 @@ import {
 } from "lucide-react";
 
 export function StormOptionsBar() {
+  const { t } = useTranslation();
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const objects = useCanvasStore((s) => s.objects);
   const groups = useCanvasStore((s) => s.groups);
@@ -379,7 +381,7 @@ export function StormOptionsBar() {
         {!isStepKind && (
           <button
             onClick={handleToggleArray}
-            title="Toggle Array Collection []"
+            title={t("popovers.optionsBar.arrayCollection")}
             className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               isArray
                 ? "border border-blue-200 dark:border-blue-800 bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300"
@@ -398,7 +400,7 @@ export function StormOptionsBar() {
             title={
               data.action
                 ? `Authorization Action: ${data.action}`
-                : "Configure Authorization Action"
+                : t("popovers.action.title")
             }
             className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               data.action
@@ -470,7 +472,7 @@ export function StormOptionsBar() {
             title={
               selectedQueryItem?.types.length
                 ? `Edit Query Item: ${selectedQueryItem.types.join(", ")}`
-                : "Edit Query Item"
+                : t("popovers.queryItem.title")
             }
             className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               hasQueryItemActive
@@ -547,7 +549,7 @@ export function StormOptionsBar() {
         {isStepKind && (
           <button
             onClick={handleAddRow}
-            title="Add Scenario Step"
+            title={t("popovers.optionsBar.addStep")}
             className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               showBddStepPopover && !bddStepPopup?.stepId
                 ? "border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300"
@@ -562,7 +564,7 @@ export function StormOptionsBar() {
         {stormHasResponseFields(kind) && (
           <button
             onClick={() => addStormField(selectedStorm.id, "response")}
-            title="Add Response Field"
+            title={t("popovers.optionsBar.addResponse")}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer"
           >
             <Plus size={16} />
@@ -573,7 +575,7 @@ export function StormOptionsBar() {
         {stormHasInputFields(kind) && (
           <button
             onClick={() => addStormField(selectedStorm.id, "response")}
-            title="Add Output Field"
+            title={t("popovers.optionsBar.addOutput")}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer"
           >
             <Plus size={16} />
@@ -584,7 +586,7 @@ export function StormOptionsBar() {
         {stormHasQueryItems(kind) && (
           <button
             onClick={handleOpenAddQueryItem}
-            title="Add DCB Query Item"
+            title={t("popovers.optionsBar.addQueryItem")}
             className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               showQueryItemPopover && queryItemPopoverMode === "create"
                 ? "border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300"
@@ -599,7 +601,7 @@ export function StormOptionsBar() {
         {kind === "constraint" && (
           <button
             onClick={() => addStormConstraint(selectedStorm.id)}
-            title="Add Constraint Rule"
+            title={t("popovers.optionsBar.addConstraint")}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 cursor-pointer"
           >
             <Ban size={16} />
@@ -609,7 +611,7 @@ export function StormOptionsBar() {
         {/* Create Reference Copy — linked duplicate, content stays in sync */}
         <button
           onClick={() => createReferenceCopy([selectedStorm.id])}
-          title="Create Reference Copy"
+          title={t("popovers.optionsBar.createRef")}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 cursor-pointer"
         >
           <Link2 size={16} />

@@ -10,7 +10,10 @@ interface TagPopoverProps {
   anchorPosition: { x: number; y: number };
 }
 
+import { useTranslation } from "react-i18next";
+
 export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
+  const { t } = useTranslation();
   const objects = useCanvasStore((s) => s.objects);
   const updateObject = useCanvasStore((s) => s.updateObject);
   const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
@@ -145,12 +148,13 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
         <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-100">
           <Tag size={15} className="shrink-0 text-orange-600 dark:text-orange-400" />
           <span className="truncate">
-            {currentField ? `Tag: ${currentField.name}` : "Set Tag"}
+            {currentField ? t("popovers.tag.titleNamed", { name: currentField.name }) : t("popovers.tag.title")}
           </span>
         </div>
         <button
           onClick={onClose}
           className="flex h-5 w-5 items-center justify-center rounded-md text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
+          title={t("common.close")}
         >
           <X size={13} />
         </button>
@@ -172,7 +176,7 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
                     handleApply(tagInput);
                   }
                 }}
-                placeholder="e.g. order, user, payment..."
+                placeholder={t("popovers.tag.placeholder")}
                 className="w-full rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 text-xs text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:outline-none"
               />
             </div>
@@ -181,13 +185,13 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
               onClick={() => handleApply(tagInput)}
               className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 transition-colors cursor-pointer"
             >
-              Apply
+              {t("common.apply")}
             </button>
             {currentField?.tag && (
               <button
                 type="button"
                 onClick={handleRemoveTag}
-                title="Delete tag"
+                title={t("popovers.tag.deleteTag")}
                 className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-400 dark:text-zinc-400 hover:border-red-200 dark:hover:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
               >
                 <Trash2 size={13} />
@@ -200,7 +204,7 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
         {existingTags.length > 0 && (
           <div className="border-t border-gray-100 dark:border-zinc-800 pt-2">
             <div className="mb-1 text-[11px] font-semibold text-gray-500 dark:text-zinc-400">
-              Existing Tags on Board:
+              {t("popovers.tag.existingTags")}
             </div>
             <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto">
               {existingTags.map((tag) => (

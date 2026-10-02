@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { LineStyle } from "@/types";
 import { Lock, Unlock, FolderMinus, Edit2, Check } from "lucide-react";
@@ -35,6 +36,7 @@ function LineStyleIcon({ style }: { style: LineStyle }) {
 }
 
 export function GroupOptionsBar() {
+  const { t } = useTranslation();
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const groups = useCanvasStore((s) => s.groups);
   const viewport = useCanvasStore((s) => s.viewport);
@@ -204,7 +206,7 @@ export function GroupOptionsBar() {
       {/* Ungroup Button */}
       <button
         onClick={handleUngroup}
-        title="Ungroup (Cmd+Shift+G)"
+        title={t("popovers.optionsBar.ungroup")}
         className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
       >
         <FolderMinus size={16} />

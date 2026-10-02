@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { X, FilePlus, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface NewBoardModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ export function NewBoardModal({
   onClose,
   onConfirm,
 }: NewBoardModalProps) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,10 +46,10 @@ export function NewBoardModal({
             </div>
             <div>
               <h2 className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
-                Start New Board
+                {t("modals.newBoard.title")}
               </h2>
               <p className="text-xs text-gray-500 dark:text-zinc-400">
-                Create a blank canvas
+                {t("modals.newBoard.subtitle")}
               </p>
             </div>
           </div>
@@ -62,12 +65,10 @@ export function NewBoardModal({
         <div className="p-5 space-y-3">
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-amber-800 text-xs leading-relaxed dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
             <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <span>
-              Your current board will be automatically backed up. You can restore it anytime from <strong>File → Restore</strong>.
-            </span>
+            <span>{t("modals.newBoard.backupNotice")}</span>
           </div>
           <p className="text-xs text-gray-600 dark:text-zinc-300 leading-relaxed">
-            Are you sure you want to clear the canvas and start a new board?
+            {t("modals.newBoard.confirmText")}
           </p>
         </div>
 
@@ -77,13 +78,13 @@ export function NewBoardModal({
             onClick={onClose}
             className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className="rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
           >
-            Create New Board
+            {t("modals.newBoard.confirmBtn")}
           </button>
         </div>
       </div>

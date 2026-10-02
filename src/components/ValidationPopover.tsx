@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type {
   CanvasObject,
@@ -53,6 +54,7 @@ export function ValidationPopover({
   onClose,
   anchorPosition,
 }: ValidationPopoverProps) {
+  const { t } = useTranslation();
   const updateObject = useCanvasStore((s) => s.updateObject);
   const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -201,11 +203,11 @@ export function ValidationPopover({
       <div className="flex items-center justify-between border-b border-gray-100 pb-2 dark:border-zinc-800">
         <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-100">
           <ListChecks size={15} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
-          <span className="truncate">Validate: {title}</span>
+          <span className="truncate">{t("popovers.validation.title")}: {title}</span>
         </div>
         <button
           onClick={onClose}
-          title="Close"
+          title={t("common.close")}
           className="flex h-5 w-5 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
         >
           <X size={13} />
@@ -315,7 +317,7 @@ export function ValidationPopover({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">Min length</span>
+                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{t("popovers.validation.minLength")}</span>
                   <input
                     type="number"
                     min={0}
@@ -326,7 +328,7 @@ export function ValidationPopover({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">Max length</span>
+                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{t("popovers.validation.maxLength")}</span>
                   <input
                     type="number"
                     min={0}
@@ -342,7 +344,7 @@ export function ValidationPopover({
             {/* Regex pattern */}
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-semibold text-gray-600 dark:text-zinc-300">
-                Pattern (regex)
+                {t("popovers.validation.pattern")}
               </span>
               <input
                 type="text"
@@ -360,7 +362,7 @@ export function ValidationPopover({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">Min</span>
+                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{t("popovers.validation.minVal")}</span>
                   <input
                     type="number"
                     value={draft.min}
@@ -370,7 +372,7 @@ export function ValidationPopover({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">Max</span>
+                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{t("popovers.validation.maxVal")}</span>
                   <input
                     type="number"
                     value={draft.max}
@@ -385,7 +387,7 @@ export function ValidationPopover({
             {/* Allowed values (enum) */}
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-semibold text-gray-600 dark:text-zinc-300">
-                Allowed values
+                {t("popovers.validation.enumVals")}
               </span>
               <input
                 type="text"
@@ -406,11 +408,11 @@ export function ValidationPopover({
             type="button"
             onClick={() => commit(EMPTY_VALIDATION_DRAFT)}
             disabled={!currentValidation}
-            title="Clear validation"
+            title={t("popovers.validation.clearValidation")}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-gray-500 transition-all hover:bg-gray-100 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-red-400"
           >
             <Trash2 size={13} />
-            Clear
+            {t("common.delete")}
           </button>
         </div>
       </div>
