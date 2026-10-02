@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background squircle shadow -->
+    <filter id="squircle-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#0f172a" flood-opacity="0.12" />
+    </filter>
+
+    <!-- Dark container shadow -->
+    <filter id="emblem-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" />
+      <feOffset dx="0" dy="8" />
+      <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Blue Loop Gradient -->
+    <linearGradient id="blue-grad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+
+    <!-- Orange Loop Gradient -->
+    <linearGradient id="orange-grad" x1="0%" y1="20%" x2="100%" y2="80%">
+      <stop offset="0%" stop-color="#fb923c" />
+      <stop offset="60%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#c2410c" />
+    </linearGradient>
+
+    <!-- Green Loop Gradient -->
+    <linearGradient id="green-grad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80" />
+      <stop offset="50%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <!-- Center Starburst Flare -->
+    <radialGradient id="center-flare" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+      <stop offset="25%" stop-color="#ffffff" stop-opacity="0.8" />
+      <stop offset="60%" stop-color="#60a5fa" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Squircle Gradient -->
+    <linearGradient id="squircle-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f3f4f6" />
+    </linearGradient>
+  </defs>
+
+  <!-- App Icon Squircle Base -->
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="url(#squircle-bg)" stroke="#e5e7eb" stroke-width="2" filter="url(#squircle-shadow)" />
+
+  <!-- Dark Rounded Triangle Housing -->
+  <path d="M 256 92
+           C 285 92, 395 285, 415 325
+           C 435 365, 405 404, 360 404
+           L 152 404
+           C 107 404, 77 365, 97 325
+           C 117 285, 227 92, 256 92 Z"
+        fill="#090d16"
+        stroke="#1e293b"
+        stroke-width="4"
+        filter="url(#emblem-glow)" />
+
+  <!-- Tri-color Flow Loops -->
+  <g stroke-linecap="round" fill="none">
+    <!-- Top Blue Flow (Command) -->
+    <path d="M 215 250
+             C 195 190, 230 145, 275 145
+             C 320 145, 345 180, 335 220
+             C 325 255, 290 268, 256 268"
+          stroke="url(#blue-grad)"
+          stroke-width="42" />
+    <!-- Arrow Head Blue -->
+    <polygon points="210,242 226,264 200,268" fill="#38bdf8" />
+
+    <!-- Bottom-Right Orange Flow (Event) -->
+    <path d="M 270 235
+             C 330 220, 380 250, 380 295
+             C 380 340, 340 365, 300 360
+             C 265 355, 245 325, 256 295"
+          stroke="url(#orange-grad)"
+          stroke-width="42" />
+    <!-- Arrow Head Orange -->
+    <polygon points="274,226 288,252 260,250" fill="#fb923c" />
+
+    <!-- Bottom-Left Green Flow (Read Model) -->
+    <path d="M 270 280
+             C 230 335, 175 330, 150 295
+             C 125 260, 140 215, 180 200
+             C 215 185, 250 215, 250 255"
+          stroke="url(#green-grad)"
+          stroke-width="42" />
+    <!-- Arrow Head Green -->
+    <polygon points="272,286 250,296 262,270" fill="#4ade80" />
+  </g>
+
+  <!-- Accent Satellite Dots & Mini Arrows -->
+  <circle cx="160" cy="190" r="9" fill="#34d399" opacity="0.8" />
+  <circle cx="145" cy="205" r="5" fill="#34d399" opacity="0.6" />
+  
+  <circle cx="360" cy="200" r="9" fill="#fb923c" opacity="0.8" />
+  <circle cx="372" cy="216" r="5" fill="#fb923c" opacity="0.6" />
+
+  <circle cx="265" cy="385" r="9" fill="#38bdf8" opacity="0.8" />
+  <circle cx="282" cy="385" r="5" fill="#38bdf8" opacity="0.6" />
+
+  <!-- Center Starburst Flare -->
+  <circle cx="256" cy="260" r="48" fill="url(#center-flare)" />
+  <polygon points="256,236 261,255 280,260 261,265 256,284 251,265 232,260 251,255" fill="#ffffff" />
+</svg>
