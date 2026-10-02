@@ -27,7 +27,7 @@ export function App() {
   return (
     <div className="flex h-screen w-screen flex-col bg-[#f9fafb] dark:bg-[#121214] text-gray-900 dark:text-zinc-100">
       <Header />
-      <main className="relative flex-1 overflow-hidden" id="canvas-container">
+      <main className="relative flex-1 overflow-hidden outline-none focus:outline-none" id="canvas-container">
         <PixiCanvas />
         <InlineTextEditor />
         <TypeSelectPopover />

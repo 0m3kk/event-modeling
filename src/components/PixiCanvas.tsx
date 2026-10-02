@@ -377,8 +377,7 @@ export function PixiCanvas() {
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full overflow-hidden select-none"
-      tabIndex={0}
+      className="relative h-full w-full overflow-hidden select-none outline-none focus:outline-none focus-visible:outline-none"
     />
   );
 }

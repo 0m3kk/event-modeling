@@ -24,6 +24,13 @@ body,
   font-family: "Geist Mono", monospace;
 }
 
+#canvas-container,
+#canvas-container > div,
+#canvas-container canvas {
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Success toast entrance: drops in from the top-right with a subtle scale. */
 @keyframes toast-enter {
   from {

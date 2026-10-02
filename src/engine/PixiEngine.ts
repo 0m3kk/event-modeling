@@ -260,6 +260,7 @@ export class PixiEngine {
       this.app.canvas.style.display = "block";
       this.app.canvas.style.width = "100%";
       this.app.canvas.style.height = "100%";
+      this.app.canvas.style.outline = "none";
       this.container.appendChild(this.app.canvas);
       setActivePixiEngine(this);
 
