@@ -221,24 +221,52 @@ export function StormOptionsBar() {
       : `Set Tag for "${selectedField.name}"`
     : "Set Field Tag";
 
-  const handleOpenEditQueryItem = () => {
-    setQueryItemPopoverMode("edit");
-    setShowQueryItemPopover(true);
-    setShowTagPopover(false);
+  const closeAllPopovers = () => {
     setShowActionPopover(false);
     setShowDescriptionPopover(false);
     setShowPermissionsPopover(false);
+    setShowTagPopover(false);
+    setShowQueryItemPopover(false);
     setValidationTarget(null);
+    setBddStepPopup(null);
+  };
+
+  const handleToggleActionPopover = () => {
+    const next = !showActionPopover;
+    closeAllPopovers();
+    if (next) setShowActionPopover(true);
+  };
+
+  const handleTogglePermissionsPopover = () => {
+    const next = !showPermissionsPopover;
+    closeAllPopovers();
+    if (next) setShowPermissionsPopover(true);
+  };
+
+  const handleToggleTagPopover = () => {
+    const next = !showTagPopover;
+    closeAllPopovers();
+    if (next) setShowTagPopover(true);
+  };
+
+  const handleOpenEditQueryItem = () => {
+    if (showQueryItemPopover && queryItemPopoverMode === "edit") {
+      setShowQueryItemPopover(false);
+      return;
+    }
+    closeAllPopovers();
+    setQueryItemPopoverMode("edit");
+    setShowQueryItemPopover(true);
   };
 
   const handleOpenAddQueryItem = () => {
+    if (showQueryItemPopover && queryItemPopoverMode === "create") {
+      setShowQueryItemPopover(false);
+      return;
+    }
+    closeAllPopovers();
     setQueryItemPopoverMode("create");
     setShowQueryItemPopover(true);
-    setShowTagPopover(false);
-    setShowActionPopover(false);
-    setShowDescriptionPopover(false);
-    setShowPermissionsPopover(false);
-    setValidationTarget(null);
   };
 
   const handleToggleValidationPopover = () => {
@@ -246,11 +274,7 @@ export function StormOptionsBar() {
       setValidationTarget(null);
       return;
     }
-    setShowTagPopover(false);
-    setShowActionPopover(false);
-    setShowDescriptionPopover(false);
-    setShowPermissionsPopover(false);
-    setShowQueryItemPopover(false);
+    closeAllPopovers();
     if (validationField) {
       setValidationTarget({
         objectId: selectedStorm.id,
@@ -261,8 +285,8 @@ export function StormOptionsBar() {
 
   const handleToggleDescriptionPopover = () => {
     const next = !showDescriptionPopover;
-    if (next) setValidationTarget(null);
-    setShowDescriptionPopover(next);
+    closeAllPopovers();
+    if (next) setShowDescriptionPopover(true);
   };
 
   // Calculate screen position & zoom scale
@@ -318,6 +342,15 @@ export function StormOptionsBar() {
 
   const handleAddRow = () => {
     if (isStepKind) {
+      if (
+        showBddStepPopover &&
+        bddStepPopup?.objectId === selectedStorm.id &&
+        !bddStepPopup?.stepId
+      ) {
+        setBddStepPopup(null);
+        return;
+      }
+      closeAllPopovers();
       setBddStepPopup({ objectId: selectedStorm.id });
       return;
     }
@@ -330,6 +363,15 @@ export function StormOptionsBar() {
 
   const handleEditStep = () => {
     if (!selectedStep) return;
+    if (
+      showBddStepPopover &&
+      bddStepPopup?.objectId === selectedStorm.id &&
+      bddStepPopup?.stepId === selectedStep.id
+    ) {
+      setBddStepPopup(null);
+      return;
+    }
+    closeAllPopovers();
     setBddStepPopup({ objectId: selectedStorm.id, stepId: selectedStep.id });
   };
 
@@ -396,7 +438,7 @@ export function StormOptionsBar() {
         {stormHasAction(kind) && (
           <button
             ref={actionButtonRef}
-            onClick={() => setShowActionPopover((v) => !v)}
+            onClick={handleToggleActionPopover}
             title={
               data.action
                 ? `Authorization Action: ${data.action}`
@@ -429,7 +471,7 @@ export function StormOptionsBar() {
         {/* Set Field Tag Button — only visible when a taggable row is selected */}
         {taggableField && (
           <button
-            onClick={() => setShowTagPopover((v) => !v)}
+            onClick={handleToggleTagPopover}
             title={tagButtonTitle}
             className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               hasTagActive
@@ -495,7 +537,7 @@ export function StormOptionsBar() {
         {kind === "actor" && (
           <button
             ref={permissionsButtonRef}
-            onClick={() => setShowPermissionsPopover((v) => !v)}
+            onClick={handleTogglePermissionsPopover}
             title={`Permissions (${getActorPermissions(data).length})`}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-pink-200 dark:border-pink-800 bg-pink-50 dark:bg-pink-950/40 text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-900/40 cursor-pointer"
           >
