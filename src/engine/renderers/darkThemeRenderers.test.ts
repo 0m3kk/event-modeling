@@ -28,11 +28,15 @@ describe("Dark mode rendering in StormCardRenderer and ModelNodeRenderer", () =>
     expect(res).toBeDefined();
     expect(res.hitZones.length).toBeGreaterThan(0);
 
-    // Verify text colors for dark mode: field names should be light (0xf4f4f5)
+    // Verify text colors for dark mode: field names should be subdued light (0xd4d4d8)
     const texts = container.children.filter((c) => c instanceof Text) as Text[];
     const fieldText = texts.find((t) => t.text.includes("orderId"));
     expect(fieldText).toBeDefined();
-    expect(fieldText!.style.fill).toBe(0xf4f4f5);
+    expect(fieldText!.style.fill).toBe(0xd4d4d8);
+
+    const titleText = texts.find((t) => t.text === "CreateOrder");
+    expect(titleText).toBeDefined();
+    expect(titleText!.style.fill).toBe(0xe4e4e7);
   });
 
   it("renders StormCard with light styling when isDark is false", () => {
@@ -86,7 +90,11 @@ describe("Dark mode rendering in StormCardRenderer and ModelNodeRenderer", () =>
     const texts = container.children.filter((c) => c instanceof Text) as Text[];
     const fieldText = texts.find((t) => t.text.includes("username"));
     expect(fieldText).toBeDefined();
-    expect(fieldText!.style.fill).toBe(0xf4f4f5);
+    expect(fieldText!.style.fill).toBe(0xd4d4d8);
+
+    const titleText = texts.find((t) => t.text === "User");
+    expect(titleText).toBeDefined();
+    expect(titleText!.style.fill).toBe(0xe4e4e7);
   });
 
   it("renders ModelNode with light styling when isDark is false", () => {

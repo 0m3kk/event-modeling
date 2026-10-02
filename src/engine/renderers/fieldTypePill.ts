@@ -1,7 +1,7 @@
 import type { Container, Graphics } from "pixi.js";
 import { Text } from "pixi.js";
 import { APP_FONT_FAMILY } from "@/constants/canvas";
-import { MODEL_KIND_COLORS } from "@/constants/model";
+import { modelKindColor } from "@/constants/model";
 import type { CanvasObject, ModelNodeKind } from "@/types";
 
 export function truncateText(str: string, maxLen: number): string {
@@ -13,9 +13,9 @@ export function truncateText(str: string, maxLen: number): string {
 /**
  * Returns numeric hex color for a given model kind.
  */
-export function getModelKindHex(kind?: string): number {
-  if (!kind || !(kind in MODEL_KIND_COLORS)) return 0x0891b2;
-  const hex = MODEL_KIND_COLORS[kind as ModelNodeKind];
+export function getModelKindHex(kind?: string, isDark: boolean = false): number {
+  if (!kind) return isDark ? 0x155e75 : 0x0891b2;
+  const hex = modelKindColor(kind as ModelNodeKind, isDark);
   return parseInt(hex.replace("#", ""), 16);
 }
 
@@ -164,7 +164,7 @@ export function drawFieldTypePill(options: DrawFieldTypePillOptions): void {
   const targetKind = targetModel?.modelData?.kind || "object";
 
   if (isModel) {
-    const kindHex = getModelKindHex(targetKind);
+    const kindHex = getModelKindHex(targetKind, isDark);
 
     // Pill background & border with model kind tint
     g.roundRect(x, y, w, h, 3)

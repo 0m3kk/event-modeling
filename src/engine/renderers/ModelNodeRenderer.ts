@@ -1,7 +1,10 @@
 import { Container, Graphics, Text } from "pixi.js";
 import type { CanvasObject, ModelData, ModelNodeKind } from "@/types";
 import { APP_FONT_FAMILY } from "@/constants/canvas";
-import { MODEL_KIND_COLORS, MODEL_KIND_LABELS } from "@/constants/model";
+import {
+  MODEL_KIND_LABELS,
+  modelKindColor,
+} from "@/constants/model";
 import { DEFAULT_ANY_TYPE, DEFAULT_FIELD_TYPE } from "@/constants/fieldType";
 import type { CardHitZone, RenderResult } from "./types";
 import { drawHeaderKindIcon } from "./headerIcons";
@@ -44,7 +47,7 @@ export class ModelNodeRenderer {
     };
 
     const kind: ModelNodeKind = data.kind;
-    const kindColorHex = MODEL_KIND_COLORS[kind] ?? "#0891b2";
+    const kindColorHex = modelKindColor(kind, isDark);
     const headerColor = parseInt(kindColorHex.replace("#", "0x"), 16);
     const kindLabel = MODEL_KIND_LABELS[kind] ?? kind;
     const rawTitle = data.name || obj.text || kindLabel;
@@ -79,7 +82,7 @@ export class ModelNodeRenderer {
     // Header Right-edge elements: Kind Icon, Description Icon
     const iconCX = w - 18;
     const iconCY = headerHeight / 2;
-    drawHeaderKindIcon(g, kind, iconCX, iconCY, 0xffffff);
+    drawHeaderKindIcon(g, kind, iconCX, iconCY, isDark ? 0xe4e4e7 : 0xffffff);
 
     let rightEdgeBoundary = iconCX - 12;
 
@@ -91,9 +94,9 @@ export class ModelNodeRenderer {
       const infoY = 9;
       drawInfoBadge(g, container, infoX + 7, infoY + 7, {
         radius: 7,
-        stroke: 0xffffff,
+        stroke: isDark ? 0xe4e4e7 : 0xffffff,
         strokeWidth: 1.2,
-        fill: 0xffffff,
+        fill: isDark ? 0xe4e4e7 : 0xffffff,
         fontSize: 9,
         bold: true,
         alpha: hasDesc ? 1 : 0.5,
@@ -122,7 +125,7 @@ export class ModelNodeRenderer {
         fontSize: 13,
         fontWeight: "bold",
         fontFamily: APP_FONT_FAMILY,
-        fill: 0xffffff,
+        fill: isDark ? 0xe4e4e7 : 0xffffff,
       },
       resolution: textResolution,
     });
@@ -163,7 +166,7 @@ export class ModelNodeRenderer {
             fontSize: 11,
             fontWeight: "500",
             fontFamily: APP_FONT_FAMILY,
-            fill: isDark ? 0xf4f4f5 : 0x1e293b,
+            fill: isDark ? 0xd4d4d8 : 0x1e293b,
           },
           resolution: textResolution,
         });
@@ -307,7 +310,7 @@ export class ModelNodeRenderer {
           style: {
             fontSize: 11,
             fontFamily: APP_FONT_FAMILY,
-            fill: isDark ? 0xf4f4f5 : 0x1e293b,
+            fill: isDark ? 0xd4d4d8 : 0x1e293b,
           },
           resolution: textResolution,
         });
@@ -350,7 +353,7 @@ export class ModelNodeRenderer {
       const targetModel = resolveTargetModel(allObjects, itemType);
       const isModel = Boolean(targetModel && targetModel.modelData);
       const targetKind = targetModel?.modelData?.kind || "object";
-      const kindHex = isModel ? getModelKindHex(targetKind) : (isDark ? 0xf87171 : 0xb91c1c);
+      const kindHex = isModel ? getModelKindHex(targetKind, isDark) : (isDark ? 0xef4444 : 0xb91c1c);
       const bgHex = isModel ? kindHex : (isDark ? 0x450a0a : 0xfef2f2);
       const strokeHex = isModel ? kindHex : (isDark ? 0x7f1d1d : 0xfecaca);
       const hasValidation = hasValidationRules(data.validation);
@@ -420,7 +423,7 @@ export class ModelNodeRenderer {
       const targetModel = resolveTargetModel(allObjects, innerType);
       const isModel = Boolean(targetModel && targetModel.modelData);
       const targetKind = targetModel?.modelData?.kind || "object";
-      const kindHex = isModel ? getModelKindHex(targetKind) : (isDark ? 0xfacc15 : 0xa16207);
+      const kindHex = isModel ? getModelKindHex(targetKind, isDark) : (isDark ? 0xeab308 : 0xa16207);
       const bgHex = isModel ? kindHex : (isDark ? 0x422006 : 0xfefce8);
       const strokeHex = isModel ? kindHex : (isDark ? 0x713f12 : 0xfef08a);
       const hasValidation = hasValidationRules(data.validation);

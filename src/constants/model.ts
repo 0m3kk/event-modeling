@@ -11,6 +11,24 @@ export const MODEL_KIND_COLORS: Record<ModelNodeKind, string> = {
   enum: "#65a30d", // lime
 };
 
+/** Subdued/deeper header colors for dark mode to prevent harsh glare */
+export const MODEL_KIND_DARK_COLORS: Record<ModelNodeKind, string> = {
+  object: "#155e75", // cyan 800
+  array: "#991b1b", // red 800
+  wrap: "#854d0e", // yellow 800
+  enum: "#3f6212", // lime 800
+};
+
+export function modelKindColor(
+  kind: ModelNodeKind,
+  isDark: boolean = false,
+): string {
+  if (isDark) {
+    return MODEL_KIND_DARK_COLORS[kind] ?? MODEL_KIND_COLORS[kind];
+  }
+  return MODEL_KIND_COLORS[kind] ?? "#0891b2";
+}
+
 export const MODEL_KIND_LABELS: Record<ModelNodeKind, string> = {
   object: "Object",
   array: "Array",

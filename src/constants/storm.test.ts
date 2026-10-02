@@ -37,6 +37,11 @@ describe("storm kind helpers", () => {
     // Falls back to the kind color when a BDD card somehow has no phase
     expect(stormAccentColor("bdd")).toBe(STORM_KIND_COLORS.bdd);
     expect(stormAccentColor("command")).toBe(STORM_KIND_COLORS.command);
+
+    // Dark mode colors are subdued
+    expect(stormAccentColor("command", undefined, true)).toBe("#1e40af");
+    expect(stormAccentColor("event", undefined, true)).toBe("#9a3412");
+    expect(stormAccentColor("bdd", "given", true)).toBe("#075985");
   });
 
   it("renders scenario steps instead of a field list on BDD cards", () => {

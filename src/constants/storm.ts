@@ -16,6 +16,18 @@ export const STORM_KIND_COLORS: Record<StormKind, string> = {
   bdd: "#0284c7", // sky (default Given) — replaced by the phase color
 };
 
+/** Subdued/deeper header colors for dark mode to prevent harsh glare */
+export const STORM_KIND_DARK_COLORS: Record<StormKind, string> = {
+  command: "#1e40af", // blue 800
+  event: "#9a3412", // orange 800
+  actor: "#9d174d", // pink 800
+  state: "#5b21b6", // violet 800
+  constraint: "#115e59", // teal 800
+  external: "#075985", // sky 800
+  query: "#3730a3", // indigo 800
+  bdd: "#075985", // sky 800
+};
+
 /** Display label per kind */
 export const STORM_KIND_LABELS: Record<StormKind, string> = {
   command: "Command",
@@ -33,6 +45,13 @@ export const STORM_PHASE_COLORS: Record<BddPhase, string> = {
   given: "#0284c7", // Sky 600
   when: "#d97706", // Amber 600
   then: "#059669", // Emerald 600
+};
+
+/** BDD Phase badge colors in dark mode */
+export const STORM_PHASE_DARK_COLORS: Record<BddPhase, string> = {
+  given: "#075985", // Sky 800
+  when: "#92400e", // Amber 800
+  then: "#065f46", // Emerald 800
 };
 
 export const STORM_PHASE_BG_COLORS: Record<BddPhase, string> = {
@@ -76,7 +95,17 @@ export function stormHasPhase(kind: StormKind): boolean {
  * emerald) so the step is readable at a glance; every other kind uses its
  * fixed kind color. Falls back to the kind color when a BDD card has no phase.
  */
-export function stormAccentColor(kind: StormKind, phase?: BddPhase): string {
+export function stormAccentColor(
+  kind: StormKind,
+  phase?: BddPhase,
+  isDark: boolean = false,
+): string {
+  if (isDark) {
+    if (stormHasPhase(kind) && phase) {
+      return STORM_PHASE_DARK_COLORS[phase] ?? STORM_KIND_DARK_COLORS[kind];
+    }
+    return STORM_KIND_DARK_COLORS[kind];
+  }
   if (stormHasPhase(kind) && phase) {
     return STORM_PHASE_COLORS[phase] ?? STORM_KIND_COLORS[kind];
   }

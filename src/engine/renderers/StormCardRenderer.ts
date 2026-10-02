@@ -5,6 +5,7 @@ import { DEFAULT_FIELD_TYPE } from "@/constants/fieldType";
 import {
   STORM_KIND_LABELS,
   STORM_PHASE_COLORS,
+  STORM_PHASE_DARK_COLORS,
   STORM_PHASE_LABELS,
   BDD_STEP_REF_COLORS,
   BDD_STEP_REF_LABELS,
@@ -67,7 +68,7 @@ export class StormCardRenderer {
     const kind: StormKind = data.kind;
     // BDD cards take the color of their phase so Given/When/Then reads at a glance
     const headerColor = parseInt(
-      stormAccentColor(kind, data.phase).replace("#", "0x"),
+      stormAccentColor(kind, data.phase, isDark).replace("#", "0x"),
       16,
     );
     const kindLabel = STORM_KIND_LABELS[kind] ?? kind;
@@ -131,7 +132,7 @@ export class StormCardRenderer {
     // Header Right-edge elements: Kind Icon, BDD Badge, Description Icon
     const iconCX = w - 18;
     const iconCY = headerHeight / 2;
-    drawHeaderKindIcon(g, kind, iconCX, iconCY, 0xffffff);
+    drawHeaderKindIcon(g, kind, iconCX, iconCY, isDark ? 0xe4e4e7 : 0xffffff);
 
     let rightEdgeBoundary = iconCX - 12;
 
@@ -139,7 +140,9 @@ export class StormCardRenderer {
     if (data.phase) {
       const phase = data.phase;
       const phaseLabel = STORM_PHASE_LABELS[phase] ?? phase.toUpperCase();
-      const phaseColorHex = STORM_PHASE_COLORS[phase] ?? "#000000";
+      const phaseColorHex = isDark
+        ? (STORM_PHASE_DARK_COLORS[phase] ?? "#000000")
+        : (STORM_PHASE_COLORS[phase] ?? "#000000");
 
       const badgeWidth = phaseLabel.length * 6 + 12;
       const badgeX = rightEdgeBoundary - badgeWidth;
@@ -177,9 +180,9 @@ export class StormCardRenderer {
       const infoY = 11;
       drawInfoBadge(g, container, infoX + 7, infoY + 7, {
         radius: 7,
-        stroke: 0xffffff,
+        stroke: isDark ? 0xe4e4e7 : 0xffffff,
         strokeWidth: 1.2,
-        fill: 0xffffff,
+        fill: isDark ? 0xe4e4e7 : 0xffffff,
         fontSize: 9,
         bold: true,
         alpha: hasDesc ? 1 : 0.5,
@@ -201,7 +204,7 @@ export class StormCardRenderer {
     if (hasAction && data.action) {
       const actionX = rightEdgeBoundary - 18;
       const actionY = 11;
-      drawActionIcon(g, actionX + 7, actionY + 7, 0xffffff, 1);
+      drawActionIcon(g, actionX + 7, actionY + 7, isDark ? 0xe4e4e7 : 0xffffff, 1);
 
       hitZones.push({
         type: "action",
@@ -225,7 +228,7 @@ export class StormCardRenderer {
         fontSize: 13,
         fontWeight: "bold",
         fontFamily: APP_FONT_FAMILY,
-        fill: 0xffffff,
+        fill: isDark ? 0xe4e4e7 : 0xffffff,
       },
       resolution: textResolution,
     });
@@ -300,7 +303,7 @@ export class StormCardRenderer {
             fontSize: 11,
             fontWeight: "500",
             fontFamily: APP_FONT_FAMILY,
-            fill: isDark ? 0xf4f4f5 : 0x1e293b,
+            fill: isDark ? 0xd4d4d8 : 0x1e293b,
           },
           resolution: textResolution,
         });
@@ -569,7 +572,7 @@ export class StormCardRenderer {
             fontSize: 12,
             fontWeight: "bold",
             fontFamily: APP_FONT_FAMILY,
-            fill: step.name?.trim() ? (isDark ? 0xf4f4f5 : 0x1e293b) : (isDark ? 0x71717a : 0x94a3b8),
+            fill: step.name?.trim() ? (isDark ? 0xd4d4d8 : 0x1e293b) : (isDark ? 0x71717a : 0x94a3b8),
           },
           resolution: textResolution,
         });
@@ -628,7 +631,7 @@ export class StormCardRenderer {
               fontSize: 10,
               fontWeight: "500",
               fontFamily: APP_FONT_FAMILY,
-              fill: entry.value ? (isDark ? 0xf4f4f5 : 0x0f172a) : (isDark ? 0x52525b : 0xcbd5e1),
+              fill: entry.value ? (isDark ? 0xd4d4d8 : 0x0f172a) : (isDark ? 0x52525b : 0xcbd5e1),
             },
             resolution: textResolution,
           });
@@ -677,7 +680,7 @@ export class StormCardRenderer {
           style: {
             fontSize: 11,
             fontFamily: APP_FONT_FAMILY,
-            fill: isDark ? 0xf4f4f5 : 0x334155,
+            fill: isDark ? 0xd4d4d8 : 0x334155,
           },
           resolution: textResolution,
         });
@@ -770,7 +773,7 @@ export class StormCardRenderer {
           fontSize: 9,
           fontWeight: "bold",
           fontFamily: APP_FONT_FAMILY,
-          fill: isDark ? 0xa78bfa : 0x7c3aed,
+          fill: isDark ? 0x8b5cf6 : 0x7c3aed,
           letterSpacing: 0.5,
         },
         resolution: textResolution,
@@ -818,7 +821,7 @@ export class StormCardRenderer {
               fontSize: 9.5,
               fontWeight: "600",
               fontFamily: APP_FONT_FAMILY,
-              fill: isDark ? 0xfdba74 : 0x9a3412,
+              fill: isDark ? 0xfb923c : 0x9a3412,
             },
             resolution: textResolution,
           });
@@ -846,7 +849,7 @@ export class StormCardRenderer {
               fontSize: 10,
               fontWeight: "bold",
               fontFamily: APP_FONT_FAMILY,
-              fill: isDark ? 0xc4b5fd : 0x6d28d9,
+              fill: isDark ? 0xa78bfa : 0x6d28d9,
             },
             resolution: textResolution,
           });
@@ -898,7 +901,7 @@ export class StormCardRenderer {
           fontSize: 9,
           fontWeight: "bold",
           fontFamily: APP_FONT_FAMILY,
-          fill: isDark ? 0x2dd4bf : 0x0f766e,
+          fill: isDark ? 0x14b8a6 : 0x0f766e,
           letterSpacing: 0.5,
         },
         resolution: textResolution,
@@ -922,7 +925,7 @@ export class StormCardRenderer {
           style: {
             fontSize: 10,
             fontFamily: APP_FONT_FAMILY,
-            fill: isDark ? 0x2dd4bf : 0x134e4a,
+            fill: isDark ? 0x14b8a6 : 0x134e4a,
           },
           resolution: textResolution,
         });
@@ -934,7 +937,7 @@ export class StormCardRenderer {
           style: {
             fontSize: 10,
             fontFamily: APP_FONT_FAMILY,
-            fill: isDark ? 0x2dd4bf : 0x134e4a,
+            fill: isDark ? 0xd4d4d8 : 0x134e4a,
             wordWrap: true,
             wordWrapWidth: wrapWidth,
             lineHeight: 14,

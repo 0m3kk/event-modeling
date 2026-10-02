@@ -27,7 +27,7 @@ export class TextBoxRenderer {
     const isDark =
       typeof document !== "undefined" &&
       document.documentElement.classList.contains("dark");
-    const defaultColor = isDark ? 0xf4f4f5 : 0x1e293b;
+    const defaultColor = isDark ? 0xd4d4d8 : 0x1e293b;
     const textColor = obj.stroke
       ? parseInt(obj.stroke.replace("#", "0x"), 16)
       : defaultColor;
