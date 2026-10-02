@@ -142,4 +142,18 @@ describe("CardLayer incremental drawing", () => {
 
     layer.destroy();
   });
+
+  it("invalidates and redraws cards when setDark changes theme", () => {
+    const layer = new CardLayer();
+    const card = stormCard();
+    layer.renderCards([card], 1, []);
+    const firstChild = containerOf(layer, "c1").children[0];
+
+    layer.setDark(true);
+    layer.renderCards([card], 1, []);
+
+    expect(containerOf(layer, "c1").children[0]).not.toBe(firstChild);
+
+    layer.destroy();
+  });
 });

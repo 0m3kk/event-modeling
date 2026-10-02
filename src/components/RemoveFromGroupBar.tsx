@@ -50,7 +50,7 @@ export function RemoveFromGroupBar() {
       style={{ left: barX, top: barY }}
     >
       <div
-        className="pointer-events-auto flex items-center rounded-2xl border border-gray-200/90 bg-white/95 px-2 py-1.5 shadow-2xl backdrop-blur-md select-none"
+        className="pointer-events-auto flex items-center rounded-2xl border border-gray-200/90 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 px-2 py-1.5 shadow-2xl backdrop-blur-md select-none"
         style={{ zoom: barScale }}
         onPointerDown={(e) => e.stopPropagation()}
       >

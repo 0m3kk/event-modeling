@@ -64,12 +64,12 @@ function ToolButton({
           e.preventDefault();
         }}
         title={tooltip}
-        className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all active:scale-90 ${
+        className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all active:scale-90 cursor-pointer ${
           isActive
             ? "bg-blue-600 text-white shadow-sm"
             : danger
-              ? "text-red-500 hover:bg-red-50 hover:text-red-600"
-              : "border border-transparent hover:border-gray-200/80 hover:bg-gray-100/90 hover:shadow-xs"
+              ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400"
+              : "border border-transparent text-gray-700 dark:text-zinc-300 hover:border-gray-200/80 dark:hover:border-zinc-700/80 hover:bg-gray-100/90 dark:hover:bg-zinc-800/90 hover:shadow-xs hover:text-gray-900 dark:hover:text-zinc-100"
         }`}
         style={!isActive && color ? { color } : undefined}
       >
@@ -77,9 +77,9 @@ function ToolButton({
       </button>
 
       {/* Floating Hover Tooltip */}
-      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 -translate-x-1/2 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 -translate-x-1/2 rounded-lg bg-gray-900 dark:bg-zinc-800 border border-transparent dark:border-zinc-700 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-white dark:text-zinc-100 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
         {tooltip}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-zinc-800" />
       </div>
     </div>
   );
@@ -285,7 +285,7 @@ export function Toolbar() {
   const modelKinds: ModelNodeKind[] = ["object", "enum", "array", "wrap"];
 
   return (
-    <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md">
+    <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-2xl border border-gray-200/90 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 px-3.5 py-2 shadow-2xl backdrop-blur-md">
       {/* Navigation & Connector Tools */}
       <div className="flex items-center gap-1">
         <ToolButton
@@ -308,7 +308,7 @@ export function Toolbar() {
         />
       </div>
 
-      <div className="mx-1 h-6 w-px bg-gray-200" />
+      <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />
 
       {/* Storm Cards (Icons with Tooltips) */}
       <div className="flex items-center gap-1">
@@ -323,7 +323,7 @@ export function Toolbar() {
         ))}
       </div>
 
-      <div className="mx-1 h-6 w-px bg-gray-200" />
+      <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />
 
       {/* BDD Scenario Card (Given/When/Then) — a card of its own */}
       <div className="flex items-center gap-1">
@@ -335,7 +335,7 @@ export function Toolbar() {
         />
       </div>
 
-      <div className="mx-1 h-6 w-px bg-gray-200" />
+      <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />
 
       {/* Model Nodes (Icons with Tooltips) */}
       <div className="flex items-center gap-1">
@@ -350,7 +350,7 @@ export function Toolbar() {
         ))}
       </div>
 
-      <div className="mx-1 h-6 w-px bg-gray-200" />
+      <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />
 
       {/* Supporting Shapes & Grouping */}
       <div className="flex items-center gap-1">
@@ -364,7 +364,6 @@ export function Toolbar() {
           onClick={handleAddText}
           icon={<Type size={20} />}
           tooltip="Text (T)"
-          color="#334155"
         />
         <ToolButton
           onClick={() => useCanvasStore.getState().groupObjects()}
@@ -374,7 +373,7 @@ export function Toolbar() {
         />
       </div>
 
-      <div className="mx-1 h-6 w-px bg-gray-200" />
+      <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />
 
       {/* Clear Canvas */}
       <ToolButton

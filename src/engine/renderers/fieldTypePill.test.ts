@@ -158,4 +158,27 @@ describe("fieldTypePill renderer", () => {
     expect(textChild.text).toBe(longType);
     expect(textChild.text).not.toContain("…");
   });
+
+  it("renders dark-styled pill for primitive types when isDark=true", () => {
+    const g = new Graphics();
+    const container = new Container();
+
+    drawFieldTypePill({
+      g,
+      container,
+      rawType: "string",
+      x: 100,
+      y: 20,
+      w: 60,
+      h: 20,
+      targetModel: null,
+      textResolution: 1,
+      isDark: true,
+    });
+
+    const textChild = container.children.find((c) => c instanceof Text) as Text;
+    expect(textChild).toBeDefined();
+    expect(textChild.text).toBe("string");
+    expect(textChild.style.fill).toBe(0xa1a1aa);
+  });
 });

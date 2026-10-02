@@ -104,7 +104,7 @@ export function AlignOptionsBar() {
       }}
     >
       <div
-        className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
+        className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
         style={{
           zoom: barScale,
         }}
@@ -117,14 +117,14 @@ export function AlignOptionsBar() {
             key={direction}
             onClick={() => alignObjects(direction)}
             title={title}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 active:scale-95"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 active:scale-95 cursor-pointer"
           >
             {icon}
           </button>
         ))}
       </div>
 
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
       {/* Vertical Alignment */}
       <div className="flex items-center gap-0.5">
@@ -133,14 +133,14 @@ export function AlignOptionsBar() {
             key={direction}
             onClick={() => alignObjects(direction)}
             title={title}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 active:scale-95"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 active:scale-95 cursor-pointer"
           >
             {icon}
           </button>
         ))}
       </div>
 
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
       {/* Distribution (Horizontal / Vertical) */}
       <div className="flex items-center gap-0.5">
@@ -152,7 +152,7 @@ export function AlignOptionsBar() {
               ? "Distribute horizontally"
               : "Select 3+ objects to distribute"
           }
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-30 disabled:hover:bg-transparent"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
         >
           <AlignHorizontalDistributeCenter size={16} />
         </button>
@@ -164,21 +164,21 @@ export function AlignOptionsBar() {
               ? "Distribute vertically"
               : "Select 3+ objects to distribute"
           }
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-30 disabled:hover:bg-transparent"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
         >
           <AlignVerticalDistributeCenter size={16} />
         </button>
       </div>
 
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
       {/* Arrange Storm Lanes Button */}
       <button
         onClick={() => arrangeLanes()}
         title="Arrange Storm Lanes (Actor → Command → Event → External → Query → State → Constraint)"
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200/80 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 active:scale-95 cursor-pointer"
       >
-        <Columns3 size={16} className="text-indigo-600" />
+        <Columns3 size={16} className="text-indigo-600 dark:text-indigo-400" />
       </button>
     </div>
     </div>

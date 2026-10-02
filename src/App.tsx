@@ -17,13 +17,15 @@ import { ModelCardPopup } from "@/components/ModelCardPopup";
 import { SearchModal } from "@/components/SearchModal";
 import { AIPanel } from "@/components/AIPanel";
 import { useCanvasStore } from "@/store";
+import { useTheme } from "@/hooks/useTheme";
 
 export function App() {
+  useTheme();
   const isSearchOpen = useCanvasStore((s) => s.isSearchOpen);
   const setSearchOpen = useCanvasStore((s) => s.setSearchOpen);
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-[#f9fafb]">
+    <div className="flex h-screen w-screen flex-col bg-[#f9fafb] dark:bg-[#121214] text-gray-900 dark:text-zinc-100">
       <Header />
       <main className="relative flex-1 overflow-hidden" id="canvas-container">
         <PixiCanvas />

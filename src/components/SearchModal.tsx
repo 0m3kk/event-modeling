@@ -205,9 +205,9 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed top-14 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md">
+    <div className="fixed top-14 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-gray-200/90 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 px-3.5 py-2 shadow-2xl backdrop-blur-md">
       <div className="flex items-center gap-2">
-        <Search size={16} className="text-gray-400" />
+        <Search size={16} className="text-gray-400 dark:text-zinc-500" />
         <input
           ref={inputRef}
           type="text"
@@ -218,12 +218,12 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
           }}
           onKeyDown={handleKeyDown}
           placeholder="Search cards, fields, tags, rules..."
-          className="w-64 text-xs text-gray-800 placeholder-gray-400 focus:outline-none"
+          className="w-64 text-xs text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 bg-transparent focus:outline-none"
         />
       </div>
 
       {query && (
-        <span className="font-mono text-xs text-gray-400">
+        <span className="font-mono text-xs text-gray-400 dark:text-zinc-500">
           {matches.length === 0
             ? "0 of 0"
             : `${currentIndex + 1} of ${matches.length}`}
@@ -235,7 +235,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
           onClick={handlePrev}
           disabled={matches.length === 0}
           title="Previous (Shift+Enter)"
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent"
+          className="rounded p-1 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-700 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
         >
           <ChevronUp size={15} />
         </button>
@@ -243,17 +243,17 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
           onClick={handleNext}
           disabled={matches.length === 0}
           title="Next (Enter)"
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent"
+          className="rounded p-1 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-700 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
         >
           <ChevronDown size={15} />
         </button>
       </div>
 
-      <div className="h-4 w-px bg-gray-200" />
+      <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
 
       <button
         onClick={onClose}
-        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+        className="rounded p-1 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-700 dark:hover:text-zinc-200 cursor-pointer"
       >
         <X size={15} />
       </button>

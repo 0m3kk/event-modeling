@@ -34,25 +34,25 @@ export function NewBoardModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex w-full max-w-md flex-col rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+      <div className="flex w-full max-w-md flex-col rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 dark:border-zinc-800 dark:bg-zinc-900">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50/70">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50/70 dark:border-zinc-800 dark:bg-zinc-800/50">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
               <FilePlus size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-900">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
                 Start New Board
               </h2>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-zinc-400">
                 Create a blank canvas
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 transition-colors"
           >
             <X size={16} />
           </button>
@@ -60,22 +60,22 @@ export function NewBoardModal({
 
         {/* Content */}
         <div className="p-5 space-y-3">
-          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-amber-800 text-xs leading-relaxed">
-            <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-amber-800 text-xs leading-relaxed dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+            <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <span>
               Your current board will be automatically backed up. You can restore it anytime from <strong>File → Restore</strong>.
             </span>
           </div>
-          <p className="text-xs text-gray-600 leading-relaxed">
+          <p className="text-xs text-gray-600 dark:text-zinc-300 leading-relaxed">
             Are you sure you want to clear the canvas and start a new board?
           </p>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-3 bg-gray-50/50">
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-3 bg-gray-50/50 dark:border-zinc-800 dark:bg-zinc-800/50">
           <button
             onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+            className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
           >
             Cancel
           </button>

@@ -71,7 +71,7 @@ export function ValidationTooltip() {
 
   return (
     <div
-      className="pointer-events-none absolute z-50 max-w-75 rounded-md bg-gray-900 px-3 py-2 text-sm leading-relaxed wrap-break-words whitespace-pre-wrap text-white shadow-lg"
+      className="pointer-events-none absolute z-50 max-w-75 rounded-md bg-gray-900 px-3 py-2 text-sm leading-relaxed wrap-break-words whitespace-pre-wrap text-white shadow-lg dark:bg-zinc-800 dark:border dark:border-zinc-700"
       style={{
         left: centerX,
         top: flip ? iconScreenY - 12 : iconScreenY + 16,

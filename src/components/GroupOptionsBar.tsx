@@ -110,7 +110,7 @@ export function GroupOptionsBar() {
       }}
     >
       <div
-        className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
+        className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
         style={{
           zoom: barScale,
         }}
@@ -128,11 +128,11 @@ export function GroupOptionsBar() {
               if (e.key === "Escape") setIsEditingName(false);
             }}
             autoFocus
-            className="w-32 rounded border border-blue-500 px-2 py-0.5 text-xs text-gray-800 focus:outline-none"
+            className="w-32 rounded border border-blue-500 bg-white dark:bg-zinc-800 px-2 py-0.5 text-xs text-gray-800 dark:text-zinc-100 focus:outline-none"
           />
           <button
             onClick={handleCommitRename}
-            className="rounded p-1 text-blue-600 hover:bg-blue-50"
+            className="rounded p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
           >
             <Check size={14} />
           </button>
@@ -140,14 +140,14 @@ export function GroupOptionsBar() {
       ) : (
         <button
           onClick={handleStartRename}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 cursor-pointer"
           title={`Rename Group: ${selectedGroup.name}`}
         >
           <Edit2 size={16} />
         </button>
       )}
 
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
       {/* Border Color Swatches */}
       <div className="flex items-center gap-1">
@@ -155,9 +155,9 @@ export function GroupOptionsBar() {
           <button
             key={color}
             onClick={() => handleColorChange(color)}
-            className={`h-5 w-5 rounded-full border border-black/10 transition-transform ${
+            className={`h-5 w-5 rounded-full border border-black/10 transition-transform cursor-pointer ${
               selectedGroup.stroke === color
-                ? "scale-125 ring-2 ring-blue-500 ring-offset-1"
+                ? "scale-125 ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-zinc-900"
                 : "hover:scale-110"
             }`}
             style={{ backgroundColor: color }}
@@ -166,19 +166,19 @@ export function GroupOptionsBar() {
         ))}
       </div>
 
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
       {/* Border Style (Solid / Dashed / Dotted) */}
-      <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5">
+      <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-zinc-800 p-0.5">
         {(["solid", "dashed", "dotted"] as LineStyle[]).map((style) => (
           <button
             key={style}
             onClick={() => handleLineStyleChange(style)}
             title={`${style[0].toUpperCase()}${style.slice(1)} border`}
-            className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${
+            className={`flex h-7 w-7 items-center justify-center rounded-md transition-all cursor-pointer ${
               selectedGroup.lineStyle === style
-                ? "bg-white text-gray-900 shadow-xs"
-                : "text-gray-500 hover:text-gray-800"
+                ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 shadow-xs"
+                : "text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200"
             }`}
           >
             <LineStyleIcon style={style} />
@@ -186,16 +186,16 @@ export function GroupOptionsBar() {
         ))}
       </div>
 
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
       {/* Toggle Lock */}
       <button
         onClick={handleToggleLock}
         title={selectedGroup.locked ? "Unlock Group" : "Lock Group"}
-        className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+        className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
           selectedGroup.locked
-            ? "bg-amber-100 text-amber-700"
-            : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            ? "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300"
+            : "text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-800 dark:hover:text-zinc-200"
         }`}
       >
         {selectedGroup.locked ? <Lock size={15} /> : <Unlock size={15} />}
@@ -205,7 +205,7 @@ export function GroupOptionsBar() {
       <button
         onClick={handleUngroup}
         title="Ungroup (Cmd+Shift+G)"
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
       >
         <FolderMinus size={16} />
       </button>

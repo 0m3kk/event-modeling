@@ -205,23 +205,23 @@ export function QueryItemPopover({
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 flex w-84 flex-col rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xl"
+      className="absolute z-50 flex w-84 flex-col rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
       style={{
         left: Math.max(12, anchorPosition.x - 165),
         top: Math.max(12, anchorPosition.y + 8),
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-        <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-gray-800">
-          <Filter size={15} className="shrink-0 text-violet-600" />
+      <div className="flex items-center justify-between border-b border-gray-100 pb-2 dark:border-zinc-800">
+        <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-100">
+          <Filter size={15} className="shrink-0 text-violet-600 dark:text-violet-400" />
           <span className="truncate">
             {isEditMode ? "Edit Query Item" : "Add Query Item"}
           </span>
         </div>
         <button
           onClick={onClose}
-          className="flex h-5 w-5 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="flex h-5 w-5 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
         >
           <X size={13} />
         </button>
@@ -231,14 +231,14 @@ export function QueryItemPopover({
         {/* Section 1: Event Types */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-600">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
               Event Types ({selectedTypes.length === 0 ? "Any *" : selectedTypes.length})
             </span>
             {selectedTypes.length > 0 && (
               <button
                 type="button"
                 onClick={handleClearAllTypes}
-                className="text-[10px] text-gray-400 hover:text-red-500"
+                className="text-[10px] text-gray-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"
               >
                 Clear (Match Any)
               </button>
@@ -246,22 +246,22 @@ export function QueryItemPopover({
           </div>
 
           {/* Selected Event Types Badges */}
-          <div className="mb-1.5 flex min-h-7 flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1.5">
+          <div className="mb-1.5 flex min-h-7 flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1.5 dark:border-zinc-800 dark:bg-zinc-800/50">
             {selectedTypes.length === 0 ? (
-              <span className="text-[11px] italic text-gray-400 px-1">
+              <span className="text-[11px] italic text-gray-400 px-1 dark:text-zinc-500">
                 * (Matches all event types)
               </span>
             ) : (
               selectedTypes.map((t) => (
                 <span
                   key={t}
-                  className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-800"
+                  className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-800 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300"
                 >
                   <span>{t}</span>
                   <button
                     type="button"
                     onClick={() => handleToggleEvent(t)}
-                    className="hover:text-red-600"
+                    className="hover:text-red-600 dark:hover:text-red-400"
                   >
                     <X size={10} />
                   </button>
@@ -273,7 +273,7 @@ export function QueryItemPopover({
           {/* Available Events on Board (toggle chips) */}
           {existingEvents.length > 0 && (
             <div className="mb-1.5">
-              <div className="mb-1 text-[10px] text-gray-400">
+              <div className="mb-1 text-[10px] text-gray-400 dark:text-zinc-500">
                 Click event to toggle:
               </div>
               <div className="flex max-h-20 flex-wrap gap-1 overflow-y-auto">
@@ -286,8 +286,8 @@ export function QueryItemPopover({
                       onClick={() => handleToggleEvent(eventName)}
                       className={`rounded-md px-2 py-0.5 text-[11px] transition-colors ${
                         isSelected
-                          ? "border border-violet-300 bg-violet-100 font-bold text-violet-800"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          ? "border border-violet-300 bg-violet-100 font-bold text-violet-800 dark:border-violet-700 dark:bg-violet-950/70 dark:text-violet-200"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                       }`}
                     >
                       {eventName}
@@ -316,13 +316,13 @@ export function QueryItemPopover({
                 }
               }}
               placeholder="Or type event name..."
-              className="flex-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 placeholder-gray-400 focus:border-violet-500 focus:outline-none"
+              className="flex-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-800 placeholder-gray-400 focus:border-violet-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
             />
             {customTypeInput.trim() && (
               <button
                 type="button"
                 onClick={handleAddCustomType}
-                className="flex items-center gap-0.5 rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-200"
+                className="flex items-center gap-0.5 rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
                 <Plus size={12} />
                 <span>Add</span>
@@ -332,16 +332,16 @@ export function QueryItemPopover({
         </div>
 
         {/* Section 2: Tag Filter */}
-        <div className="border-t border-gray-100 pt-2">
+        <div className="border-t border-gray-100 pt-2 dark:border-zinc-800">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-600">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
               Tag Filter ({selectedTagFieldIds.length === 0 ? "Any" : "1 Selected"})
             </span>
             {selectedTagFieldIds.length > 0 && (
               <button
                 type="button"
                 onClick={handleClearAllTags}
-                className="text-[10px] text-gray-400 hover:text-red-500"
+                className="text-[10px] text-gray-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"
               >
                 Clear (Match Any)
               </button>
@@ -349,7 +349,7 @@ export function QueryItemPopover({
           </div>
 
           {taggedFields.length === 0 ? (
-            <div className="text-[11px] italic text-gray-400">
+            <div className="text-[11px] italic text-gray-400 dark:text-zinc-500">
               No tagged input params on this card (matches any tag).
             </div>
           ) : (
@@ -363,8 +363,8 @@ export function QueryItemPopover({
                     onClick={() => handleToggleTagField(f.id)}
                     className={`rounded-md px-2 py-0.5 text-[11px] transition-colors ${
                       isSelected
-                        ? "border border-orange-300 bg-orange-100 font-bold text-orange-800"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        ? "border border-orange-300 bg-orange-100 font-bold text-orange-800 dark:border-orange-700 dark:bg-orange-950/70 dark:text-orange-300"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                     }`}
                   >
                     {f.tag}:{f.name}
@@ -376,8 +376,8 @@ export function QueryItemPopover({
         </div>
 
         {/* Bottom Actions */}
-        <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
-          <div className="text-[10px] text-gray-400">
+        <div className="flex items-center justify-between border-t border-gray-100 pt-2.5 dark:border-zinc-800">
+          <div className="text-[10px] text-gray-400 dark:text-zinc-500">
             {selectedTypes.length === 0 && selectedTagFieldIds.length === 0
               ? "Matches all events"
               : `Matches: ${selectedTypes.length || "all"} types${selectedTagFieldIds.length > 0 ? ", 1 tag" : ", any tag"}`}
@@ -388,7 +388,7 @@ export function QueryItemPopover({
                 type="button"
                 onClick={handleDelete}
                 title="Delete query item"
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
               >
                 <Trash2 size={13} />
               </button>

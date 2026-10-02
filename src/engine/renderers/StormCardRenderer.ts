@@ -54,6 +54,7 @@ export class StormCardRenderer {
     isSelected: boolean = false,
     selectedFieldId?: string,
     allObjects?: CanvasObject[] | Map<string, CanvasObject>,
+    isDark: boolean = false,
   ): RenderResult {
     container.removeChildren();
 
@@ -145,7 +146,7 @@ export class StormCardRenderer {
       const badgeY = 9;
 
       g.roundRect(badgeX, badgeY, badgeWidth, 18, 9)
-        .fill({ color: 0xffffff })
+        .fill({ color: isDark ? 0x27272a : 0xffffff })
         .stroke({
           color: parseInt(phaseColorHex.replace("#", "0x"), 16),
           width: 1.5,
@@ -254,7 +255,7 @@ export class StormCardRenderer {
         // Draw selection highlight for this row
         if (selectedFieldId && field.id === selectedFieldId) {
           g.roundRect(4, rowY + 1, w - 8, rowHeight - 2, 4).fill({
-            color: 0xdbeafe,
+            color: isDark ? 0x1e3a8a : 0xdbeafe,
           });
         }
 
@@ -299,7 +300,7 @@ export class StormCardRenderer {
             fontSize: 11,
             fontWeight: "500",
             fontFamily: APP_FONT_FAMILY,
-            fill: 0x1e293b,
+            fill: isDark ? 0xf4f4f5 : 0x1e293b,
           },
           resolution: textResolution,
         });
@@ -347,9 +348,13 @@ export class StormCardRenderer {
           const tagPillH = 18;
           const tagPillY = rowY + Math.round((rowHeight - tagPillH) / 2);
 
+          const tagBg = isDark ? 0x431407 : 0xffedd5;
+          const tagStroke = isDark ? 0x9a3412 : 0xfdba74;
+          const tagTextColor = isDark ? 0xfdba74 : 0x9a3412;
+
           g.roundRect(tagPillX, tagPillY, tagPillW, tagPillH, tagPillH / 2)
-            .fill({ color: 0xffedd5 })
-            .stroke({ color: 0xfdba74, width: 1 });
+            .fill({ color: tagBg })
+            .stroke({ color: tagStroke, width: 1 });
 
           const tagText = new Text({
             text: `#${displayTag}`,
@@ -357,7 +362,7 @@ export class StormCardRenderer {
               fontSize: 9.5,
               fontWeight: "600",
               fontFamily: APP_FONT_FAMILY,
-              fill: 0x9a3412,
+              fill: tagTextColor,
             },
             resolution: textResolution,
           });
@@ -392,6 +397,7 @@ export class StormCardRenderer {
             h: 20,
             targetModel,
             textResolution,
+            isDark,
           });
 
           hitZones.push({
@@ -487,7 +493,7 @@ export class StormCardRenderer {
           style: {
             fontSize: 11,
             fontFamily: APP_FONT_FAMILY,
-            fill: isSelected ? 0x3b82f6 : 0x94a3b8,
+            fill: isSelected ? 0x3b82f6 : (isDark ? 0x71717a : 0x94a3b8),
             fontStyle: isSelected ? "normal" : "italic",
           },
           resolution: textResolution,
@@ -516,7 +522,7 @@ export class StormCardRenderer {
         // Selection highlight for the whole step block.
         if (selectedFieldId && step.id === selectedFieldId) {
           g.roundRect(4, rowY - 1, w - 8, stepHeight + 2, 4).fill({
-            color: 0xdbeafe,
+            color: isDark ? 0x1e3a8a : 0xdbeafe,
           });
         }
 
@@ -563,7 +569,7 @@ export class StormCardRenderer {
             fontSize: 12,
             fontWeight: "bold",
             fontFamily: APP_FONT_FAMILY,
-            fill: step.name?.trim() ? 0x1e293b : 0x94a3b8,
+            fill: step.name?.trim() ? (isDark ? 0xf4f4f5 : 0x1e293b) : (isDark ? 0x71717a : 0x94a3b8),
           },
           resolution: textResolution,
         });
@@ -604,7 +610,7 @@ export class StormCardRenderer {
               fontSize: 10,
               fontWeight: "600",
               fontFamily: APP_FONT_FAMILY,
-              fill: 0x64748b,
+              fill: isDark ? 0xa1a1aa : 0x64748b,
             },
             resolution: textResolution,
           });
@@ -622,7 +628,7 @@ export class StormCardRenderer {
               fontSize: 10,
               fontWeight: "500",
               fontFamily: APP_FONT_FAMILY,
-              fill: entry.value ? 0x0f172a : 0xcbd5e1,
+              fill: entry.value ? (isDark ? 0xf4f4f5 : 0x0f172a) : (isDark ? 0x52525b : 0xcbd5e1),
             },
             resolution: textResolution,
           });
@@ -671,7 +677,7 @@ export class StormCardRenderer {
           style: {
             fontSize: 11,
             fontFamily: APP_FONT_FAMILY,
-            fill: 0x334155,
+            fill: isDark ? 0xf4f4f5 : 0x334155,
           },
           resolution: textResolution,
         });
@@ -698,7 +704,7 @@ export class StormCardRenderer {
             fontSize: 9,
             fontWeight: "bold",
             fontFamily: APP_FONT_FAMILY,
-            fill: 0x94a3b8,
+            fill: isDark ? 0x71717a : 0x94a3b8,
             letterSpacing: 0.5,
           },
           resolution: textResolution,
@@ -719,7 +725,7 @@ export class StormCardRenderer {
             fontSize: 9,
             fontWeight: "bold",
             fontFamily: APP_FONT_FAMILY,
-            fill: 0x94a3b8,
+            fill: isDark ? 0x71717a : 0x94a3b8,
             letterSpacing: 0.5,
           },
           resolution: textResolution,
@@ -742,7 +748,7 @@ export class StormCardRenderer {
             fontSize: 9,
             fontWeight: "bold",
             fontFamily: APP_FONT_FAMILY,
-            fill: 0x94a3b8,
+            fill: isDark ? 0x71717a : 0x94a3b8,
             letterSpacing: 0.5,
           },
           resolution: textResolution,
@@ -764,7 +770,7 @@ export class StormCardRenderer {
           fontSize: 9,
           fontWeight: "bold",
           fontFamily: APP_FONT_FAMILY,
-          fill: 0x7c3aed,
+          fill: isDark ? 0xa78bfa : 0x7c3aed,
           letterSpacing: 0.5,
         },
         resolution: textResolution,
@@ -781,7 +787,7 @@ export class StormCardRenderer {
         // Draw selection highlight for this row
         if (selectedFieldId && item.id === selectedFieldId) {
           g.roundRect(4, rowY + 1, w - 8, itemHeight - 2, 4).fill({
-            color: 0xdbeafe,
+            color: isDark ? 0x1e3a8a : 0xdbeafe,
           });
         }
 
@@ -803,8 +809,8 @@ export class StormCardRenderer {
           const tagY = rowY + 4 + tIdx * 22;
 
           g.roundRect(tagPillX, tagY, tagPillW, 18, 9)
-            .fill({ color: 0xffedd5 })
-            .stroke({ color: 0xfdba74, width: 1 });
+            .fill({ color: isDark ? 0x431407 : 0xffedd5 })
+            .stroke({ color: isDark ? 0x9a3412 : 0xfdba74, width: 1 });
 
           const tagText = new Text({
             text: rawTagText,
@@ -812,7 +818,7 @@ export class StormCardRenderer {
               fontSize: 9.5,
               fontWeight: "600",
               fontFamily: APP_FONT_FAMILY,
-              fill: 0x9a3412,
+              fill: isDark ? 0xfdba74 : 0x9a3412,
             },
             resolution: textResolution,
           });
@@ -840,7 +846,7 @@ export class StormCardRenderer {
               fontSize: 10,
               fontWeight: "bold",
               fontFamily: APP_FONT_FAMILY,
-              fill: 0x6d28d9,
+              fill: isDark ? 0xc4b5fd : 0x6d28d9,
             },
             resolution: textResolution,
           });
@@ -871,7 +877,7 @@ export class StormCardRenderer {
           fontSize: 9,
           fontWeight: "bold",
           fontFamily: APP_FONT_FAMILY,
-          fill: 0x94a3b8,
+          fill: isDark ? 0x71717a : 0x94a3b8,
           letterSpacing: 0.5,
         },
         resolution: textResolution,
@@ -892,7 +898,7 @@ export class StormCardRenderer {
           fontSize: 9,
           fontWeight: "bold",
           fontFamily: APP_FONT_FAMILY,
-          fill: 0x0f766e,
+          fill: isDark ? 0x2dd4bf : 0x0f766e,
           letterSpacing: 0.5,
         },
         resolution: textResolution,
@@ -916,7 +922,7 @@ export class StormCardRenderer {
           style: {
             fontSize: 10,
             fontFamily: APP_FONT_FAMILY,
-            fill: 0x134e4a,
+            fill: isDark ? 0x2dd4bf : 0x134e4a,
           },
           resolution: textResolution,
         });
@@ -928,7 +934,7 @@ export class StormCardRenderer {
           style: {
             fontSize: 10,
             fontFamily: APP_FONT_FAMILY,
-            fill: 0x134e4a,
+            fill: isDark ? 0x2dd4bf : 0x134e4a,
             wordWrap: true,
             wordWrapWidth: wrapWidth,
             lineHeight: 14,
@@ -953,7 +959,7 @@ export class StormCardRenderer {
         // Draw selection highlight for this row
         if (selectedFieldId && c.id === selectedFieldId) {
           g.roundRect(4, rowY + 1, w - 8, itemHeight - 2, 4).fill({
-            color: 0xdbeafe,
+            color: isDark ? 0x1e3a8a : 0xdbeafe,
           });
         }
 
@@ -974,11 +980,17 @@ export class StormCardRenderer {
     }
 
     const finalHeight = Math.max(renderY + 10, 80);
+    const bodyBgColor = isDark ? 0x18181b : 0xffffff;
+    const bodyStrokeColor = isSelected
+      ? 0x3b82f6
+      : isDark
+        ? 0x27272a
+        : 0xe2e8f0;
     bgGraphics
       .roundRect(0, 0, w, finalHeight, r)
-      .fill({ color: 0xffffff })
+      .fill({ color: bodyBgColor })
       .stroke({
-        color: isSelected ? 0x3b82f6 : 0xe2e8f0,
+        color: bodyStrokeColor,
         width: isSelected ? 2 : 1.5,
       });
 

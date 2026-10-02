@@ -326,7 +326,7 @@ function SingleModelPopupCard({
       <div
         ref={cardRef}
         data-model-popup
-        className="pointer-events-auto flex flex-col rounded-lg border border-slate-200 bg-white shadow-2xl animate-in fade-in"
+        className="pointer-events-auto flex flex-col rounded-lg border border-slate-200 bg-white shadow-2xl animate-in fade-in dark:border-zinc-800 dark:bg-zinc-900"
         style={{
           zoom: position.zoom,
           width: `${position.width}px`,
@@ -373,7 +373,7 @@ function SingleModelPopupCard({
 
       {/* Description if any */}
       {data.description && (
-        <div className="border-b border-slate-100 bg-slate-50/70 px-3 py-1.5 text-[11px] text-slate-500 italic">
+        <div className="border-b border-slate-100 bg-slate-50/70 px-3 py-1.5 text-[11px] text-slate-500 italic dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-400">
           {data.description}
         </div>
       )}
@@ -381,9 +381,9 @@ function SingleModelPopupCard({
       {/* Body Rows */}
       <div className="flex-1 overflow-y-auto py-1">
         {kind === "object" && (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-zinc-800">
             {(data.fields ?? []).length === 0 ? (
-              <div className="px-3 py-2 text-center text-xs text-slate-400 italic">
+              <div className="px-3 py-2 text-center text-xs text-slate-400 italic dark:text-zinc-500">
                 (No fields)
               </div>
             ) : (
@@ -414,13 +414,13 @@ function SingleModelPopupCard({
                       isActive
                         ? "font-medium"
                         : isModel
-                          ? "hover:bg-slate-50 cursor-pointer"
+                          ? "hover:bg-slate-50 dark:hover:bg-zinc-800/60 cursor-pointer"
                           : ""
                     }`}
                   >
                     <div className="flex min-w-0 items-center gap-1.5 pr-2">
-                      <span className="text-slate-400 font-bold">•</span>
-                      <span className="truncate text-slate-800" title={field.name}>
+                      <span className="text-slate-400 font-bold dark:text-zinc-500">•</span>
+                      <span className="truncate text-slate-800 dark:text-zinc-200" title={field.name}>
                         {field.name}
                       </span>
                       {field.required && (
@@ -451,7 +451,7 @@ function SingleModelPopupCard({
                           <ChevronRight className="h-3 w-3 shrink-0 opacity-70" />
                         </div>
                       ) : (
-                        <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
+                        <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                           {field.fieldType || DEFAULT_FIELD_TYPE}
                         </span>
                       )}
@@ -464,16 +464,16 @@ function SingleModelPopupCard({
         )}
 
         {kind === "enum" && (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-zinc-800">
             {(data.values ?? []).length === 0 ? (
-              <div className="px-3 py-2 text-center text-xs text-slate-400 italic">
+              <div className="px-3 py-2 text-center text-xs text-slate-400 italic dark:text-zinc-500">
                 (No enum values)
               </div>
             ) : (
               (data.values ?? []).map((val, idx) => (
                 <div
                   key={val.id ? `val-${val.id}` : `val-${idx}-${val.name || val.value || "unnamed"}`}
-                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700"
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-zinc-300"
                 >
                   <span
                     className="h-2 w-2 rounded-full shrink-0"
@@ -505,7 +505,9 @@ function SingleModelPopupCard({
                     }
                   }}
                   className={`rounded-md border p-2 text-xs transition-colors ${
-                    isModel ? "cursor-pointer hover:opacity-95" : ""
+                    isModel
+                      ? "cursor-pointer hover:opacity-95"
+                      : "border-slate-200 bg-slate-50 dark:border-zinc-700 dark:bg-zinc-800"
                   }`}
                   style={
                     isModel
@@ -513,13 +515,10 @@ function SingleModelPopupCard({
                           borderColor: `${targetColor}50`,
                           backgroundColor: `${targetColor}10`,
                         }
-                      : {
-                          borderColor: "#e2e8f0",
-                          backgroundColor: "#f8fafc",
-                        }
+                      : undefined
                   }
                 >
-                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 dark:text-zinc-400">
                     Array Element
                   </div>
                   <div className="flex items-center justify-between">
@@ -568,7 +567,9 @@ function SingleModelPopupCard({
                     }
                   }}
                   className={`rounded-md border p-2 text-xs transition-colors ${
-                    isModel ? "cursor-pointer hover:opacity-95" : ""
+                    isModel
+                      ? "cursor-pointer hover:opacity-95"
+                      : "border-slate-200 bg-slate-50 dark:border-zinc-700 dark:bg-zinc-800"
                   }`}
                   style={
                     isModel
@@ -576,13 +577,10 @@ function SingleModelPopupCard({
                           borderColor: `${targetColor}50`,
                           backgroundColor: `${targetColor}10`,
                         }
-                      : {
-                          borderColor: "#e2e8f0",
-                          backgroundColor: "#f8fafc",
-                        }
+                      : undefined
                   }
                 >
-                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 dark:text-zinc-400">
                     Wrapped Target
                   </div>
                   <div className="flex items-center justify-between">

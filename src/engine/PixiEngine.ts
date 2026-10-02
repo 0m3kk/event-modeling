@@ -86,6 +86,7 @@ export class PixiEngine {
   public visualLinkLayer: VisualLinkLayer;
   public cardLayer: CardLayer;
   public gizmoLayer: GizmoLayer;
+  public currentTheme: "light" | "dark" = "light";
 
   // Container element
   private container: HTMLElement;
@@ -234,10 +235,16 @@ export class PixiEngine {
       const height =
         this.container.clientHeight || window.innerHeight - 48 || 600;
 
+      const isDark =
+        typeof document !== "undefined" &&
+        document.documentElement.classList.contains("dark");
+      this.currentTheme = isDark ? "dark" : "light";
+      const bg = isDark ? 0x121214 : 0xf9fafb;
+
       await this.app.init({
         width,
         height,
-        backgroundColor: 0xf9fafb,
+        backgroundColor: bg,
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
         antialias: true,
@@ -248,6 +255,8 @@ export class PixiEngine {
         return;
       }
 
+      this.gridLayer.setDark(isDark);
+      this.cardLayer.setDark(isDark);
       this.app.canvas.style.display = "block";
       this.app.canvas.style.width = "100%";
       this.app.canvas.style.height = "100%";
@@ -369,6 +378,18 @@ export class PixiEngine {
     this.viewDirty = true;
     this.contentDirty = true;
     this.scheduleRender();
+  }
+
+  public setTheme(theme: "light" | "dark"): void {
+    if (this.currentTheme === theme) return;
+    this.currentTheme = theme;
+    const isDark = theme === "dark";
+    if (this.app?.renderer) {
+      this.app.renderer.background.color = isDark ? 0x121214 : 0xf9fafb;
+    }
+    this.gridLayer.setDark(isDark);
+    this.cardLayer.setDark(isDark);
+    this.invalidateAll();
   }
 
   /**
@@ -2573,7 +2594,7 @@ export class PixiEngine {
         resolution: scale,
         // Match the on-screen board background instead of emitting a
         // transparent PNG, and keep vector edges smooth at the export scale.
-        clearColor: "#f9fafb",
+        clearColor: this.currentTheme === "dark" ? "#121214" : "#f9fafb",
         antialias: true,
       });
 

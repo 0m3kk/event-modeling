@@ -189,7 +189,7 @@ export function ConnectorOptionsBar() {
       style={{ left: barX, top: barY }}
     >
       <div
-        className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
+        className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
         style={{ zoom: barScale }}
         onPointerDown={(e) => e.stopPropagation()}
       >
@@ -199,9 +199,9 @@ export function ConnectorOptionsBar() {
             <button
               key={swatch}
               onClick={() => patchData({ stroke: swatch })}
-              className={`h-5 w-5 rounded-full border border-black/10 transition-transform ${
+              className={`h-5 w-5 rounded-full border border-black/10 transition-transform cursor-pointer ${
                 color === swatch
-                  ? "scale-125 ring-2 ring-blue-500 ring-offset-1"
+                  ? "scale-125 ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-zinc-900"
                   : "hover:scale-110"
               }`}
               style={{ backgroundColor: swatch }}
@@ -210,19 +210,19 @@ export function ConnectorOptionsBar() {
           ))}
         </div>
 
-        <div className="h-5 w-px bg-gray-200" />
+        <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
         {/* Stroke Pattern (Solid / Dashed / Dotted) */}
-        <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5">
+        <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-zinc-800 p-0.5">
           {(["solid", "dashed", "dotted"] as LineStyle[]).map((style) => (
             <button
               key={style}
               onClick={() => patchData({ lineStyle: style })}
               title={`${style[0].toUpperCase()}${style.slice(1)} line`}
-              className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${
+              className={`flex h-7 w-7 items-center justify-center rounded-md transition-all cursor-pointer ${
                 lineStyle === style
-                  ? "bg-white text-gray-900 shadow-xs"
-                  : "text-gray-500 hover:text-gray-800"
+                  ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 shadow-xs"
+                  : "text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200"
               }`}
             >
               <LineStyleIcon style={style} />
@@ -230,19 +230,19 @@ export function ConnectorOptionsBar() {
           ))}
         </div>
 
-        <div className="h-5 w-px bg-gray-200" />
+        <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
         {/* Stroke Width */}
-        <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5">
+        <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-zinc-800 p-0.5">
           {STROKE_WIDTHS.map(({ value, label }) => (
             <button
               key={value}
               onClick={() => patchData({ strokeWidth: value })}
               title={`${label} line`}
-              className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${
+              className={`flex h-7 w-7 items-center justify-center rounded-md transition-all cursor-pointer ${
                 strokeWidth === value
-                  ? "bg-white text-gray-900 shadow-xs"
-                  : "text-gray-500 hover:text-gray-800"
+                  ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 shadow-xs"
+                  : "text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200"
               }`}
             >
               <WidthIcon width={value} />
@@ -250,17 +250,17 @@ export function ConnectorOptionsBar() {
           ))}
         </div>
 
-        <div className="h-5 w-px bg-gray-200" />
+        <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
         {/* Arrowhead toggles */}
-        <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5">
+        <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-zinc-800 p-0.5">
           <button
             onClick={() => patchData({ arrowStart: !arrowStart })}
             title={arrowStart ? "Hide start arrow" : "Show start arrow"}
-            className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${
+            className={`flex h-7 w-7 items-center justify-center rounded-md transition-all cursor-pointer ${
               arrowStart
-                ? "bg-white text-gray-900 shadow-xs"
-                : "text-gray-400 hover:text-gray-700"
+                ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 shadow-xs"
+                : "text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-300"
             }`}
           >
             <ArrowIcon direction="start" />
@@ -268,23 +268,23 @@ export function ConnectorOptionsBar() {
           <button
             onClick={() => patchData({ arrowEnd: !arrowEnd })}
             title={arrowEnd ? "Hide end arrow" : "Show end arrow"}
-            className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${
+            className={`flex h-7 w-7 items-center justify-center rounded-md transition-all cursor-pointer ${
               arrowEnd
-                ? "bg-white text-gray-900 shadow-xs"
-                : "text-gray-400 hover:text-gray-700"
+                ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 shadow-xs"
+                : "text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-300"
             }`}
           >
             <ArrowIcon direction="end" />
           </button>
         </div>
 
-        <div className="h-5 w-px bg-gray-200" />
+        <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
         {/* Delete Connector */}
         <button
           onClick={() => deleteObjects([selectedConnector.id])}
           title="Delete Connector"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 dark:text-zinc-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
         >
           <Trash2 size={15} />
         </button>

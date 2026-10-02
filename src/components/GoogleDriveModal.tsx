@@ -300,18 +300,18 @@ export function GoogleDriveModal({
         if (e.target === e.currentTarget && !isSaving) onClose();
       }}
     >
-      <div className="flex w-full max-w-xl flex-col rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 max-h-[90vh]">
+      <div className="flex w-full max-w-xl flex-col rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 max-h-[90vh] dark:border-zinc-800 dark:bg-zinc-900">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50/70 shrink-0">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50/70 shrink-0 dark:border-zinc-800 dark:bg-zinc-800/50">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
               <Cloud size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-900">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
                 Google Drive
               </h2>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-zinc-400">
                 Lưu trữ và đồng bộ hóa dự án Event Modeling
               </p>
             </div>
@@ -319,21 +319,21 @@ export function GoogleDriveModal({
           <button
             onClick={onClose}
             disabled={isSaving}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-40"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 transition-colors disabled:opacity-40"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* Account Bar */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-2.5 bg-white text-xs shrink-0">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-2.5 bg-white text-xs shrink-0 dark:border-zinc-800 dark:bg-zinc-900">
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
               {authConfig.userPicture ? (
                 <img
                   src={authConfig.userPicture}
                   alt="Avatar"
-                  className="h-6 w-6 rounded-full border border-gray-200"
+                  className="h-6 w-6 rounded-full border border-gray-200 dark:border-zinc-700"
                 />
               ) : (
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 font-medium text-[10px] text-white">
@@ -342,24 +342,24 @@ export function GoogleDriveModal({
               )}
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-gray-800">
+                  <span className="font-medium text-gray-800 dark:text-zinc-200">
                     {authConfig.userName || authConfig.userEmail || "Google Drive Connected"}
                   </span>
                   {authConfig.isEnvAccessToken && (
-                    <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[10px] font-semibold text-emerald-700">
+                    <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                       .env token
                     </span>
                   )}
                 </div>
                 {authConfig.userName && authConfig.userEmail && (
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">
                     {authConfig.userEmail}
                   </span>
                 )}
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 text-gray-500">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-zinc-400">
               <span className="h-2 w-2 rounded-full bg-amber-400" />
               <span>Chưa kết nối tài khoản Google</span>
             </div>
@@ -370,7 +370,7 @@ export function GoogleDriveModal({
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-gray-600 hover:bg-gray-100 transition-colors"
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
                 title="Đăng xuất khỏi Google Drive"
               >
                 <LogOut size={13} />
@@ -392,15 +392,15 @@ export function GoogleDriveModal({
 
         {/* Missing Env Notice */}
         {!isConfiguredInEnv && (
-          <div className="mx-5 mt-3 rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-800 shrink-0">
+          <div className="mx-5 mt-3 rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-800 shrink-0 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
             <div className="font-semibold mb-1 flex items-center gap-1.5">
-              <AlertCircle size={14} className="text-amber-600" />
+              <AlertCircle size={14} className="text-amber-600 dark:text-amber-400" />
               Chưa cấu hình biến môi trường Google Drive
             </div>
-            <p className="text-[11px] text-amber-700 leading-relaxed">
+            <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
               Vui lòng khai báo trong file <code>.env</code> (hoặc <code>.env.local</code>):
             </p>
-            <pre className="mt-1.5 font-mono text-[10px] text-amber-900 bg-white/80 p-2 rounded border border-amber-200 overflow-x-auto">
+            <pre className="mt-1.5 font-mono text-[10px] text-amber-900 bg-white/80 p-2 rounded border border-amber-200 overflow-x-auto dark:bg-zinc-950 dark:border-zinc-800 dark:text-amber-200">
               VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com{"\n"}
               # hoặc Access Token trực tiếp:{"\n"}
               VITE_GOOGLE_ACCESS_TOKEN=ya29.your-token
@@ -409,7 +409,7 @@ export function GoogleDriveModal({
         )}
 
         {/* Tabs Bar */}
-        <div className="flex border-b border-gray-100 px-5 bg-white shrink-0 mt-1">
+        <div className="flex border-b border-gray-100 px-5 bg-white shrink-0 mt-1 dark:border-zinc-800 dark:bg-zinc-900">
           <button
             type="button"
             onClick={() => {
@@ -418,8 +418,8 @@ export function GoogleDriveModal({
             }}
             className={`flex items-center gap-1.5 py-2.5 px-3 border-b-2 font-medium text-xs transition-colors ${
               activeTab === "save"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-800"
+                ? "border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400"
+                : "border-transparent text-gray-500 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
             <CloudUpload size={14} />
@@ -433,8 +433,8 @@ export function GoogleDriveModal({
             }}
             className={`flex items-center gap-1.5 py-2.5 px-3 border-b-2 font-medium text-xs transition-colors ${
               activeTab === "open"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-800"
+                ? "border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400"
+                : "border-transparent text-gray-500 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
             <FolderOpen size={14} />
@@ -444,7 +444,7 @@ export function GoogleDriveModal({
 
         {/* Global Error Notice */}
         {errorMsg && (
-          <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50/70 p-2.5 text-xs text-red-700 shrink-0">
+          <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50/70 p-2.5 text-xs text-red-700 shrink-0 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
             <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
             <span className="flex-1">{errorMsg}</span>
           </div>
@@ -458,31 +458,31 @@ export function GoogleDriveModal({
               <div>
                 <label
                   htmlFor={saveNameId}
-                  className="block text-xs font-medium text-gray-700 mb-1"
+                  className="block text-xs font-medium text-gray-700 mb-1 dark:text-zinc-300"
                 >
                   Tên file dự án (.storm)
                 </label>
-                <div className="flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+                <div className="flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800">
                   <input
                     id={saveNameId}
                     type="text"
                     value={saveName}
                     onChange={(e) => setSaveName(e.target.value)}
                     placeholder="Untitled"
-                    className="flex-1 text-xs text-gray-900 focus:outline-none"
+                    className="flex-1 text-xs text-gray-900 focus:outline-none dark:text-zinc-100 dark:bg-transparent"
                     disabled={isSaving}
                   />
-                  <span className="text-xs font-mono text-gray-400">.storm</span>
+                  <span className="text-xs font-mono text-gray-400 dark:text-zinc-500">.storm</span>
                 </div>
               </div>
 
               {googleDriveFileId && (
-                <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50 space-y-2">
-                  <span className="block text-xs font-medium text-gray-700">
+                <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50 space-y-2 dark:border-zinc-700 dark:bg-zinc-800/40">
+                  <span className="block text-xs font-medium text-gray-700 dark:text-zinc-300">
                     Tùy chọn lưu:
                   </span>
                   <div className="space-y-1.5">
-                    <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-zinc-300 cursor-pointer">
                       <input
                         type="radio"
                         name="saveMode"
@@ -492,7 +492,7 @@ export function GoogleDriveModal({
                       />
                       <span>Cập nhật file hiện tại trên Google Drive</span>
                     </label>
-                    <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-zinc-300 cursor-pointer">
                       <input
                         type="radio"
                         name="saveMode"
@@ -508,12 +508,12 @@ export function GoogleDriveModal({
 
               {/* Success Result Box */}
               {saveSuccessResult && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-800 space-y-2">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-800 space-y-2 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
                   <div className="flex items-center gap-2 font-medium">
-                    <CheckCircle2 size={16} className="text-emerald-600" />
+                    <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
                     <span>Lưu file lên Google Drive thành công!</span>
                   </div>
-                  <p className="text-[11px] text-emerald-700">
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
                     File: <strong>{saveSuccessResult.name}</strong>
                   </p>
                   {saveSuccessResult.webViewLink && (
@@ -521,7 +521,7 @@ export function GoogleDriveModal({
                       href={saveSuccessResult.webViewLink}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
                     >
                       <ExternalLink size={12} />
                       Mở trong Google Drive
@@ -540,13 +540,13 @@ export function GoogleDriveModal({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Tìm kiếm file .storm..."
-                  className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-800 focus:border-blue-500 focus:outline-none"
+                  className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-800 focus:border-blue-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
                 />
                 <button
                   type="button"
                   onClick={loadFiles}
                   disabled={isLoadingFiles || !isAuthenticated}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                   title="Làm mới danh sách"
                 >
                   <RefreshCw
@@ -557,12 +557,12 @@ export function GoogleDriveModal({
               </div>
 
               {!isAuthenticated ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-gray-500">
-                  <Cloud size={32} className="text-gray-300 mb-2" />
-                  <p className="font-medium text-gray-700">
+                <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-gray-500 dark:text-zinc-400">
+                  <Cloud size={32} className="text-gray-300 dark:text-zinc-600 mb-2" />
+                  <p className="font-medium text-gray-700 dark:text-zinc-300">
                     Chưa kết nối Google Drive
                   </p>
-                  <p className="mt-1 text-[11px] text-gray-400 max-w-xs">
+                  <p className="mt-1 text-[11px] text-gray-400 dark:text-zinc-500 max-w-xs">
                     Vui lòng đăng nhập Google để xem và mở các dự án Event Modeling đã lưu trên Drive của bạn.
                   </p>
                   {authConfig.clientId && (
@@ -577,34 +577,34 @@ export function GoogleDriveModal({
                   )}
                 </div>
               ) : isLoadingFiles ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-gray-500">
-                  <RefreshCw size={24} className="animate-spin text-blue-600 mb-2" />
+                <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-gray-500 dark:text-zinc-400">
+                  <RefreshCw size={24} className="animate-spin text-blue-600 dark:text-blue-400 mb-2" />
                   <span>Đang tải danh sách file từ Google Drive...</span>
                 </div>
               ) : filteredFiles.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-gray-500">
-                  <FileCode size={30} className="text-gray-300 mb-2" />
-                  <p className="font-medium text-gray-600">
+                <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-gray-500 dark:text-zinc-400">
+                  <FileCode size={30} className="text-gray-300 dark:text-zinc-600 mb-2" />
+                  <p className="font-medium text-gray-600 dark:text-zinc-300">
                     Không tìm thấy file .storm nào
                   </p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
+                  <p className="text-[11px] text-gray-400 dark:text-zinc-500 mt-0.5">
                     Hãy chuyển sang tab "Lưu vào Drive" để lưu dự án hiện tại lên Google Drive.
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 overflow-hidden max-h-60 overflow-y-auto">
+                <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 overflow-hidden max-h-60 overflow-y-auto dark:divide-zinc-800 dark:border-zinc-800">
                   {filteredFiles.map((file) => (
                     <div
                       key={file.id}
-                      className="flex items-center justify-between p-2.5 hover:bg-gray-50/80 transition-colors"
+                      className="flex items-center justify-between p-2.5 hover:bg-gray-50/80 dark:hover:bg-zinc-800/60 transition-colors"
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-2">
                         <FileCode size={18} className="text-blue-500 shrink-0" />
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-medium text-gray-800">
+                          <p className="truncate text-xs font-medium text-gray-800 dark:text-zinc-200">
                             {file.name}
                           </p>
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-[10px] text-gray-400 dark:text-zinc-500">
                             {file.modifiedTime
                               ? new Date(file.modifiedTime).toLocaleString()
                               : "N/A"}
@@ -616,7 +616,7 @@ export function GoogleDriveModal({
                         type="button"
                         onClick={() => handleOpenFile(file)}
                         disabled={loadingFileId === file.id}
-                        className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50 shrink-0"
+                        className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-400 dark:hover:bg-blue-900/60 transition-colors disabled:opacity-50 shrink-0"
                       >
                         {loadingFileId === file.id ? "Đang nạp..." : "Mở"}
                       </button>
@@ -629,12 +629,12 @@ export function GoogleDriveModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-3 bg-gray-50/50 shrink-0">
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-3 bg-gray-50/50 shrink-0 dark:border-zinc-800 dark:bg-zinc-800/50">
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+            className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
           >
             Đóng
           </button>

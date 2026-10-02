@@ -33,6 +33,7 @@ export class ModelNodeRenderer {
     isSelected: boolean = false,
     selectedFieldId?: string,
     allObjects?: CanvasObject[] | Map<string, CanvasObject>,
+    isDark: boolean = false,
   ): RenderResult {
     container.removeChildren();
 
@@ -139,7 +140,7 @@ export class ModelNodeRenderer {
         // Draw selection highlight for this row
         if (selectedFieldId && field.id === selectedFieldId) {
           g.roundRect(4, rowY + 1, w - 8, rowHeight - 2, 4).fill({
-            color: 0xdbeafe,
+            color: isDark ? 0x1e3a8a : 0xdbeafe,
           });
         }
 
@@ -162,7 +163,7 @@ export class ModelNodeRenderer {
             fontSize: 11,
             fontWeight: "500",
             fontFamily: APP_FONT_FAMILY,
-            fill: 0x1e293b,
+            fill: isDark ? 0xf4f4f5 : 0x1e293b,
           },
           resolution: textResolution,
         });
@@ -212,6 +213,7 @@ export class ModelNodeRenderer {
           h: 20,
           targetModel,
           textResolution,
+          isDark,
         });
 
         hitZones.push({
@@ -290,7 +292,7 @@ export class ModelNodeRenderer {
         // Draw selection highlight for this row
         if (selectedFieldId && val.id === selectedFieldId) {
           g.roundRect(4, rowY + 1, w - 8, rowHeight - 2, 4).fill({
-            color: 0xdbeafe,
+            color: isDark ? 0x1e3a8a : 0xdbeafe,
           });
         }
 
@@ -305,7 +307,7 @@ export class ModelNodeRenderer {
           style: {
             fontSize: 11,
             fontFamily: APP_FONT_FAMILY,
-            fill: 0x1e293b,
+            fill: isDark ? 0xf4f4f5 : 0x1e293b,
           },
           resolution: textResolution,
         });
@@ -348,9 +350,9 @@ export class ModelNodeRenderer {
       const targetModel = resolveTargetModel(allObjects, itemType);
       const isModel = Boolean(targetModel && targetModel.modelData);
       const targetKind = targetModel?.modelData?.kind || "object";
-      const kindHex = isModel ? getModelKindHex(targetKind) : 0xb91c1c;
-      const bgHex = isModel ? kindHex : 0xfef2f2;
-      const strokeHex = isModel ? kindHex : 0xfecaca;
+      const kindHex = isModel ? getModelKindHex(targetKind) : (isDark ? 0xf87171 : 0xb91c1c);
+      const bgHex = isModel ? kindHex : (isDark ? 0x450a0a : 0xfef2f2);
+      const strokeHex = isModel ? kindHex : (isDark ? 0x7f1d1d : 0xfecaca);
       const hasValidation = hasValidationRules(data.validation);
       const showValidationBadge = hasValidation || isSelected;
       const maxItemChars = Math.max(
@@ -362,8 +364,8 @@ export class ModelNodeRenderer {
       const displayType = `${truncateText(itemType, maxItemChars)}[]`;
 
       g.roundRect(10, rowY + 3, w - 20, 24, 4)
-        .fill({ color: bgHex, alpha: isModel ? 0.12 : 1 })
-        .stroke({ color: strokeHex, alpha: isModel ? 0.45 : 1, width: 1 });
+        .fill({ color: bgHex, alpha: isModel ? (isDark ? 0.22 : 0.12) : 1 })
+        .stroke({ color: strokeHex, alpha: isModel ? (isDark ? 0.55 : 0.45) : 1, width: 1 });
 
       let textStartX = 18;
       if (isModel) {
@@ -418,9 +420,9 @@ export class ModelNodeRenderer {
       const targetModel = resolveTargetModel(allObjects, innerType);
       const isModel = Boolean(targetModel && targetModel.modelData);
       const targetKind = targetModel?.modelData?.kind || "object";
-      const kindHex = isModel ? getModelKindHex(targetKind) : 0xa16207;
-      const bgHex = isModel ? kindHex : 0xfefce8;
-      const strokeHex = isModel ? kindHex : 0xfef08a;
+      const kindHex = isModel ? getModelKindHex(targetKind) : (isDark ? 0xfacc15 : 0xa16207);
+      const bgHex = isModel ? kindHex : (isDark ? 0x422006 : 0xfefce8);
+      const strokeHex = isModel ? kindHex : (isDark ? 0x713f12 : 0xfef08a);
       const hasValidation = hasValidationRules(data.validation);
       const showValidationBadge = hasValidation || isSelected;
       const maxInnerChars = Math.max(
@@ -432,8 +434,8 @@ export class ModelNodeRenderer {
       const displayInner = truncateText(innerType, maxInnerChars);
 
       g.roundRect(10, rowY + 3, w - 20, 24, 4)
-        .fill({ color: bgHex, alpha: isModel ? 0.12 : 1 })
-        .stroke({ color: strokeHex, alpha: isModel ? 0.45 : 1, width: 1 });
+        .fill({ color: bgHex, alpha: isModel ? (isDark ? 0.22 : 0.12) : 1 })
+        .stroke({ color: strokeHex, alpha: isModel ? (isDark ? 0.55 : 0.45) : 1, width: 1 });
 
       let textStartX = 18;
       if (isModel) {
@@ -485,11 +487,13 @@ export class ModelNodeRenderer {
     }
 
     const finalHeight = Math.max(renderY + 10, 80);
+    const bodyBgColor = isDark ? 0x18181b : 0xffffff;
+    const bodyStrokeColor = isSelected ? 0x3b82f6 : isDark ? 0x27272a : 0xe2e8f0;
     bgGraphics
       .roundRect(0, 0, w, finalHeight, r)
-      .fill({ color: 0xffffff })
+      .fill({ color: bodyBgColor })
       .stroke({
-        color: isSelected ? 0x3b82f6 : 0xe2e8f0,
+        color: bodyStrokeColor,
         width: isSelected ? 2 : 1.5,
       });
 

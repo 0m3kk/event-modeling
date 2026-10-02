@@ -125,7 +125,7 @@ export function InlineTextEditor() {
           onChange={(e) => setValue(e.target.value)}
           onBlur={commit}
           onKeyDown={handleKeyDown}
-          className="h-full w-full resize-none rounded border border-blue-500 bg-white/95 p-1.5 font-mono text-xs text-gray-900 shadow-md outline-none focus:ring-1 focus:ring-blue-500"
+          className="h-full w-full resize-none rounded border border-blue-500 bg-white/95 dark:bg-zinc-900/95 p-1.5 font-mono text-xs text-gray-900 dark:text-zinc-100 shadow-md outline-none focus:ring-1 focus:ring-blue-500"
           style={{
             fontSize: `${Math.max(10, (zone.type === "constraint" ? 10 : 13) * zoom)}px`,
             lineHeight: "1.3",
@@ -139,7 +139,7 @@ export function InlineTextEditor() {
           onChange={(e) => setValue(e.target.value)}
           onBlur={commit}
           onKeyDown={handleKeyDown}
-          className="h-full w-full rounded border border-blue-500 bg-white/95 px-1.5 font-mono text-xs text-gray-900 shadow-md outline-none focus:ring-1 focus:ring-blue-500"
+          className="h-full w-full rounded border border-blue-500 bg-white/95 dark:bg-zinc-900/95 px-1.5 font-mono text-xs text-gray-900 dark:text-zinc-100 shadow-md outline-none focus:ring-1 focus:ring-blue-500"
           style={{
             fontSize: `${Math.max(10, (zone.type === "header" ? 12 : 11) * zoom)}px`,
           }}

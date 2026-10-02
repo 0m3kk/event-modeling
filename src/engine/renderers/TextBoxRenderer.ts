@@ -24,12 +24,20 @@ export class TextBoxRenderer {
     }
 
     const content = obj.text || "Double click to edit";
+    const isDark =
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark");
+    const defaultColor = isDark ? 0xf4f4f5 : 0x1e293b;
+    const textColor = obj.stroke
+      ? parseInt(obj.stroke.replace("#", "0x"), 16)
+      : defaultColor;
+
     const text = new Text({
       text: content,
       style: {
         fontSize: 14,
         fontFamily: APP_FONT_FAMILY,
-        fill: 0x1e293b,
+        fill: textColor,
         wordWrap: true,
         wordWrapWidth: w - 8,
         lineHeight: 20,

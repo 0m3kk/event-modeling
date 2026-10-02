@@ -25,7 +25,7 @@ export function RemoveFromGroupButton({
       title={
         groupName ? `Remove from Group "${groupName}"` : "Remove from Group"
       }
-      className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-amber-50 hover:text-amber-600"
+      className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer"
     >
       <FolderMinus size={16} />
     </button>

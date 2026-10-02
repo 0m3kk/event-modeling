@@ -31,6 +31,8 @@ export class CardLayer extends Container {
   private cardCursor: string = "default";
   /** Set when the draw budget cut a render short; the caller refines next frame. */
   private pendingDraws: boolean = false;
+  /** Whether dark mode is active, used by renderers for background and text colors. */
+  private isDark: boolean = false;
 
   // Stable identity tokens for storm/model data objects. Store updates replace
   // these objects on edit, so an identity change is exactly a content change.
@@ -54,6 +56,13 @@ export class CardLayer extends Container {
   constructor() {
     super();
     this.zIndex = Z_INDICES.CARDS;
+  }
+
+  public setDark(isDark: boolean): void {
+    if (this.isDark !== isDark) {
+      this.isDark = isDark;
+      this.cardDrawKeys.clear();
+    }
   }
 
   private tokenFor(data: object | undefined): number {
@@ -192,6 +201,7 @@ export class CardLayer extends Container {
       // Everything the renderers read, folded into one signature. Only when it
       // changes do we throw away and rebuild the card's children.
       const drawKey = [
+        this.isDark ? 1 : 0,
         textResolution,
         isSelected ? 1 : 0,
         cardSelectedFieldId ?? "",
@@ -229,6 +239,7 @@ export class CardLayer extends Container {
           isSelected,
           cardSelectedFieldId,
           modelsMap,
+          this.isDark,
         );
       } else if (obj.type === "model") {
         result = ModelNodeRenderer.draw(
@@ -238,6 +249,7 @@ export class CardLayer extends Container {
           isSelected,
           cardSelectedFieldId,
           modelsMap,
+          this.isDark,
         );
       } else if (obj.type === "stickyNote") {
         result = StickyNoteRenderer.draw(card, obj, textResolution, isSelected);

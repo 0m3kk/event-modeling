@@ -192,7 +192,7 @@ export function ModelOptionsBar() {
         }}
       >
         <div
-          className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
+          className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
           style={{
             zoom: barScale,
           }}
@@ -204,11 +204,11 @@ export function ModelOptionsBar() {
             <button
               onClick={handleAddRow}
               title={kind === "object" ? "Add Field" : "Add Value"}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 cursor-pointer"
             >
               <Plus size={16} />
             </button>
-            <div className="h-5 w-px bg-gray-200" />
+            <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
           </>
         )}
 
@@ -216,13 +216,13 @@ export function ModelOptionsBar() {
         <button
           onClick={handleToggleDescriptionPopover}
           title={infoTitle}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+          className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
             currentDescription
-              ? "border border-sky-200 bg-sky-50 text-sky-700"
-              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              ? "border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300"
+              : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
           }`}
         >
-          <Info size={16} className="text-sky-600" />
+          <Info size={16} className="text-sky-600 dark:text-sky-400" />
         </button>
 
         {/* Field / node validation ✓ — object fields, array length, wrap rules */}
@@ -230,35 +230,35 @@ export function ModelOptionsBar() {
           <button
             onClick={handleToggleValidationPopover}
             title={validationButtonTitle}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               hasValidation || showValidationPopover
-                ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
             }`}
           >
             <ListChecks
               size={16}
               className={
                 hasValidation || showValidationPopover
-                  ? "text-emerald-600"
-                  : "text-gray-600"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-gray-600 dark:text-zinc-400"
               }
             />
           </button>
         )}
 
-        <div className="h-5 w-px bg-gray-200" />
+        <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
         {/* Create Reference Copy — linked duplicate, content stays in sync */}
         <button
           onClick={() => createReferenceCopy([selectedModel.id])}
           title="Create Reference Copy"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 cursor-pointer"
         >
           <Link2 size={16} />
         </button>
 
-        <div className="h-5 w-px bg-gray-200" />
+        <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
         {/* Remove from Group — detaches just this node, keeping the group */}
         {parentGroup && !parentGroup.locked && (
@@ -267,7 +267,7 @@ export function ModelOptionsBar() {
               objectId={selectedModel.id}
               groupName={parentGroup.name}
             />
-            <div className="h-5 w-px bg-gray-200" />
+            <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
           </>
         )}
 
@@ -275,7 +275,7 @@ export function ModelOptionsBar() {
         <button
           onClick={handleDelete}
           title={trashTitle}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 dark:text-zinc-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
         >
           <Trash2 size={15} />
         </button>

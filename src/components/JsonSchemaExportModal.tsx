@@ -69,25 +69,25 @@ export function JsonSchemaExportModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 dark:border-zinc-800 dark:bg-zinc-900">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50/70">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50/70 dark:border-zinc-800 dark:bg-zinc-800/50">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
               <FileCode2 size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-800">
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-zinc-100">
                 Export JSON Schema
               </h2>
-              <p className="text-[11px] text-gray-500">
+              <p className="text-[11px] text-gray-500 dark:text-zinc-400">
                 Standard JSON Schema for all Model nodes & Storm card payloads
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
             title="Close"
           >
             <X size={18} />
@@ -95,9 +95,9 @@ export function JsonSchemaExportModal({
         </div>
 
         {/* Toolbar controls */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-2.5 bg-white">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-2.5 bg-white dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium text-gray-600 mr-1">
+            <span className="text-xs font-medium text-gray-600 mr-1 dark:text-zinc-400">
               Dialect:
             </span>
             <button
@@ -105,7 +105,7 @@ export function JsonSchemaExportModal({
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 dialect === "draft-07"
                   ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               }`}
             >
               Draft-07
@@ -115,7 +115,7 @@ export function JsonSchemaExportModal({
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 dialect === "2020-12"
                   ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               }`}
             >
               Draft 2020-12
@@ -125,12 +125,12 @@ export function JsonSchemaExportModal({
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-2xs"
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-2xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:active:bg-zinc-600"
             >
               {copied ? (
                 <>
-                  <Check size={13} className="text-green-600" />
-                  <span className="text-green-600">Copied!</span>
+                  <Check size={13} className="text-green-600 dark:text-green-400" />
+                  <span className="text-green-600 dark:text-green-400">Copied!</span>
                 </>
               ) : (
                 <>
@@ -150,12 +150,12 @@ export function JsonSchemaExportModal({
         </div>
 
         {/* Code Content Preview */}
-        <div className="relative flex-1 overflow-auto bg-gray-950 p-4 font-mono text-xs text-gray-100">
+        <div className="relative flex-1 overflow-auto bg-gray-950 p-4 font-mono text-xs text-gray-100 dark:bg-zinc-950 dark:text-zinc-200">
           <pre className="whitespace-pre">{schemaString}</pre>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-gray-100 px-5 py-2.5 text-[11px] text-gray-400 bg-gray-50/50">
+        <div className="flex items-center justify-between border-t border-gray-100 px-5 py-2.5 text-[11px] text-gray-400 bg-gray-50/50 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-500">
           <span>
             {schemaString.split("\n").length} lines •{" "}
             {(new Blob([schemaString]).size / 1024).toFixed(1)} KB

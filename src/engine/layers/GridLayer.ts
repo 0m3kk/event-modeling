@@ -28,12 +28,21 @@ export class GridLayer extends Container {
   private sprite: TilingSprite | null = null;
   private lastTileKey: string = "";
   private lastBoundsKey: string = "";
+  private isDark: boolean = false;
 
   constructor() {
     super();
     this.zIndex = Z_INDICES.GRID;
     // Kept off-tree: only used as the source shape when (re)baking the tile.
     this.tileSource = new Graphics();
+  }
+
+  public setDark(isDark: boolean): void {
+    if (this.isDark !== isDark) {
+      this.isDark = isDark;
+      this.lastTileKey = "";
+      this.lastBoundsKey = "";
+    }
   }
 
   public renderGrid(
@@ -58,7 +67,7 @@ export class GridLayer extends Container {
     const radiusKey = Math.round(dotRadius * 4) / 4;
     const alphaKey = Math.round(alpha * 10) / 10;
     const resolutionKey = Math.min(6, Math.max(1, Math.ceil(zoom * dpr)));
-    const tileKey = [step, radiusKey, alphaKey, resolutionKey].join(",");
+    const tileKey = [step, radiusKey, alphaKey, resolutionKey, this.isDark ? 1 : 0].join(",");
 
     if (tileKey !== this.lastTileKey) {
       this.bakeTile(step, radiusKey, alphaKey, resolutionKey, renderer);
@@ -102,7 +111,9 @@ export class GridLayer extends Container {
 
     this.tileSource.clear();
     this.tileSource.circle(step / 2, step / 2, dotRadius);
-    this.tileSource.fill({ color: 0x9ca3af, alpha });
+    const dotColor = this.isDark ? 0x52525b : 0x9ca3af;
+    const dotAlpha = this.isDark ? Math.min(0.65, alpha * 1.3) : alpha;
+    this.tileSource.fill({ color: dotColor, alpha: dotAlpha });
 
     this.tileTexture = renderer.generateTexture({
       target: this.tileSource,

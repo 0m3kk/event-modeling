@@ -343,7 +343,7 @@ export function StormOptionsBar() {
         }}
       >
         <div
-          className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
+          className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-gray-200/90 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 px-3.5 py-2 shadow-2xl backdrop-blur-md select-none"
           style={{
             zoom: barScale,
           }}
@@ -352,16 +352,16 @@ export function StormOptionsBar() {
         {/* BDD Phase switch (Given / When / Then) — only the Given/When/Then
             card kind carries a phase; every other kind is fixed at creation. */}
         {stormHasPhase(kind) && (
-          <div className="flex items-center rounded-lg bg-gray-100 p-0.5">
+          <div className="flex items-center rounded-lg bg-gray-100 dark:bg-zinc-800 p-0.5">
             {(["given", "when", "then"] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => handleSetPhase(p)}
                 title={`${STORM_PHASE_TITLES[p]} step`}
-                className={`rounded-md px-2 py-1 text-[11px] font-bold transition-all ${
+                className={`rounded-md px-2 py-1 text-[11px] font-bold transition-all cursor-pointer ${
                   phase === p
                     ? "text-white shadow-xs"
-                    : "text-gray-600 hover:text-gray-900"
+                    : "text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-100"
                 }`}
                 style={
                   phase === p
@@ -380,10 +380,10 @@ export function StormOptionsBar() {
           <button
             onClick={handleToggleArray}
             title="Toggle Array Collection []"
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               isArray
-                ? "border border-blue-200 bg-blue-100 text-blue-700"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "border border-blue-200 dark:border-blue-800 bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300"
+                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
             }`}
           >
             <Brackets size={16} />
@@ -400,13 +400,13 @@ export function StormOptionsBar() {
                 ? `Authorization Action: ${data.action}`
                 : "Configure Authorization Action"
             }
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               data.action
-                ? "border border-blue-200 bg-blue-50 text-blue-700"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300"
+                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
             }`}
           >
-            <Shield size={16} className="text-blue-600" />
+            <Shield size={16} className="text-blue-600 dark:text-blue-400" />
           </button>
         )}
 
@@ -415,13 +415,13 @@ export function StormOptionsBar() {
         <button
           onClick={handleToggleDescriptionPopover}
           title={infoButtonTitle}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+          className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
             currentDescription
-              ? "border border-sky-200 bg-sky-50 text-sky-700"
-              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              ? "border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300"
+              : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
           }`}
         >
-          <Info size={16} className="text-sky-600" />
+          <Info size={16} className="text-sky-600 dark:text-sky-400" />
         </button>
 
         {/* Set Field Tag Button — only visible when a taggable row is selected */}
@@ -429,15 +429,15 @@ export function StormOptionsBar() {
           <button
             onClick={() => setShowTagPopover((v) => !v)}
             title={tagButtonTitle}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               hasTagActive
-                ? "border border-orange-200 bg-orange-50 text-orange-700"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300"
+                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
             }`}
           >
             <Tag
               size={16}
-              className={hasTagActive ? "text-orange-600" : "text-gray-600"}
+              className={hasTagActive ? "text-orange-600 dark:text-orange-400" : "text-gray-600 dark:text-zinc-400"}
             />
           </button>
         )}
@@ -448,16 +448,16 @@ export function StormOptionsBar() {
           <button
             onClick={handleToggleValidationPopover}
             title={validationButtonTitle}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               hasValidationActive
-                ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
             }`}
           >
             <ListChecks
               size={16}
               className={
-                hasValidationActive ? "text-emerald-600" : "text-gray-600"
+                hasValidationActive ? "text-emerald-600 dark:text-emerald-400" : "text-gray-600 dark:text-zinc-400"
               }
             />
           </button>
@@ -472,18 +472,18 @@ export function StormOptionsBar() {
                 ? `Edit Query Item: ${selectedQueryItem.types.join(", ")}`
                 : "Edit Query Item"
             }
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               hasQueryItemActive
-                ? "border border-violet-200 bg-violet-50 text-violet-700"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300"
+                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
             }`}
           >
             <Filter
               size={16}
               className={
                 hasQueryItemActive
-                  ? "text-violet-600"
-                  : "text-gray-600"
+                  ? "text-violet-600 dark:text-violet-400"
+                  : "text-gray-600 dark:text-zinc-400"
               }
             />
           </button>
@@ -495,9 +495,9 @@ export function StormOptionsBar() {
             ref={permissionsButtonRef}
             onClick={() => setShowPermissionsPopover((v) => !v)}
             title={`Permissions (${getActorPermissions(data).length})`}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-pink-200 bg-pink-50 text-pink-700 hover:bg-pink-100"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-pink-200 dark:border-pink-800 bg-pink-50 dark:bg-pink-950/40 text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-900/40 cursor-pointer"
           >
-            <Shield size={16} className="text-pink-600" />
+            <Shield size={16} className="text-pink-600 dark:text-pink-400" />
           </button>
         )}
 
@@ -515,7 +515,7 @@ export function StormOptionsBar() {
                   ? "Add Input Param"
                   : "Add Field"
             }
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 cursor-pointer"
           >
             <Plus size={16} />
           </button>
@@ -530,15 +530,15 @@ export function StormOptionsBar() {
                 ? `Edit Step: ${selectedStep.name}`
                 : "Edit Step"
             }
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               showBddStepPopover
-                ? "border border-sky-200 bg-sky-50 text-sky-700"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300"
+                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
             }`}
           >
             <Pencil
               size={15}
-              className={showBddStepPopover ? "text-sky-600" : "text-gray-600"}
+              className={showBddStepPopover ? "text-sky-600 dark:text-sky-400" : "text-gray-600 dark:text-zinc-400"}
             />
           </button>
         )}
@@ -548,10 +548,10 @@ export function StormOptionsBar() {
           <button
             onClick={handleAddRow}
             title="Add Scenario Step"
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               showBddStepPopover && !bddStepPopup?.stepId
-                ? "border border-sky-200 bg-sky-50 text-sky-700"
-                : "text-sky-700 hover:bg-sky-50"
+                ? "border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300"
+                : "text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40"
             }`}
           >
             <PlusCircle size={16} />
@@ -563,7 +563,7 @@ export function StormOptionsBar() {
           <button
             onClick={() => addStormField(selectedStorm.id, "response")}
             title="Add Response Field"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 hover:bg-indigo-50"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer"
           >
             <Plus size={16} />
           </button>
@@ -574,7 +574,7 @@ export function StormOptionsBar() {
           <button
             onClick={() => addStormField(selectedStorm.id, "response")}
             title="Add Output Field"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 hover:bg-indigo-50"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer"
           >
             <Plus size={16} />
           </button>
@@ -585,10 +585,10 @@ export function StormOptionsBar() {
           <button
             onClick={handleOpenAddQueryItem}
             title="Add DCB Query Item"
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
               showQueryItemPopover && queryItemPopoverMode === "create"
-                ? "border border-violet-200 bg-violet-50 text-violet-700"
-                : "text-violet-700 hover:bg-violet-50"
+                ? "border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300"
+                : "text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40"
             }`}
           >
             <Layers size={16} />
@@ -600,7 +600,7 @@ export function StormOptionsBar() {
           <button
             onClick={() => addStormConstraint(selectedStorm.id)}
             title="Add Constraint Rule"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-teal-700 hover:bg-teal-50"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 cursor-pointer"
           >
             <Ban size={16} />
           </button>
@@ -610,7 +610,7 @@ export function StormOptionsBar() {
         <button
           onClick={() => createReferenceCopy([selectedStorm.id])}
           title="Create Reference Copy"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 cursor-pointer"
         >
           <Link2 size={16} />
         </button>
@@ -618,7 +618,7 @@ export function StormOptionsBar() {
         {/* Remove from Group — detaches just this card, keeping the group */}
         {parentGroup && !parentGroup.locked && (
           <>
-            <div className="h-5 w-px bg-gray-200" />
+            <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
             <RemoveFromGroupButton
               objectId={selectedStorm.id}
               groupName={parentGroup.name}
@@ -630,7 +630,7 @@ export function StormOptionsBar() {
         <button
           onClick={handleDelete}
           title={trashTitle}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 dark:text-zinc-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
         >
           <Trash2 size={15} />
         </button>

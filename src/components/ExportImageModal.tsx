@@ -101,25 +101,25 @@ export function ExportImageModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex w-full max-w-lg flex-col rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+      <div className="flex w-full max-w-lg flex-col rounded-xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 dark:border-zinc-800 dark:bg-zinc-900">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50/70">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50/70 dark:border-zinc-800 dark:bg-zinc-800/50">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
               <ImageIcon size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-800">
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-zinc-100">
                 Export Image
               </h2>
-              <p className="text-[11px] text-gray-500">
+              <p className="text-[11px] text-gray-500 dark:text-zinc-400">
                 Download high-resolution image of your board
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
             title="Close"
           >
             <X size={18} />
@@ -127,13 +127,13 @@ export function ExportImageModal({
         </div>
 
         {/* Tab switch */}
-        <div className="flex border-b border-gray-100 bg-gray-50/40 px-5 pt-2">
+        <div className="flex border-b border-gray-100 bg-gray-50/40 px-5 pt-2 dark:border-zinc-800 dark:bg-zinc-800/30">
           <button
             onClick={() => setTab("png")}
             className={`border-b-2 px-4 py-2 text-xs font-medium transition-colors ${
               tab === "png"
-                ? "border-blue-600 text-blue-600 font-semibold"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "border-blue-600 text-blue-600 font-semibold dark:border-blue-500 dark:text-blue-400"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
             PNG Image
@@ -142,8 +142,8 @@ export function ExportImageModal({
             onClick={() => setTab("svg")}
             className={`border-b-2 px-4 py-2 text-xs font-medium transition-colors ${
               tab === "svg"
-                ? "border-blue-600 text-blue-600 font-semibold"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "border-blue-600 text-blue-600 font-semibold dark:border-blue-500 dark:text-blue-400"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
             SVG Vector
@@ -155,7 +155,7 @@ export function ExportImageModal({
           {tab === "png" ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                <label className="block text-xs font-medium text-gray-700 mb-1.5 dark:text-zinc-300">
                   Resolution Scale
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -169,27 +169,27 @@ export function ExportImageModal({
                       onClick={() => setScale(item.val)}
                       className={`flex flex-col items-center justify-center p-2.5 rounded-lg border text-center transition-all ${
                         scale === item.val
-                          ? "border-blue-600 bg-blue-50/50 text-blue-700 font-medium ring-1 ring-blue-600"
-                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                          ? "border-blue-600 bg-blue-50/50 text-blue-700 font-medium ring-1 ring-blue-600 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-300 dark:ring-blue-500"
+                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                       }`}
                     >
                       <span className="text-sm font-semibold">{item.label}</span>
-                      <span className="text-[10px] text-gray-500">{item.desc}</span>
+                      <span className="text-[10px] text-gray-500 dark:text-zinc-400">{item.desc}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 space-y-1 border border-gray-100">
+              <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 space-y-1 border border-gray-100 dark:bg-zinc-800/50 dark:text-zinc-400 dark:border-zinc-800">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Output Dimensions:</span>
-                  <span className="font-mono font-medium text-gray-700">
+                  <span className="text-gray-500 dark:text-zinc-400">Output Dimensions:</span>
+                  <span className="font-mono font-medium text-gray-700 dark:text-zinc-200">
                     {estimatedWidth} × {estimatedHeight} px
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Elements:</span>
-                  <span className="font-medium text-gray-700">
+                  <span className="text-gray-500 dark:text-zinc-400">Elements:</span>
+                  <span className="font-medium text-gray-700 dark:text-zinc-200">
                     {objects.length} cards & connectors, {groups.length} groups
                   </span>
                 </div>
@@ -215,11 +215,11 @@ export function ExportImageModal({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 border border-gray-100 space-y-1">
-                <p className="font-medium text-gray-800">
+              <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 border border-gray-100 space-y-1 dark:bg-zinc-800/50 dark:text-zinc-400 dark:border-zinc-800">
+                <p className="font-medium text-gray-800 dark:text-zinc-200">
                   Scalable Vector Graphics (SVG)
                 </p>
-                <p className="text-[11px] text-gray-500">
+                <p className="text-[11px] text-gray-500 dark:text-zinc-400">
                   Infinitely scalable vector file containing crisp text, cards, connectors, and groups. Perfect for embedding in docs or importing into Figma/Illustrator.
                 </p>
               </div>
@@ -227,12 +227,12 @@ export function ExportImageModal({
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleCopySvg}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-2xs"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-2xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:active:bg-zinc-600"
                 >
                   {copiedSvg ? (
                     <>
-                      <Check size={14} className="text-green-600" />
-                      <span className="text-green-600">Copied SVG Code!</span>
+                      <Check size={14} className="text-green-600 dark:text-green-400" />
+                      <span className="text-green-600 dark:text-green-400">Copied SVG Code!</span>
                     </>
                   ) : (
                     <>
@@ -253,13 +253,13 @@ export function ExportImageModal({
           )}
 
           {onOpenJsonSchema && (
-            <div className="pt-2 border-t border-gray-100 text-center">
+            <div className="pt-2 border-t border-gray-100 text-center dark:border-zinc-800">
               <button
                 onClick={() => {
                   onClose();
                   onOpenJsonSchema();
                 }}
-                className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                className="text-xs text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
               >
                 Looking for domain schemas? Export JSON Schema instead →
               </button>

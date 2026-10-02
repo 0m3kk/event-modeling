@@ -138,6 +138,7 @@ export interface DrawFieldTypePillOptions {
   h?: number;
   targetModel?: CanvasObject | null;
   textResolution?: number;
+  isDark?: boolean;
 }
 
 /**
@@ -156,6 +157,7 @@ export function drawFieldTypePill(options: DrawFieldTypePillOptions): void {
     h = 20,
     targetModel,
     textResolution = 2,
+    isDark = false,
   } = options;
 
   const isModel = Boolean(targetModel && targetModel.modelData);
@@ -166,8 +168,8 @@ export function drawFieldTypePill(options: DrawFieldTypePillOptions): void {
 
     // Pill background & border with model kind tint
     g.roundRect(x, y, w, h, 3)
-      .fill({ color: kindHex, alpha: 0.12 })
-      .stroke({ color: kindHex, alpha: 0.45, width: 1 });
+      .fill({ color: kindHex, alpha: isDark ? 0.22 : 0.12 })
+      .stroke({ color: kindHex, alpha: isDark ? 0.55 : 0.45, width: 1 });
 
     // Kind icon
     const iconCX = x + 9;
@@ -192,16 +194,20 @@ export function drawFieldTypePill(options: DrawFieldTypePillOptions): void {
   } else {
     // Primitive type: neutral slate pill. The full type text is rendered so
     // custom / long type names are never cut off.
+    const pillBg = isDark ? 0x27272a : 0xf8fafc;
+    const pillStroke = isDark ? 0x3f3f46 : 0xe2e8f0;
+    const pillTextColor = isDark ? 0xa1a1aa : 0x64748b;
+
     g.roundRect(x, y, w, h, 3)
-      .fill({ color: 0xf8fafc })
-      .stroke({ color: 0xe2e8f0, width: 1 });
+      .fill({ color: pillBg })
+      .stroke({ color: pillStroke, width: 1 });
 
     const typeText = new Text({
       text: rawType,
       style: {
         fontSize: 10,
         fontFamily: APP_FONT_FAMILY,
-        fill: 0x64748b,
+        fill: pillTextColor,
       },
       resolution: textResolution,
     });
