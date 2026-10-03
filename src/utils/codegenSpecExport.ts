@@ -57,6 +57,17 @@ export interface CodegenQuery {
   response?: CodegenField[];
 }
 
+export interface CodegenConstraintRule {
+  code?: string;
+  description?: string;
+  assert?: string;
+  message?: string;
+  severity?: "error" | "warning";
+  status?: number;
+}
+
+export type CodegenConstraintRuleItem = string | CodegenConstraintRule;
+
 export interface CodegenConstraint {
   name: string;
   description?: string;
@@ -64,7 +75,7 @@ export interface CodegenConstraint {
   params: CodegenField[];
   queryItems: CodegenQueryItem[];
   outputFields: CodegenField[];
-  rules: string[];
+  rules: CodegenConstraintRuleItem[];
 }
 
 export interface CodegenActor {
@@ -405,8 +416,34 @@ export function buildCodegenSpec(
             queryItems: resolveQueryItems(storm.queryItems, inputFields),
             outputFields: (storm.outputFields ?? []).map(cleanField),
             rules: (storm.constraints ?? [])
-              .map((c) => c.text.trim())
-              .filter(Boolean),
+              .map((c) => {
+                const hasStructured = Boolean(
+                  (c.assert ?? "").trim() ||
+                    (c.code ?? "").trim() ||
+                    (c.message ?? "").trim() ||
+                    c.status !== undefined ||
+                    c.severity,
+                );
+                if (hasStructured) {
+                  const ruleObj: CodegenConstraintRule = {};
+                  if ((c.code ?? "").trim()) ruleObj.code = c.code!.trim();
+                  if ((c.text ?? "").trim()) ruleObj.description = c.text.trim();
+                  if ((c.assert ?? "").trim()) ruleObj.assert = c.assert!.trim();
+                  if ((c.message ?? "").trim()) ruleObj.message = c.message!.trim();
+                  if (c.severity) ruleObj.severity = c.severity;
+                  if (typeof c.status === "number" && !Number.isNaN(c.status)) {
+                    ruleObj.status = c.status;
+                  }
+                  return ruleObj;
+                }
+                return c.text?.trim() || "";
+              })
+              .filter((r): r is CodegenConstraintRuleItem => {
+                if (typeof r === "string") return Boolean(r);
+                return Boolean(
+                  r && (r.assert || r.code || r.description || r.message),
+                );
+              }),
           });
           break;
         }

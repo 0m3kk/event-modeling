@@ -1503,4 +1503,80 @@ describe("AI Model & Write Tools", () => {
     expect(res.isError).toBeFalsy();
     expect(fake.objects[0]!.groupId).toBe("group-1");
   });
+
+  it("create_storm_cards and update_storm_card support structured codegen constraint rules", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    // 1. Create constraint card with structured rules
+    const createRes = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "constraint",
+              name: "User Must Exist",
+              inputFields: [{ name: "User ID", fieldType: "UUID" }],
+              outputFields: [{ name: "Is Deleted", fieldType: "Boolean" }],
+              constraints: [
+                // Plain string rule
+                "Legacy string rule",
+                // Structured codegen rule
+                {
+                  code: "USER_NOT_FOUND",
+                  description: "User account must exist in the event stream",
+                  assert: "output.userId != null",
+                  message: "User account not found.",
+                  status: 404,
+                  severity: "error",
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(createRes.isError).toBeFalsy();
+    const createdCard = fake.objects.find(
+      (o) => o.stormData?.name === "User Must Exist",
+    );
+    expect(createdCard).toBeDefined();
+    expect(createdCard?.stormData?.constraints).toHaveLength(2);
+    expect(createdCard?.stormData?.constraints?.[0]?.text).toBe("Legacy string rule");
+    expect(createdCard?.stormData?.constraints?.[1]?.code).toBe("USER_NOT_FOUND");
+    expect(createdCard?.stormData?.constraints?.[1]?.assert).toBe("output.userId != null");
+    expect(createdCard?.stormData?.constraints?.[1]?.status).toBe(404);
+
+    // 2. Update card with additional structured rule
+    const updateRes = await executeToolCall(
+      {
+        id: "2",
+        name: "update_storm_card",
+        arguments: JSON.stringify({
+          id: createdCard!.id,
+          constraints: [
+            {
+              code: "USER_DELETED",
+              assert: "!output.isDeleted",
+              message: "Account is deleted.",
+              status: 410,
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(updateRes.isError).toBeFalsy();
+    const updatedCard = fake.objects.find((o) => o.id === createdCard!.id);
+    const updatedConstraints = updatedCard?.stormData?.constraints;
+    expect(updatedConstraints).toHaveLength(1);
+    expect(updatedConstraints?.[0]?.code).toBe("USER_DELETED");
+    expect(updatedConstraints?.[0]?.assert).toBe("!output.isDeleted");
+    expect(updatedConstraints?.[0]?.status).toBe(410);
+  });
 });

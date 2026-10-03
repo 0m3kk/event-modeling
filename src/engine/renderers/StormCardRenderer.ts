@@ -915,10 +915,14 @@ export class StormCardRenderer {
       const wrapWidth = Math.max(40, w - textX - 10);
       for (const c of constraints) {
         const rowY = renderY;
-        const rawText = c.text || "";
+        const rawText = c.text || c.code || c.assert || "";
         const displayText = rawText.startsWith("•")
           ? rawText.replace(/^•\s*/, "")
           : rawText;
+        const hasStructured = Boolean(c.assert);
+        const itemWrapWidth = hasStructured
+          ? Math.max(30, wrapWidth - 14)
+          : wrapWidth;
 
         const bullet = new Text({
           text: "•",
@@ -939,7 +943,7 @@ export class StormCardRenderer {
             fontFamily: APP_FONT_FAMILY,
             fill: isDark ? 0xd4d4d8 : 0x134e4a,
             wordWrap: true,
-            wordWrapWidth: wrapWidth,
+            wordWrapWidth: itemWrapWidth,
             lineHeight: 14,
             breakWords: true,
           },
@@ -970,6 +974,18 @@ export class StormCardRenderer {
         cText.y = rowY + 5;
         container.addChild(bullet);
         container.addChild(cText);
+
+        if (hasStructured) {
+          drawInfoBadge(g, container, w - 14, rowY + 12, {
+            radius: 6,
+            stroke: isDark ? 0x14b8a6 : 0x0f766e,
+            fill: isDark ? 0x2dd4bf : 0x0f766e,
+            fontSize: 8,
+            glyph: "ƒ",
+            bold: true,
+            textResolution,
+          });
+        }
 
         hitZones.push({
           type: "constraint",

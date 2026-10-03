@@ -1761,5 +1761,51 @@ describe("useCanvasStore", () => {
       useCanvasStore.getState().objects.some((o) => o.id === "conn-1"),
     ).toBe(true);
   });
+
+  it("adds and updates structured constraint rules via updateStormConstraint", () => {
+    const card: CanvasObject = {
+      id: "const-card-1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 250,
+      height: 150,
+      stormData: {
+        kind: "constraint",
+        name: "Check User",
+        fields: [],
+        inputFields: [{ id: "f1", name: "userId", fieldType: "uuid" }],
+        outputFields: [{ id: "o1", name: "isDeleted", fieldType: "boolean" }],
+        constraints: [],
+      },
+    };
+    useCanvasStore.getState().addObject(card);
+
+    const ruleId = useCanvasStore.getState().addStormConstraint("const-card-1")!;
+    expect(ruleId).toBeDefined();
+
+    let updated = useCanvasStore.getState().objects.find((o) => o.id === "const-card-1");
+    expect(updated?.stormData?.constraints).toHaveLength(1);
+    expect(updated?.stormData?.constraints?.[0]?.id).toBe(ruleId);
+
+    // Update with structured codegen fields
+    useCanvasStore.getState().updateStormConstraint("const-card-1", ruleId, {
+      text: "User must exist and not be deleted",
+      code: "USER_NOT_FOUND",
+      assert: "output.userId != null && !output.isDeleted",
+      message: "User account not found.",
+      status: 404,
+      severity: "error",
+    });
+
+    updated = useCanvasStore.getState().objects.find((o) => o.id === "const-card-1");
+    const rule = updated?.stormData?.constraints?.[0];
+    expect(rule?.text).toBe("User must exist and not be deleted");
+    expect(rule?.code).toBe("USER_NOT_FOUND");
+    expect(rule?.assert).toBe("output.userId != null && !output.isDeleted");
+    expect(rule?.message).toBe("User account not found.");
+    expect(rule?.status).toBe(404);
+    expect(rule?.severity).toBe("error");
+  });
 });
 

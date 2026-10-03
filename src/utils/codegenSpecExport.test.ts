@@ -510,4 +510,79 @@ describe("codegenSpecExport", () => {
     expect(sliceModel?.slice).toBe("Billing Slice");
     expect(sliceModel?.group).toBeUndefined();
   });
+
+  it("exports structured constraint rules when assert, code, or status are provided", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "const-1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 300,
+        height: 250,
+        stormData: {
+          kind: "constraint",
+          name: "UserMustExist",
+          fields: [],
+          inputFields: [
+            { id: "p1", name: "userId", fieldType: "uuid", required: true },
+          ],
+          outputFields: [
+            { id: "o1", name: "isDeleted", fieldType: "boolean" },
+          ],
+          constraints: [
+            // Legacy string rule
+            { id: "c1", text: "Legacy free text rule without assertion" },
+            // Structured codegen rule
+            {
+              id: "c2",
+              text: "User account must exist in the event stream",
+              code: "USER_NOT_FOUND",
+              assert: "output.userId != null",
+              message: "User account not found.",
+              status: 404,
+              severity: "error",
+            },
+            // Soft delete assertion
+            {
+              id: "c3",
+              text: "Deleted account cannot be used",
+              code: "USER_DELETED",
+              assert: "!output.isDeleted",
+              message: "User account is deleted.",
+              status: 410,
+            },
+          ],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, []);
+    expect(spec.constraints).toHaveLength(1);
+    const c = spec.constraints[0];
+    expect(c.name).toBe("UserMustExist");
+    expect(c.rules).toHaveLength(3);
+
+    // Rule 1 is a legacy string
+    expect(c.rules[0]).toBe("Legacy free text rule without assertion");
+
+    // Rule 2 is structured
+    expect(c.rules[1]).toEqual({
+      code: "USER_NOT_FOUND",
+      description: "User account must exist in the event stream",
+      assert: "output.userId != null",
+      message: "User account not found.",
+      severity: "error",
+      status: 404,
+    });
+
+    // Rule 3 is structured
+    expect(c.rules[2]).toEqual({
+      code: "USER_DELETED",
+      description: "Deleted account cannot be used",
+      assert: "!output.isDeleted",
+      message: "User account is deleted.",
+      status: 410,
+    });
+  });
 });

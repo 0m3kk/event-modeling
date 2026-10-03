@@ -24,6 +24,7 @@ import { PermissionsPopover } from "./PermissionsPopover";
 import { TagPopover } from "./TagPopover";
 import { QueryItemPopover } from "./QueryItemPopover";
 import { ValidationPopover } from "./ValidationPopover";
+import { ConstraintRulePopover } from "./ConstraintRulePopover";
 import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 import { findDescriptionText } from "@/utils/description";
 import { getActorPermissions } from "@/utils/stormAuth";
@@ -45,6 +46,7 @@ import {
   ListChecks,
   Pencil,
   PlusCircle,
+  Code2,
 } from "lucide-react";
 
 export function StormOptionsBar() {
@@ -77,6 +79,7 @@ export function StormOptionsBar() {
   const [queryItemPopoverMode, setQueryItemPopoverMode] = useState<
     "create" | "edit"
   >("create");
+  const [showConstraintRulePopover, setShowConstraintRulePopover] = useState(false);
 
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const permissionsButtonRef = useRef<HTMLButtonElement>(null);
@@ -650,6 +653,25 @@ export function StormOptionsBar() {
           </button>
         )}
 
+        {/* Configure Constraint Rule (Codegen) */}
+        {kind === "constraint" && selectedConstraint && (
+          <button
+            onClick={() => setShowConstraintRulePopover(!showConstraintRulePopover)}
+            title={
+              selectedConstraint.assert
+                ? `Rule: ${selectedConstraint.code || "assert"} (${selectedConstraint.assert})`
+                : "Configure Constraint Rule (Codegen)"
+            }
+            className={`flex h-8 w-8 items-center justify-center rounded-lg cursor-pointer transition-colors ${
+              showConstraintRulePopover || selectedConstraint.assert || selectedConstraint.code
+                ? "bg-teal-100 text-teal-800 dark:bg-teal-950/80 dark:text-teal-300 font-semibold"
+                : "text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40"
+            }`}
+          >
+            <Code2 size={16} />
+          </button>
+        )}
+
         {/* Create Reference Copy — linked duplicate, content stays in sync */}
         <button
           onClick={() => createReferenceCopy([selectedStorm.id])}
@@ -747,6 +769,16 @@ export function StormOptionsBar() {
           card={selectedStorm}
           stepId={bddStepPopup.stepId}
           onClose={() => setBddStepPopup(null)}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
+        />
+      )}
+
+      {/* Constraint Rule Popover (Codegen) */}
+      {showConstraintRulePopover && selectedConstraint && (
+        <ConstraintRulePopover
+          card={selectedStorm}
+          constraintId={selectedConstraint.id}
+          onClose={() => setShowConstraintRulePopover(false)}
           anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}

@@ -88,11 +88,26 @@ export interface StormQueryItem {
 }
 
 /**
- * Free-text business rule / constraint line on a Constraint card
+ * Business rule / invariant constraint line on a Constraint card.
+ * Supports both human-readable text and structured codegen expressions.
  */
 export interface StormConstraint {
   id: string;
+  /** Human-readable rule text / description */
   text: string;
+  /** Unique machine-readable error/rule code, e.g. "USER_NOT_FOUND" */
+  code?: string;
+  /**
+   * Executable invariant expression in CEL / JS boolean syntax.
+   * e.g. "output.userId != null", "!output.isDeleted", "now() < output.expiresAt"
+   */
+  assert?: string;
+  /** Client-facing error message, e.g. "User account does not exist." */
+  message?: string;
+  /** Error severity: "error" (default) or "warning" */
+  severity?: "error" | "warning";
+  /** Optional HTTP status code for API codegen (e.g. 400, 401, 403, 404, 409) */
+  status?: number;
 }
 
 /**

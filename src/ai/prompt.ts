@@ -35,7 +35,22 @@ The application models systems according to CQRS and Event Sourcing with DCB:
    - **Reusable & Independent Components**: A Constraint is a modular, reusable Decision Model component completely independent of any specific Command. It only checks data directly relevant to what it is evaluating.
      - Example: A "User Exists" constraint ONLY checks user existence against user events (\`User Registered\`, \`User Deleted\`). It must NEVER include rules like "Profile Must Exist" or validate profile fields just because it happens to be placed in an "Update User Profile" workflow.
      - When a workflow requires checking multiple invariants, use multiple separate, reusable constraints (e.g. \`[User Exists]\` AND \`[Profile Exists]\`), placed side by side in the Constraint layer between the Command and Event.
-   - **Constraint Has the Same Shape as State**: A Constraint carries the same three parts as a State — \`inputFields\` (INPUT params; the only tag-bearing rows), \`queryItems\` (which historical events it evaluates), and \`outputFields\` (OUTPUT fields it projects from those events) — plus its free-text \`constraints\` invariant rules. Keep input and output separate: never put projected fields in \`inputFields\` and never tag \`outputFields\`.
+   - **Constraint Has the Same Shape as State**: A Constraint carries the same three parts as a State — \`inputFields\` (INPUT params; the only tag-bearing rows), \`queryItems\` (which historical events it evaluates), and \`outputFields\` (OUTPUT fields it projects from those events) — plus its \`constraints\` invariant rules. Keep input and output separate: never put projected fields in \`inputFields\` and never tag \`outputFields\`.
+   - **Codegen-Ready Structured Constraint Rules**:
+     - Constraint rules support structured objects for automated code generation (\`codegen\`). Prefer structured rules over plain free-text:
+       \`\`\`json
+       {
+         "code": "USER_NOT_FOUND",
+         "description": "The user account must exist.",
+         "assert": "output.userId != null",
+         "message": "User account does not exist.",
+         "status": 404
+       }
+       \`\`\`
+     - \`assert\`: Boolean invariant expression in CEL / JS syntax. Evaluates against \`params.<field>\` (inputFields), \`output.<field>\` (outputFields), and context (e.g. \`now()\`, \`verifyHash()\`, \`verifyTotp()\`). Must evaluate to \`true\` to proceed.
+     - \`code\`: UPPER_SNAKE_CASE domain error code (e.g. \`EMAIL_ALREADY_IN_USE\`, \`ACCOUNT_SUSPENDED\`, \`TOKEN_EXPIRED\`).
+     - \`status\`: HTTP status code hint (e.g. 400, 401, 403, 404, 409, 429).
+     - Plain string rules are supported as shorthand fallback.
    - **Do NOT Repeat Input Params in Output Fields**: If a field is already declared in \`inputFields\` (the INPUT params), do NOT list it again in \`outputFields\`. Only add a field to \`outputFields\` when it is a distinct field carrying a different meaning than the input params (e.g. a value projected from event history).
    - **Input Params Are Optional**: \`inputFields\` is only needed when a query item filters by a tag. When a query item filters purely by event type, leave \`inputFields\` empty. Tags in \`queryItems[].tagFields\` can ONLY come from \`inputFields\`.
    - **Business Logic Invariants vs. Command Validation**:

@@ -1683,6 +1683,30 @@ export const useCanvasStore = create<CanvasStore>()(
         return newId;
       },
 
+      updateStormConstraint: (objectId, constraintId, patch) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "storm" || !obj.stormData || obj.locked)
+          return;
+        if (obj.stormData.kind !== "constraint") return;
+
+        const nextConstraints = (obj.stormData.constraints ?? []).map((c) =>
+          c.id === constraintId ? { ...c, ...patch } : c,
+        );
+        const nextData = { ...obj.stormData, constraints: nextConstraints };
+        const newHeight = computeStormCardHeight(nextData, obj.width);
+        set({
+          objects: syncReferenceAfterChange(
+            objects.map((o) =>
+              o.id === obj.id
+                ? { ...o, height: newHeight, stormData: nextData }
+                : o,
+            ),
+            obj.id,
+          ),
+        });
+      },
+
       addBddStep: (objectId, ref) => {
         const { objects } = get();
         const obj = objects.find((o) => o.id === objectId);

@@ -100,8 +100,22 @@ const queryItemSpec = z.object({
     ),
 });
 
+export const constraintRuleSpec = z.union([
+  z.string(),
+  z.object({
+    text: z.string().optional().describe("Human-readable rule text or description"),
+    description: z.string().optional().describe("Alternative alias for text"),
+    code: z.string().optional().describe("Machine-readable error/rule code, e.g. USER_NOT_FOUND, EMAIL_ALREADY_IN_USE"),
+    assert: z.string().optional().describe("Boolean invariant expression in CEL / JS syntax, e.g. output.userId != null, !output.isDeleted, now() < output.expiresAt"),
+    message: z.string().optional().describe("Client error message, e.g. User account does not exist"),
+    severity: z.enum(["error", "warning"]).optional(),
+    status: z.number().int().optional().describe("HTTP status code for API codegen, e.g. 400, 401, 403, 404, 409"),
+  }),
+]);
+
 type FieldSpec = z.output<typeof fieldSpec>;
 type QueryItemSpec = z.output<typeof queryItemSpec>;
+export type ConstraintRuleSpec = z.output<typeof constraintRuleSpec>;
 
 function createStormField(
   name: string,
@@ -133,10 +147,29 @@ function createStormQueryItem(
   };
 }
 
-function createStormConstraint(text = ""): StormConstraint {
+function createStormConstraint(
+  input: string | ConstraintRuleSpec = "",
+): StormConstraint {
+  if (typeof input === "string") {
+    return {
+      id: nanoid(),
+      text: input,
+    };
+  }
+  const label =
+    input.text?.trim() ||
+    input.description?.trim() ||
+    input.code?.trim() ||
+    input.assert?.trim() ||
+    "";
   return {
     id: nanoid(),
-    text,
+    text: label,
+    code: input.code?.trim() || undefined,
+    assert: input.assert?.trim() || undefined,
+    message: input.message?.trim() || undefined,
+    severity: input.severity,
+    status: typeof input.status === "number" ? input.status : undefined,
   };
 }
 
@@ -208,7 +241,7 @@ function buildStormData(input: {
   outputFields?: StormField[];
   responseFields?: StormField[];
   queryItems?: QueryItemSpec[];
-  constraints?: string[];
+  constraints?: (string | ConstraintRuleSpec)[];
   action?: string;
   permissions?: string[];
 }): StormData {
@@ -323,10 +356,10 @@ export const createStormCardsTool = defineTool({
               "State & Constraint cards: DCB query matching event types and tagged input params.",
             ),
           constraints: z
-            .array(z.string())
+            .array(constraintRuleSpec)
             .optional()
             .describe(
-              "Constraint cards only: domain business logic invariants evaluated against historical events (not command input validation). Constraints are reusable and independent.",
+              "Constraint cards only: domain business logic invariants evaluated against historical events. Supports free-text strings or structured codegen rules with { code, assert, message, status }.",
             ),
           action: z
             .string()
@@ -660,7 +693,12 @@ export const updateStormCardTool = defineTool({
       .describe(
         "Updated queryItems for State/Constraint (e.g. adding new event types during Constraint Evolution). tagFields reference tagged input params.",
       ),
-    constraints: z.array(z.string()).optional(),
+    constraints: z
+      .array(constraintRuleSpec)
+      .optional()
+      .describe(
+        "Updated constraints for Constraint cards (strings or structured codegen rules with { code, assert, message, status }).",
+      ),
     action: z
       .string()
       .optional()

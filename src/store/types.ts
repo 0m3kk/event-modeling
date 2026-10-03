@@ -1,4 +1,4 @@
-import type { CanvasObject, GroupInfo, Tool, Viewport, AISettings, AIConversation, BddStep, BddStepRef } from "@/types";
+import type { CanvasObject, GroupInfo, Tool, Viewport, AISettings, AIConversation, BddStep, BddStepRef, StormConstraint } from "@/types";
 import type { CardHitZone } from "@/engine/renderers/types";
 
 export interface AlignmentGuide {
@@ -188,6 +188,11 @@ export interface CanvasStoreActions {
   ) => string | undefined;
   addStormQueryItem: (objectId: string) => string | undefined;
   addStormConstraint: (objectId: string) => string | undefined;
+  updateStormConstraint: (
+    objectId: string,
+    constraintId: string,
+    patch: Partial<Omit<StormConstraint, "id">>,
+  ) => void;
   /** Create a BDD scenario step (defaults to the phase's ref) and select it. */
   addBddStep: (objectId: string, ref?: BddStepRef) => string | undefined;
   /** Replace the editable parts of a BDD scenario step. */

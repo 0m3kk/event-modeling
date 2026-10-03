@@ -241,7 +241,18 @@ export interface StormValidationCard {
   outputFields?: StormField[];
   writtenFields?: StormField[];
   queryItems?: { types?: string[]; tagFields?: string[] }[];
-  constraints?: (string | { id?: string; text: string })[];
+  constraints?: (
+    | string
+    | {
+        id?: string;
+        text?: string;
+        code?: string;
+        assert?: string;
+        message?: string;
+        severity?: "error" | "warning";
+        status?: number;
+      }
+  )[];
   action?: string;
   permissions?: string[];
   writtenPermissions?: string[];
