@@ -1,0 +1,513 @@
+import { describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
+import {
+  buildCodegenSpec,
+  exportCodegenSpec,
+} from "./codegenSpecExport";
+import type { CanvasObject, GroupInfo } from "@/types";
+
+describe("codegenSpecExport", () => {
+  it("exports exact query items with event types and resolved readable tags", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "s1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 250,
+        height: 200,
+        stormData: {
+          kind: "state",
+          name: "OrderSummary",
+          fields: [],
+          inputFields: [
+            {
+              id: "in-1",
+              name: "orderId",
+              fieldType: "uuid",
+              tag: "order",
+              required: true,
+            },
+            {
+              id: "in-2",
+              name: "tenantId",
+              fieldType: "string",
+              tag: "tenant",
+            },
+            {
+              id: "in-3",
+              name: "unTaggedField",
+              fieldType: "string",
+            },
+          ],
+          queryItems: [
+            {
+              id: "q-1",
+              types: ["OrderPlaced", "OrderUpdated"],
+              tagFieldIds: ["in-1", "in-2"],
+            },
+            {
+              id: "q-2",
+              types: ["PaymentProcessed"],
+              tagFieldIds: ["in-3"],
+            },
+          ],
+          outputFields: [
+            { id: "out-1", name: "totalAmount", fieldType: "number", required: true },
+            { id: "out-2", name: "status", fieldType: "string" },
+          ],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, []);
+    expect(spec.readModels).toHaveLength(1);
+    const readModel = spec.readModels[0];
+    expect(readModel.name).toBe("OrderSummary");
+    expect(readModel.params).toEqual([
+      { name: "orderId", type: "uuid", required: true, tag: "order" },
+      { name: "tenantId", type: "string", tag: "tenant" },
+      { name: "unTaggedField", type: "string" },
+    ]);
+    expect(readModel.queryItems).toEqual([
+      {
+        eventTypes: ["OrderPlaced", "OrderUpdated"],
+        tags: ["order:orderId", "tenant:tenantId"],
+      },
+      {
+        eventTypes: ["PaymentProcessed"],
+        tags: ["unTaggedField"],
+      },
+    ]);
+    expect(readModel.outputFields).toEqual([
+      { name: "totalAmount", type: "number", required: true },
+      { name: "status", type: "string" },
+    ]);
+  });
+
+  it("organizes items into flattened root lists and attaches slice when grouped", () => {
+    const groups: GroupInfo[] = [
+      { id: "grp-orders", name: "Order Processing" },
+    ];
+
+    const objects: CanvasObject[] = [
+      {
+        id: "c1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        groupId: "grp-orders",
+        stormData: {
+          kind: "command",
+          name: "PlaceOrder",
+          action: "order:create",
+          fields: [
+            { id: "f1", name: "orderId", fieldType: "uuid", required: true },
+            {
+              id: "f2",
+              name: "quantity",
+              fieldType: "number",
+              validation: { min: 1, max: 99 },
+            },
+          ],
+          responseFields: [
+            { id: "rf1", name: "orderId", fieldType: "uuid", required: true },
+          ],
+        },
+      },
+      {
+        id: "e1",
+        type: "storm",
+        x: 250,
+        y: 0,
+        width: 200,
+        height: 100,
+        groupId: "grp-orders",
+        stormData: {
+          kind: "event",
+          name: "OrderPlaced",
+          fields: [
+            { id: "ef1", name: "orderId", fieldType: "uuid", required: true, tag: "order" },
+          ],
+        },
+      },
+      {
+        id: "e2",
+        type: "storm",
+        x: 500,
+        y: 0,
+        width: 200,
+        height: 100,
+        // Ungrouped
+        stormData: {
+          kind: "event",
+          name: "GlobalNotificationSent",
+          fields: [{ id: "nf1", name: "message", fieldType: "string" }],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, groups, "Shop Domain");
+    expect(spec.title).toBe("Shop Domain");
+    expect(spec.slices).toEqual(["Order Processing"]);
+
+    expect(spec.commands).toHaveLength(1);
+    expect(spec.commands[0]).toEqual({
+      name: "PlaceOrder",
+      slice: "Order Processing",
+      action: "order:create",
+      payload: [
+        { name: "orderId", type: "uuid", required: true },
+        { name: "quantity", type: "number", validation: { min: 1, max: 99 } },
+      ],
+      response: [{ name: "orderId", type: "uuid", required: true }],
+    });
+
+    expect(spec.events).toHaveLength(2);
+    expect(spec.events[0]).toEqual({
+      name: "OrderPlaced",
+      slice: "Order Processing",
+      fields: [{ name: "orderId", type: "uuid", required: true, tag: "order" }],
+    });
+    expect(spec.events[1]).toEqual({
+      name: "GlobalNotificationSent",
+      fields: [{ name: "message", type: "string" }],
+    });
+  });
+
+  it("exports models, queries, constraints, actors, externals, and bdd scenarios", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "m1",
+        type: "model",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        modelData: {
+          kind: "enum",
+          name: "OrderStatus",
+          values: [
+            { id: "v1", name: "PENDING", description: "Created but unpaid" },
+            { id: "v2", name: "CONFIRMED", value: "confirmed" },
+          ],
+        },
+      },
+      {
+        id: "m2",
+        type: "model",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        modelData: {
+          kind: "object",
+          name: "Address",
+          fields: [
+            { id: "mf1", name: "street", fieldType: "string", required: true },
+            { id: "mf2", name: "zipCode", fieldType: "string", validation: { pattern: "^\\d{5}$" } },
+          ],
+        },
+      },
+      {
+        id: "q1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "query",
+          name: "GetOrder",
+          fields: [{ id: "qf1", name: "orderId", fieldType: "uuid", required: true }],
+          responseFields: [{ id: "qrf1", name: "total", fieldType: "number" }],
+        },
+      },
+      {
+        id: "c1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "constraint",
+          name: "InventoryCheck",
+          fields: [],
+          inputFields: [{ id: "ci1", name: "orderId", fieldType: "uuid", tag: "order" }],
+          queryItems: [{ id: "qi1", types: ["OrderPlaced"], tagFieldIds: ["ci1"] }],
+          outputFields: [{ id: "co1", name: "availableStock", fieldType: "number" }],
+          constraints: [
+            { id: "rule-1", text: "availableStock >= requestedQuantity" },
+            { id: "rule-2", text: "isStoreOpen == true" },
+          ],
+        },
+      },
+      {
+        id: "a1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "actor",
+          name: "StoreManager",
+          fields: [],
+          permissions: ["order:*", "inventory:update"],
+        },
+      },
+      {
+        id: "x1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "external",
+          name: "StripeGateway",
+          fields: [{ id: "xf1", name: "apiKey", fieldType: "string", required: true }],
+        },
+      },
+      {
+        id: "b1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "bdd",
+          name: "Given an existing user",
+          phase: "given",
+          fields: [],
+          steps: [
+            {
+              id: "step1",
+              ref: "event",
+              name: "UserRegistered",
+              payload: [
+                { id: "p1", key: "userId", value: "u-101" },
+                { id: "p2", key: "email", value: "test@example.com" },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, []);
+
+    expect(spec.models).toEqual([
+      {
+        kind: "enum",
+        name: "OrderStatus",
+        values: [
+          { name: "PENDING", description: "Created but unpaid" },
+          { name: "CONFIRMED", value: "confirmed" },
+        ],
+      },
+      {
+        kind: "object",
+        name: "Address",
+        fields: [
+          { name: "street", type: "string", required: true },
+          { name: "zipCode", type: "string", validation: { pattern: "^\\d{5}$" } },
+        ],
+      },
+    ]);
+
+    expect(spec.queries[0]).toEqual({
+      name: "GetOrder",
+      params: [{ name: "orderId", type: "uuid", required: true }],
+      response: [{ name: "total", type: "number" }],
+    });
+
+    expect(spec.constraints[0]).toEqual({
+      name: "InventoryCheck",
+      params: [{ name: "orderId", type: "uuid", tag: "order" }],
+      queryItems: [{ eventTypes: ["OrderPlaced"], tags: ["order:orderId"] }],
+      outputFields: [{ name: "availableStock", type: "number" }],
+      rules: [
+        "availableStock >= requestedQuantity",
+        "isStoreOpen == true",
+      ],
+    });
+
+    expect(spec.actors[0]).toEqual({
+      name: "StoreManager",
+      permissions: ["order:*", "inventory:update"],
+    });
+
+    expect(spec.externals[0]).toEqual({
+      name: "StripeGateway",
+      fields: [{ name: "apiKey", type: "string", required: true }],
+    });
+
+    expect(spec.scenarios[0]).toEqual({
+      name: "Given an existing user",
+      phase: "given",
+      steps: [
+        {
+          ref: "event",
+          name: "UserRegistered",
+          payload: {
+            userId: "u-101",
+            email: "test@example.com",
+          },
+        },
+      ],
+    });
+  });
+
+  it("resolves connectors into semantic flows", () => {
+    const groups: GroupInfo[] = [{ id: "g1", name: "Checkout" }];
+    const objects: CanvasObject[] = [
+      {
+        id: "cmd-1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        groupId: "g1",
+        stormData: { kind: "command", name: "SubmitOrder", fields: [] },
+      },
+      {
+        id: "evt-1",
+        type: "storm",
+        x: 200,
+        y: 0,
+        width: 100,
+        height: 100,
+        groupId: "g1",
+        stormData: { kind: "event", name: "OrderSubmitted", fields: [] },
+      },
+      {
+        id: "conn-1",
+        type: "connector",
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        connectorData: {
+          start: { objectId: "cmd-1", anchor: "right" },
+          end: { objectId: "evt-1", anchor: "left" },
+          lineStyle: "dashed",
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, groups);
+    expect(spec.flows).toHaveLength(1);
+    expect(spec.flows[0]).toEqual({
+      from: { name: "SubmitOrder", kind: "command", slice: "Checkout" },
+      to: { name: "OrderSubmitted", kind: "event", slice: "Checkout" },
+      lineStyle: "dashed",
+    });
+  });
+
+  it("exports JSON and YAML string formats accurately", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "e1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        stormData: {
+          kind: "event",
+          name: "UserCreated",
+          fields: [{ id: "f1", name: "id", fieldType: "uuid", required: true }],
+        },
+      },
+    ];
+
+    const jsonStr = exportCodegenSpec(objects, [], { format: "json", projectName: "MyProject" });
+    const parsedJson = JSON.parse(jsonStr);
+    expect(parsedJson.version).toBe("1.0");
+    expect(parsedJson.title).toBe("MyProject");
+    expect(parsedJson.events[0].name).toBe("UserCreated");
+
+    const yamlStr = exportCodegenSpec(objects, [], { format: "yaml", projectName: "MyProject" });
+    const parsedYaml = parseYaml(yamlStr) as typeof parsedJson;
+    expect(parsedYaml.version).toBe("1.0");
+    expect(parsedYaml.title).toBe("MyProject");
+    expect(parsedYaml.events[0].name).toBe("UserCreated");
+  });
+
+  it("treats groups with only models as shared type containers, not slices", () => {
+    const groups: GroupInfo[] = [
+      { id: "grp-shared", name: "Shared Models" },
+      { id: "grp-slice", name: "Billing Slice" },
+    ];
+
+    const objects: CanvasObject[] = [
+      // In shared models group (only models)
+      {
+        id: "m-common",
+        type: "model",
+        x: 0,
+        y: 0,
+        width: 150,
+        height: 100,
+        groupId: "grp-shared",
+        modelData: {
+          kind: "enum",
+          name: "Currency",
+          values: [{ id: "v1", name: "USD" }, { id: "v2", name: "VND" }],
+        },
+      },
+      // In billing slice (contains command + event + model)
+      {
+        id: "cmd-invoice",
+        type: "storm",
+        x: 200,
+        y: 0,
+        width: 150,
+        height: 100,
+        groupId: "grp-slice",
+        stormData: {
+          kind: "command",
+          name: "IssueInvoice",
+          fields: [{ id: "f1", name: "invoiceId", fieldType: "uuid", required: true }],
+        },
+      },
+      {
+        id: "m-slice",
+        type: "model",
+        x: 350,
+        y: 0,
+        width: 150,
+        height: 100,
+        groupId: "grp-slice",
+        modelData: {
+          kind: "object",
+          name: "InvoiceLine",
+          fields: [{ id: "lf1", name: "amount", fieldType: "number", required: true }],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, groups);
+
+    // "Shared Models" is NOT in slices because it contains only models
+    expect(spec.slices).toEqual(["Billing Slice"]);
+
+    // Model in shared group has group: "Shared Models", but NO slice
+    const sharedModel = spec.models.find((m) => m.name === "Currency");
+    expect(sharedModel).toBeDefined();
+    expect(sharedModel?.group).toBe("Shared Models");
+    expect(sharedModel?.slice).toBeUndefined();
+
+    // Model in actual slice has slice: "Billing Slice", and NO group
+    const sliceModel = spec.models.find((m) => m.name === "InvoiceLine");
+    expect(sliceModel).toBeDefined();
+    expect(sliceModel?.slice).toBe("Billing Slice");
+    expect(sliceModel?.group).toBeUndefined();
+  });
+});

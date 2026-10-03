@@ -3,6 +3,7 @@ import { SpatialIndex } from "./SpatialIndex";
 import { useCanvasStore } from "@/store";
 import { exportCanvasToSvg } from "@/utils/imageExport";
 import { exportCanvasJsonSchema } from "@/utils/jsonSchemaExport";
+import { exportCodegenSpec } from "@/utils/codegenSpecExport";
 import type { CanvasObject } from "@/types";
 
 describe("Performance Hardening & Benchmarks (Phase 7)", () => {
@@ -126,11 +127,14 @@ describe("Performance Hardening & Benchmarks (Phase 7)", () => {
       });
     }
 
-    // 1. JSON Schema export benchmark
+    // 1. Codegen Spec & JSON Schema export benchmarks
     const t0 = performance.now();
+    const codegenSpec = exportCodegenSpec(objects, []);
+    const specTime = performance.now() - t0;
+    expect(specTime).toBeLessThan(100);
+    expect(codegenSpec.length).toBeGreaterThan(1000);
+
     const jsonSchema = exportCanvasJsonSchema(objects, { dialect: "2020-12" });
-    const schemaTime = performance.now() - t0;
-    expect(schemaTime).toBeLessThan(100);
     expect(jsonSchema.length).toBeGreaterThan(1000);
 
     // 2. SVG export benchmark

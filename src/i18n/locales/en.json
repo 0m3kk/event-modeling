@@ -37,7 +37,8 @@
     "saveDrive": "Save to Drive",
     "restoreBackup": "Restore",
     "exportImage": "Image",
-    "exportJsonSchema": "JSON Schema",
+    "exportJsonSchema": "Codegen Spec",
+    "exportCodegenSpec": "Codegen Spec",
     "exportDrive": "Google Drive",
     "searchTooltip": "Search (Cmd+F)",
     "undoTooltip": "Undo (Cmd+Z)",
@@ -47,7 +48,8 @@
     "resetZoomTooltip": "Reset Zoom to 100%",
     "resetViewTooltip": "Reset View",
     "toast": {
-      "jsonSchemaSuccess": "JSON Schema exported successfully — {{detail}}",
+      "jsonSchemaSuccess": "Codegen Spec exported successfully — {{detail}}",
+      "codegenSpecSuccess": "Codegen Spec exported successfully — {{detail}}",
       "pngSuccess": "PNG exported successfully — {{detail}}",
       "svgSuccess": "SVG exported successfully — {{detail}}"
     }
@@ -129,16 +131,26 @@
       "copiedSvg": "Copied SVG Code!",
       "copySvg": "Copy SVG Markup",
       "downloadSvg": "Download .svg",
-      "jsonSchemaLink": "Looking for domain schemas? Export JSON Schema instead →"
+      "jsonSchemaLink": "Looking for domain spec? Export Codegen Spec instead →"
+    },
+    "codegenSpec": {
+      "title": "Export Codegen Spec",
+      "subtitle": "High-fidelity domain specification with exact modeled data for code generation",
+      "format": "Format:",
+      "copy": "Copy {{format}}",
+      "copied": "Copied!",
+      "download": "Download .{{ext}}",
+      "compatibility": "Compatible with CQRS code generators, OpenAPI, and scaffolding tools",
+      "linesCount": "{{lines}} lines • {{size}} KB"
     },
     "jsonSchema": {
-      "title": "Export JSON Schema",
-      "subtitle": "Standard JSON Schema for all Model nodes & Storm card payloads",
-      "dialect": "Dialect:",
+      "title": "Export Codegen Spec",
+      "subtitle": "High-fidelity domain specification with exact modeled data for code generation",
+      "dialect": "Format:",
       "copyJson": "Copy JSON",
       "copiedJson": "Copied!",
       "downloadJson": "Download .json",
-      "compatibility": "Compatible with OpenAPI, AJV, and standard validators",
+      "compatibility": "Compatible with CQRS code generators, OpenAPI, and scaffolding tools",
       "linesCount": "{{lines}} lines • {{size}} KB"
     },
     "gdrive": {

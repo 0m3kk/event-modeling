@@ -37,7 +37,8 @@
     "saveDrive": "Lưu vào Drive",
     "restoreBackup": "Khôi phục sao lưu",
     "exportImage": "Hình ảnh",
-    "exportJsonSchema": "JSON Schema",
+    "exportJsonSchema": "Codegen Spec",
+    "exportCodegenSpec": "Codegen Spec",
     "exportDrive": "Google Drive",
     "searchTooltip": "Tìm kiếm (Cmd+F)",
     "undoTooltip": "Hoàn tác (Cmd+Z)",
@@ -47,7 +48,8 @@
     "resetZoomTooltip": "Đặt lại thu phóng 100%",
     "resetViewTooltip": "Đặt lại góc nhìn",
     "toast": {
-      "jsonSchemaSuccess": "Xuất JSON Schema thành công — {{detail}}",
+      "jsonSchemaSuccess": "Xuất Codegen Spec thành công — {{detail}}",
+      "codegenSpecSuccess": "Xuất Codegen Spec thành công — {{detail}}",
       "pngSuccess": "Xuất PNG thành công — {{detail}}",
       "svgSuccess": "Xuất SVG thành công — {{detail}}"
     }
@@ -129,16 +131,26 @@
       "copiedSvg": "Đã sao chép mã SVG!",
       "copySvg": "Sao chép mã SVG",
       "downloadSvg": "Tải .svg",
-      "jsonSchemaLink": "Bạn đang tìm schema dữ liệu? Xuất JSON Schema thay thế →"
+      "jsonSchemaLink": "Bạn đang tìm spec dữ liệu? Xuất Codegen Spec thay thế →"
+    },
+    "codegenSpec": {
+      "title": "Xuất Codegen Spec",
+      "subtitle": "Đặc tả domain chi tiết với dữ liệu model chính xác phục vụ sinh mã (codegen)",
+      "format": "Định dạng:",
+      "copy": "Sao chép {{format}}",
+      "copied": "Đã sao chép!",
+      "download": "Tải .{{ext}}",
+      "compatibility": "Tương thích với các bộ sinh mã CQRS, OpenAPI và công cụ scaffolding",
+      "linesCount": "{{lines}} dòng • {{size}} KB"
     },
     "jsonSchema": {
-      "title": "Xuất JSON Schema",
-      "subtitle": "JSON Schema chuẩn cho tất cả node Data Model & dữ liệu thẻ Storm",
-      "dialect": "Chuẩn Dialect:",
+      "title": "Xuất Codegen Spec",
+      "subtitle": "Đặc tả domain chi tiết với dữ liệu model chính xác phục vụ sinh mã (codegen)",
+      "dialect": "Định dạng:",
       "copyJson": "Sao chép JSON",
       "copiedJson": "Đã sao chép!",
       "downloadJson": "Tải .json",
-      "compatibility": "Tương thích với OpenAPI, AJV và các bộ kiểm tra chuẩn",
+      "compatibility": "Tương thích với các bộ sinh mã CQRS, OpenAPI và công cụ scaffolding",
       "linesCount": "{{lines}} dòng • {{size}} KB"
     },
     "gdrive": {

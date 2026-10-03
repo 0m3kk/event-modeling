@@ -31,7 +31,7 @@ import {
   saveAutoSave,
 } from "@/utils/fileIO";
 import { DEFAULT_VIEWPORT } from "@/constants/canvas";
-import { JsonSchemaExportModal } from "./JsonSchemaExportModal";
+import { CodegenSpecExportModal } from "./CodegenSpecExportModal";
 import { ExportImageModal } from "./ExportImageModal";
 import { NewBoardModal } from "./NewBoardModal";
 import { GoogleDriveModal } from "./GoogleDriveModal";
@@ -522,7 +522,7 @@ export function Header() {
                     >
                       <FileCode2 size={14} className="text-blue-500" />
                       <span className="font-medium text-blue-600 dark:text-blue-400">
-                        {t("header.exportJsonSchema")}
+                        {t("header.exportCodegenSpec")}
                       </span>
                     </button>
                     <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
@@ -638,11 +638,11 @@ export function Header() {
       />
 
       {/* Modals */}
-      <JsonSchemaExportModal
+      <CodegenSpecExportModal
         isOpen={isJsonSchemaModalOpen}
         onClose={() => setIsJsonSchemaModalOpen(false)}
         onExported={(detail) =>
-          showToast(`JSON Schema exported successfully — ${detail}`)
+          showToast(t("header.toast.codegenSpecSuccess", { detail }))
         }
       />
       <ExportImageModal
