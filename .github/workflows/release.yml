@@ -53,6 +53,8 @@ jobs:
       CI: true
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+      VITE_GOOGLE_DESKTOP_CLIENT_ID: ${{ secrets.VITE_GOOGLE_DESKTOP_CLIENT_ID }}
+      VITE_GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.VITE_GOOGLE_DESKTOP_CLIENT_SECRET }}
       VITE_GOOGLE_ACCESS_TOKEN: ${{ secrets.VITE_GOOGLE_ACCESS_TOKEN }}
     steps:
       - name: Checkout repository

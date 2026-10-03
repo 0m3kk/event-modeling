@@ -51,6 +51,11 @@ export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 export const GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v3/userinfo";
 export const GOOGLE_DRIVE_FILES_ENDPOINT = "https://www.googleapis.com/drive/v3/files";
 export const GOOGLE_DRIVE_UPLOAD_ENDPOINT = "https://www.googleapis.com/upload/drive/v3/files";
+export const GOOGLE_OAUTH_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
+export const GOOGLE_OAUTH_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+export const GOOGLE_OAUTH_SCOPES = `${GOOGLE_DRIVE_SCOPE} https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile`;
+
+const GOOGLE_LOOPBACK_TIMEOUT_MS = 5 * 60 * 1000;
 
 const DEFAULT_AUTH_CONFIG: GoogleAuthConfig = {
   clientId: "",
@@ -74,10 +79,21 @@ export function setSessionGoogleAuth(config: GoogleAuthConfig | null): void {
   inMemorySessionAuth = config;
 }
 
+function pickGoogleClientId(env: Record<string, string> | undefined | null): string {
+  const webClientId = (env && env.VITE_GOOGLE_CLIENT_ID) || "";
+  if (webClientId) return webClientId.trim();
+  // The desktop (Tauri) build uses a separate "Desktop app" OAuth client
+  // because loopback redirects are only allowed for that client type.
+  if (isTauriEnvironment()) {
+    return ((env && env.VITE_GOOGLE_DESKTOP_CLIENT_ID) || "").trim();
+  }
+  return "";
+}
+
 export function getGoogleDriveEnv(): { clientId: string; accessToken: string } {
   if (customEnv !== null) {
     return {
-      clientId: (customEnv.VITE_GOOGLE_CLIENT_ID || "").trim(),
+      clientId: pickGoogleClientId(customEnv),
       accessToken: (customEnv.VITE_GOOGLE_ACCESS_TOKEN || "").trim(),
     };
   }
@@ -86,7 +102,7 @@ export function getGoogleDriveEnv(): { clientId: string; accessToken: string } {
     (import.meta as unknown as { env?: Record<string, string> }).env;
 
   return {
-    clientId: ((env && env.VITE_GOOGLE_CLIENT_ID) || "").trim(),
+    clientId: pickGoogleClientId(env || undefined),
     accessToken: ((env && env.VITE_GOOGLE_ACCESS_TOKEN) || "").trim(),
   };
 }
@@ -463,11 +479,225 @@ export function loadGoogleIdentityServicesScript(): Promise<void> {
   return gisScriptLoadingPromise;
 }
 
+function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function randomUrlSafeToken(byteLength: number): string {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes);
+}
+
+async function createCodeChallenge(codeVerifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(codeVerifier),
+  );
+  return base64UrlEncode(new Uint8Array(digest));
+}
+
+export function getGoogleDesktopOAuthEnv(): { clientId: string; clientSecret: string } {
+  const env =
+    customEnv ??
+    (typeof import.meta !== "undefined"
+      ? (import.meta as unknown as { env?: Record<string, string> }).env
+      : undefined);
+  return {
+    clientId: ((env && env.VITE_GOOGLE_DESKTOP_CLIENT_ID) || "").trim(),
+    clientSecret: ((env && env.VITE_GOOGLE_DESKTOP_CLIENT_SECRET) || "").trim(),
+  };
+}
+
+/**
+ * Desktop (Tauri) sign-in.
+ *
+ * Tauri's webview blocks `window.open`, so the Google Identity Services popup
+ * flow can never work there ("Failed to open popup window"). Instead we open
+ * Google's consent page in the system browser and capture the redirect on a
+ * temporary loopback server (`http://127.0.0.1:<port>`), using the
+ * authorization code + PKCE flow that Google recommends for desktop apps.
+ */
+export async function requestGoogleDriveAccessTokenViaLoopback(
+  fallbackClientId: string,
+): Promise<{ accessToken: string; expiresIn: number }> {
+  const desktopEnv = getGoogleDesktopOAuthEnv();
+  const clientId = (desktopEnv.clientId || fallbackClientId).trim();
+  if (!clientId) {
+    throw new GoogleDriveError("Google Client ID is missing");
+  }
+
+  const [{ start, cancel, onUrl, onInvalidUrl }, { openUrl }] = await Promise.all([
+    import("@fabianlars/tauri-plugin-oauth"),
+    import("@tauri-apps/plugin-opener"),
+  ]);
+
+  const port = await start();
+  const redirectUri = `http://127.0.0.1:${port}`;
+  const codeVerifier = randomUrlSafeToken(32);
+  const codeChallenge = await createCodeChallenge(codeVerifier);
+  const state = randomUrlSafeToken(16);
+
+  const authUrl = new URL(GOOGLE_OAUTH_AUTH_ENDPOINT);
+  authUrl.searchParams.set("client_id", clientId);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
+  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("scope", GOOGLE_OAUTH_SCOPES);
+  authUrl.searchParams.set("state", state);
+  authUrl.searchParams.set("code_challenge", codeChallenge);
+  authUrl.searchParams.set("code_challenge_method", "S256");
+  authUrl.searchParams.set("prompt", "consent");
+
+  let unlistenUrl: (() => void) | undefined;
+  let unlistenInvalid: (() => void) | undefined;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    const authorizationCode = await new Promise<string>((resolve, reject) => {
+      let settled = false;
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(error instanceof Error ? error : new GoogleDriveError(String(error)));
+      };
+
+      const handleCallback = (callbackUrl: string) => {
+        if (settled) return;
+        try {
+          const url = new URL(callbackUrl);
+          const oauthError = url.searchParams.get("error");
+          if (oauthError) {
+            fail(new GoogleDriveError(`Google OAuth error: ${oauthError}`));
+            return;
+          }
+          if (url.searchParams.get("state") !== state) {
+            fail(
+              new GoogleDriveError(
+                "Google OAuth state mismatch (possible CSRF). Please try again.",
+              ),
+            );
+            return;
+          }
+          const code = url.searchParams.get("code");
+          if (!code) {
+            fail(new GoogleDriveError("No authorization code returned by Google"));
+            return;
+          }
+          settled = true;
+          resolve(code);
+        } catch (error) {
+          fail(error);
+        }
+      };
+
+      onUrl(handleCallback)
+        .then((unlisten) => {
+          unlistenUrl = unlisten;
+        })
+        .catch(fail);
+      onInvalidUrl((message) => fail(new GoogleDriveError(message)))
+        .then((unlisten) => {
+          unlistenInvalid = unlisten;
+        })
+        .catch(fail);
+
+      timeoutId = setTimeout(
+        () => fail(new GoogleDriveError("Google sign-in timed out. Please try again.")),
+        GOOGLE_LOOPBACK_TIMEOUT_MS,
+      );
+
+      openUrl(authUrl.toString()).catch(fail);
+    });
+
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code: authorizationCode,
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
+    });
+    if (desktopEnv.clientSecret) {
+      body.set("client_secret", desktopEnv.clientSecret);
+    }
+
+    const res = await driveHttpFetch(GOOGLE_OAUTH_TOKEN_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+
+    if (!res.ok) {
+      let errorCode = "";
+      let errorDetail = "";
+      try {
+        const errJson = (await res.json()) as {
+          error?: string;
+          error_description?: string;
+        };
+        errorCode = errJson.error || "";
+        errorDetail = errJson.error_description || errJson.error || "";
+      } catch {
+        // ignore
+      }
+      const needsDesktopClient =
+        res.status === 400 &&
+        (errorCode === "redirect_uri_mismatch" ||
+          errorCode === "invalid_request" ||
+          /redirect_uri/i.test(errorDetail));
+      throw new GoogleDriveError(
+        needsDesktopClient
+          ? 'Google OAuth chưa hỗ trợ loopback cho client hiện tại. Hãy tạo một OAuth client loại "Desktop app" trong Google Cloud Console rồi đặt client ID vào VITE_GOOGLE_DESKTOP_CLIENT_ID (tùy chọn: VITE_GOOGLE_DESKTOP_CLIENT_SECRET).'
+          : errorDetail
+            ? `Google OAuth token error: ${errorDetail}`
+            : `Failed to exchange Google authorization code (${res.status})`,
+        res.status,
+      );
+    }
+
+    const data = (await res.json()) as {
+      access_token?: string;
+      expires_in?: number;
+      scope?: string;
+    };
+    if (!data.access_token) {
+      throw new GoogleDriveError("No access token returned by Google");
+    }
+    if (data.scope && !data.scope.includes("drive")) {
+      throw new GoogleDriveError(
+        "Bạn chưa tích chọn ô cho phép truy cập Google Drive trên màn hình của Google. Vui lòng bấm Đăng nhập lại và nhớ tích chọn vào ô cấp quyền.",
+      );
+    }
+    return {
+      accessToken: data.access_token,
+      expiresIn: data.expires_in ?? 3599,
+    };
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+    unlistenUrl?.();
+    unlistenInvalid?.();
+    try {
+      await cancel(port);
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+}
+
 export async function requestGoogleDriveAccessToken(
   clientId: string,
 ): Promise<{ accessToken: string; expiresIn: number }> {
   if (!clientId.trim()) {
     throw new GoogleDriveError("Google Client ID is missing");
+  }
+
+  // Tauri's webview cannot open the GIS popup, so use the loopback flow there.
+  // The browser build keeps using the GIS token client popup.
+  if (isTauriEnvironment()) {
+    return requestGoogleDriveAccessTokenViaLoopback(clientId);
   }
 
   await loadGoogleIdentityServicesScript();

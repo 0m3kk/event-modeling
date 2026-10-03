@@ -401,7 +401,8 @@ export function GoogleDriveModal({
               {t("modals.gdrive.missingEnvGuide")} <code>.env</code> (hoặc <code>.env.local</code>):
             </p>
             <pre className="mt-1.5 font-mono text-[10px] text-amber-900 bg-white/80 p-2 rounded border border-amber-200 overflow-x-auto dark:bg-zinc-950 dark:border-zinc-800 dark:text-amber-200">
-              VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com{"\n"}
+              VITE_GOOGLE_CLIENT_ID=...apps.googleusercontent.com{"\n"}
+              VITE_GOOGLE_DESKTOP_CLIENT_ID=...apps.googleusercontent.com{"\n"}
               # hoặc Access Token trực tiếp:{"\n"}
               VITE_GOOGLE_ACCESS_TOKEN=ya29.your-token
             </pre>

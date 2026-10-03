@@ -7,6 +7,9 @@
   ],
   "permissions": [
     "core:default",
+    "oauth:allow-start",
+    "oauth:allow-cancel",
+    "opener:default",
     {
       "identifier": "http:default",
       "allow": [
