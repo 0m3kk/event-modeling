@@ -1582,7 +1582,7 @@ describe("AI Model & Write Tools", () => {
 
   it("supports explicit field mapping and projection set dictionaries in create_storm_cards and update_storm_card", async () => {
     const fake = createFakeStore();
-    const ctx: AIToolContext = { getState: () => fake.store };
+    const { ctx } = createContext(fake);
 
     // 1. Create Event with explicit mapping and State with queryItem set
     const createRes = await executeToolCall(

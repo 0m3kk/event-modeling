@@ -593,6 +593,8 @@ describe("codegenSpecExport", () => {
         type: "storm",
         x: 0,
         y: 0,
+        width: 250,
+        height: 200,
         stormData: {
           kind: "event",
           name: "UserRegistered",
@@ -629,6 +631,8 @@ describe("codegenSpecExport", () => {
         type: "storm",
         x: 100,
         y: 100,
+        width: 250,
+        height: 200,
         stormData: {
           kind: "state",
           name: "UserState",
