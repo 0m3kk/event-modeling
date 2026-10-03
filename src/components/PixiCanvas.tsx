@@ -4,7 +4,10 @@ import { useCanvasStore, undo, redo } from "@/store";
 import { spawnAtViewportCenter } from "@/utils/viewport";
 import { computeStormCardHeight } from "@/utils/cardDimensions";
 import { makeUniqueName, collectComponentNameKeys } from "@/utils/naming";
+import { isDesktopApp } from "@/utils/platform";
 import type { CanvasObject, StormData, StormKind } from "@/types";
+
+const IS_DESKTOP = isDesktopApp();
 
 export function PixiCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -256,6 +259,8 @@ export function PixiCanvas() {
       }
 
       if (isCmdOrCtrl && e.code === "KeyF") {
+        // The desktop build routes Cmd+F through the native menu accelerator.
+        if (IS_DESKTOP) return;
         e.preventDefault();
         const current = useCanvasStore.getState().isSearchOpen;
         useCanvasStore.getState().setSearchOpen(!current);
