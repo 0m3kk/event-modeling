@@ -1579,4 +1579,104 @@ describe("AI Model & Write Tools", () => {
     expect(updatedConstraints?.[0]?.assert).toBe("!output.isDeleted");
     expect(updatedConstraints?.[0]?.status).toBe(410);
   });
+
+  it("supports explicit field mapping and projection set dictionaries in create_storm_cards and update_storm_card", async () => {
+    const fake = createFakeStore();
+    const ctx: AIToolContext = { getState: () => fake.store };
+
+    // 1. Create Event with explicit mapping and State with queryItem set
+    const createRes = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "event",
+              name: "ItemAddedToCart",
+              fields: [
+                {
+                  name: "cartId",
+                  fieldType: "UUID",
+                  tag: "cart",
+                  mapping: "command.cartId",
+                },
+                {
+                  name: "itemId",
+                  fieldType: "UUID",
+                  mapping: "command.itemId",
+                },
+                {
+                  name: "addedAt",
+                  fieldType: "DateTime",
+                  mapping: "now()",
+                },
+              ],
+            },
+            {
+              kind: "state",
+              name: "CartSummary",
+              inputFields: [
+                { name: "cartId", fieldType: "UUID", tag: "cart" },
+              ],
+              outputFields: [
+                { name: "totalItems", fieldType: "Number" },
+              ],
+              queryItems: [
+                {
+                  types: ["ItemAddedToCart"],
+                  tagFields: ["cartId"],
+                  set: {
+                    totalItems: "totalItems + 1",
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(createRes.isError).toBeFalsy();
+    const eventCard = fake.objects.find(
+      (o) => o.stormData?.name === "Item Added To Cart",
+    );
+    expect(eventCard).toBeDefined();
+    expect(eventCard?.stormData?.fields[0].mapping).toBe("command.cartId");
+    expect(eventCard?.stormData?.fields[1].mapping).toBe("command.itemId");
+    expect(eventCard?.stormData?.fields[2].mapping).toBe("now()");
+
+    const stateCard = fake.objects.find(
+      (o) => o.stormData?.name === "Cart Summary",
+    );
+    expect(stateCard).toBeDefined();
+    expect(stateCard?.stormData?.queryItems?.[0].set).toEqual({
+      totalItems: "totalItems + 1",
+    });
+
+    // 2. Update Event card to change mapping
+    const updateRes = await executeToolCall(
+      {
+        id: "2",
+        name: "update_storm_card",
+        arguments: JSON.stringify({
+          id: eventCard!.id,
+          fields: [
+            {
+              name: "cartId",
+              fieldType: "UUID",
+              tag: "cart",
+              mapping: "uuid()",
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(updateRes.isError).toBeFalsy();
+    const updatedEvent = fake.objects.find((o) => o.id === eventCard!.id);
+    expect(updatedEvent?.stormData?.fields[0].mapping).toBe("uuid()");
+  });
 });

@@ -16,11 +16,13 @@ export interface CodegenField {
   tag?: string;
   description?: string;
   validation?: FieldValidation;
+  mapping?: string;
 }
 
 export interface CodegenQueryItem {
   eventTypes: string[];
   tags: string[];
+  set?: Record<string, string>;
 }
 
 export interface CodegenCommand {
@@ -180,17 +182,26 @@ function cleanField(field: StormField): CodegenField {
   if (field.validation && Object.keys(field.validation).length > 0) {
     result.validation = field.validation;
   }
+  if ((field.mapping ?? "").trim()) {
+    result.mapping = field.mapping!.trim();
+  }
   return result;
 }
 
 function resolveQueryItems(
   items: StormData["queryItems"],
   inputFields: StormField[] = [],
+  outputFields: StormField[] = [],
 ): CodegenQueryItem[] {
   if (!items || items.length === 0) return [];
   const fieldMap = new Map<string, StormField>();
   for (const f of inputFields) {
     fieldMap.set(f.id, f);
+  }
+  const outputFieldMap = new Map<string, string>();
+  for (const f of outputFields) {
+    outputFieldMap.set(f.id, f.name.trim());
+    outputFieldMap.set(f.name.trim(), f.name.trim());
   }
 
   return items.map((item) => {
@@ -206,10 +217,25 @@ function resolveQueryItems(
       }
     }
 
-    return {
+    const queryItem: CodegenQueryItem = {
       eventTypes: (item.types ?? []).map((t) => t.trim()).filter(Boolean),
       tags,
     };
+
+    if (item.set && Object.keys(item.set).length > 0) {
+      const resolvedSet: Record<string, string> = {};
+      for (const [key, expr] of Object.entries(item.set)) {
+        const cleanExpr = expr.trim();
+        if (!cleanExpr) continue;
+        const fieldName = outputFieldMap.get(key) || key.trim();
+        resolvedSet[fieldName] = cleanExpr;
+      }
+      if (Object.keys(resolvedSet).length > 0) {
+        queryItem.set = resolvedSet;
+      }
+    }
+
+    return queryItem;
   });
 }
 
@@ -386,7 +412,11 @@ export function buildCodegenSpec(
             ...(slice ? { slice } : {}),
             ...(storm.isArray ? { isArray: true } : {}),
             params: inputFields.map(cleanField),
-            queryItems: resolveQueryItems(storm.queryItems, inputFields),
+            queryItems: resolveQueryItems(
+              storm.queryItems,
+              inputFields,
+              storm.outputFields ?? [],
+            ),
             outputFields: (storm.outputFields ?? []).map(cleanField),
           });
           break;
@@ -413,7 +443,11 @@ export function buildCodegenSpec(
             ...(desc ? { description: desc } : {}),
             ...(slice ? { slice } : {}),
             params: inputFields.map(cleanField),
-            queryItems: resolveQueryItems(storm.queryItems, inputFields),
+            queryItems: resolveQueryItems(
+              storm.queryItems,
+              inputFields,
+              storm.outputFields ?? [],
+            ),
             outputFields: (storm.outputFields ?? []).map(cleanField),
             rules: (storm.constraints ?? [])
               .map((c) => {

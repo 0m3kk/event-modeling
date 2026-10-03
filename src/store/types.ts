@@ -78,6 +78,26 @@ export interface ValidationTarget {
   iconBounds: { x: number; y: number; width: number; height: number };
 }
 
+/**
+ * Target of the mapping popover (Event field or Command/Query response field).
+ */
+export interface MappingTarget {
+  objectId: string;
+  fieldId: string;
+  section?: "params" | "response";
+}
+
+/**
+ * Target of the mapping [⇄] or warning [!] hover tooltip.
+ */
+export interface MappingHover {
+  objectId: string;
+  fieldId?: string;
+  text: string;
+  isWarning?: boolean;
+  iconBounds: { x: number; y: number; width: number; height: number };
+}
+
 export interface ModelPopupEntry {
   id: string;
   modelId: string;
@@ -119,6 +139,10 @@ export interface CanvasStoreState {
   bddStepPopup: BddStepPopupTarget | null;
   /** Hovered validation ✓ badge, used to anchor its tooltip. */
   validationHover: ValidationTarget | null;
+  /** Open field mapping popover target (Event field / Response field). */
+  mappingTarget: MappingTarget | null;
+  /** Hovered mapping [⇄] or warning [!] badge. */
+  mappingHover: MappingHover | null;
   fieldClipboard: FieldClipboard | null;
   /** Snapshot of the selected objects/groups, filled by Cmd/Ctrl+C. */
   objectClipboard: ObjectClipboard | null;
@@ -193,6 +217,19 @@ export interface CanvasStoreActions {
     constraintId: string,
     patch: Partial<Omit<StormConstraint, "id">>,
   ) => void;
+  updateStormFieldMapping: (
+    objectId: string,
+    fieldId: string,
+    mapping?: string,
+    section?: "params" | "response",
+  ) => void;
+  updateStormQueryItemSet: (
+    objectId: string,
+    queryItemId: string,
+    set?: Record<string, string>,
+  ) => void;
+  setMappingTarget: (target: MappingTarget | null) => void;
+  setMappingHover: (hover: MappingHover | null) => void;
   /** Create a BDD scenario step (defaults to the phase's ref) and select it. */
   addBddStep: (objectId: string, ref?: BddStepRef) => string | undefined;
   /** Replace the editable parts of a BDD scenario step. */

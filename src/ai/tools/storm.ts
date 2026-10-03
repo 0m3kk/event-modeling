@@ -78,6 +78,12 @@ const fieldSpec = z.object({
     .describe(
       "Tag name on Event field for DCB dynamic consistency boundary (e.g. 'Order'). Tag ONLY key/unique identifier fields (IDs, unique email, code); never tag non-key fields or all fields.",
     ),
+  mapping: z
+    .string()
+    .optional()
+    .describe(
+      "Explicit source expression for code generation (e.g. 'command.userId', 'now()', 'uuid()', 'constraint.balance'). Crucial for Event fields and Response fields to know where data comes from without guessing.",
+    ),
   validation: validationSpec
     .optional()
     .describe(
@@ -97,6 +103,12 @@ const queryItemSpec = z.object({
     .optional()
     .describe(
       "Names of tagged INPUT params (inputFields) on this State/Constraint card used to filter matching events. Tags only exist on input params.",
+    ),
+  set: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe(
+      "State projection dictionary mapping output field names to event expressions (e.g. { 'status': 'event.newStatus', 'count': 'count + 1' }). Explains how this event mutates the state.",
     ),
 });
 
@@ -124,6 +136,7 @@ function createStormField(
   description?: string,
   tag?: string,
   validation?: FieldValidation,
+  mapping?: string,
 ): StormField {
   return {
     id: nanoid(),
@@ -132,6 +145,7 @@ function createStormField(
     required,
     description,
     tag,
+    mapping: mapping?.trim() ? mapping.trim() : undefined,
     ...(validation ? { validation } : {}),
   };
 }
@@ -139,11 +153,13 @@ function createStormField(
 function createStormQueryItem(
   types: string[] = [],
   tagFieldIds: string[] = [],
+  set?: Record<string, string>,
 ): StormQueryItem {
   return {
     id: nanoid(),
     types,
     tagFieldIds,
+    set: set && Object.keys(set).length > 0 ? set : undefined,
   };
 }
 
@@ -218,6 +234,7 @@ function buildFields(
       spec.description,
       spec.tag ? toDisplayName(spec.tag) : undefined,
       options.allowValidation ? normalizeValidation(spec.validation) : undefined,
+      spec.mapping,
     );
   });
 }
@@ -286,6 +303,7 @@ function buildStormData(input: {
       return createStormQueryItem(
         (item.types ?? []).map(toDisplayName),
         tagFieldIds,
+        item.set,
       );
     });
   }

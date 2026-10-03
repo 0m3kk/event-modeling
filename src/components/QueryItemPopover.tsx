@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { CanvasObject, StormQueryItem } from "@/types";
-import { Filter, X, Trash2, Plus } from "lucide-react";
+import { Filter, X, Trash2, Plus, ArrowLeftRight } from "lucide-react";
 
 interface QueryItemPopoverProps {
   card: CanvasObject;
@@ -49,13 +49,20 @@ export function QueryItemPopover({
   // Text input for typing a custom event name
   const [customTypeInput, setCustomTypeInput] = useState("");
 
+  // Set mappings (outputField.name/id -> source expression)
+  const [setMappings, setSetMappings] = useState<Record<string, string>>(
+    () => currentItem?.set ? { ...currentItem.set } : {},
+  );
+
   useEffect(() => {
     if (currentItem) {
       setSelectedTypes(currentItem.types ?? []);
       setSelectedTagFieldIds(currentItem.tagFieldIds ?? []);
+      setSetMappings(currentItem.set ? { ...currentItem.set } : {});
     } else {
       setSelectedTypes([]);
       setSelectedTagFieldIds([]);
+      setSetMappings({});
     }
   }, [currentItem]);
 
@@ -78,6 +85,11 @@ export function QueryItemPopover({
       (f) => Boolean((f.tag ?? "").trim()),
     );
   }, [card.stormData?.inputFields]);
+
+  // Output fields on this State/Constraint card whose state is updated by this query item
+  const outputFields = useMemo(() => {
+    return card.stormData?.outputFields ?? [];
+  }, [card.stormData?.outputFields]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -158,10 +170,19 @@ export function QueryItemPopover({
       finalTypes = Array.from(new Set([...finalTypes, ...parts]));
     }
 
+    // Clean set mappings: only non-empty trimmed strings
+    const cleanSet: Record<string, string> = {};
+    for (const [key, val] of Object.entries(setMappings)) {
+      if (val && val.trim()) {
+        cleanSet[key] = val.trim();
+      }
+    }
+    const finalSet = Object.keys(cleanSet).length > 0 ? cleanSet : undefined;
+
     if (isEditMode && currentItem) {
       const nextItems = (card.stormData.queryItems ?? []).map((q) =>
         q.id === currentItem.id
-          ? { ...q, types: finalTypes, tagFieldIds: selectedTagFieldIds }
+          ? { ...q, types: finalTypes, tagFieldIds: selectedTagFieldIds, set: finalSet }
           : q,
       );
       updateObject(card.id, {
@@ -176,6 +197,7 @@ export function QueryItemPopover({
         id: newId,
         types: finalTypes,
         tagFieldIds: selectedTagFieldIds,
+        set: finalSet,
       };
       const nextItems = [...(card.stormData.queryItems ?? []), newItem];
       updateObject(card.id, {
@@ -376,6 +398,51 @@ export function QueryItemPopover({
             </div>
           )}
         </div>
+
+        {/* Section 3: State Projection Updates (`set`) for Output Fields */}
+        {outputFields.length > 0 && (
+          <div className="border-t border-gray-100 pt-2 dark:border-zinc-800">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 flex items-center gap-1">
+                <ArrowLeftRight size={12} />
+                State Updates (set)
+              </span>
+              <span className="text-[10px] text-gray-400 dark:text-zinc-500">
+                Maps event fields → state
+              </span>
+            </div>
+
+            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              {outputFields.map((of) => {
+                const currentVal = setMappings[of.name] ?? setMappings[of.id] ?? "";
+                return (
+                  <div key={of.id} className="flex items-center gap-2">
+                    <span
+                      title={of.name}
+                      className="w-24 truncate text-right font-mono text-[11px] font-medium text-gray-700 dark:text-zinc-300"
+                    >
+                      {of.name}
+                    </span>
+                    <span className="text-[11px] text-gray-400 dark:text-zinc-500">=</span>
+                    <input
+                      type="text"
+                      value={currentVal}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSetMappings((prev) => ({
+                          ...prev,
+                          [of.name]: val,
+                        }));
+                      }}
+                      placeholder={`e.g. event.${of.name} or count + 1`}
+                      className="flex-1 font-mono text-[11px] rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-gray-800 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:border-cyan-500 dark:focus:border-cyan-400 focus:outline-none"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Bottom Actions */}
         <div className="flex items-center justify-between border-t border-gray-100 pt-2.5 dark:border-zinc-800">

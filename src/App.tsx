@@ -6,6 +6,7 @@ import { TypeSelectPopover } from "@/components/TypeSelectPopover";
 import { DescTooltip } from "@/components/DescTooltip";
 import { ActionTooltip } from "@/components/ActionTooltip";
 import { ValidationTooltip } from "@/components/ValidationTooltip";
+import { MappingTooltip } from "@/components/MappingTooltip";
 import { StormOptionsBar } from "@/components/StormOptionsBar";
 import { ModelOptionsBar } from "@/components/ModelOptionsBar";
 import { GroupOptionsBar } from "@/components/GroupOptionsBar";
@@ -35,6 +36,7 @@ export function App() {
         <DescTooltip />
         <ActionTooltip />
         <ValidationTooltip />
+        <MappingTooltip />
         <StormOptionsBar />
         <ModelOptionsBar />
         <GroupOptionsBar />

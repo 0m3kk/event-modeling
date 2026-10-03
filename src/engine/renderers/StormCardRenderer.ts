@@ -423,6 +423,52 @@ export class StormCardRenderer {
         // - ✓ shows whenever the Command field / Query param has rules (or is
         //   selected), dimmed when no rules are set so it doubles as an
         //   "add validation" cue
+        // - ⇄ / ! shows mapping status:
+        //   - On Event cards (kind === "event") or Command/Query Response rows (section === "response"):
+        //     If field.mapping is set, shows ⇄ (cyan).
+        //     If field.mapping is missing, shows ! (amber warning) to indicate unmapped source.
+        //   - On State / Constraint outputFields:
+        //     If any queryItem.set targets this field, mapped.
+        //     If unmapped, shows ! (amber warning) to indicate unprojected output field.
+        const isEventField = kind === "event";
+        const isResponseField = section === "response" && (kind === "command" || kind === "query");
+        const isOutputField = section === "response" && (kind === "state" || kind === "constraint");
+        const hasDirectMapping = Boolean(field.mapping?.trim());
+
+        let showMappingBadge = false;
+        let mappingBadgeGlyph = "⇄";
+        let mappingBadgeStroke = 0x06b6d4; // cyan-500
+        let mappingBadgeFill = 0x0891b2;   // cyan-600
+        let mappingTooltipText = field.mapping?.trim() || "";
+
+        if (isEventField || isResponseField) {
+          showMappingBadge = true;
+          if (hasDirectMapping) {
+            mappingBadgeGlyph = "⇄";
+            mappingBadgeStroke = 0x06b6d4;
+            mappingBadgeFill = 0x0891b2;
+            mappingTooltipText = `Mapping: ${field.mapping}`;
+          } else {
+            // Missing mapping -> warning icon !
+            mappingBadgeGlyph = "!";
+            mappingBadgeStroke = 0xf59e0b; // amber-500
+            mappingBadgeFill = 0xd97706;   // amber-600
+            mappingTooltipText = "Warning: Missing explicit mapping for codegen";
+          }
+        } else if (isOutputField) {
+          // Check if any queryItem.set references this field (by name or id)
+          const isProjected = (data.queryItems ?? []).some(
+            (q) => q.set && (Boolean(q.set[field.name]) || Boolean(q.set[field.id])),
+          );
+          if (!isProjected) {
+            showMappingBadge = true;
+            mappingBadgeGlyph = "!";
+            mappingBadgeStroke = 0xf59e0b;
+            mappingBadgeFill = 0xd97706;
+            mappingTooltipText = "Warning: Field is never updated in any Query Item set";
+          }
+        }
+
         const showDescBadge =
           Boolean(field.description) || selectedFieldId === field.id;
         const showValidationBadge =
@@ -430,12 +476,36 @@ export class StormCardRenderer {
           section === "params" &&
           (hasValidation || selectedFieldId === field.id);
 
-        if (showDescBadge || showValidationBadge) {
+        if (showDescBadge || showValidationBadge || showMappingBadge) {
           const hasDesc = Boolean(field.description);
-          const rowInfoX = (hasTag ? tagPillX : typeZoneX) - 14;
+          let currentBadgeX = (hasTag ? tagPillX : typeZoneX) - 14;
 
-          if (showValidationBadge && rowInfoX - 14 > 30) {
-            const validationX = rowInfoX - 14;
+          if (showMappingBadge && currentBadgeX > 30) {
+            const mappingX = currentBadgeX;
+            drawInfoBadge(g, container, mappingX, rowY + 13, {
+              radius: 5,
+              stroke: mappingBadgeStroke,
+              fill: mappingBadgeFill,
+              fontSize: 8,
+              bold: true,
+              glyph: mappingBadgeGlyph,
+              alpha: 1,
+              textResolution,
+            });
+
+            hitZones.push({
+              type: "mapping",
+              bounds: { x: mappingX - 8, y: rowY + 5, width: 16, height: 16 },
+              fieldId: field.id,
+              section,
+              currentText: mappingTooltipText,
+            });
+
+            currentBadgeX -= 14;
+          }
+
+          if (showValidationBadge && currentBadgeX > 30) {
+            const validationX = currentBadgeX;
             drawInfoBadge(g, container, validationX, rowY + 13, {
               radius: 5,
               stroke: hasValidation ? 0x86efac : 0x94a3b8,
@@ -457,10 +527,13 @@ export class StormCardRenderer {
                 ? describeValidationRules(field.validation)
                 : "Add validation rules",
             });
+
+            currentBadgeX -= 14;
           }
 
-          if (showDescBadge && rowInfoX > 30) {
-            drawInfoBadge(g, container, rowInfoX, rowY + 13, {
+          if (showDescBadge && currentBadgeX > 30) {
+            const descX = currentBadgeX;
+            drawInfoBadge(g, container, descX, rowY + 13, {
               radius: 5,
               stroke: 0x94a3b8,
               fill: 0x64748b,
@@ -471,7 +544,7 @@ export class StormCardRenderer {
 
             hitZones.push({
               type: "desc",
-              bounds: { x: rowInfoX - 8, y: rowY + 5, width: 16, height: 16 },
+              bounds: { x: descX - 8, y: rowY + 5, width: 16, height: 16 },
               fieldId: field.id,
               section,
               currentText: field.description,

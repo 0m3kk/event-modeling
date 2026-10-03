@@ -118,9 +118,11 @@ The application models systems according to CQRS and Event Sourcing with DCB:
 - **external**: Interaction with a system outside the bounded context (sky) — typeless payload fields; e.g. an outbound user notification / message.
 
 References must be valid:
-- Prefer every field in an Event to exist in the associated Command or Constraint payload; timestamp/audit fields (Created At, Updated At) are exempt and need no source.
+- **Explicit Field Mapping (Zero Guessing / Codegen)**:
+  - Event fields and Command/Query responseFields MUST carry an explicit \`mapping\` expression (e.g. \`command.<field>\`, \`constraint.<output>\`, \`now()\`, \`uuid()\`, \`hashPassword(command.password)\`). If unmapped, a warning icon [!] appears and codegen will fail. Never omit or leave mappings to guesswork.
+  - State and Constraint cards MUST define \`set\` on their \`queryItems\` to project event fields into \`outputFields\` (e.g. \`{ status: "event.newStatus", balance: "balance - event.amount" }\`). Any unprojected output field will show a warning icon [!].
 - Event field tags must only be placed on key/identifier fields (ID, unique email, code); never tag non-key fields or all fields in an event.
-- Constraints must be reusable, independent decision models checking domain invariants against event history, never command input validation.
+- Constraints must be reusable, independent decision models checking domain invariants against event history, never command input validation. Prefer structured rules with \`{ code, assert, message, status, severity }\` (e.g. assert: \`output.balance >= command.amount\`).
 - State and Constraint queryItems \`types\` must name existing Event cards on the board (exact match). Read Slices have no Event cards of their own — their States reference events defined in Write Slices.
 - State and Constraint tags may ONLY be placed on \`inputFields\` (the INPUT params); \`outputFields\` (projected fields) must never carry tags.
 - State and Constraint \`queryItems[].tagFields\` must name a tagged \`inputFields\` param on the same card, and that tag must match an existing tagged field on an Event card with the same fieldType.

@@ -76,6 +76,7 @@ function cloneStormData(data: StormData): StormData {
       ...item,
       types: [...item.types],
       tagFieldIds: [...item.tagFieldIds],
+      set: item.set ? { ...item.set } : undefined,
     })),
     constraints: data.constraints?.map((c) => ({ ...c })),
     permissions: data.permissions ? [...data.permissions] : undefined,

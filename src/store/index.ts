@@ -93,6 +93,8 @@ export const initialCanvasState: CanvasStoreState = {
   validationTarget: null,
   bddStepPopup: null,
   validationHover: null,
+  mappingTarget: null,
+  mappingHover: null,
   fieldClipboard: null,
   objectClipboard: null,
   stormActionHover: null,
@@ -1247,6 +1249,10 @@ export const useCanvasStore = create<CanvasStore>()(
 
       setValidationHover: (validationHover) => set({ validationHover }),
 
+      setMappingTarget: (mappingTarget) => set({ mappingTarget }),
+
+      setMappingHover: (mappingHover) => set({ mappingHover }),
+
       setStormActionHover: (stormActionHover) => set({ stormActionHover }),
 
       setAIHighlight: (ids) => {
@@ -1701,6 +1707,60 @@ export const useCanvasStore = create<CanvasStore>()(
               o.id === obj.id
                 ? { ...o, height: newHeight, stormData: nextData }
                 : o,
+            ),
+            obj.id,
+          ),
+        });
+      },
+
+      updateStormFieldMapping: (objectId, fieldId, mapping, section) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "storm" || !obj.stormData || obj.locked) return;
+
+        const updateList = (list?: typeof obj.stormData.fields) =>
+          (list ?? []).map((f) =>
+            f.id === fieldId ? { ...f, mapping: mapping?.trim() ? mapping.trim() : undefined } : f,
+          );
+
+        let nextData = obj.stormData;
+        if (section === "response" && nextData.responseFields) {
+          nextData = { ...nextData, responseFields: updateList(nextData.responseFields) };
+        } else if (section === "response" && nextData.outputFields) {
+          nextData = { ...nextData, outputFields: updateList(nextData.outputFields) };
+        } else if (nextData.fields.some((f) => f.id === fieldId)) {
+          nextData = { ...nextData, fields: updateList(nextData.fields) };
+        } else if (nextData.responseFields?.some((f) => f.id === fieldId)) {
+          nextData = { ...nextData, responseFields: updateList(nextData.responseFields) };
+        } else if (nextData.outputFields?.some((f) => f.id === fieldId)) {
+          nextData = { ...nextData, outputFields: updateList(nextData.outputFields) };
+        }
+
+        set({
+          objects: syncReferenceAfterChange(
+            objects.map((o) =>
+              o.id === obj.id ? { ...o, stormData: nextData } : o,
+            ),
+            obj.id,
+          ),
+        });
+      },
+
+      updateStormQueryItemSet: (objectId, queryItemId, setRecord) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "storm" || !obj.stormData || obj.locked) return;
+        if (obj.stormData.kind !== "state" && obj.stormData.kind !== "constraint") return;
+
+        const nextQueryItems = (obj.stormData.queryItems ?? []).map((q) =>
+          q.id === queryItemId ? { ...q, set: setRecord && Object.keys(setRecord).length > 0 ? setRecord : undefined } : q,
+        );
+        const nextData = { ...obj.stormData, queryItems: nextQueryItems };
+
+        set({
+          objects: syncReferenceAfterChange(
+            objects.map((o) =>
+              o.id === obj.id ? { ...o, stormData: nextData } : o,
             ),
             obj.id,
           ),

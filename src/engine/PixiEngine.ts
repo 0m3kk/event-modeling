@@ -29,6 +29,7 @@ import {
   type ActionTarget,
   type DescTarget,
   type ValidationTarget,
+  type MappingHover,
 } from "@/store";
 import { calculateSnapping } from "@/utils/snapping";
 import {
@@ -919,6 +920,20 @@ export class PixiEngine {
         state.setValidationTarget({
           objectId: id,
           fieldId: accurateZone.fieldId,
+        });
+        return;
+      }
+
+      // Click on a field's mapping badge (⇄ / !) selects the target and opens
+      // the FieldMappingPopover.
+      if (accurateZone?.type === "mapping" && accurateZone.fieldId) {
+        state.clearModelPopups();
+        state.selectObject(id, e.shiftKey || e.metaKey || e.ctrlKey);
+        state.setStormSelectedField({ objectId: id, fieldId: accurateZone.fieldId });
+        state.setMappingTarget({
+          objectId: id,
+          fieldId: accurateZone.fieldId,
+          section: accurateZone.section,
         });
         return;
       }
@@ -2105,6 +2120,7 @@ export class PixiEngine {
     let nextHover: DescTarget | null = null;
     let nextActionHover: ActionTarget | null = null;
     let nextValidationHover: ValidationTarget | null = null;
+    let nextMappingHover: MappingHover | null = null;
     if (
       !isBusy &&
       !this.isSpaceHeld &&
@@ -2127,6 +2143,13 @@ export class PixiEngine {
         };
       } else if (hit && zone?.type === "validation" && zone.currentText) {
         nextValidationHover = {
+          objectId: hit.obj.id,
+          fieldId: zone.fieldId,
+          text: zone.currentText,
+          iconBounds: zone.bounds,
+        };
+      } else if (hit && zone?.type === "mapping" && zone.currentText) {
+        nextMappingHover = {
           objectId: hit.obj.id,
           fieldId: zone.fieldId,
           text: zone.currentText,
@@ -2167,6 +2190,16 @@ export class PixiEngine {
         : currentValidation === null && nextValidationHover === null;
     if (!sameValidation) {
       useCanvasStore.getState().setValidationHover(nextValidationHover);
+    }
+
+    const currentMapping = useCanvasStore.getState().mappingHover;
+    const sameMapping =
+      currentMapping && nextMappingHover
+        ? currentMapping.objectId === nextMappingHover.objectId &&
+          currentMapping.fieldId === nextMappingHover.fieldId
+        : currentMapping === null && nextMappingHover === null;
+    if (!sameMapping) {
+      useCanvasStore.getState().setMappingHover(nextMappingHover);
     }
   }
 

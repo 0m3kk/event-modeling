@@ -85,6 +85,12 @@ export interface StormQueryItem {
    * fields (projected after rehydrate) never contribute tags.
    */
   tagFieldIds: string[];
+  /**
+   * Projection assignment for output fields when matched events occur:
+   * Maps outputField name (or ID) -> derivation expression.
+   * e.g. { "Status": "'Pending'", "Email": "event.email" }
+   */
+  set?: Record<string, string>;
 }
 
 /**
@@ -123,6 +129,8 @@ export interface StormField {
   tag?: string; // tag name (e.g. 'order') forming '{tag}:{name}'
   /** Command payload / Query param validation. Only set on those kinds. */
   validation?: FieldValidation;
+  /** Explicit derivation / mapping expression for codegen (e.g. 'command.email', 'uuid()', 'now()') */
+  mapping?: string;
 }
 
 /**

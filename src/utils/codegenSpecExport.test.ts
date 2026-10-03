@@ -585,4 +585,90 @@ describe("codegenSpecExport", () => {
       status: 410,
     });
   });
+
+  it("exports explicit field mapping and query item set dictionary without guessing", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "ev1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        stormData: {
+          kind: "event",
+          name: "UserRegistered",
+          fields: [
+            {
+              id: "f1",
+              name: "userId",
+              fieldType: "UUID",
+              mapping: "uuid()",
+            },
+            {
+              id: "f2",
+              name: "email",
+              fieldType: "Email",
+              mapping: "command.email",
+            },
+            {
+              id: "f3",
+              name: "passwordHash",
+              fieldType: "String",
+              mapping: "hashPassword(command.password)",
+            },
+            {
+              id: "f4",
+              name: "unmappedField",
+              fieldType: "String",
+              // explicitly no mapping!
+            },
+          ],
+        },
+      },
+      {
+        id: "st1",
+        type: "storm",
+        x: 100,
+        y: 100,
+        stormData: {
+          kind: "state",
+          name: "UserState",
+          fields: [],
+          inputFields: [
+            { id: "in1", name: "userId", fieldType: "UUID", tag: "user" },
+          ],
+          outputFields: [
+            { id: "out1", name: "email", fieldType: "Email" },
+            { id: "out2", name: "status", fieldType: "String" },
+          ],
+          queryItems: [
+            {
+              id: "qi1",
+              types: ["UserRegistered"],
+              tagFieldIds: ["in1"],
+              set: {
+                email: "event.email",
+                status: "'active'",
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, []);
+    const event = spec.events.find((e) => e.name === "UserRegistered")!;
+    expect(event).toBeDefined();
+    expect(event.fields.find((f) => f.name === "userId")?.mapping).toBe("uuid()");
+    expect(event.fields.find((f) => f.name === "email")?.mapping).toBe("command.email");
+    expect(event.fields.find((f) => f.name === "passwordHash")?.mapping).toBe("hashPassword(command.password)");
+    // Zero guessing: unmappedField has NO mapping exported!
+    expect(event.fields.find((f) => f.name === "unmappedField")?.mapping).toBeUndefined();
+
+    const state = spec.readModels.find((s) => s.name === "UserState")!;
+    expect(state).toBeDefined();
+    expect(state.queryItems[0].set).toEqual({
+      email: "event.email",
+      status: "'active'",
+    });
+  });
 });
