@@ -1,107 +1,119 @@
+<div align="center">
+
+<img src="public/icon.png" width="96" alt="Event Modeling" />
+
 # Event Modeling
 
-A local-first, canvas-based tool for **Event Modeling** — mapping systems as vertical slices of commands, events, constraints, and read models. It runs both as a **desktop app** (Tauri) and in the **browser** (Vite), and ships with an AI assistant for generating and editing models.
+**Map your system as vertical slices of commands, events, constraints, and read models.**
 
-The modeling philosophy is opinionated around **CQRS**, **Event Sourcing**, and **Dynamic Consistency Boundaries (DCB)**.
+Local-first. Desktop + web. Powered by an AI assistant.
 
-## Features
+[![CI](https://github.com/0m3kk/event-modeling/actions/workflows/ci.yml/badge.svg)](https://github.com/0m3kk/event-modeling/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tauri 2](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://v2.tauri.app/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#)
 
-### Modeling canvas
-- Infinite, pannable/zoomable canvas rendered with Pixi.js (GPU-accelerated, spatially indexed for fast hit-testing).
-- **Write slices**: Command → Constraint(s) → Event(s).
-- **Read slices**: Query → State (optional Constraint layer).
-- **8 storm card kinds**: command, event, actor, state, constraint, external, query, and BDD.
-- **Data model nodes**: object, enum, array, and wrapper types, with 12 primitive field types (`String`, `Number`, `Boolean`, `UUID`, `DateTime`, `Date`, `Email`, `URL`, `URI`, `JSON`, `Any`, `Void`, plus `[]` arrays).
-- **DCB support**: query items (event types + tag fields) that define consistency boundaries.
-- **RBAC**: `resource:verb:scope` action strings on commands/queries, with wildcard permissions on actor cards.
-- **BDD cards**: Given/When/Then steps referencing events, commands, queries, states, errors, and externals.
-- **Groups & sections**: nestable groups with custom bounds and styles; connectors, freeform lines, sticky notes, and text boxes.
-- **Field validation**: min/max length, pattern, format, ranges, allowed values, and item counts.
-- Reference copies that share content and style but keep independent positions.
-- Auto-layout ("Arrange Storm Lanes") and arrange-slice helpers, magnetic snapping, alignment guides, align/distribute.
+Opinionated around **CQRS**, **Event Sourcing**, and **Dynamic Consistency Boundaries (DCB)**.
 
-### Editing experience
-- Undo/redo with debounced history (500 steps) — a whole AI turn collapses into one undo step.
-- Marquee multi-selection, resize handles with auto-fit width, inline text editing, type selector, and rich popovers for descriptions, tags, actions, validation, BDD steps, and DCB query items.
-- Search across cards, fields, tags, and rules (`Cmd/Ctrl+F`).
-- Light/dark themes and localization (**English** and **Vietnamese**).
+</div>
 
-### AI assistant
-- OpenAI-compatible chat client (works with OpenAI, or local endpoints like Ollama / LM Studio).
-- Tool-calling agent with 25 canvas/storm/model tools and a fallback JSON-plan mode for endpoints without tool support.
-- Context auto-compaction for long conversations.
+---
 
-### Files & export
-- `.storm` / `.json` project files (versioned, validated).
-- **JSON Schema export** (draft-07 and 2020-12) covering model nodes and storm payloads.
-- **Image export**: PNG at multiple resolutions and vector SVG.
-- Auto-save to `localStorage` plus a one-slot backup with restore.
-- **Google Drive** integration for open/save/export (PKCE OAuth; loopback flow on desktop).
+<!--
+## Screenshots
 
-## Desktop and web apps
+<p align="center">
+  <img src="docs/screenshot-canvas.png" width="900" alt="Event Modeling canvas" />
+</p>
+-->
 
-The same React/Pixi codebase ships to two targets:
+## ✨ Features
 
-- **Web app** — a standard Vite SPA you can host anywhere. Uses the in-app **File** and **Export** menus, `Cmd/Ctrl+S` to save, browser download/upload for project files, and Google Identity Services popup sign-in.
-- **Desktop app** — a Tauri 2 native shell for macOS, Windows, and Linux. Uses the **native OS menu bar** (File / Edit / View / Export / Window) with real accelerators, opens/saves files natively, and signs in to Google through the system browser with a loopback OAuth redirect (the webview blocks the GIS popup).
+### 🎨 Modeling canvas
+- ♾️ Infinite, pannable/zoomable canvas — Pixi.js (GPU) with a spatial index for fast hit-testing
+- ✍️ **Write slices**: Command → Constraint(s) → Event(s)
+- 📖 **Read slices**: Query → State (optional Constraint layer)
+- 🃏 **8 storm card kinds**: command, event, actor, state, constraint, external, query, BDD
+- 🧩 **Data model nodes**: object, enum, array, wrapper + 12 primitives (`String`, `Number`, `Boolean`, `UUID`, `DateTime`, `Date`, `Email`, `URL`, `URI`, `JSON`, `Any`, `Void`, plus `[]`)
+- 🔒 **DCB + RBAC**: consistency boundaries as query items; `resource:verb:scope` actions with actor wildcards
+- 🥒 **BDD cards**: Given/When/Then referencing events, commands, queries, states, errors, externals
+- 📐 Groups, connectors, sticky notes, text boxes, reference copies, auto-layout, snapping & guides
 
-Platform differences are detected at runtime (`src/utils/platform.ts`), so the UI adapts automatically.
+### ⚡ Editing experience
+- ↩️ Undo/redo — 500-step history, one AI turn collapses into a single step
+- 🔦 Marquee select, resize handles, inline text editing, rich popovers for tags/actions/validation
+- 🔍 Search across cards, fields, tags, and rules (`Cmd/Ctrl+F`)
+- 🌗 Light/dark themes · 🌐 English & Vietnamese
 
-### Run the web app
+### 🤖 AI assistant
+- 🔌 OpenAI-compatible (OpenAI, Ollama, LM Studio, …)
+- 🛠️ Tool-calling agent — 25 canvas/storm/model tools, with JSON-plan fallback
+- 🗜️ Auto-compaction for long conversations
+
+### 💾 Files & export
+- 📄 `.storm` / `.json` project files (versioned, validated)
+- 🧾 **JSON Schema** export (draft-07 & 2020-12)
+- 🖼️ **Image export** — PNG at multiple resolutions + vector SVG
+- 💽 Auto-save to `localStorage` with one-slot backup & restore
+- ☁️ **Google Drive** open/save/export (PKCE OAuth; loopback on desktop)
+
+## 🖥️ Desktop & web
+
+One React/Pixi codebase, two targets. Platform is detected at runtime (`src/utils/platform.ts`), so the UI adapts automatically.
+
+| | 🌐 Web app | 🖥️ Desktop app |
+| --- | --- | --- |
+| **Stack** | Vite SPA | Tauri 2 native shell |
+| **Platforms** | Anywhere you can host it | macOS · Windows · Linux |
+| **Menus** | In-app File / Export | Native OS menu bar (File / Edit / View / Export / Window) |
+| **Files** | Browser download/upload | Native open/save dialogs |
+| **Sign-in** | Google Identity Services popup | System browser + loopback OAuth |
+
+## 🧱 Tech stack
+
+| Layer | Stack |
+| --- | --- |
+| **Frontend** | React 19 · TypeScript · Vite · Tailwind CSS 4 |
+| **Canvas** | Pixi.js 8 · pixi-viewport · rbush |
+| **State** | Zustand · zundo (undo/redo) · Zod |
+| **i18n** | i18next · react-i18next |
+| **Desktop** | Tauri 2 (Rust) · http, opener, OAuth plugins |
+| **Tooling** | pnpm · Vitest · ESLint · Prettier |
+
+## 🚀 Getting started
+
+**Prerequisites**
+
+- Node.js **22+** and pnpm **12+**
+- Desktop build only: a [Rust toolchain](https://www.rust-lang.org/tools/install) and [Tauri system dependencies](https://v2.tauri.app/start/prerequisites/)
 
 ```bash
-pnpm dev
+pnpm install     # install
+
+pnpm dev         # run the web app
+pnpm tauri dev   # run the desktop app
+
+pnpm build       # type-check + build web bundle → dist/
+pnpm tauri build # produce a native desktop bundle
 ```
 
-### Run the desktop app
+## 🔌 Google Drive setup (optional)
 
-```bash
-pnpm tauri dev
-```
-
-## Tech stack
-
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS 4
-- **Canvas**: Pixi.js 8 + pixi-viewport, rbush spatial index
-- **State**: Zustand + zundo (temporal undo/redo), Zod for schemas
-- **i18n**: i18next + react-i18next
-- **Desktop**: Tauri 2 (Rust) with http, opener, and OAuth plugins
-- **Tooling**: pnpm, Vitest, ESLint, Prettier
-
-## Getting started
-
-### Prerequisites
-
-- **Node.js 22+** and **pnpm 12+**
-- For the desktop build: a [Rust toolchain](https://www.rust-lang.org/tools/install) and the [Tauri system dependencies](https://v2.tauri.app/start/prerequisites/)
-
-### Install
-
-```bash
-pnpm install
-```
-
-### Build
-
-```bash
-pnpm build        # type-check + build the web bundle into dist/
-pnpm tauri build  # produce a native desktop bundle
-```
-
-## Google Drive setup (optional)
-
-Google Drive integration is configured through environment variables. Copy `.env.example` to `.env.local` and fill in the values you need:
+Copy `.env.example` to `.env.local` and fill in what you need:
 
 | Variable | Purpose |
 | --- | --- |
 | `VITE_GOOGLE_CLIENT_ID` | OAuth "Web application" client for the browser build |
-| `VITE_GOOGLE_DESKTOP_CLIENT_ID` | OAuth "Desktop app" client for the Tauri build (loopback redirect) |
+| `VITE_GOOGLE_DESKTOP_CLIENT_ID` | OAuth "Desktop app" client for Tauri (loopback redirect) |
 | `VITE_GOOGLE_DESKTOP_CLIENT_SECRET` | Optional; only if your client requires a secret on token exchange |
-| `VITE_GOOGLE_ACCESS_TOKEN` | Optional; a direct token for local development/testing |
+| `VITE_GOOGLE_ACCESS_TOKEN` | Optional; direct token for local development/testing |
 
-The desktop app signs in through the system browser with a loopback redirect (`http://127.0.0.1:<port>`), which requires a **Desktop app** OAuth client — a Web application client will not work there.
+> [!IMPORTANT]
+> The desktop app signs in via the system browser with a loopback redirect (`http://127.0.0.1:<port>`), so it needs a **Desktop app** OAuth client — a Web application client won't work there.
 
-## Scripts
+## 📜 Scripts
 
 | Command | Description |
 | --- | --- |
@@ -112,10 +124,10 @@ The desktop app signs in through the system browser with a loopback redirect (`h
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm typecheck` | Type-check without emitting |
 | `pnpm lint` | Run ESLint |
-| `pnpm tauri` | Tauri CLI (e.g. `pnpm tauri dev`, `pnpm tauri build`) |
-| `pnpm bump` | Bump the version and trigger a release (`:patch`, `:minor`, `:major`) |
+| `pnpm tauri` | Tauri CLI (e.g. `pnpm tauri dev`) |
+| `pnpm bump` | Bump version + release (`:patch`, `:minor`, `:major`) |
 
-## Project structure
+## 📁 Project structure
 
 ```
 src/
@@ -131,10 +143,10 @@ src/
 src-tauri/      Rust/Tauri shell: native menu, plugins, config
 ```
 
-## License
+## 📦 Releases
 
-[MIT](LICENSE)
+`scripts/bump-version.sh` bumps `package.json` + `src-tauri/tauri.conf.json`, commits, tags, pushes, and opens a GitHub release. Publishing triggers the **Release** workflow → builds a macOS (ARM64) bundle and uploads the DMG. CI runs lint, type-check, tests, and the web build on every push and PR.
 
-## Releases
+## 📄 License
 
-The `bump` script (`scripts/bump-version.sh`) bumps the version in `package.json` and `src-tauri/tauri.conf.json`, commits, tags, pushes, and creates a GitHub release. Publishing a release triggers the `Release` workflow, which builds a macOS (ARM64) bundle and uploads the DMG. CI (`.github/workflows/ci.yml`) runs lint, type-check, tests, and the web build on every push and pull request.
+[MIT](LICENSE) © 0m3kk
