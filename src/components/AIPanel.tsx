@@ -371,7 +371,7 @@ export function AIPanel() {
     <div
       ref={panelRef}
       tabIndex={-1}
-      className="fixed right-6 bottom-6 z-40 flex max-h-[calc(100vh-5rem)] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-white border border-gray-200 shadow-2xl text-gray-800 outline-none dark:bg-gray-900 dark:border-gray-700/80 dark:text-gray-200"
+      className="fixed right-6 bottom-6 z-40 flex max-h-[calc(100vh-5rem)] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-white border border-gray-200 shadow-2xl text-gray-800 outline-none select-text dark:bg-gray-900 dark:border-gray-700/80 dark:text-gray-200"
       style={{ width: size.width, height: size.height }}
       onMouseDown={handlePanelMouseDown}
       onKeyDown={handlePanelKeyDown}
