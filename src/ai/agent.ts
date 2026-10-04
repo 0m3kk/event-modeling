@@ -35,7 +35,7 @@ import {
   createToolMessage,
 } from "./conversation";
 
-export const MAX_AGENT_ITERATIONS = 25;
+export const MAX_AGENT_ITERATIONS = 100;
 
 export interface AgentCallbacks {
   onMessage: (message: AIChatMessage) => void;
