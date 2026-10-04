@@ -241,6 +241,9 @@ describe("toCamelCase and fieldNameMatches", () => {
     expect(normalizeExpressionForCodegen('"Params"."Amount" <= "Fields"."Balance"')).toBe("params.amount <= output.balance");
     expect(normalizeExpressionForCodegen('"Fields"."Status" == "User Status"."PENDING"')).toBe("output.status == UserStatus.PENDING");
     expect(normalizeExpressionForCodegen('"User Registered"."Email"')).toBe("userRegistered.email");
+    expect(
+      normalizeExpressionForCodegen('"Password Service"."hashPassword"("Command"."Password")'),
+    ).toBe("passwordService.hashPassword(command.password)");
     expect(normalizeExpressionForCodegen("")).toBe("");
   });
 });

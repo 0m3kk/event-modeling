@@ -153,12 +153,33 @@ export interface CodegenFlow {
   lineStyle?: string;
 }
 
+export interface CodegenServiceMethodParam {
+  name: string;
+  type: string;
+}
+
+export interface CodegenServiceMethod {
+  name: string;
+  params: CodegenServiceMethodParam[];
+  returnType: string;
+  description?: string;
+}
+
+export interface CodegenService {
+  name: string;
+  description?: string;
+  slice?: string;
+  group?: string;
+  methods: CodegenServiceMethod[];
+}
+
 export interface CodegenSpec {
   version: "1.0";
   title: string;
   createdAt: string;
   slices?: string[];
   models: CodegenModelDef[];
+  services: CodegenService[];
   commands: CodegenCommand[];
   events: CodegenEvent[];
   readModels: CodegenReadModel[];
@@ -266,7 +287,7 @@ function toModelDef(
   location?: { slice?: string; group?: string },
 ): CodegenModelDef {
   const def: CodegenModelDef = {
-    kind: model.kind,
+    kind: model.kind as "object" | "enum" | "array" | "wrap",
     name: model.name.trim(),
   };
   if (model.description?.trim()) def.description = model.description.trim();
@@ -370,6 +391,7 @@ export function buildCodegenSpec(
     createdAt: new Date().toISOString(),
     ...(sliceNames.length > 0 ? { slices: sliceNames } : {}),
     models: [],
+    services: [],
     commands: [],
     events: [],
     readModels: [],
@@ -394,7 +416,29 @@ export function buildCodegenSpec(
         : isModelOnly
         ? { group: groupName }
         : undefined;
-      spec.models.push(toModelDef(obj.modelData, location));
+
+      if (obj.modelData.kind === "service") {
+        const sDef: CodegenService = {
+          name: obj.modelData.name.trim(),
+          methods: (obj.modelData.methods ?? []).map((m) => ({
+            name: m.name.trim(),
+            params: (m.params ?? []).map((p) => ({
+              name: p.name.trim(),
+              type: p.paramType.trim() || "string",
+            })),
+            returnType: m.returnType.trim() || "string",
+            ...(m.description?.trim() ? { description: m.description.trim() } : {}),
+          })),
+          ...(obj.modelData.description?.trim()
+            ? { description: obj.modelData.description.trim() }
+            : {}),
+          ...(location?.slice ? { slice: location.slice } : {}),
+          ...(location?.group ? { group: location.group } : {}),
+        };
+        spec.services.push(sDef);
+      } else {
+        spec.models.push(toModelDef(obj.modelData, location));
+      }
       continue;
     }
 

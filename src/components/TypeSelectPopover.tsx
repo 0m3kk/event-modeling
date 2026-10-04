@@ -231,6 +231,17 @@ export function TypeSelectPopover() {
             innerType: newType,
           },
         });
+      } else if (obj.modelData.kind === "service") {
+        const list = obj.modelData.methods ?? [];
+        const nextList = list.map((m) =>
+          m.id === typeSelect.fieldId ? { ...m, returnType: newType } : m,
+        );
+        updateObject(obj.id, {
+          modelData: {
+            ...obj.modelData,
+            methods: nextList,
+          },
+        });
       } else {
         const list = obj.modelData.fields ?? [];
         const nextList = list.map((f) =>

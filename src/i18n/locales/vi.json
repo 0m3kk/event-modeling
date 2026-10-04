@@ -76,6 +76,7 @@
       "bdd": "Given/When/Then",
       "object": "Đối tượng",
       "enum": "Enum",
+      "service": "Dịch vụ",
       "array": "Mảng",
       "wrap": "Bọc"
     }

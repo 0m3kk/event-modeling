@@ -9,6 +9,7 @@ export const MODEL_KIND_COLORS: Record<ModelNodeKind, string> = {
   array: "#dc2626", // red
   wrap: "#ca8a04", // yellow
   enum: "#65a30d", // lime
+  service: "#6366f1", // indigo
 };
 
 /** Subdued/deeper header colors for dark mode to prevent harsh glare */
@@ -17,6 +18,7 @@ export const MODEL_KIND_DARK_COLORS: Record<ModelNodeKind, string> = {
   array: "#991b1b", // red 800
   wrap: "#854d0e", // yellow 800
   enum: "#3f6212", // lime 800
+  service: "#4338ca", // indigo 800
 };
 
 export function modelKindColor(
@@ -34,6 +36,7 @@ export const MODEL_KIND_LABELS: Record<ModelNodeKind, string> = {
   array: "Array",
   wrap: "Wrap",
   enum: "Enum",
+  service: "Service",
 };
 
 export const MODEL_LAYOUT = {

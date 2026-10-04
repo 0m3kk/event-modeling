@@ -219,11 +219,14 @@ export function computeModelNodeHeight(data: ModelData): number {
   const kind = data.kind;
   const fields = data.fields ?? [];
   const values = data.values ?? [];
+  const methods = data.methods ?? [];
 
   if (kind === "object") {
     h += fields.length * rowHeight;
   } else if (kind === "enum") {
     h += values.length * rowHeight;
+  } else if (kind === "service") {
+    h += methods.length * rowHeight;
   } else if (kind === "array" || kind === "wrap") {
     h += rowHeight;
   }
@@ -484,6 +487,20 @@ export function computeOptimalModelNodeWidth(
     const text = v.name || v.value || "";
     const vWidth = text.length * 7.0 + 40;
     requiredWidth = Math.max(requiredWidth, vWidth);
+  }
+
+  for (const m of data.methods ?? []) {
+    const rawReturnType = m.returnType || DEFAULT_FIELD_TYPE;
+    const targetModel = objects ? resolveTargetModel(objects, rawReturnType) : null;
+    const isModel = Boolean(targetModel && targetModel.modelData);
+    const typeZoneW = Math.max(isModel ? 72 : 65, rawReturnType.length * 6.5 + (isModel ? 24 : 14));
+    const paramsStr = (m.params ?? [])
+      .map((p) => p.name || p.paramType)
+      .join(", ");
+    const sigText = `${m.name || "method"}(${paramsStr})`;
+    const sigWidth = sigText.length * 7.0 + 34;
+    const rowWidth = sigWidth + typeZoneW + 24;
+    requiredWidth = Math.max(requiredWidth, rowWidth);
   }
 
   if (data.itemType) {

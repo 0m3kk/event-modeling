@@ -19,7 +19,7 @@ import type { CanvasObject, ModelData, StormData } from "@/types";
 export type RowMoveDirection = "up" | "down";
 
 /** Which list inside a ModelData a row id belongs to */
-export type ModelRowList = "fields" | "values";
+export type ModelRowList = "fields" | "values" | "methods";
 
 /** Which list inside a StormData a row id belongs to */
 export type StormRowList =
@@ -78,6 +78,12 @@ export function resolveModelRowList(
   if (data.kind === "enum" && (data.values ?? []).some((v) => v.id === rowId)) {
     return "values";
   }
+  if (
+    data.kind === "service" &&
+    (data.methods ?? []).some((m) => m.id === rowId)
+  ) {
+    return "methods";
+  }
   return null;
 }
 
@@ -129,14 +135,24 @@ export function moveModelRowInObject(
       modelData: { ...data, fields: reorderItems(items, fromIndex, toIndex) },
     };
   }
-  // enum values
-  const items = data.values ?? [];
-  const fromIndex = items.findIndex((v) => v.id === rowId);
+  if (list === "values") {
+    const items = data.values ?? [];
+    const fromIndex = items.findIndex((v) => v.id === rowId);
+    const toIndex = stepIndex(fromIndex, items.length, direction);
+    if (toIndex === -1) return null;
+    return {
+      ...obj,
+      modelData: { ...data, values: reorderItems(items, fromIndex, toIndex) },
+    };
+  }
+  // methods
+  const items = data.methods ?? [];
+  const fromIndex = items.findIndex((m) => m.id === rowId);
   const toIndex = stepIndex(fromIndex, items.length, direction);
   if (toIndex === -1) return null;
   return {
     ...obj,
-    modelData: { ...data, values: reorderItems(items, fromIndex, toIndex) },
+    modelData: { ...data, methods: reorderItems(items, fromIndex, toIndex) },
   };
 }
 

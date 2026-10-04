@@ -151,6 +151,18 @@ export function generateModelJsonSchema(
         model.validation,
       );
     }
+    case "service": {
+      def.type = "object";
+      def.properties = {};
+      for (const m of model.methods ?? []) {
+        const mName = toCamelCaseIdentifier(m.name);
+        def.properties[mName] = {
+          type: "string",
+          description: m.description || `Service method: ${m.name}(...) -> ${m.returnType}`,
+        };
+      }
+      break;
+    }
     case "object":
     default: {
       def.type = "object";

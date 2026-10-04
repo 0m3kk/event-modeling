@@ -255,6 +255,12 @@ export interface CanvasStoreActions {
   setQueryItemPopup: (target: QueryItemPopupTarget | null) => void;
   addModelField: (objectId: string) => string | undefined;
   addModelEnumValue: (objectId: string) => string | undefined;
+  addServiceModelMethod: (objectId: string) => string | undefined;
+  updateServiceModelMethod: (
+    objectId: string,
+    methodId: string,
+    patch: Partial<import("@/types").ServiceMethod>,
+  ) => void;
 
   // Alignment, Distribution & Layout
   alignObjects: (direction: AlignDirection) => void;

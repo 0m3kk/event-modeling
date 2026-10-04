@@ -211,6 +211,30 @@ export function drawHeaderKindIcon(
         .stroke({ color, width: 1.4, cap: "round" });
       break;
     }
+
+    case "service": {
+      // Cpu / Microchip icon
+      // Central square
+      g.roundRect(x0 + 4, y0 + 4, 8, 8, 1.5).stroke({ color, width: 1.3 });
+      g.rect(x0 + 6, y0 + 6, 4, 4).fill({ color, alpha: 0.85 });
+
+      // Top pins
+      g.moveTo(x0 + 6, y0 + 1.5).lineTo(x0 + 6, y0 + 4).stroke({ color, width: 1.2 });
+      g.moveTo(x0 + 10, y0 + 1.5).lineTo(x0 + 10, y0 + 4).stroke({ color, width: 1.2 });
+
+      // Bottom pins
+      g.moveTo(x0 + 6, y0 + 12).lineTo(x0 + 6, y0 + 14.5).stroke({ color, width: 1.2 });
+      g.moveTo(x0 + 10, y0 + 12).lineTo(x0 + 10, y0 + 14.5).stroke({ color, width: 1.2 });
+
+      // Left pins
+      g.moveTo(x0 + 1.5, y0 + 6).lineTo(x0 + 4, y0 + 6).stroke({ color, width: 1.2 });
+      g.moveTo(x0 + 1.5, y0 + 10).lineTo(x0 + 4, y0 + 10).stroke({ color, width: 1.2 });
+
+      // Right pins
+      g.moveTo(x0 + 12, y0 + 6).lineTo(x0 + 14.5, y0 + 6).stroke({ color, width: 1.2 });
+      g.moveTo(x0 + 12, y0 + 10).lineTo(x0 + 14.5, y0 + 10).stroke({ color, width: 1.2 });
+      break;
+    }
   }
 }
 

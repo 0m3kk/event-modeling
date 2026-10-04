@@ -347,6 +347,110 @@ export class ModelNodeRenderer {
 
         renderY += rowHeight;
       }
+    } else if (kind === "service") {
+      const methods = data.methods ?? [];
+      for (const m of methods) {
+        const rowY = renderY;
+
+        // Selection highlight
+        if (selectedFieldId && m.id === selectedFieldId) {
+          g.roundRect(4, rowY + 1, w - 8, rowHeight - 2, 4).fill({
+            color: isDark ? 0x1e3a8a : 0xdbeafe,
+          });
+        }
+
+        // Return type zone width
+        const rawReturnType = m.returnType || DEFAULT_FIELD_TYPE;
+        const targetModel = resolveTargetModel(allObjects, rawReturnType);
+        const isModel = Boolean(targetModel && targetModel.modelData);
+        const typeZoneW = computeTypeZoneWidth(rawReturnType, isModel);
+        const typeZoneX = w - typeZoneW - 8;
+
+        // Method signature: name(p1, p2)
+        const paramsStr = (m.params ?? [])
+          .map((p) => p.name || p.paramType)
+          .join(", ");
+        const sigText = `${m.name || "method"}(${paramsStr})`;
+
+        const availableSigWidth = typeZoneX - 24;
+        const maxSigChars = Math.max(6, Math.floor(availableSigWidth / 6.5));
+        const displaySig = truncateText(sigText, maxSigChars);
+
+        const methodText = new Text({
+          text: `• ${displaySig}`,
+          style: {
+            fontSize: 11,
+            fontWeight: "500",
+            fontFamily: APP_FONT_FAMILY,
+            fill: isDark ? 0xd4d4d8 : 0x1e293b,
+          },
+          resolution: textResolution,
+        });
+        methodText.x = 10;
+        methodText.y = rowY + 5;
+        container.addChild(methodText);
+
+        // Hit zone for method name row
+        hitZones.push({
+          type: "methodName",
+          bounds: {
+            x: 0,
+            y: rowY,
+            width: w,
+            height: rowHeight,
+          },
+          fieldId: m.id,
+          currentText: m.name,
+        });
+
+        // Return type pill
+        drawFieldTypePill({
+          g,
+          container,
+          rawType: rawReturnType,
+          x: typeZoneX,
+          y: rowY + 3,
+          w: typeZoneW,
+          h: 20,
+          targetModel,
+          textResolution,
+          isDark,
+        });
+
+        hitZones.push({
+          type: "methodReturnType",
+          bounds: {
+            x: typeZoneX,
+            y: rowY,
+            width: typeZoneW,
+            height: rowHeight,
+          },
+          fieldId: m.id,
+          currentText: m.returnType,
+        });
+
+        if (m.description || selectedFieldId === m.id) {
+          const hasDesc = Boolean(m.description);
+          const rowInfoX = typeZoneX - 16;
+          drawInfoBadge(g, container, rowInfoX, rowY + 13, {
+            radius: 5,
+            stroke: 0x94a3b8,
+            fill: 0x64748b,
+            fontSize: 7,
+            alpha: hasDesc ? 1 : 0.5,
+            textResolution,
+          });
+
+          hitZones.push({
+            type: "desc",
+            bounds: { x: rowInfoX - 8, y: rowY + 5, width: 16, height: 16 },
+            fieldId: m.id,
+            currentText: m.description,
+          });
+        }
+
+        renderY += rowHeight;
+      }
     } else if (kind === "array") {
       const rowY = renderY;
       const itemType = data.itemType || DEFAULT_ANY_TYPE;

@@ -1958,5 +1958,65 @@ describe("useCanvasStore", () => {
     expect(rule?.status).toBe(404);
     expect(rule?.severity).toBe("error");
   });
+
+  it("manages service card methods: add, update, move, delete", () => {
+    const serviceCard: CanvasObject = {
+      id: "srv-card-1",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 80,
+      modelData: {
+        kind: "service",
+        name: "AuthService",
+        methods: [],
+      },
+    };
+    useCanvasStore.getState().addObject(serviceCard);
+
+    // 1. Add method
+    const m1 = useCanvasStore.getState().addServiceModelMethod("srv-card-1")!;
+    expect(m1).toBeDefined();
+
+    let card = useCanvasStore.getState().objects.find((o) => o.id === "srv-card-1");
+    expect(card?.modelData?.methods).toHaveLength(1);
+    expect(card?.modelData?.methods?.[0].id).toBe(m1);
+
+    // 2. Update method
+    useCanvasStore.getState().updateServiceModelMethod("srv-card-1", m1, {
+      name: "hashPassword",
+      params: [{ id: "p1", name: "password", paramType: "String" }],
+      returnType: "String",
+    });
+
+    card = useCanvasStore.getState().objects.find((o) => o.id === "srv-card-1");
+    expect(card?.modelData?.methods?.[0].name).toBe("hashPassword");
+    expect(card?.modelData?.methods?.[0].params).toEqual([
+      { id: "p1", name: "password", paramType: "String" },
+    ]);
+    expect(card?.modelData?.methods?.[0].returnType).toBe("String");
+
+    // 3. Add second method & move row
+    const m2 = useCanvasStore.getState().addServiceModelMethod("srv-card-1")!;
+    useCanvasStore.getState().updateServiceModelMethod("srv-card-1", m2, {
+      name: "verifyPassword",
+    });
+
+    card = useCanvasStore.getState().objects.find((o) => o.id === "srv-card-1");
+    expect(card?.modelData?.methods?.[0].name).toBe("hashPassword");
+    expect(card?.modelData?.methods?.[1].name).toBe("verifyPassword");
+
+    useCanvasStore.getState().moveRow("srv-card-1", m2, "up");
+    card = useCanvasStore.getState().objects.find((o) => o.id === "srv-card-1");
+    expect(card?.modelData?.methods?.[0].name).toBe("verifyPassword");
+    expect(card?.modelData?.methods?.[1].name).toBe("hashPassword");
+
+    // 4. Delete method
+    useCanvasStore.getState().deleteSelectedRow("srv-card-1", m2);
+    card = useCanvasStore.getState().objects.find((o) => o.id === "srv-card-1");
+    expect(card?.modelData?.methods).toHaveLength(1);
+    expect(card?.modelData?.methods?.[0].name).toBe("hashPassword");
+  });
 });
 

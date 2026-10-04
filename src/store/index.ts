@@ -1431,6 +1431,10 @@ export const useCanvasStore = create<CanvasStore>()(
             nextData.values = (obj.modelData.values ?? []).filter(
               (v) => v.id !== rowId,
             );
+          } else if (obj.modelData.kind === "service") {
+            nextData.methods = (obj.modelData.methods ?? []).filter(
+              (m) => m.id !== rowId,
+            );
           }
           const newHeight = computeModelNodeHeight(nextData);
           set({
@@ -2019,6 +2023,61 @@ export const useCanvasStore = create<CanvasStore>()(
           stormSelectedField: { objectId: obj.id, fieldId: newId },
         });
         return newId;
+      },
+
+      addServiceModelMethod: (objectId) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "model" || !obj.modelData || obj.locked)
+          return;
+        if (obj.modelData.kind !== "service") return;
+        const newId = nanoid();
+        const newMethod: import("@/types").ServiceMethod = {
+          id: newId,
+          name: "",
+          params: [],
+          returnType: DEFAULT_FIELD_TYPE,
+        };
+        const nextMethods = [...(obj.modelData.methods ?? []), newMethod];
+        const nextData = { ...obj.modelData, methods: nextMethods };
+        const newHeight = computeModelNodeHeight(nextData);
+        set({
+          objects: syncReferenceAfterChange(
+            objects.map((o) =>
+              o.id === obj.id
+                ? { ...o, height: newHeight, modelData: nextData }
+                : o,
+            ),
+            obj.id,
+          ),
+          selectedIds: [obj.id],
+          stormSelectedField: { objectId: obj.id, fieldId: newId },
+        });
+        return newId;
+      },
+
+      updateServiceModelMethod: (objectId, methodId, patch) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "model" || !obj.modelData || obj.locked)
+          return;
+        if (obj.modelData.kind !== "service") return;
+        const methods = obj.modelData.methods ?? [];
+        const nextMethods = methods.map((m) =>
+          m.id === methodId ? { ...m, ...patch } : m,
+        );
+        const nextData = { ...obj.modelData, methods: nextMethods };
+        const newHeight = computeModelNodeHeight(nextData);
+        set({
+          objects: syncReferenceAfterChange(
+            objects.map((o) =>
+              o.id === obj.id
+                ? { ...o, height: newHeight, modelData: nextData }
+                : o,
+            ),
+            obj.id,
+          ),
+        });
       },
 
       alignObjects: (direction) => {

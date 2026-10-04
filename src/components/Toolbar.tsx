@@ -19,6 +19,7 @@ import {
   FolderPlus,
   ListChecks,
   PenLine,
+  Cpu,
 } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import type {
@@ -190,6 +191,8 @@ export function Toolbar() {
       modelData.fields = [];
     } else if (kind === "enum") {
       modelData.values = [];
+    } else if (kind === "service") {
+      modelData.methods = [];
     } else if (kind === "array") {
       modelData.itemType = "";
     } else if (kind === "wrap") {
@@ -271,6 +274,7 @@ export function Toolbar() {
   const modelIcons: Record<ModelNodeKind, React.ReactNode> = {
     object: <Box size={20} />,
     enum: <List size={20} />,
+    service: <Cpu size={20} />,
     array: <Brackets size={20} />,
     wrap: <Parentheses size={20} />,
   };
@@ -285,7 +289,13 @@ export function Toolbar() {
     "external",
   ];
 
-  const modelKinds: ModelNodeKind[] = ["object", "enum", "array", "wrap"];
+  const modelKinds: ModelNodeKind[] = [
+    "object",
+    "enum",
+    "service",
+    "array",
+    "wrap",
+  ];
 
   return (
     <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-2xl border border-gray-200/90 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 px-3.5 py-2 shadow-2xl backdrop-blur-md">

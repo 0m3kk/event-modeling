@@ -4,7 +4,21 @@
 
 import type { FieldValidation } from "./validation";
 
-export type ModelNodeKind = "object" | "enum" | "array" | "wrap";
+export type ModelNodeKind = "object" | "enum" | "array" | "wrap" | "service";
+
+export interface ServiceMethodParam {
+  id: string;
+  name: string;
+  paramType: string;
+}
+
+export interface ServiceMethod {
+  id: string;
+  name: string;
+  params: ServiceMethodParam[];
+  returnType: string;
+  description?: string;
+}
 
 export interface ModelField {
   id: string;
@@ -31,6 +45,7 @@ export interface ModelData {
   itemType?: string; // array only (primitive or model node name)
   innerType?: string; // wrap only (e.g. nullable/optional target)
   values?: ModelEnumValue[]; // enum only
+  methods?: ServiceMethod[]; // service only
   /**
    * Node-level validation for array (minItems/maxItems) and wrap (value
    * rules). Enum has none; object validation lives on each field.

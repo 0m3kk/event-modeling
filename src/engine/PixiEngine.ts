@@ -838,6 +838,12 @@ export class PixiEngine {
         } else if (obj.modelData.kind === "wrap") {
           fieldType = obj.modelData.innerType;
           fieldName = "inner";
+        } else if (obj.modelData.kind === "service") {
+          const m = obj.modelData.methods?.find(
+            (method) => method.id === accurateZone?.fieldId,
+          );
+          fieldType = m?.returnType;
+          fieldName = m?.name;
         }
       } else if (obj.type === "storm" && obj.stormData) {
         const f =
@@ -871,7 +877,8 @@ export class PixiEngine {
       if (
         (accurateZone?.type === "fieldType" ||
           accurateZone?.type === "itemType" ||
-          accurateZone?.type === "innerType") &&
+          accurateZone?.type === "innerType" ||
+          accurateZone?.type === "methodReturnType") &&
         isFieldAlreadySelected &&
         !targetModel
       ) {
@@ -964,7 +971,9 @@ export class PixiEngine {
         accurateZone?.type === "bddStep" ||
         accurateZone?.type === "bddStepName" ||
         accurateZone?.type === "bddPayloadKey" ||
-        accurateZone?.type === "bddPayloadValue"
+        accurateZone?.type === "bddPayloadValue" ||
+        accurateZone?.type === "methodName" ||
+        accurateZone?.type === "methodReturnType"
       ) {
         // BDD zones carry the owning step in `fieldId`; payload zones must not
         // fall through to `valueId` (that is the payload row, not the step).
@@ -1093,7 +1102,8 @@ export class PixiEngine {
       if (
         zone?.type === "fieldType" ||
         zone?.type === "itemType" ||
-        zone?.type === "innerType"
+        zone?.type === "innerType" ||
+        zone?.type === "methodReturnType"
       ) {
         state.selectObject(obj.id);
         state.setStormSelectedField({

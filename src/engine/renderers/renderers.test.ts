@@ -253,6 +253,48 @@ describe("Pixi Card Renderers", () => {
     expect(enumRes.hitZones.some((z) => z.type === "validation")).toBe(false);
   });
 
+  it("renders service cards with methods and returnType hit zones", () => {
+    const serviceObj: CanvasObject = {
+      id: "srv-1",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 100,
+      modelData: {
+        kind: "service",
+        name: "PasswordService",
+        methods: [
+          {
+            id: "m1",
+            name: "hashPassword",
+            params: [{ id: "p1", name: "password", paramType: "String" }],
+            returnType: "String",
+            description: "Hashes password",
+          },
+        ],
+      },
+    };
+    const container = new Container();
+    const res = ModelNodeRenderer.draw(container, serviceObj, 1, false);
+
+    expect(res.height).toBeGreaterThanOrEqual(80);
+    const methodZone = res.hitZones.find((z) => z.type === "methodName");
+    expect(methodZone).toBeDefined();
+    expect(methodZone?.fieldId).toBe("m1");
+    expect(methodZone?.currentText).toBe("hashPassword");
+
+    const returnTypeZone = res.hitZones.find((z) => z.type === "methodReturnType");
+    expect(returnTypeZone).toBeDefined();
+    expect(returnTypeZone?.fieldId).toBe("m1");
+    expect(returnTypeZone?.currentText).toBe("String");
+
+    const descZone = res.hitZones.find((z) => z.type === "desc");
+    expect(descZone).toBeDefined();
+    expect(descZone?.fieldId).toBe("m1");
+    expect(descZone?.currentText).toBe("Hashes password");
+  });
+
   it("allows wider card width so long titles and field names fit without truncation", () => {
     const longName = "veryLongBillingAccountIdentificationNumber";
     const longTitle = "ProcessCustomerMonthlyInvoicePaymentCommand";

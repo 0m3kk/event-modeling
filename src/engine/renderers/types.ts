@@ -18,7 +18,9 @@ export type CardHitZoneType =
   | "validation"
   | "mapping"
   | "stickyText"
-  | "textBoxText";
+  | "textBoxText"
+  | "methodName"
+  | "methodReturnType";
 
 export interface CardHitZone {
   type: CardHitZoneType;

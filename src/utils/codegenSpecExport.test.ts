@@ -775,5 +775,64 @@ describe("codegenSpecExport", () => {
       { kind: "object", name: "Broken", fields: [] },
     ]);
   });
+
+  it("exports service cards with methods and params into spec.services", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "s1",
+        type: "model",
+        x: 0,
+        y: 0,
+        width: 240,
+        height: 120,
+        modelData: {
+          kind: "service",
+          name: "PasswordService",
+          description: "Provides password hashing and verification",
+          methods: [
+            {
+              id: "m1",
+              name: "hashPassword",
+              params: [{ id: "p1", name: "password", paramType: "String" }],
+              returnType: "String",
+              description: "Hashes raw password using argon2",
+            },
+            {
+              id: "m2",
+              name: "verifyPassword",
+              params: [
+                { id: "p2", name: "password", paramType: "String" },
+                { id: "p3", name: "hash", paramType: "String" },
+              ],
+              returnType: "Boolean",
+            },
+          ],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, []);
+    expect(spec.services).toHaveLength(1);
+    expect(spec.services[0]).toEqual({
+      name: "PasswordService",
+      description: "Provides password hashing and verification",
+      methods: [
+        {
+          name: "hashPassword",
+          params: [{ name: "password", type: "String" }],
+          returnType: "String",
+          description: "Hashes raw password using argon2",
+        },
+        {
+          name: "verifyPassword",
+          params: [
+            { name: "password", type: "String" },
+            { name: "hash", type: "String" },
+          ],
+          returnType: "Boolean",
+        },
+      ],
+    });
+  });
 });
 

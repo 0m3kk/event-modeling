@@ -76,6 +76,7 @@
       "bdd": "Given/When/Then",
       "object": "Object",
       "enum": "Enum",
+      "service": "Service",
       "array": "Array",
       "wrap": "Wrap"
     }

@@ -245,6 +245,54 @@ function applyUpdate(
         values: nextList,
       },
     });
+  } else if (zone.type === "methodName" && obj.type === "model" && obj.modelData) {
+    const list = obj.modelData.methods ?? [];
+    // If user typed name with params e.g. "hashPassword(password: String)" or just "hashPassword"
+    // parse method name and optional params
+    const raw = newValue.trim();
+    let methodName = raw;
+    let parsedParams: import("@/types").ServiceMethodParam[] | undefined = undefined;
+
+    const parenMatch = raw.match(/^([a-zA-Z0-9_]+)\s*\((.*)\)$/);
+    if (parenMatch) {
+      methodName = parenMatch[1]!;
+      const paramsContent = parenMatch[2]!.trim();
+      if (paramsContent) {
+        parsedParams = paramsContent.split(",").map((p) => {
+          const parts = p.trim().split(":");
+          if (parts.length === 2) {
+            return {
+              id: Math.random().toString(36).slice(2, 9),
+              name: parts[0]!.trim(),
+              paramType: parts[1]!.trim(),
+            };
+          }
+          return {
+            id: Math.random().toString(36).slice(2, 9),
+            name: "",
+            paramType: parts[0]!.trim(),
+          };
+        });
+      } else {
+        parsedParams = [];
+      }
+    }
+
+    const nextList = list.map((m) =>
+      m.id === zone.fieldId
+        ? {
+            ...m,
+            name: methodName,
+            ...(parsedParams !== undefined ? { params: parsedParams } : {}),
+          }
+        : m,
+    );
+    updateObject(obj.id, {
+      modelData: {
+        ...obj.modelData,
+        methods: nextList,
+      },
+    });
   } else if (zone.type === "constraint" && obj.type === "storm" && obj.stormData) {
     const list = obj.stormData.constraints ?? [];
     const nextList = list.map((c) =>

@@ -6,6 +6,7 @@ import { MODEL_KIND_LABELS } from "@/constants/model";
 import { DescriptionPopover } from "./DescriptionPopover";
 import { ValidationPopover } from "./ValidationPopover";
 import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
+import { ServiceParamsPopover } from "./ServiceParamsPopover";
 import { findDescriptionText } from "@/utils/description";
 import {
   describeValidationRules,
@@ -18,6 +19,7 @@ import {
   Trash2,
   Info,
   ListChecks,
+  Sliders,
 } from "lucide-react";
 
 export function ModelOptionsBar() {
@@ -38,8 +40,10 @@ export function ModelOptionsBar() {
   const validationTarget = useCanvasStore((s) => s.validationTarget);
   const setValidationTarget = useCanvasStore((s) => s.setValidationTarget);
   const isDragging = useCanvasStore((s) => s.isDragging);
+  const addServiceModelMethod = useCanvasStore((s) => s.addServiceModelMethod);
 
   const [showDescriptionPopover, setShowDescriptionPopover] = useState(false);
+  const [showParamsPopover, setShowParamsPopover] = useState(false);
 
   const selectedModel = useMemo(() => {
     if (selectedIds.length !== 1 || isLocked) return null;
@@ -76,6 +80,8 @@ export function ModelOptionsBar() {
       addModelField(selectedModel.id);
     } else if (kind === "enum") {
       addModelEnumValue(selectedModel.id);
+    } else if (kind === "service") {
+      addServiceModelMethod(selectedModel.id);
     }
   };
 
@@ -85,7 +91,8 @@ export function ModelOptionsBar() {
       sf.objectId === selectedModel.id &&
       sf.fieldId &&
       ((kind === "object" && data.fields?.some((f) => f.id === sf.fieldId)) ||
-        (kind === "enum" && data.values?.some((v) => v.id === sf.fieldId))),
+        (kind === "enum" && data.values?.some((v) => v.id === sf.fieldId)) ||
+        (kind === "service" && data.methods?.some((m) => m.id === sf.fieldId))),
   );
 
   const selectedModelRow = (() => {
@@ -95,6 +102,9 @@ export function ModelOptionsBar() {
     }
     if (kind === "enum") {
       return data.values?.find((v) => v.id === sf.fieldId) ?? null;
+    }
+    if (kind === "service") {
+      return data.methods?.find((m) => m.id === sf.fieldId) ?? null;
     }
     return null;
   })();
@@ -136,12 +146,27 @@ export function ModelOptionsBar() {
       ? `Set Validation for "${selectedModelField?.name ?? "field"}"`
       : `Set Validation for this ${MODEL_KIND_LABELS[kind]}`;
 
+  const selectedServiceMethod =
+    kind === "service" && isRowSelected
+      ? ((selectedModelRow as import("@/types").ServiceMethod | null) ?? null)
+      : null;
+
+  const handleToggleParamsPopover = () => {
+    const next = !showParamsPopover;
+    if (next) {
+      setShowDescriptionPopover(false);
+      setValidationTarget(null);
+    }
+    setShowParamsPopover(next);
+  };
+
   const handleToggleValidationPopover = () => {
     if (showValidationPopover) {
       setValidationTarget(null);
       return;
     }
     setShowDescriptionPopover(false);
+    setShowParamsPopover(false);
     if (canValidate) {
       setValidationTarget({
         objectId: selectedModel.id,
@@ -152,7 +177,10 @@ export function ModelOptionsBar() {
 
   const handleToggleDescriptionPopover = () => {
     const next = !showDescriptionPopover;
-    if (next) setValidationTarget(null);
+    if (next) {
+      setValidationTarget(null);
+      setShowParamsPopover(false);
+    }
     setShowDescriptionPopover(next);
   };
 
@@ -200,12 +228,18 @@ export function ModelOptionsBar() {
           }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-        {/* Add Field / Value */}
-        {(kind === "object" || kind === "enum") && (
+        {/* Add Field / Value / Method */}
+        {(kind === "object" || kind === "enum" || kind === "service") && (
           <>
             <button
               onClick={handleAddRow}
-              title={kind === "object" ? "Add Field" : "Add Value"}
+              title={
+                kind === "object"
+                  ? "Add Field"
+                  : kind === "enum"
+                    ? "Add Value"
+                    : "Add Method"
+              }
               className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100 cursor-pointer"
             >
               <Plus size={16} />
@@ -250,6 +284,28 @@ export function ModelOptionsBar() {
         )}
 
         <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
+
+        {/* Service Method Parameters button */}
+        {selectedServiceMethod && (
+          <button
+            onClick={handleToggleParamsPopover}
+            title={`Configure Parameters for "${selectedServiceMethod.name || "method"}"`}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
+              showParamsPopover || (selectedServiceMethod.params?.length ?? 0) > 0
+                ? "border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300"
+                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <Sliders
+              size={16}
+              className={
+                showParamsPopover || (selectedServiceMethod.params?.length ?? 0) > 0
+                  ? "text-indigo-600 dark:text-indigo-400"
+                  : "text-gray-600 dark:text-zinc-400"
+              }
+            />
+          </button>
+        )}
 
         {/* Create Reference Copy — linked duplicate, content stays in sync */}
         <button
@@ -298,6 +354,16 @@ export function ModelOptionsBar() {
         <ValidationPopover
           target={selectedModel}
           onClose={() => setValidationTarget(null)}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
+        />
+      )}
+
+      {/* Service Method Params Panel */}
+      {showParamsPopover && selectedServiceMethod && (
+        <ServiceParamsPopover
+          card={selectedModel}
+          method={selectedServiceMethod}
+          onClose={() => setShowParamsPopover(false)}
           anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}

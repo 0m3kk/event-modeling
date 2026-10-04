@@ -203,14 +203,32 @@ export function FieldMappingPopover({
         }
       }
     }
+
+    // Dynamic suggestions from Service cards on the canvas
+    const serviceNodes = objects.filter(
+      (o) => o.type === "model" && o.modelData?.kind === "service" && o.modelData.methods?.length,
+    );
+
+    for (const sNode of serviceNodes) {
+      const sName = sNode.modelData!.name.trim() || "Service";
+      for (const m of sNode.modelData!.methods ?? []) {
+        const mName = m.name.trim();
+        if (!mName) continue;
+        // Build suggested invocation argument
+        const arg = targetField?.name.trim()
+          ? `"Command"."${targetField.name.trim()}"`
+          : '"Command"."field"';
+        list.push({
+          label: `"${sName}"."${mName}"(...)`,
+          value: `"${sName}"."${mName}"(${arg})`,
+        });
+      }
+    }
+
     list.push(
       { label: "now()", value: "now()" },
       { label: "uuid()", value: "uuid()" },
       { label: '"Constraint"."<Output>"', value: '"Constraint".' },
-      {
-        label: "hashPassword(...)",
-        value: `hashPassword("Command"."${targetField?.name.trim() || "Password"}")`,
-      },
     );
     const seen = new Set<string>();
     return list.filter((item) => {
