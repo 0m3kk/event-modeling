@@ -65,63 +65,54 @@ const fieldSpec = z.object({
     .string()
     .optional()
     .describe(
-      "Primitive type (String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void) or the name of a Model node on the canvas; append '[]' for an array. Defaults to String. Invalid types are rejected. Actor cards ignore type.",
+      "Primitive type (String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void) or Model node name; append '[]' for array. Defaults to String.",
     ),
   required: z.boolean().optional(),
-  description: z
-    .string()
-    .optional()
-    .describe("Short, clear domain explanation of the field purpose."),
+  description: z.string().optional().describe("Domain explanation of field."),
   tag: z
     .string()
     .optional()
     .describe(
-      "Tag name on Event field for DCB dynamic consistency boundary (e.g. 'Order'). Tag ONLY key/unique identifier fields (IDs, unique email, code); never tag non-key fields or all fields.",
+      "DCB tag name on Event field (e.g. 'Order'). Tag ONLY key/unique identifier fields.",
     ),
   mapping: z
     .string()
     .optional()
     .describe(
-      "Explicit source expression for code generation (e.g. 'Command.User ID', 'Command.Email', 'now()', 'uuid()', 'Constraint.Balance'). MUST use Title Case matching defined card and field (never camelCase like 'command.userId').",
+      "Source expression in Title Case (e.g. 'Command.Email', 'now()').",
     ),
   validation: validationSpec
     .optional()
-    .describe(
-      "Input validation for Command payload fields and Query params only (ignored on Event/State/Constraint/External/Actor fields and on Command/Query responseFields). Maps to JSON Schema (minLength, format, pattern, minimum, enum).",
-    ),
+    .describe("Input validation for Command payload or Query params only."),
 });
 
 const queryItemSpec = z.object({
   types: z
     .array(z.string())
     .optional()
-    .describe(
-      "Existing Event card names evaluated by this Constraint/State; empty matches all.",
-    ),
+    .describe("Matching Event card names; empty matches all."),
   tagFields: z
     .array(z.string())
     .optional()
-    .describe(
-      "Names of tagged INPUT params (inputFields) on this State/Constraint card used to filter matching events. Tags only exist on input params.",
-    ),
+    .describe("Names of tagged inputFields on this card used to filter events."),
   set: z
     .record(z.string(), z.string())
     .optional()
     .describe(
-      "State projection dictionary mapping output field names to event expressions (e.g. { 'Status': \"'ACTIVE'\", 'Registered Email': 'UserRegistered.Email', 'Total Items': 'Total Items + 1' }). Keys MUST match defined outputFields names in Title Case (not camelCase). Values MUST reference <EventName>.<FieldName> in Title Case (never generic event.<field> or camelCase).",
+      "Projection mapping: outputFields in Title Case -> EventName.FieldName in Title Case (e.g. { 'Status': \"'ACTIVE'\", 'Email': 'User Registered.Email' }).",
     ),
 });
 
 export const constraintRuleSpec = z.union([
   z.string(),
   z.object({
-    text: z.string().optional().describe("Human-readable rule text or description"),
-    description: z.string().optional().describe("Alternative alias for text"),
-    code: z.string().optional().describe("Machine-readable error/rule code, e.g. USER_NOT_FOUND, EMAIL_ALREADY_IN_USE"),
-    assert: z.string().optional().describe('Boolean invariant expression in CEL / JS syntax. Wrap card and field names in double quotes and use "Fields"."<Name>" (for output fields) and "Params"."<Name>" (for input params), e.g. "Fields"."User ID" != null, "Fields"."Status" == "User Status"."ACTIVE", "Params"."Amount" <= "Fields"."Balance"'),
-    message: z.string().optional().describe("Client error message, e.g. User account does not exist"),
+    text: z.string().optional().describe("Human-readable rule text."),
+    description: z.string().optional(),
+    code: z.string().optional().describe("Domain error code (e.g. USER_NOT_FOUND)."),
+    assert: z.string().optional().describe('CEL/JS invariant (e.g. "Fields"."User ID" != null).'),
+    message: z.string().optional().describe("Error message."),
     severity: z.enum(["error", "warning"]).optional(),
-    status: z.number().int().optional().describe("HTTP status code for API codegen, e.g. 400, 401, 403, 404, 409"),
+    status: z.number().int().optional().describe("HTTP status code (e.g. 400, 404)."),
   }),
 ]);
 
@@ -336,7 +327,7 @@ function layoutSize(
 export const createStormCardsTool = defineTool({
   name: "create_storm_cards",
   description:
-    "Create event-storming cards. For Write Slices: Command (intent + action, optional responseFields for the handler's response) -> Constraint (reusable Decision Model checking business logic invariants against historical events, independent of command) -> Event (past fact with field tags only on key/unique fields; prefer event fields that also appear in the Command or Constraint payload, though timestamp/audit fields like Created At/Updated At are exempt). For Read Slices: Query (params + responseFields + action) -> State (projection), optionally with a Constraint layer between Query and State (Query -> Constraint(s) -> State) when the read needs to check an invariant or visibility rule; a Read Slice has NO Event layer — the State queries existing events elsewhere on the board via queryItems, so do NOT create Event cards in a Read Slice. State and Constraint split fields into three parts: inputFields (INPUT params; only these may carry tags and feed queryItems.tagFields), queryItems (which events feed the card; leave inputFields empty if it filters by event type only), and outputFields (OUTPUT fields produced by rehydrating the matching events; never tag these; do not repeat an inputFields entry here — only add an outputField when it is a distinct field with a different meaning). Command payload fields and Query params may set `validation` (minLength/maxLength/pattern/format/min/max/allowedValues) for input validation that maps to JSON Schema; never put validation rules in Constraint text or on a responseFields row. Actor specifies permissions (wildcard) and must NOT be connected to Command/Query. Query-item 'types' must name existing Event cards, and State/Constraint field tags must exist on an Event field. Actor permissions must match an existing Command or Query action on the canvas.",
+    "Create event-storming cards (command, constraint, event, state, query, actor, external) in vertical slices. Command/Query specify action. Constraints act as Decision Models checking historical events. Events carry DCB tags on key fields.",
   schema: z.object({
     cards: z
       .array(
@@ -353,44 +344,36 @@ export const createStormCardsTool = defineTool({
             .array(fieldSpec)
             .optional()
             .describe(
-              "State & Constraint cards only: INPUT params. Their `tag` values are the only tags a queryItems.tagFields entry can reference. Leave empty when query items filter by event type only.",
+              "State & Constraint cards only: INPUT params (carry tags for queryItems).",
             ),
           outputFields: z
             .array(fieldSpec)
             .optional()
             .describe(
-              "State & Constraint cards only: OUTPUT fields produced by rehydrating/projecting the matching events. Never put tags here.",
+              "State & Constraint cards only: OUTPUT projected fields (no tags).",
             ),
           responseFields: z
             .array(fieldSpec)
             .optional()
-            .describe(
-              "Query & Command cards: the RESPONSE output payload (Query read result / Command handler response). Never carries input validation.",
-            ),
+            .describe("Query & Command cards: response payload."),
           queryItems: z
             .array(queryItemSpec)
             .optional()
-            .describe(
-              "State & Constraint cards: DCB query matching event types and tagged input params.",
-            ),
+            .describe("DCB queries matching event types & tagged input params."),
           constraints: z
             .array(constraintRuleSpec)
             .optional()
             .describe(
-              "Constraint cards only: domain business logic invariants evaluated against historical events. Supports free-text strings or structured codegen rules with { code, assert, message, status }.",
+              "Constraint cards: domain invariants (strings or { code, assert, message, status }).",
             ),
           action: z
             .string()
             .optional()
-            .describe(
-              "Authorization action (resource:verb:scope) required for Command and Query cards (e.g. 'order:create:own', 'order:read:own').",
-            ),
+            .describe("Authorization action (resource:verb:scope) for Command/Query."),
           permissions: z
             .array(z.string())
             .optional()
-            .describe(
-              "Actor cards only: wildcard permission patterns (e.g. ['order:*', '*:read:own']).",
-            ),
+            .describe("Actor wildcard permissions (e.g. ['order:*'])."),
           x: z.number().optional(),
           y: z.number().optional(),
           groupId: z
@@ -695,33 +678,23 @@ export const updateStormCardTool = defineTool({
     inputFields: z
       .array(fieldSpec)
       .optional()
-      .describe(
-        "State & Constraint cards: replace the INPUT params. Tags are only allowed here.",
-      ),
+      .describe("State & Constraint: replace INPUT params (tags allowed here)."),
     outputFields: z
       .array(fieldSpec)
       .optional()
-      .describe(
-        "State & Constraint cards: replace the OUTPUT (rehydrated) fields. No tags.",
-      ),
+      .describe("State & Constraint: replace OUTPUT fields (no tags)."),
     responseFields: z
       .array(fieldSpec)
       .optional()
-      .describe(
-        "Query & Command cards: replace the RESPONSE payload. Never carries input validation.",
-      ),
+      .describe("Query & Command: replace RESPONSE payload."),
     queryItems: z
       .array(queryItemSpec)
       .optional()
-      .describe(
-        "Updated queryItems for State/Constraint (e.g. adding new event types during Constraint Evolution). tagFields reference tagged input params.",
-      ),
+      .describe("Updated queryItems for State/Constraint."),
     constraints: z
       .array(constraintRuleSpec)
       .optional()
-      .describe(
-        "Updated constraints for Constraint cards (strings or structured codegen rules with { code, assert, message, status }).",
-      ),
+      .describe("Updated constraints (strings or { code, assert, message, status })."),
     action: z
       .string()
       .optional()

@@ -5,11 +5,11 @@ import { chatCompletion, type OpenAIMessage } from "./client";
 // Budgets
 // ============================================================================
 
-export const CONTEXT_BUDGET = 32000;
-export const RECENT_CONTEXT_BUDGET = 20000;
-const TOOL_ELIDE_AFTER_MESSAGES = 4;
-const TOOL_ELIDE_KEEP_CHARS = 400;
-const SUMMARY_INPUT_CHARS = 24000;
+export const CONTEXT_BUDGET = 24000;
+export const RECENT_CONTEXT_BUDGET = 12000;
+const TOOL_ELIDE_AFTER_MESSAGES = 2;
+const TOOL_ELIDE_KEEP_CHARS = 250;
+const SUMMARY_INPUT_CHARS = 16000;
 
 const SUPERSEDABLE_READ_TOOLS = new Set([
   "get_canvas_overview",

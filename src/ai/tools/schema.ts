@@ -34,7 +34,7 @@ export function toOpenAITools(tools: AIToolDefinition[]): OpenAITool[] {
   }));
 }
 
-export const MAX_TOOL_RESULT_CHARS = 8000;
+export const MAX_TOOL_RESULT_CHARS = 4000;
 
 export function serializeToolResult(value: unknown): string {
   let text: string;
