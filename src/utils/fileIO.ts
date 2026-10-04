@@ -153,6 +153,51 @@ export function sanitizeFilename(name: string): string {
   return sanitized;
 }
 
+export async function saveStormFile(
+  file: StormProjectFile,
+  filename?: string,
+): Promise<boolean> {
+  const rawName = filename || file.name || "project";
+  const baseName = sanitizeFilename(rawName);
+  const json = JSON.stringify(file, null, 2);
+
+  // In Tauri desktop environment, show the native Save As dialog
+  if (
+    typeof window !== "undefined" &&
+    (Boolean((window as unknown as Record<string, unknown>).__TAURI_INTERNALS__) ||
+      Boolean((window as unknown as Record<string, unknown>).__TAURI__))
+  ) {
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+
+      const filePath = await save({
+        defaultPath: `${baseName}.storm`,
+        filters: [
+          {
+            name: "Storm Project",
+            extensions: ["storm", "json"],
+          },
+        ],
+      });
+
+      if (!filePath) {
+        // User cancelled the file save dialog
+        return false;
+      }
+
+      await writeTextFile(filePath, json);
+      return true;
+    } catch (err) {
+      console.error("Failed to save file via native dialog, falling back to download:", err);
+    }
+  }
+
+  // Web fallback or failure fallback: trigger browser download
+  downloadStormFile(file, filename);
+  return true;
+}
+
 export function downloadStormFile(
   file: StormProjectFile,
   filename?: string,

@@ -23,7 +23,7 @@ import { useCanvasStore, undo, redo, canUndo, canRedo, clearHistory } from "@/st
 import { useAutoSave } from "@/hooks/useAutoSave";
 import {
   serializeStormFile,
-  downloadStormFile,
+  saveStormFile,
   readStormFile,
   createBackup,
   hasBackup,
@@ -38,10 +38,6 @@ import { GoogleDriveModal } from "./GoogleDriveModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
 import { useTranslation } from "react-i18next";
-import { isDesktopApp } from "@/utils/platform";
-import { MENU_ACTION_EVENT } from "@/constants/menu";
-
-const IS_DESKTOP = isDesktopApp();
 
 export function Header() {
   const { t } = useTranslation();
@@ -193,7 +189,7 @@ export function Header() {
     }
   }, [executeNewBoard]);
 
-  const handleSaveFile = useCallback(() => {
+  const handleSaveFile = useCallback(async () => {
     setIsFileMenuOpen(false);
     const saveName =
       (isEditingTitle ? titleInput : projectName).trim() || "Untitled";
@@ -209,7 +205,7 @@ export function Header() {
       viewport,
       name: saveName,
     });
-    downloadStormFile(JSON.parse(serialized), saveName);
+    await saveStormFile(JSON.parse(serialized), saveName);
   }, [isEditingTitle, titleInput, projectName, setProjectName]);
 
   // Keyboard shortcuts: Cmd+S / Ctrl+S to save, Cmd+N / Ctrl+N for new board
@@ -226,8 +222,6 @@ export function Header() {
 
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       if (isCmdOrCtrl && e.code === "KeyS") {
-        // The desktop build routes Cmd+S through the native menu accelerator.
-        if (IS_DESKTOP) return;
         e.preventDefault();
         handleSaveFile();
       } else if (isCmdOrCtrl && e.code === "KeyN") {
@@ -305,53 +299,7 @@ export function Header() {
     }
   };
 
-  // Keep the latest handlers reachable from the native menu listener without
-  // re-subscribing on every render.
-  const menuActionsRef = useRef<Record<string, () => void>>({});
-  useEffect(() => {
-    menuActionsRef.current = {
-      "file.new": handleNewBoard,
-      "file.open": handleOpenFileClick,
-      "file.open_drive": handleOpenGoogleDriveOpen,
-      "file.save": handleSaveFile,
-      "file.save_drive": handleOpenGoogleDriveSave,
-      "file.restore_backup": handleRestoreBackup,
-      "edit.search": () => {
-        const store = useCanvasStore.getState();
-        store.setSearchOpen(!store.isSearchOpen);
-      },
-      "view.zoom_in": handleZoomIn,
-      "view.zoom_out": handleZoomOut,
-      "view.zoom_reset": handleResetZoom,
-      "export.image": () => setIsExportImageModalOpen(true),
-      "export.json_schema": () => setIsJsonSchemaModalOpen(true),
-      "export.drive": handleOpenGoogleDriveSave,
-    };
-  });
 
-  // Desktop only: the native application menu lives in the OS menu bar.
-  useEffect(() => {
-    if (!IS_DESKTOP) return;
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    import("@tauri-apps/api/event")
-      .then(({ listen }) =>
-        listen<string>(MENU_ACTION_EVENT, (event) => {
-          menuActionsRef.current[event.payload]?.();
-        }),
-      )
-      .then((fn) => {
-        if (cancelled) fn();
-        else unlisten = fn;
-      })
-      .catch((err) => {
-        console.error("Failed to subscribe to native menu events:", err);
-      });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, []);
 
   return (
     <>
@@ -413,131 +361,126 @@ export function Header() {
             </button>
           </div>
 
-          {/* Desktop uses the native OS menu bar instead of in-app dropdowns. */}
-          {!IS_DESKTOP && (
-            <>
-              <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-zinc-800" />
+          <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-zinc-800" />
 
-              {/* File Dropdown */}
-              <div className="relative" ref={fileMenuRef}>
+          {/* File Dropdown */}
+          <div className="relative" ref={fileMenuRef}>
+            <button
+              onClick={() => {
+                setIsFileMenuOpen((v) => !v);
+                setIsExportMenuOpen(false);
+              }}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
+            >
+              <span>{t("header.fileMenu")}</span>
+              <ChevronDown size={12} className="text-gray-400" />
+            </button>
+
+            {isFileMenuOpen && (
+              <div className="absolute top-full left-0 mt-1 w-48 rounded-lg border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
+                <button
+                  onClick={handleNewBoard}
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <FilePlus size={14} className="text-gray-400" />
+                    <span>{t("header.newBoard")}</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-mono">⌘N</span>
+                </button>
+                <button
+                  onClick={handleOpenFileClick}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
+                >
+                  <FolderOpen size={14} className="text-gray-400" />
+                  <span>{t("header.openLocal")}</span>
+                </button>
+                <button
+                  onClick={handleOpenGoogleDriveOpen}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
+                >
+                  <Cloud size={14} className="text-blue-500" />
+                  <span>{t("header.openDrive")}</span>
+                </button>
+                <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
+                <button
+                  onClick={handleSaveFile}
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Save size={14} className="text-gray-400" />
+                    <span>{t("header.saveLocal")}</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-mono">⌘S</span>
+                </button>
+                <button
+                  onClick={handleOpenGoogleDriveSave}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
+                >
+                  <CloudUpload size={14} className="text-blue-500" />
+                  <span>{t("header.saveDrive")}</span>
+                </button>
+                <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
+                <button
+                  onClick={handleRestoreBackup}
+                  disabled={!hasBackup()}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40"
+                >
+                  <History size={14} className="text-gray-400" />
+                  <span>{t("header.restoreBackup")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Export Dropdown */}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => {
+                setIsExportMenuOpen((v) => !v);
+                setIsFileMenuOpen(false);
+              }}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
+            >
+              <span>{t("header.exportMenu")}</span>
+              <ChevronDown size={12} className="text-gray-400" />
+            </button>
+
+            {isExportMenuOpen && (
+              <div className="absolute top-full left-0 mt-1 w-44 rounded-lg border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
                 <button
                   onClick={() => {
-                    setIsFileMenuOpen((v) => !v);
                     setIsExportMenuOpen(false);
+                    setIsExportImageModalOpen(true);
                   }}
-                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
                 >
-                  <span>{t("header.fileMenu")}</span>
-                  <ChevronDown size={12} className="text-gray-400" />
+                  <Download size={14} className="text-gray-400" />
+                  <span>{t("header.exportImage")}</span>
                 </button>
-
-                {isFileMenuOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-48 rounded-lg border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
-                    <button
-                      onClick={handleNewBoard}
-                      className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FilePlus size={14} className="text-gray-400" />
-                        <span>{t("header.newBoard")}</span>
-                      </div>
-                      <span className="text-[10px] text-gray-400 font-mono">⌘N</span>
-                    </button>
-                    <button
-                      onClick={handleOpenFileClick}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
-                    >
-                      <FolderOpen size={14} className="text-gray-400" />
-                      <span>{t("header.openLocal")}</span>
-                    </button>
-                    <button
-                      onClick={handleOpenGoogleDriveOpen}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
-                    >
-                      <Cloud size={14} className="text-blue-500" />
-                      <span>{t("header.openDrive")}</span>
-                    </button>
-                    <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
-                    <button
-                      onClick={handleSaveFile}
-                      className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Save size={14} className="text-gray-400" />
-                        <span>{t("header.saveLocal")}</span>
-                      </div>
-                      <span className="text-[10px] text-gray-400 font-mono">⌘S</span>
-                    </button>
-                    <button
-                      onClick={handleOpenGoogleDriveSave}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
-                    >
-                      <CloudUpload size={14} className="text-blue-500" />
-                      <span>{t("header.saveDrive")}</span>
-                    </button>
-                    <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
-                    <button
-                      onClick={handleRestoreBackup}
-                      disabled={!hasBackup()}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40"
-                    >
-                      <History size={14} className="text-gray-400" />
-                      <span>{t("header.restoreBackup")}</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Export Dropdown */}
-              <div className="relative" ref={exportMenuRef}>
                 <button
                   onClick={() => {
-                    setIsExportMenuOpen((v) => !v);
-                    setIsFileMenuOpen(false);
+                    setIsExportMenuOpen(false);
+                    setIsJsonSchemaModalOpen(true);
                   }}
-                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
                 >
-                  <span>{t("header.exportMenu")}</span>
-                  <ChevronDown size={12} className="text-gray-400" />
+                  <FileCode2 size={14} className="text-blue-500" />
+                  <span className="font-medium text-blue-600 dark:text-blue-400">
+                    {t("header.exportCodegenSpec")}
+                  </span>
                 </button>
-
-                {isExportMenuOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-44 rounded-lg border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-1 shadow-lg z-50 animate-in fade-in-0 zoom-in-95 duration-100">
-                    <button
-                      onClick={() => {
-                        setIsExportMenuOpen(false);
-                        setIsExportImageModalOpen(true);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
-                    >
-                      <Download size={14} className="text-gray-400" />
-                      <span>{t("header.exportImage")}</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsExportMenuOpen(false);
-                        setIsJsonSchemaModalOpen(true);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
-                    >
-                      <FileCode2 size={14} className="text-blue-500" />
-                      <span className="font-medium text-blue-600 dark:text-blue-400">
-                        {t("header.exportCodegenSpec")}
-                      </span>
-                    </button>
-                    <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
-                    <button
-                      onClick={handleOpenGoogleDriveSave}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
-                    >
-                      <CloudUpload size={14} className="text-blue-500" />
-                      <span>{t("header.exportDrive")}</span>
-                    </button>
-                  </div>
-                )}
+                <div className="my-1 border-t border-gray-100 dark:border-zinc-800" />
+                <button
+                  onClick={handleOpenGoogleDriveSave}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
+                >
+                  <CloudUpload size={14} className="text-blue-500" />
+                  <span>{t("header.exportDrive")}</span>
+                </button>
               </div>
-            </>
-          )}
+            )}
+          </div>
 
           <div className="hidden items-center gap-2 border-l border-gray-200 dark:border-zinc-800 pl-3 text-xs text-gray-500 dark:text-zinc-400 sm:flex">
             <span>{t("common.objects", { count: objectCount })}</span>

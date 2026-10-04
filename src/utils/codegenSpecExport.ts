@@ -612,3 +612,64 @@ export function exportCodegenSpec(
 
   return JSON.stringify(spec, null, 2);
 }
+
+export function downloadCodegenSpec(
+  content: string,
+  fileName: string,
+  format: "yaml" | "json",
+): void {
+  const mimeType = format === "yaml" ? "text/yaml;charset=utf-8" : "application/json";
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function saveCodegenSpec(
+  content: string,
+  fileName: string,
+  format: "yaml" | "json",
+): Promise<boolean> {
+  // In Tauri desktop environment, show the native Save As dialog
+  if (
+    typeof window !== "undefined" &&
+    (Boolean((window as unknown as Record<string, unknown>).__TAURI_INTERNALS__) ||
+      Boolean((window as unknown as Record<string, unknown>).__TAURI__))
+  ) {
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+
+      const filterName = format === "yaml" ? "YAML Spec" : "JSON Spec";
+
+      const filePath = await save({
+        defaultPath: fileName,
+        filters: [
+          {
+            name: filterName,
+            extensions: format === "yaml" ? ["yaml", "yml"] : ["json"],
+          },
+        ],
+      });
+
+      if (!filePath) {
+        // User cancelled dialog
+        return false;
+      }
+
+      await writeTextFile(filePath, content);
+      return true;
+    } catch (err) {
+      console.error("Failed to save spec via native dialog, falling back to download:", err);
+    }
+  }
+
+  // Web fallback or failure fallback: trigger browser download
+  downloadCodegenSpec(content, fileName, format);
+  return true;
+}

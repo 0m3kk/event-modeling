@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import {
   exportCodegenSpec,
+  saveCodegenSpec,
   type CodegenExportFormat,
 } from "@/utils/codegenSpecExport";
 
@@ -53,10 +54,7 @@ export function CodegenSpecExportModal({
     }
   };
 
-  const handleDownload = () => {
-    const mimeType = format === "yaml" ? "text/yaml;charset=utf-8" : "application/json";
-    const blob = new Blob([specString], { type: mimeType });
-    const url = URL.createObjectURL(blob);
+  const handleDownload = async () => {
     const sanitizedTitle = (projectName || "domain")
       .trim()
       .toLowerCase()
@@ -64,14 +62,10 @@ export function CodegenSpecExportModal({
       .replace(/^-|-$/g, "");
     const fileName = `${sanitizedTitle || "domain"}-spec.${format}`;
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    onExported?.(fileName);
+    const saved = await saveCodegenSpec(specString, fileName, format);
+    if (saved) {
+      onExported?.(fileName);
+    }
   };
 
   return (
