@@ -29,11 +29,13 @@ import {
   groupHasContent,
   recomputeGroupBoundsForObjects,
   recomputeGroupBoundsForGroupIds,
+  refitGroupSeparators,
   reparentChildrenOfRemovedGroups,
 } from "@/utils/groupBounds";
 import {
   findFreeSpot,
   getGroupObstacleRects,
+  snapMembersNearGroup,
   type Rect,
 } from "@/utils/placement";
 import {
@@ -47,7 +49,7 @@ import {
   syncReferenceSet,
   touchesSyncedReferenceField,
 } from "@/utils/reference";
-import type { CanvasObject } from "@/types";
+import type { CanvasObject, GroupInfo } from "@/types";
 import type { BddStep } from "@/types";
 import type { CanvasStore, CanvasStoreState } from "./types";
 import { createDebouncedHandleSet } from "./historyDebounce";
@@ -75,6 +77,39 @@ function patchTouchesGeometry(patch: Partial<CanvasObject>): boolean {
     patch.height !== undefined ||
     patch.groupId !== undefined
   );
+}
+
+/**
+ * Re-fit the separator lines of every affected group whose geometry changed.
+ *
+ * A group is refitted only when one of `changedIds` is a card inside it, so
+ * dragging a separator by hand (or creating separator lines) is never fought.
+ */
+function applySeparatorRefit(
+  objects: CanvasObject[],
+  groups: GroupInfo[],
+  affectedGroupIds: Iterable<string>,
+  changedIds: Iterable<string>,
+): CanvasObject[] {
+  const groupIds = [...affectedGroupIds];
+  if (groupIds.length === 0) return objects;
+
+  const changed = new Set(changedIds);
+  if (changed.size === 0) return objects;
+
+  let next = objects;
+  for (const groupId of groupIds) {
+    const hasChangedCard = next.some(
+      (o) =>
+        changed.has(o.id) &&
+        o.groupId === groupId &&
+        o.type !== "connector" &&
+        o.type !== "line",
+    );
+    if (!hasChangedCard) continue;
+    next = refitGroupSeparators(next, groups, groupId);
+  }
+  return next;
 }
 
 export const initialCanvasState: CanvasStoreState = {
@@ -208,8 +243,25 @@ export const useCanvasStore = create<CanvasStore>()(
 
       addObject: (object) => {
         set((state) => {
-          const next = ensureUniqueComponentName(object, state.objects);
-          const objects = [...state.objects, next];
+          let next = ensureUniqueComponentName(object, state.objects);
+          if (next.groupId) {
+            const snap = snapMembersNearGroup(
+              state.objects,
+              state.groups,
+              next.groupId,
+              [next],
+            ).get(next.id);
+            if (snap) next = { ...next, x: snap.x, y: snap.y };
+          }
+          let objects = [...state.objects, next];
+          if (next.groupId) {
+            objects = applySeparatorRefit(
+              objects,
+              state.groups,
+              [next.groupId],
+              [next.id],
+            );
+          }
           const groups = next.groupId
             ? recomputeGroupBoundsForGroupIds(objects, state.groups, [
                 next.groupId,
@@ -227,18 +279,37 @@ export const useCanvasStore = create<CanvasStore>()(
         if (newObjects.length === 0) return;
         set((state) => {
           const existing = [...state.objects];
-          const affectedGroupIds = new Set<string>();
-          const added = newObjects.map((obj) => {
+          const added: CanvasObject[] = [];
+          for (const obj of newObjects) {
             // Dedupe within the batch too: each accepted name joins `existing`
             // before the next object is checked.
-            const next = ensureUniqueComponentName(obj, existing);
-            existing.push(next);
+            let next = ensureUniqueComponentName(obj, existing);
             if (next.groupId) {
-              affectedGroupIds.add(next.groupId);
+              // Pull a member added far away back next to its group's cluster.
+              const snap = snapMembersNearGroup(
+                [...state.objects, ...added],
+                state.groups,
+                next.groupId,
+                [next],
+              ).get(next.id);
+              if (snap) next = { ...next, x: snap.x, y: snap.y };
             }
-            return next;
-          });
-          const objects = [...state.objects, ...added];
+            added.push(next);
+            existing.push(next);
+          }
+          const affectedGroupIds = new Set<string>();
+          for (const obj of added) {
+            if (obj.groupId) affectedGroupIds.add(obj.groupId);
+          }
+          let objects = [...state.objects, ...added];
+          if (affectedGroupIds.size > 0) {
+            objects = applySeparatorRefit(
+              objects,
+              state.groups,
+              affectedGroupIds,
+              added.map((o) => o.id),
+            );
+          }
           const groups =
             affectedGroupIds.size > 0
               ? recomputeGroupBoundsForGroupIds(
@@ -303,12 +374,18 @@ export const useCanvasStore = create<CanvasStore>()(
           const affectedGroupIds = new Set<string>();
           if (oldGroupId) affectedGroupIds.add(oldGroupId);
           if (updatedObj?.groupId) affectedGroupIds.add(updatedObj.groupId);
-          return {
+          const refitted = applySeparatorRefit(
             objects,
+            state.groups,
+            affectedGroupIds,
+            [id],
+          );
+          return {
+            objects: refitted,
             groups:
               affectedGroupIds.size > 0
                 ? recomputeGroupBoundsForGroupIds(
-                    objects,
+                    refitted,
                     state.groups,
                     affectedGroupIds,
                   )
@@ -352,10 +429,16 @@ export const useCanvasStore = create<CanvasStore>()(
             }
             if (affectedGroupIds.size === 0) return { objects };
             // Keep group boundaries enclosing their members while dragging.
-            return {
+            const refitted = applySeparatorRefit(
               objects,
+              state.groups,
+              affectedGroupIds,
+              geometryIds,
+            );
+            return {
+              objects: refitted,
               groups: recomputeGroupBoundsForGroupIds(
-                objects,
+                refitted,
                 state.groups,
                 affectedGroupIds,
               ),
@@ -393,10 +476,16 @@ export const useCanvasStore = create<CanvasStore>()(
             if (o?.groupId) affectedGroupIds.add(o.groupId);
           }
           if (affectedGroupIds.size === 0) return { objects };
-          return {
+          const refitted = applySeparatorRefit(
             objects,
+            state.groups,
+            affectedGroupIds,
+            geometryIds,
+          );
+          return {
+            objects: refitted,
             groups: recomputeGroupBoundsForGroupIds(
-              objects,
+              refitted,
               state.groups,
               affectedGroupIds,
             ),
@@ -571,11 +660,23 @@ export const useCanvasStore = create<CanvasStore>()(
               y: nextY,
             };
           });
-          return {
+          const affectedGroupIds = new Set<string>();
+          for (const obj of objects) {
+            if (idSet.has(obj.id) && obj.groupId) {
+              affectedGroupIds.add(obj.groupId);
+            }
+          }
+          const refitted = applySeparatorRefit(
             objects,
+            state.groups,
+            affectedGroupIds,
+            idSet,
+          );
+          return {
+            objects: refitted,
             // Keep group boundaries enclosing their members as they move.
             groups: recomputeGroupBoundsForObjects(
-              objects,
+              refitted,
               state.groups,
               idSet,
             ),
@@ -705,6 +806,19 @@ export const useCanvasStore = create<CanvasStore>()(
         );
         if (validObjects.length === 0) return;
 
+        // A member joining from far away is pulled back next to the group's
+        // cluster so the frame stays compact instead of spanning the canvas.
+        const snaps = snapMembersNearGroup(
+          state.objects,
+          state.groups,
+          groupId,
+          validObjects,
+        );
+        const placed = (obj: CanvasObject): CanvasObject => {
+          const snap = snaps.get(obj.id);
+          return snap ? { ...obj, x: snap.x, y: snap.y } : obj;
+        };
+
         // Separator lines already drawn across this section join it, so the
         // frame grows to enclose them instead of leaving them stranded outside.
         const existingMembers = state.objects.filter(
@@ -712,7 +826,7 @@ export const useCanvasStore = create<CanvasStore>()(
         );
         const region = getObjectUnionBounds([
           ...existingMembers,
-          ...validObjects,
+          ...validObjects.map(placed),
         ]);
         if (region) {
           for (const line of findAdoptableLines(state.objects, region)) {
@@ -720,9 +834,9 @@ export const useCanvasStore = create<CanvasStore>()(
           }
         }
 
-        const nextObjects = state.objects.map((obj) =>
+        let nextObjects = state.objects.map((obj) =>
           targetIdSet.has(obj.id) && obj.type !== "connector"
-            ? { ...obj, groupId }
+            ? { ...placed(obj), groupId }
             : obj,
         );
 
@@ -734,6 +848,13 @@ export const useCanvasStore = create<CanvasStore>()(
             affectedGroupIds.add(obj.groupId);
           }
         }
+
+        nextObjects = applySeparatorRefit(
+          nextObjects,
+          state.groups,
+          affectedGroupIds,
+          validObjects.map((o) => o.id),
+        );
 
         // Source groups left without any member or child dissolve, matching
         // removeFromGroup's behaviour.

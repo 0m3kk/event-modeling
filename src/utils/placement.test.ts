@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { CanvasObject } from "@/types";
+import type { CanvasObject, GroupInfo } from "@/types";
+import { createLineObject } from "./lineGeometry";
 import {
   findFreeSpot,
   getGroupObstacleRects,
   getOccupiedRects,
   rectsOverlap,
+  snapMembersNearGroup,
 } from "./placement";
 
 const card = (overrides: Partial<CanvasObject> = {}): CanvasObject => ({
@@ -95,5 +97,50 @@ describe("findFreeSpot", () => {
       { maxRings: 1 },
     );
     expect(spot.x).toBeGreaterThanOrEqual(5000);
+  });
+});
+
+describe("snapMembersNearGroup", () => {
+  const group: GroupInfo = { id: "g1", name: "Group" };
+
+  it("leaves a member already next to the cluster", () => {
+    const existing = [card({ id: "a", groupId: "g1" })];
+    const joining = card({ id: "b", groupId: "g1", x: 100, y: 0 });
+    expect(snapMembersNearGroup(existing, [group], "g1", [joining]).size).toBe(
+      0,
+    );
+  });
+
+  it("pulls a far member back next to the cluster", () => {
+    const existing = [card({ id: "a", groupId: "g1" })];
+    const joining = card({ id: "b", groupId: "g1", x: 5000, y: 0 });
+    const snaps = snapMembersNearGroup(existing, [group], "g1", [joining]);
+    // Right of the cluster (200), plus the placement padding (40).
+    expect(snaps.get("b")).toEqual({ x: 240, y: 0 });
+  });
+
+  it("does nothing when the group has no existing members", () => {
+    const joining = card({ id: "b", groupId: "g1", x: 5000, y: 0 });
+    expect(snapMembersNearGroup([], [group], "g1", [joining]).size).toBe(0);
+  });
+
+  it("ignores lines and connectors", () => {
+    const existing = [card({ id: "a", groupId: "g1" })];
+    const line = {
+      ...createLineObject("l", { x: 5000, y: 0 }, { x: 5200, y: 0 }),
+      groupId: "g1",
+    };
+    const connector: CanvasObject = {
+      id: "k",
+      type: "connector",
+      x: 5000,
+      y: 0,
+      width: 0,
+      height: 0,
+      groupId: "g1",
+    };
+    expect(
+      snapMembersNearGroup(existing, [group], "g1", [line, connector]).size,
+    ).toBe(0);
   });
 });

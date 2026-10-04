@@ -908,7 +908,7 @@ export const arrangeStormLanesTool = defineTool({
 export const arrangeStormSliceTool = defineTool({
   name: "arrange_storm_slice",
   description:
-    "Re-center an existing vertical slice in place. Call this after adding, removing, or reordering cards in a slice (or whenever a lane grows, e.g. an extra Constraint appears in the middle layer) and BEFORE drawing the separators: it re-lays the slice out top-to-bottom and centers every layer (Command/Query, Constraint(s), Event(s)/State) on the widest layer, so the upper and lower lanes are no longer left shifted left when the middle layer widens. Then redraw the separators with separate_layers.",
+    "Re-center an existing vertical slice in place. Call this after adding, removing, or reordering cards in a slice (or whenever a lane grows, e.g. an extra Constraint appears in the middle layer): it re-lays the slice out top-to-bottom and centers every layer (Command/Query, Constraint(s), Event(s)/State) on the widest layer, so the upper and lower lanes are no longer left shifted when the middle layer widens. Existing separator lines are re-fitted into the new gaps automatically.",
   schema: z.object({
     cardIds: z
       .array(z.string())

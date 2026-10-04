@@ -744,19 +744,21 @@ describe("useCanvasStore", () => {
     const groupA = useCanvasStore.getState().groupObjects(["c1", "c2"], "A")!;
     const groupB = useCanvasStore.getState().groupObjects(["c3"], "B")!;
 
-    // Move c2 from group A into group B.
+    // Move c2 from group A into group B. c2 sat far from group B's only member
+    // (c3), so it is pulled back next to it instead of ballooning the frame.
     useCanvasStore.getState().addToGroup(groupB, ["c2"]);
 
     const state = useCanvasStore.getState();
     expect(state.objects.find((o) => o.id === "c2")?.groupId).toBe(groupB);
+    expect(state.objects.find((o) => o.id === "c2")?.x).toBe(1140);
 
     // Group A now only encloses c1 (100..300 => padded 76..324).
     const boundsA = state.groups.find((g) => g.id === groupA)?.customBounds;
     expect(boundsA).toEqual({ x: 76, y: 76, width: 248, height: 148 });
 
-    // Group B now encloses c3 (1000..1100) and c2 (400..500).
+    // Group B encloses c3 (1000..1100) and the snapped c2 (1140..1240).
     const boundsB = state.groups.find((g) => g.id === groupB)?.customBounds;
-    expect(boundsB).toEqual({ x: 376, y: 76, width: 748, height: 148 });
+    expect(boundsB).toEqual({ x: 976, y: 76, width: 288, height: 148 });
   });
 
   it("dissolves a source group that loses its last member (addToGroup)", () => {
@@ -773,6 +775,63 @@ describe("useCanvasStore", () => {
     const state = useCanvasStore.getState();
     expect(state.groups.find((g) => g.id === source)).toBeUndefined();
     expect(state.objects.find((o) => o.id === "c1")?.groupId).toBe(target);
+  });
+
+  it("snaps a far new member next to the group cluster (addToGroup)", () => {
+    useCanvasStore.getState().addObjects([
+      { id: "a", type: "storm", x: 100, y: 100, width: 200, height: 100 },
+      { id: "b", type: "storm", x: 5000, y: 100, width: 200, height: 100 },
+    ]);
+    const gid = useCanvasStore.getState().groupObjects(["a"], "Actors")!;
+
+    useCanvasStore.getState().addToGroup(gid, ["b"]);
+
+    const state = useCanvasStore.getState();
+    // b is pulled to the right of a (ends at 300) with the placement padding.
+    expect(state.objects.find((o) => o.id === "b")?.x).toBe(340);
+    // Compact frame around both members, not spanning out to x=5000.
+    const bounds = state.groups.find((g) => g.id === gid)?.customBounds;
+    expect(bounds?.width).toBe(440 + 48);
+  });
+
+  it("refits a group's separator lines when a member is resized (updateObject)", () => {
+    const cmd: CanvasObject = {
+      id: "cmd",
+      type: "storm",
+      x: 100,
+      y: 0,
+      width: 200,
+      height: 100,
+    };
+    const con: CanvasObject = {
+      id: "con",
+      type: "storm",
+      x: 100,
+      y: 200,
+      width: 200,
+      height: 100,
+    };
+    const evt: CanvasObject = {
+      id: "evt",
+      type: "storm",
+      x: 100,
+      y: 400,
+      width: 200,
+      height: 100,
+    };
+    const line1 = createLineObject("l1", { x: 60, y: 150 }, { x: 340, y: 150 });
+    const line2 = createLineObject("l2", { x: 60, y: 350 }, { x: 340, y: 350 });
+    useCanvasStore.getState().addObjects([cmd, con, evt, line1, line2]);
+    useCanvasStore
+      .getState()
+      .groupObjects(["cmd", "con", "evt", "l1", "l2"], "Slice");
+
+    useCanvasStore.getState().updateObject("con", { height: 250 });
+
+    const state = useCanvasStore.getState();
+    expect(state.objects.find((o) => o.id === "l1")?.y).toBe(150);
+    // con now ends at y=450, past evt's top (400): pin the line below it.
+    expect(state.objects.find((o) => o.id === "l2")?.y).toBe(456);
   });
 
   it("shrinks both source groups when groupObjects creates a new group from their members", () => {

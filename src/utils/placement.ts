@@ -1,4 +1,5 @@
-import type { CanvasObject, GroupBounds } from "@/types";
+import type { CanvasObject, GroupBounds, GroupInfo } from "@/types";
+import { getObjectUnionBounds, groupAndAncestorIds } from "./groupBounds";
 
 // ============================================================================
 // Free-spot placement
@@ -142,4 +143,101 @@ export function findFreeSpot(
   const bounds = unionBounds(occupied);
   if (!bounds) return { x: anchor.x, y: anchor.y };
   return { x: bounds.x + bounds.width + padding, y: bounds.y };
+}
+
+// ============================================================================
+// Group member snapping
+// ============================================================================
+
+/**
+ * Distance a member may sit from its group's existing cluster before it is
+ * pulled back next to the cluster. Keeps a Section frame compact: a member
+ * added far away no longer stretches the boundary across the canvas.
+ */
+export const GROUP_SNAP_MARGIN = 240;
+
+function unionRect(a: Rect, b: Rect): Rect {
+  const minX = Math.min(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  const maxX = Math.max(a.x + a.width, b.x + b.width);
+  const maxY = Math.max(a.y + a.height, b.y + b.height);
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+/**
+ * Snap members joining a group back next to the group's existing cluster.
+ *
+ * Members already within `GROUP_SNAP_MARGIN` of the cluster are left where they
+ * are; ones beyond it are re-placed in the nearest free spot to the right of
+ * the (growing) cluster, clear of other objects and of foreign Section frames.
+ * Lines and connectors are ignored. Returns only the members that moved.
+ */
+export function snapMembersNearGroup(
+  existingObjects: CanvasObject[],
+  groups: GroupInfo[],
+  groupId: string,
+  members: CanvasObject[],
+): Map<string, { x: number; y: number }> {
+  const snapped = new Map<string, { x: number; y: number }>();
+
+  const movable = members.filter(
+    (o) => o.type !== "connector" && o.type !== "line",
+  );
+  if (movable.length === 0) return snapped;
+
+  const cluster = getObjectUnionBounds(
+    existingObjects.filter(
+      (o) =>
+        o.groupId === groupId && o.type !== "connector" && o.type !== "line",
+    ),
+  );
+  if (!cluster) return snapped;
+
+  const obstacles = getGroupObstacleRects(
+    groups,
+    groupAndAncestorIds(groupId, groups),
+  );
+  const placed: CanvasObject[] = [];
+
+  let running: Rect = cluster;
+  for (const member of movable) {
+    const rect: Rect = {
+      x: member.x,
+      y: member.y,
+      width: member.width ?? 0,
+      height: member.height ?? 0,
+    };
+    // Distance between the member and the cluster on each axis (0 when they
+    // overlap). A member within the margin on the dominant axis is "near" and
+    // is left where it is; anything farther is pulled back next to the cluster.
+    const gapX = Math.max(
+      running.x - (rect.x + rect.width),
+      rect.x - (running.x + running.width),
+    );
+    const gapY = Math.max(
+      running.y - (rect.y + rect.height),
+      rect.y - (running.y + running.height),
+    );
+    if (Math.max(gapX, gapY) <= GROUP_SNAP_MARGIN) {
+      running = unionRect(running, rect);
+      continue;
+    }
+
+    const anchor = {
+      x: running.x + running.width + PLACEMENT_PADDING,
+      y: running.y,
+    };
+    const spot = findFreeSpot(
+      [...existingObjects, ...placed],
+      { width: rect.width, height: rect.height },
+      anchor,
+      { obstacles },
+    );
+    snapped.set(member.id, spot);
+    const placedRect = { ...rect, x: spot.x, y: spot.y };
+    running = unionRect(running, placedRect);
+    placed.push({ ...member, x: spot.x, y: spot.y });
+  }
+
+  return snapped;
 }

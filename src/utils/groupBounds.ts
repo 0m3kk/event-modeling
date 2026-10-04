@@ -1,5 +1,5 @@
 import type { CanvasObject, GroupBounds, GroupInfo } from "@/types";
-import { getLineMidpoint } from "./lineGeometry";
+import { getLineMidpoint, normalizeLineGeometry } from "./lineGeometry";
 
 /** Padding between a group's boundary and its contents, in world units. */
 export const GROUP_PADDING = 24;
@@ -275,4 +275,97 @@ export function recomputeGroupBoundsForObjects(
   }
 
   return recomputeGroupBoundsForGroupIds(objects, groups, affectedGroupIds);
+}
+
+/** Horizontal overhang beyond the adjacent cards for a refitted separator. */
+export const SEPARATOR_PADDING = 40;
+
+const HORIZONTAL_LINE_EPSILON = 1;
+
+function isHorizontalLine(obj: CanvasObject): boolean {
+  if (obj.type !== "line" || !obj.lineData) return false;
+  return (
+    Math.abs(obj.lineData.end.y - obj.lineData.start.y) < HORIZONTAL_LINE_EPSILON
+  );
+}
+
+/**
+ * Re-fit a group's horizontal separator lines into the current gaps between its
+ * card rows, so editing a card never leaves it overflowing past a separator.
+ *
+ * Cards keep their positions; only the lines move. Layer boundaries are
+ * re-derived from the largest vertical gaps between the cards, so a card that
+ * has grown into the next row still gets a clean line below it. Nested groups,
+ * locked lines and non-horizontal lines are left alone.
+ */
+export function refitGroupSeparators(
+  objects: CanvasObject[],
+  groups: GroupInfo[],
+  groupId: string,
+): CanvasObject[] {
+  if (!groups.some((g) => g.id === groupId)) return objects;
+  if (groups.some((g) => g.parentId === groupId)) return objects;
+
+  const lines = objects
+    .filter((o) => o.groupId === groupId && !o.locked && isHorizontalLine(o))
+    .sort((a, b) => a.y - b.y);
+  if (lines.length === 0) return objects;
+
+  const cards = objects
+    .filter(
+      (o) =>
+        o.groupId === groupId &&
+        !o.locked &&
+        o.type !== "connector" &&
+        o.type !== "line",
+    )
+    .sort((a, b) => a.y + a.height / 2 - (b.y + b.height / 2));
+  if (cards.length < 2) return objects;
+
+  // Pick the widest inter-card gaps as the layer boundaries, so a card that has
+  // crossed into the next row pushes the boundary (and its line) down instead.
+  const boundaries = cards
+    .slice(0, -1)
+    .map((upper, index) => ({
+      index,
+      gap: (cards[index + 1]!.y - (upper.y + upper.height)),
+    }))
+    .sort((a, b) => b.gap - a.gap)
+    .slice(0, lines.length)
+    .map((b) => b.index)
+    .sort((a, b) => a - b);
+  if (boundaries.length === 0) return objects;
+
+  const replaced = new Map<string, CanvasObject>();
+  for (let i = 0; i < boundaries.length; i++) {
+    const boundary = boundaries[i]!;
+    const line = lines[i]!;
+    const upper = cards.slice(0, boundary + 1);
+    const lower = cards.slice(boundary + 1);
+    if (upper.length === 0 || lower.length === 0) continue;
+
+    const upperMaxY = Math.max(...upper.map((c) => c.y + c.height));
+    const lowerMinY = Math.min(...lower.map((c) => c.y));
+    const gap = lowerMinY - upperMaxY;
+    const y = gap > 0 ? upperMaxY + gap / 2 : upperMaxY + 6;
+
+    const left =
+      Math.min(...upper.map((c) => c.x), ...lower.map((c) => c.x)) -
+      SEPARATOR_PADDING;
+    const right =
+      Math.max(
+        ...upper.map((c) => c.x + c.width),
+        ...lower.map((c) => c.x + c.width),
+      ) + SEPARATOR_PADDING;
+
+    const geometry = normalizeLineGeometry(
+      { x: left, y },
+      { x: right, y },
+      line.lineData,
+    );
+    replaced.set(line.id, { ...line, ...geometry });
+  }
+
+  if (replaced.size === 0) return objects;
+  return objects.map((o) => replaced.get(o.id) ?? o);
 }
