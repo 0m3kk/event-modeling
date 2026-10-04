@@ -269,10 +269,30 @@ export const updateObjectsTool = defineTool({
       const nextPatch = { ...patch } as Partial<CanvasObject>;
       // Keep a width the user resized by hand, even if the patch carries one.
       if (target.widthLocked) delete nextPatch.width;
-      // `modelData`/`stormData` arrive unvalidated (z.unknown): repair any
-      // non-array field lists so a malformed patch cannot corrupt the board.
+      // `modelData`/`stormData` arrive unvalidated (z.unknown) and this is a
+      // partial-patch tool, so merge them over the existing payload: an update
+      // that only carries, say, a new `methods` list must not silently drop the
+      // object's `name`/`kind`. Then repair any non-array field lists so a
+      // malformed patch cannot corrupt the board.
       if (nextPatch.modelData || nextPatch.stormData) {
-        const repaired = coerceObjectArrays({ ...target, ...nextPatch });
+        const merged = { ...target, ...nextPatch } as CanvasObject;
+        if (
+          target.modelData &&
+          nextPatch.modelData &&
+          typeof nextPatch.modelData === "object" &&
+          !Array.isArray(nextPatch.modelData)
+        ) {
+          merged.modelData = { ...target.modelData, ...nextPatch.modelData };
+        }
+        if (
+          target.stormData &&
+          nextPatch.stormData &&
+          typeof nextPatch.stormData === "object" &&
+          !Array.isArray(nextPatch.stormData)
+        ) {
+          merged.stormData = { ...target.stormData, ...nextPatch.stormData };
+        }
+        const repaired = coerceObjectArrays(merged);
         if (repaired.modelData) nextPatch.modelData = repaired.modelData;
         if (repaired.stormData) nextPatch.stormData = repaired.stormData;
       }

@@ -776,6 +776,43 @@ describe("codegenSpecExport", () => {
     ]);
   });
 
+  it("tolerates a model whose name is missing", () => {
+    const objects = [
+      {
+        id: "m1",
+        type: "model",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        modelData: { kind: "object" },
+      },
+      {
+        id: "s1",
+        type: "model",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        modelData: {
+          kind: "service",
+          methods: [{ id: "m1", params: [{ id: "p1" }] }],
+        },
+      },
+    ] as unknown as CanvasObject[];
+
+    const spec = buildCodegenSpec(objects, []);
+    expect(spec.models).toEqual([
+      { kind: "object", name: "", fields: [] },
+    ]);
+    expect(spec.services).toEqual([
+      {
+        name: "",
+        methods: [{ name: "", params: [{ name: "", type: "string" }], returnType: "string" }],
+      },
+    ]);
+  });
+
   it("exports service cards with methods and params into spec.services", () => {
     const objects: CanvasObject[] = [
       {

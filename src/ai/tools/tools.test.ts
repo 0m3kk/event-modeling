@@ -790,6 +790,52 @@ describe("AI Storm Tools", () => {
     expect(fake.objects[0]!.modelData?.fields).toEqual([]);
   });
 
+  it("update_objects merges a partial modelData patch so the name survives", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "svc-1",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      modelData: { kind: "service", name: "Auth Service", methods: [] },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "update_objects",
+        arguments: JSON.stringify({
+          updates: [
+            {
+              id: "svc-1",
+              patch: {
+                modelData: {
+                  methods: [
+                    {
+                      id: "m1",
+                      name: "hashPassword",
+                      params: [],
+                      returnType: "String",
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects[0]!.modelData?.name).toBe("Auth Service");
+    expect(fake.objects[0]!.modelData?.kind).toBe("service");
+    expect(fake.objects[0]!.modelData?.methods).toHaveLength(1);
+  });
+
   it("canonicalizes primitive field types when writing cards", async () => {
     const fake = createFakeStore();
     const { ctx } = createContext(fake);

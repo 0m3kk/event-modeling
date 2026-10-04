@@ -288,7 +288,7 @@ function toModelDef(
 ): CodegenModelDef {
   const def: CodegenModelDef = {
     kind: model.kind as "object" | "enum" | "array" | "wrap",
-    name: model.name.trim(),
+    name: (model.name ?? "").trim(),
   };
   if (model.description?.trim()) def.description = model.description.trim();
   if (location?.slice) def.slice = location.slice;
@@ -297,7 +297,7 @@ function toModelDef(
   switch (model.kind) {
     case "enum":
       def.values = (model.values ?? []).map((v) => {
-        const val: CodegenEnumValue = { name: v.name.trim() };
+        const val: CodegenEnumValue = { name: (v.name ?? "").trim() };
         if (v.value?.trim()) val.value = v.value.trim();
         if (v.description?.trim()) val.description = v.description.trim();
         return val;
@@ -319,8 +319,8 @@ function toModelDef(
     default:
       def.fields = (model.fields ?? []).map((f) => {
         const field: CodegenModelField = {
-          name: f.name.trim(),
-          type: f.fieldType.trim() || "string",
+          name: (f.name ?? "").trim(),
+          type: (f.fieldType ?? "").trim() || "string",
         };
         if (f.required) field.required = true;
         if (f.description?.trim()) field.description = f.description.trim();
@@ -419,14 +419,14 @@ export function buildCodegenSpec(
 
       if (obj.modelData.kind === "service") {
         const sDef: CodegenService = {
-          name: obj.modelData.name.trim(),
+          name: (obj.modelData.name ?? "").trim(),
           methods: (obj.modelData.methods ?? []).map((m) => ({
-            name: m.name.trim(),
+            name: (m.name ?? "").trim(),
             params: (m.params ?? []).map((p) => ({
-              name: p.name.trim(),
-              type: p.paramType.trim() || "string",
+              name: (p.name ?? "").trim(),
+              type: (p.paramType ?? "").trim() || "string",
             })),
-            returnType: m.returnType.trim() || "string",
+            returnType: (m.returnType ?? "").trim() || "string",
             ...(m.description?.trim() ? { description: m.description.trim() } : {}),
           })),
           ...(obj.modelData.description?.trim()
@@ -445,7 +445,7 @@ export function buildCodegenSpec(
     if (obj.type === "storm" && obj.stormData) {
       const slice = isSlice ? groupName : undefined;
       const storm = obj.stormData;
-      const name = storm.name.trim();
+      const name = (storm.name ?? "").trim();
       const desc = storm.description?.trim() || undefined;
 
       switch (storm.kind) {
