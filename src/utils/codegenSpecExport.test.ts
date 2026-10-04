@@ -756,5 +756,24 @@ describe("codegenSpecExport", () => {
     expect(event.fields[1].mapping).toBe("hashPassword(command.password)");
     expect(event.fields[2].mapping).toBe("command.displayName");
   });
+
+  it("tolerates a model whose fields are not an array", () => {
+    const objects = [
+      {
+        id: "m1",
+        type: "model",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        modelData: { kind: "object", name: "Broken", fields: { oops: true } },
+      },
+    ] as unknown as CanvasObject[];
+
+    const spec = buildCodegenSpec(objects, []);
+    expect(spec.models).toEqual([
+      { kind: "object", name: "Broken", fields: [] },
+    ]);
+  });
 });
 

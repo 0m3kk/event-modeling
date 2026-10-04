@@ -8,6 +8,7 @@ import type {
   FieldValidation,
 } from "@/types";
 import { fullTagOf } from "@/utils/stormQuery";
+import { coerceObjectArrays } from "@/constants/fieldType";
 import {
   fieldNameMatches,
   normalizeExpressionForCodegen,
@@ -318,6 +319,10 @@ export function buildCodegenSpec(
   groups: GroupInfo[] = [],
   projectName?: string,
 ): CodegenSpec {
+  // Repair any non-array field lists up front: this export runs from an
+  // always-mounted modal's useMemo, so one malformed model must not crash the app.
+  const safeObjects = objects.map(coerceObjectArrays);
+
   const groupNameMap = new Map<string, string>();
   for (const g of groups) {
     const name = g.name.trim();
@@ -332,7 +337,7 @@ export function buildCodegenSpec(
   const modelOnlyGroups = new Set<string>();
 
   for (const g of groups) {
-    const members = objects.filter((o) => o.groupId === g.id);
+    const members = safeObjects.filter((o) => o.groupId === g.id);
     const hasStorm = members.some((o) => o.type === "storm" && !!o.stormData);
     if (hasStorm) {
       sliceGroups.add(g.id);
@@ -355,7 +360,7 @@ export function buildCodegenSpec(
   }
 
   const objectMap = new Map<string, CanvasObject>();
-  for (const obj of objects) {
+  for (const obj of safeObjects) {
     objectMap.set(obj.id, obj);
   }
 
@@ -377,7 +382,7 @@ export function buildCodegenSpec(
   };
 
   // 1. Process Model and Storm cards
-  for (const obj of objects) {
+  for (const obj of safeObjects) {
     const groupId = obj.groupId;
     const isSlice = groupId ? sliceGroups.has(groupId) : false;
     const isModelOnly = groupId ? modelOnlyGroups.has(groupId) : false;
@@ -554,7 +559,7 @@ export function buildCodegenSpec(
   }
 
   // 2. Process Connectors / Flows
-  for (const obj of objects) {
+  for (const obj of safeObjects) {
     if (obj.type === "connector" && obj.connectorData) {
       const { start, end, lineStyle } = obj.connectorData;
       const startObj = objectMap.get(start.objectId);

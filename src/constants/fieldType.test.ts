@@ -3,6 +3,7 @@ import type { CanvasObject } from "@/types";
 import {
   DEFAULT_FIELD_TYPE,
   canonicalPrimitiveType,
+  coerceObjectArrays,
   isPrimitiveType,
   normalizeFieldType,
   normalizeObjectFieldTypes,
@@ -97,5 +98,48 @@ describe("fieldType constants", () => {
       modelData: { kind: "array", name: "Tags", itemType: "string" },
     };
     expect(normalizeObjectFieldTypes(array).modelData?.itemType).toBe("String");
+  });
+
+  it("repairs non-array field lists instead of crashing consumers", () => {
+    const model = {
+      id: "m1",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      modelData: { kind: "object", name: "Order", fields: { oops: true } },
+    } as unknown as CanvasObject;
+
+    const repaired = coerceObjectArrays(model);
+    expect(repaired.modelData?.fields).toEqual([]);
+    // normalizeObjectFieldTypes must not throw on the same malformed payload.
+    expect(normalizeObjectFieldTypes(model).modelData?.fields).toEqual([]);
+
+    const storm = {
+      id: "s1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      stormData: { kind: "event", name: "E", fields: 42, queryItems: {} },
+    } as unknown as CanvasObject;
+
+    const repairedStorm = coerceObjectArrays(storm);
+    expect(repairedStorm.stormData?.fields).toEqual([]);
+    expect(repairedStorm.stormData?.queryItems).toEqual([]);
+
+    // A well-formed object is returned untouched (same reference).
+    const ok: CanvasObject = {
+      id: "m2",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      modelData: { kind: "object", name: "Ok", fields: [] },
+    };
+    expect(coerceObjectArrays(ok)).toBe(ok);
   });
 });

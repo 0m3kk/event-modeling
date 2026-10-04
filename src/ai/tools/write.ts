@@ -13,6 +13,7 @@ import {
 import { groupAndAncestorIds } from "@/utils/groupBounds";
 import { createLineObject } from "@/utils/lineGeometry";
 import { computeStormCardHeight, getCardMinDimensions } from "@/utils/cardDimensions";
+import { coerceObjectArrays } from "@/constants/fieldType";
 import { snapToGrid } from "@/utils/snapping";
 
 const CARDINAL_ANCHORS = ["top", "right", "bottom", "left"] as const;
@@ -268,6 +269,13 @@ export const updateObjectsTool = defineTool({
       const nextPatch = { ...patch } as Partial<CanvasObject>;
       // Keep a width the user resized by hand, even if the patch carries one.
       if (target.widthLocked) delete nextPatch.width;
+      // `modelData`/`stormData` arrive unvalidated (z.unknown): repair any
+      // non-array field lists so a malformed patch cannot corrupt the board.
+      if (nextPatch.modelData || nextPatch.stormData) {
+        const repaired = coerceObjectArrays({ ...target, ...nextPatch });
+        if (repaired.modelData) nextPatch.modelData = repaired.modelData;
+        if (repaired.stormData) nextPatch.stormData = repaired.stormData;
+      }
       state.updateObject(id, nextPatch);
       updated.push(id);
     }

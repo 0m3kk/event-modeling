@@ -1,4 +1,12 @@
-import type { CanvasObject, StormField } from "@/types";
+import type {
+  BddStep,
+  CanvasObject,
+  ModelEnumValue,
+  ModelField,
+  StormConstraint,
+  StormField,
+  StormQueryItem,
+} from "@/types";
 
 /**
  * Canonical primitive field types and their normalization.
@@ -87,12 +95,90 @@ export function normalizeFieldType(raw?: string): string {
   return isArray ? `${resolved}[]` : resolved;
 }
 
-function normalizeStormFields(fields: StormField[] | undefined): StormField[] | undefined {
-  if (!fields) return fields;
-  return fields.map((field) => ({
+/**
+ * Coerce a possibly non-array list into an array. `undefined`/`null` stay
+ * `undefined` so optional bands are preserved; any other non-array value (e.g.
+ * an object written by a bad import or AI patch) becomes `[]` so downstream
+ * iteration and `.map` calls never throw.
+ */
+function asArrayOrUndefined<T>(value: unknown): T[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function normalizeStormFields(fields: unknown): StormField[] | undefined {
+  const list = asArrayOrUndefined<StormField>(fields);
+  if (list === undefined) return undefined;
+  return list.map((field) => ({
     ...field,
     fieldType: normalizeFieldType(field.fieldType),
   }));
+}
+
+function normalizeModelFields(fields: unknown): ModelField[] | undefined {
+  const list = asArrayOrUndefined<ModelField>(fields);
+  if (list === undefined) return undefined;
+  return list.map((field) => ({
+    ...field,
+    fieldType: normalizeFieldType(field.fieldType),
+  }));
+}
+
+/**
+ * Repair the array-shaped lists on a Model/Storm payload, leaving field types
+ * untouched. Boards can arrive from outside (files, autosave, AI patches) with
+ * a `fields`/`values`/`queryItems` value that is not an array; every consumer
+ * assumes arrays, so coerce them here before they reach a `.map`. Returns the
+ * original object when nothing needs repair, so it cannot churn unrelated state.
+ */
+export function coerceObjectArrays(obj: CanvasObject): CanvasObject {
+  if (obj.type === "storm" && obj.stormData) {
+    const data = obj.stormData;
+    const fields = asArrayOrUndefined<StormField>(data.fields) ?? [];
+    const inputFields = asArrayOrUndefined<StormField>(data.inputFields);
+    const outputFields = asArrayOrUndefined<StormField>(data.outputFields);
+    const responseFields = asArrayOrUndefined<StormField>(data.responseFields);
+    const queryItems = asArrayOrUndefined<StormQueryItem>(data.queryItems);
+    const constraints = asArrayOrUndefined<StormConstraint>(data.constraints);
+    const steps = asArrayOrUndefined<BddStep>(data.steps);
+    const permissions = asArrayOrUndefined<string>(data.permissions);
+    if (
+      fields === data.fields &&
+      inputFields === data.inputFields &&
+      outputFields === data.outputFields &&
+      responseFields === data.responseFields &&
+      queryItems === data.queryItems &&
+      constraints === data.constraints &&
+      steps === data.steps &&
+      permissions === data.permissions
+    ) {
+      return obj;
+    }
+    return {
+      ...obj,
+      stormData: {
+        ...data,
+        fields,
+        inputFields,
+        outputFields,
+        responseFields,
+        queryItems,
+        constraints,
+        steps,
+        permissions,
+      },
+    };
+  }
+
+  if (obj.type === "model" && obj.modelData) {
+    const data = obj.modelData;
+    const fields = asArrayOrUndefined<ModelField>(data.fields);
+    const values = asArrayOrUndefined<ModelEnumValue>(data.values);
+    if (fields === data.fields && values === data.values) return obj;
+    return { ...obj, modelData: { ...data, fields, values } };
+  }
+
+  return obj;
 }
 
 /**
@@ -112,6 +198,10 @@ export function normalizeObjectFieldTypes(obj: CanvasObject): CanvasObject {
         inputFields: normalizeStormFields(data.inputFields),
         outputFields: normalizeStormFields(data.outputFields),
         responseFields: normalizeStormFields(data.responseFields),
+        queryItems: asArrayOrUndefined<StormQueryItem>(data.queryItems),
+        constraints: asArrayOrUndefined<StormConstraint>(data.constraints),
+        steps: asArrayOrUndefined<BddStep>(data.steps),
+        permissions: asArrayOrUndefined<string>(data.permissions),
       },
     };
   }
@@ -122,10 +212,8 @@ export function normalizeObjectFieldTypes(obj: CanvasObject): CanvasObject {
       ...obj,
       modelData: {
         ...data,
-        fields: data.fields?.map((field) => ({
-          ...field,
-          fieldType: normalizeFieldType(field.fieldType),
-        })),
+        fields: normalizeModelFields(data.fields),
+        values: asArrayOrUndefined<ModelEnumValue>(data.values),
         itemType:
           data.itemType !== undefined
             ? normalizeFieldType(data.itemType)

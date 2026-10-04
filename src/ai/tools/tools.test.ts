@@ -750,6 +750,46 @@ describe("AI Storm Tools", () => {
     expect(fake.objects[0]!.width).toBe(100);
   });
 
+  it("update_objects repairs a non-array model fields payload", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "model-1",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      modelData: { kind: "object", name: "Order", fields: [] },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "update_objects",
+        arguments: JSON.stringify({
+          updates: [
+            {
+              id: "model-1",
+              patch: {
+                modelData: {
+                  kind: "object",
+                  name: "Order",
+                  fields: { oops: true },
+                },
+              },
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(Array.isArray(fake.objects[0]!.modelData?.fields)).toBe(true);
+    expect(fake.objects[0]!.modelData?.fields).toEqual([]);
+  });
+
   it("canonicalizes primitive field types when writing cards", async () => {
     const fake = createFakeStore();
     const { ctx } = createContext(fake);
