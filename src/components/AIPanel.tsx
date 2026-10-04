@@ -18,7 +18,12 @@ import type { AIChatMessage, AIPlanStep } from "@/types";
 import { cn } from "@/utils/cn";
 import { useCanvasStore } from "@/store";
 import { DEFAULT_AI_SETTINGS } from "@/ai/client";
-import { clampAIMaxTokens } from "@/ai";
+import {
+  addPromptToHistory,
+  clampAIMaxTokens,
+  getStoredPromptHistory,
+  storePromptHistory,
+} from "@/ai";
 import { useResizablePanel } from "@/hooks/useResizablePanel";
 import type { ResizeDirection } from "@/hooks/useResizablePanel";
 
@@ -236,6 +241,10 @@ export function AIPanel() {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
+  const [promptHistory, setPromptHistory] = useState<string[]>(() =>
+    getStoredPromptHistory(),
+  );
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [planOpen, setPlanOpen] = useState(true);
   const [baseUrlInput, setBaseUrlInput] = useState("");
@@ -245,6 +254,7 @@ export function AIPanel() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const draftRef = useRef("");
   const { size, beginResize } = useResizablePanel();
 
   const aiSettings = useCanvasStore((s) => s.aiSettings);
@@ -275,7 +285,11 @@ export function AIPanel() {
     if (isOpen && canSend && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [isOpen, canSend]);
+  }, [isOpen, canSend, aiConversation.id]);
+
+  useEffect(() => {
+    setHistoryIndex(null);
+  }, [aiConversation.id]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -286,40 +300,101 @@ export function AIPanel() {
     const trimmed = prompt.trim();
     if (!trimmed || aiRunning) return;
     setPrompt("");
+    setHistoryIndex(null);
+    const nextHistory = addPromptToHistory(promptHistory, trimmed);
+    setPromptHistory(nextHistory);
+    storePromptHistory(nextHistory);
     void sendAIMessage(trimmed);
-  }, [prompt, aiRunning, sendAIMessage]);
+  }, [prompt, promptHistory, aiRunning, sendAIMessage]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.code === "KeyN") {
-        event.preventDefault();
-        newAIConversation();
-        event.stopPropagation();
-        return;
-      }
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         handleSend();
+        event.stopPropagation();
+        return;
       }
+
+      // Arrow up/down walk the shared prompt history (newest first).
+      if (
+        (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        promptHistory.length > 0
+      ) {
+        const element = event.currentTarget as HTMLTextAreaElement;
+        const caretAtStart =
+          element.selectionStart === 0 && element.selectionEnd === 0;
+        if (
+          event.key === "ArrowUp" &&
+          (historyIndex !== null || caretAtStart)
+        ) {
+          event.preventDefault();
+          if (historyIndex === null) {
+            draftRef.current = prompt;
+            setHistoryIndex(0);
+            setPrompt(promptHistory[0]);
+          } else if (historyIndex < promptHistory.length - 1) {
+            const next = historyIndex + 1;
+            setHistoryIndex(next);
+            setPrompt(promptHistory[next]);
+          }
+          event.stopPropagation();
+          return;
+        }
+        if (event.key === "ArrowDown" && historyIndex !== null) {
+          event.preventDefault();
+          if (historyIndex > 0) {
+            const next = historyIndex - 1;
+            setHistoryIndex(next);
+            setPrompt(promptHistory[next]);
+          } else {
+            setHistoryIndex(null);
+            setPrompt(draftRef.current);
+          }
+          event.stopPropagation();
+          return;
+        }
+      }
+
       event.stopPropagation();
     },
-    [handleSend, newAIConversation],
+    [handleSend, promptHistory, historyIndex, prompt],
   );
 
-  // Cmd/Ctrl+N starts a new conversation whenever focus is inside the panel.
-  const handlePanelKeyDown = useCallback(
-    (event: React.KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.code === "KeyN") {
-        event.preventDefault();
-        newAIConversation();
-      }
-      event.stopPropagation();
-    },
-    [newAIConversation],
-  );
+  // Keep canvas shortcuts from leaking through while focus is inside the panel.
+  const handlePanelKeyDown = useCallback((event: React.KeyboardEvent) => {
+    event.stopPropagation();
+  }, []);
+
+  // Cmd/Ctrl+Shift+O starts a new conversation from anywhere. Browsers reserve
+  // Cmd/Ctrl+N to open a new window, so it cannot be intercepted on the web build.
+  useEffect(() => {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey) return;
+      if (event.code !== "KeyO") return;
+      const target = event.target as HTMLElement | null;
+      const isEditable =
+        !!target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (isEditable && !panelRef.current?.contains(target)) return;
+      event.preventDefault();
+      setIsOpen(true);
+      newAIConversation();
+    };
+    // Capture phase so the shortcut also fires while focus is inside the panel,
+    // whose keydown handlers stop propagation.
+    window.addEventListener("keydown", handleGlobalKeyDown, true);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown, true);
+  }, [newAIConversation]);
 
   // Clicking anywhere in the panel pulls focus onto the panel itself so that
-  // keyboard shortcuts (like Cmd/Ctrl+N) target it instead of the canvas.
+  // keyboard shortcuts target it instead of the canvas.
   const handlePanelMouseDown = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation();
@@ -391,7 +466,7 @@ export function AIPanel() {
           <button
             onClick={newAIConversation}
             className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 cursor-pointer dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-            title={t("ai.newConversation")}
+            title={`${t("ai.newConversation")} (⌘⇧O)`}
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -604,7 +679,10 @@ export function AIPanel() {
           <textarea
             ref={inputRef}
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(e) => {
+              setPrompt(e.target.value);
+              if (historyIndex !== null) setHistoryIndex(null);
+            }}
             onKeyDown={handleKeyDown}
             placeholder={
               canSend
