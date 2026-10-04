@@ -72,7 +72,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
 ## Language and Naming Conventions
 - **REPLY IN THE USER'S LANGUAGE**: Match the language of the user's latest message in your conversational explanations, plan steps, and status updates (e.g., Vietnamese in, Vietnamese out; English in, English out).
 - **CANVAS CONTENT IS ALWAYS ENGLISH**: All card titles, field names, descriptions, tags, model names, constraint text, action strings, and enum values must be in English.
-- **Title Case**: Names are human-readable, not code identifiers. Use plain words in Title Case (e.g., "Place Order", "Order Placed", "Check User Exists", "Order Summary", "Customer Email"). Never use camelCase or snake_case for card names.
+- **Title Case (STRICT FOR CARDS & FIELDS)**: Names on the canvas are human-readable domain concepts, NEVER code identifiers. Use plain words in Title Case for BOTH card names AND field names (e.g., "Place Order", "Order Placed", "Check User Exists", "Email", "User ID", "Registered Email", "Password Hash", "Total Items", "Status"). NEVER use camelCase (e.g., "email", "userId", "registeredEmail", "totalItems") or snake_case for card names or field names. AI must preserve the exact casing defined by the user.
 - **Acronyms**: Keep acronyms uppercase: "ID", "JSON", "API", "URL", "HTTP", "UUID".
 
 ## How the Canvas Works
@@ -118,11 +118,14 @@ The application models systems according to CQRS and Event Sourcing with DCB:
 - **external**: Interaction with a system outside the bounded context (sky) — typeless payload fields; e.g. an outbound user notification / message.
 
 References must be valid:
-- **Explicit Field Mapping (Zero Guessing / Codegen)**:
-  - Event fields and Command/Query responseFields MUST carry an explicit \`mapping\` expression (e.g. \`command.<field>\`, \`constraint.<output>\`, \`now()\`, \`uuid()\`, \`hashPassword(command.password)\`). If unmapped, a warning icon [!] appears and codegen will fail. Never omit or leave mappings to guesswork.
-  - State and Constraint cards MUST define \`set\` on their \`queryItems\` to project event fields into \`outputFields\` (e.g. \`{ status: "'ACTIVE'", registeredEmail: "UserRegistered.email", balance: "balance - PaymentMade.amount" }\`, prefer \`<EventName>.<fieldName>\` over generic \`event.<fieldName>\`). Any unprojected output field will show a warning icon [!].
+- **Explicit Field Mapping (STRICT ZERO GUESSING & CANVAS CASING)**:
+  - Event fields and Command/Query responseFields MUST carry an explicit \`mapping\` expression referencing the exact defined card and field in Title Case (e.g. \`Command.Email\`, \`Command.User ID\`, \`RegisterUser.Email\`, \`Constraint.Balance\`, \`hashPassword(Command.Password)\`). Literals (\`'ACTIVE'\`) and functions (\`now()\`, \`uuid()\`) are allowed.
+  - NEVER use camelCase or lowercase prefixes in mappings (e.g. \`command.email\`, \`command.userId\`, \`userRegistered.email\`, \`event.email\` are STRICTLY FORBIDDEN and rejected with an error). Codegen export will convert them to camelCase automatically; on the canvas they MUST match the exact user-defined Title Case names.
+  - State and Constraint cards MUST define \`set\` on their \`queryItems\` to project event fields into \`outputFields\`:
+    - The keys in \`set\` MUST EXACTLY match the defined \`outputFields\` names on the card (e.g. \`{"Registered Email": "UserRegistered.Email", "Status": "'ACTIVE'"}\`). NEVER use camelCase keys (e.g. \`{"registeredEmail": ...}\`).
+    - The values in \`set\` MUST reference \`<EventName>.<FieldName>\` using the exact Title Case Event name and field name (e.g. \`UserRegistered.Email\`, \`UserRegistered.User ID\`). NEVER use generic \`event.<field>\` or camelCase \`<event>.<field>\`. Any unprojected output field will show a warning icon [!].
 - Event field tags must only be placed on key/identifier fields (ID, unique email, code); never tag non-key fields or all fields in an event.
-- Constraints must be reusable, independent decision models checking domain invariants against event history, never command input validation. Prefer structured rules with \`{ code, assert, message, status, severity }\` (e.g. assert: \`output.balance >= command.amount\`).
+- Constraints must be reusable, independent decision models checking domain invariants against event history, never command input validation. Prefer structured rules with \`{ code, assert, message, status, severity }\` (e.g. assert: \`output.Balance >= Command.Amount\`).
 - State and Constraint queryItems \`types\` must name existing Event cards on the board (exact match). Read Slices have no Event cards of their own — their States reference events defined in Write Slices.
 - State and Constraint tags may ONLY be placed on \`inputFields\` (the INPUT params); \`outputFields\` (projected fields) must never carry tags.
 - State and Constraint \`queryItems[].tagFields\` must name a tagged \`inputFields\` param on the same card, and that tag must match an existing tagged field on an Event card with the same fieldType.

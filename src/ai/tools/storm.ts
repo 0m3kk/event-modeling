@@ -82,7 +82,7 @@ const fieldSpec = z.object({
     .string()
     .optional()
     .describe(
-      "Explicit source expression for code generation (e.g. 'command.userId', 'now()', 'uuid()', 'constraint.balance'). Crucial for Event fields and Response fields to know where data comes from without guessing.",
+      "Explicit source expression for code generation (e.g. 'Command.User ID', 'Command.Email', 'now()', 'uuid()', 'Constraint.Balance'). MUST use Title Case matching defined card and field (never camelCase like 'command.userId').",
     ),
   validation: validationSpec
     .optional()
@@ -108,7 +108,7 @@ const queryItemSpec = z.object({
     .record(z.string(), z.string())
     .optional()
     .describe(
-      "State projection dictionary mapping output field names to event expressions (e.g. { 'status': \"'ACTIVE'\", 'registeredEmail': 'UserRegistered.email', 'count': 'count + 1' }). Prefer <EventName>.<fieldName> over generic event.<fieldName>. Explains how this event mutates the state.",
+      "State projection dictionary mapping output field names to event expressions (e.g. { 'Status': \"'ACTIVE'\", 'Registered Email': 'UserRegistered.Email', 'Total Items': 'Total Items + 1' }). Keys MUST match defined outputFields names in Title Case (not camelCase). Values MUST reference <EventName>.<FieldName> in Title Case (never generic event.<field> or camelCase).",
     ),
 });
 
@@ -489,10 +489,15 @@ export const createStormCardsTool = defineTool({
       existing: state.objects,
       cards: built.map(({ spec, obj }): StormValidationCard => ({
         kind: spec.kind,
-        name: obj.stormData?.name ?? toDisplayName(spec.name),
+        name: spec.name,
         fields: obj.stormData?.fields ?? [],
         inputFields: obj.stormData?.inputFields,
         outputFields: obj.stormData?.outputFields,
+        responseFields: obj.stormData?.responseFields,
+        rawFields: spec.fields,
+        rawInputFields: spec.inputFields,
+        rawOutputFields: spec.outputFields,
+        rawResponseFields: spec.responseFields,
         queryItems: spec.queryItems,
         constraints: spec.constraints,
         action: obj.stormData?.action,
@@ -776,13 +781,17 @@ export const updateStormCardTool = defineTool({
       cards: [
         {
           kind: existing.kind,
-          name:
-            args.name !== undefined ? toDisplayName(args.name) : existing.name,
+          name: args.name !== undefined ? args.name : existing.name,
           fields: isProjection ? [] : fields,
           inputFields: isProjection ? inputFields : undefined,
           outputFields: isProjection ? outputFields : undefined,
+          responseFields: responseFields ?? existing.responseFields,
           writtenFields: args.fields !== undefined ? fields : [],
-          queryItems: args.queryItems,
+          rawFields: args.fields,
+          rawInputFields: args.inputFields,
+          rawOutputFields: args.outputFields,
+          rawResponseFields: args.responseFields,
+          queryItems: args.queryItems ?? existing.queryItems,
           constraints: args.constraints ?? existing.constraints,
           action: args.action ?? existing.action,
           permissions:

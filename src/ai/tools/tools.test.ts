@@ -243,14 +243,14 @@ describe("AI Storm Tools", () => {
               kind: "command",
               name: "Place Order",
               fields: [
-                { name: "orderId", fieldType: "string" },
-                { name: "amount", fieldType: "number" },
+                { name: "Order ID", fieldType: "string" },
+                { name: "Amount", fieldType: "number" },
               ],
             },
             {
               kind: "event",
               name: "Order Placed",
-              fields: [{ name: "orderId", fieldType: "string", tag: "Order" }],
+              fields: [{ name: "Order ID", fieldType: "string", tag: "Order" }],
             },
           ],
         }),
@@ -452,19 +452,19 @@ describe("AI Storm Tools", () => {
               action: "order:create:own",
               fields: [
                 {
-                  name: "email",
+                  name: "Email",
                   fieldType: "string",
                   validation: { format: "email", maxLength: 255 },
                 },
                 {
-                  name: "quantity",
+                  name: "Quantity",
                   fieldType: "number",
                   validation: { min: 1, max: 10 },
                 },
               ],
               responseFields: [
                 {
-                  name: "orderId",
+                  name: "Order ID",
                   fieldType: "uuid",
                   validation: { minLength: 1 },
                 },
@@ -476,14 +476,14 @@ describe("AI Storm Tools", () => {
               action: "order:read:own",
               fields: [
                 {
-                  name: "status",
+                  name: "Status",
                   fieldType: "string",
                   validation: { allowedValues: ["draft", "placed"] },
                 },
               ],
               responseFields: [
                 {
-                  name: "total",
+                  name: "Total",
                   fieldType: "number",
                   validation: { min: 0 },
                 },
@@ -638,8 +638,8 @@ describe("AI Storm Tools", () => {
           id: "evt-1",
           name: "Payment Completed",
           fields: [
-            { name: "txId", fieldType: "string" },
-            { name: "amount", fieldType: "number" },
+            { name: "Transaction ID", fieldType: "string" },
+            { name: "Amount", fieldType: "number" },
           ],
         }),
       },
@@ -675,8 +675,8 @@ describe("AI Storm Tools", () => {
           id: "evt-lock",
           name: "Payment Completed",
           fields: [
-            { name: "txId", fieldType: "string" },
-            { name: "amount", fieldType: "number" },
+            { name: "Transaction ID", fieldType: "string" },
+            { name: "Amount", fieldType: "number" },
           ],
         }),
       },
@@ -1584,7 +1584,7 @@ describe("AI Model & Write Tools", () => {
     const fake = createFakeStore();
     const { ctx } = createContext(fake);
 
-    // 1. Create Event with explicit mapping and State with queryItem set
+    // 1. Create Event with explicit mapping and State with queryItem set using Title Case
     const createRes = await executeToolCall(
       {
         id: "1",
@@ -1593,21 +1593,21 @@ describe("AI Model & Write Tools", () => {
           cards: [
             {
               kind: "event",
-              name: "ItemAddedToCart",
+              name: "Item Added To Cart",
               fields: [
                 {
-                  name: "cartId",
+                  name: "Cart ID",
                   fieldType: "UUID",
-                  tag: "cart",
-                  mapping: "command.cartId",
+                  tag: "Cart",
+                  mapping: "Command.Cart ID",
                 },
                 {
-                  name: "itemId",
+                  name: "Item ID",
                   fieldType: "UUID",
-                  mapping: "command.itemId",
+                  mapping: "Command.Item ID",
                 },
                 {
-                  name: "addedAt",
+                  name: "Added At",
                   fieldType: "DateTime",
                   mapping: "now()",
                 },
@@ -1615,19 +1615,19 @@ describe("AI Model & Write Tools", () => {
             },
             {
               kind: "state",
-              name: "CartSummary",
+              name: "Cart Summary",
               inputFields: [
-                { name: "cartId", fieldType: "UUID", tag: "cart" },
+                { name: "Cart ID", fieldType: "UUID", tag: "Cart" },
               ],
               outputFields: [
-                { name: "totalItems", fieldType: "Number" },
+                { name: "Total Items", fieldType: "Number" },
               ],
               queryItems: [
                 {
-                  types: ["ItemAddedToCart"],
-                  tagFields: ["cartId"],
+                  types: ["Item Added To Cart"],
+                  tagFields: ["Cart ID"],
                   set: {
-                    totalItems: "totalItems + 1",
+                    "Total Items": "Total Items + 1",
                   },
                 },
               ],
@@ -1643,8 +1643,8 @@ describe("AI Model & Write Tools", () => {
       (o) => o.stormData?.name === "Item Added To Cart",
     );
     expect(eventCard).toBeDefined();
-    expect(eventCard?.stormData?.fields[0].mapping).toBe("command.cartId");
-    expect(eventCard?.stormData?.fields[1].mapping).toBe("command.itemId");
+    expect(eventCard?.stormData?.fields[0].mapping).toBe("Command.Cart ID");
+    expect(eventCard?.stormData?.fields[1].mapping).toBe("Command.Item ID");
     expect(eventCard?.stormData?.fields[2].mapping).toBe("now()");
 
     const stateCard = fake.objects.find(
@@ -1652,7 +1652,7 @@ describe("AI Model & Write Tools", () => {
     );
     expect(stateCard).toBeDefined();
     expect(stateCard?.stormData?.queryItems?.[0].set).toEqual({
-      totalItems: "totalItems + 1",
+      "Total Items": "Total Items + 1",
     });
 
     // 2. Update Event card to change mapping
@@ -1664,9 +1664,9 @@ describe("AI Model & Write Tools", () => {
           id: eventCard!.id,
           fields: [
             {
-              name: "cartId",
+              name: "Cart ID",
               fieldType: "UUID",
-              tag: "cart",
+              tag: "Cart",
               mapping: "uuid()",
             },
           ],
@@ -1678,5 +1678,137 @@ describe("AI Model & Write Tools", () => {
     expect(updateRes.isError).toBeFalsy();
     const updatedEvent = fake.objects.find((o) => o.id === eventCard!.id);
     expect(updatedEvent?.stormData?.fields[0].mapping).toBe("uuid()");
+  });
+
+  it("strictly rejects camelCase card names, field names, mappings, and queryItems set keys with immediate error feedback", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    // 1. Reject camelCase card name
+    const resBadCardName = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "command",
+              name: "registerUser",
+              fields: [{ name: "Email", fieldType: "Email" }],
+              action: "user:create:*",
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+    expect(resBadCardName.isError).toBe(true);
+    expect(resBadCardName.content).toContain('registerUser');
+    expect(resBadCardName.content).toContain('is in camelCase');
+
+    // 2. Reject camelCase field name
+    const resBadField = await executeToolCall(
+      {
+        id: "2",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "command",
+              name: "Register User",
+              fields: [{ name: "userEmail", fieldType: "Email" }],
+              action: "user:create:*",
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+    expect(resBadField.isError).toBe(true);
+    expect(resBadField.content).toContain('userEmail');
+    expect(resBadField.content).toContain('is in camelCase');
+
+    // 3. Reject lowercase/camelCase mapping (e.g. command.email)
+    const resBadMapping = await executeToolCall(
+      {
+        id: "3",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "command",
+              name: "Register User",
+              fields: [{ name: "Email", fieldType: "Email" }],
+              action: "user:create:*",
+            },
+            {
+              kind: "event",
+              name: "User Registered",
+              fields: [
+                {
+                  name: "Email",
+                  fieldType: "Email",
+                  tag: "User",
+                  mapping: "command.email",
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+    expect(resBadMapping.isError).toBe(true);
+    expect(resBadMapping.content).toContain('command.email');
+    expect(resBadMapping.content).toContain('uses lowercase/camelCase prefix');
+
+    // 4. Reject camelCase set key and expression
+    const resBadSet = await executeToolCall(
+      {
+        id: "4",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "event",
+              name: "User Registered",
+              fields: [
+                {
+                  name: "Email",
+                  fieldType: "Email",
+                  tag: "User",
+                  mapping: "uuid()",
+                },
+              ],
+            },
+            {
+              kind: "state",
+              name: "User Directory",
+              inputFields: [
+                { name: "Email", fieldType: "Email", tag: "User" },
+              ],
+              outputFields: [
+                { name: "Registered Email", fieldType: "Email" },
+              ],
+              queryItems: [
+                {
+                  types: ["User Registered"],
+                  tagFields: ["Email"],
+                  set: {
+                    registeredEmail: "userRegistered.email",
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+    expect(resBadSet.isError).toBe(true);
+    expect(resBadSet.content).toContain('registeredEmail');
+    expect(resBadSet.content).toContain('is in camelCase');
+    expect(resBadSet.content).toContain('userRegistered.email');
+    expect(resBadSet.content).toContain('uses camelCase prefix');
   });
 });

@@ -1,6 +1,15 @@
 import type { CanvasObject, StormField, StormKind } from "@/types";
-import { nameKey, splitWords, toDisplayName } from "./naming";
+import {
+  fieldNameMatches,
+  isCamelOrLower,
+  nameKey,
+  splitWords,
+  toDisplayName,
+} from "./naming";
 import { matchesPermission } from "./stormAuth";
+
+const MEMBER_ACCESS_REGEX =
+  /\b([a-zA-Z_0-9]+)\.([a-zA-Z_0-9]+(?:\s+[a-zA-Z_0-9]+)*)\b/g;
 
 const TAG_KINDS: readonly StormKind[] = ["event", "state", "constraint", "bdd"];
 
@@ -230,6 +239,33 @@ function findCandidateSourcesForEvent(
   return [];
 }
 
+function findEventCard(
+  nameOrType: string,
+  input: StormValidationInput,
+): StormValidationCard | CanvasObject | undefined {
+  const targetKey = nameKey(nameOrType);
+  for (const card of input.cards) {
+    if (
+      card.kind === "event" &&
+      (nameKey(card.name) === targetKey || card.name.trim() === nameOrType.trim())
+    ) {
+      return card;
+    }
+  }
+  for (const obj of input.existing) {
+    if (obj.type === "storm" && obj.stormData?.kind === "event") {
+      const evName = obj.stormData.name;
+      if (
+        nameKey(evName) === targetKey ||
+        evName.trim() === nameOrType.trim()
+      ) {
+        return obj;
+      }
+    }
+  }
+  return undefined;
+}
+
 export interface StormValidationCard {
   kind: StormKind;
   name: string;
@@ -239,8 +275,17 @@ export interface StormValidationCard {
   inputFields?: StormField[];
   /** State/Constraint OUTPUT (rehydrated) fields — tags are not allowed here. */
   outputFields?: StormField[];
+  responseFields?: StormField[];
   writtenFields?: StormField[];
-  queryItems?: { types?: string[]; tagFields?: string[] }[];
+  rawFields?: { name: string; mapping?: string; tag?: string }[];
+  rawInputFields?: { name: string; mapping?: string; tag?: string }[];
+  rawOutputFields?: { name: string; mapping?: string; tag?: string }[];
+  rawResponseFields?: { name: string; mapping?: string; tag?: string }[];
+  queryItems?: {
+    types?: string[];
+    tagFields?: string[];
+    set?: Record<string, string>;
+  }[];
   constraints?: (
     | string
     | {
@@ -336,6 +381,94 @@ export function validateStormWrite(input: StormValidationInput): string[] {
     const label = `"${card.name}" (${card.kind})`;
     const writtenFields = card.writtenFields ?? card.fields;
 
+    // Validate card name casing
+    if (isCamelOrLower(card.name)) {
+      issues.push(
+        `Card name "${card.name}" (${card.kind}) is in camelCase. Card names must use Title Case (e.g. "${toDisplayName(card.name)}").`,
+      );
+    }
+
+    const allFieldSpecs = [
+      ...(card.rawFields ?? card.writtenFields ?? card.fields ?? []),
+      ...(card.rawInputFields ?? card.inputFields ?? []),
+      ...(card.rawOutputFields ?? card.outputFields ?? []),
+      ...(card.rawResponseFields ?? card.responseFields ?? []),
+    ];
+
+    // Validate field name casing across all field definitions (except Actor permissions)
+    if (card.kind !== "actor") {
+      for (const f of allFieldSpecs) {
+        if (isCamelOrLower(f.name)) {
+          issues.push(
+            `${label} field "${f.name}" is in camelCase. Field names must use Title Case matching user definitions (e.g. "${toDisplayName(f.name)}").`,
+          );
+        }
+      }
+    }
+
+    // Validate field mapping expressions
+    for (const f of allFieldSpecs) {
+      const mapping = (f.mapping ?? "").trim();
+      if (!mapping) continue;
+
+      if (/\bevent\./i.test(mapping)) {
+        issues.push(
+          `${label} field "${f.name}" mapping "${mapping}" uses generic "event.". Specify the source card name in Title Case (e.g. "Command.<FieldName>" or "<EventName>.<FieldName>").`,
+        );
+      }
+
+      const dotMatches = [...mapping.matchAll(MEMBER_ACCESS_REGEX)];
+      for (const match of dotMatches) {
+        const prefix = match[1];
+        const accessedField = match[2];
+
+        if (isCamelOrLower(prefix)) {
+          issues.push(
+            `${label} field "${f.name}" mapping "${mapping}" uses lowercase/camelCase prefix "${prefix}.". Use Title Case matching defined card (e.g. "${toDisplayName(prefix)}.${toDisplayName(accessedField)}").`,
+          );
+        } else if (isCamelOrLower(accessedField)) {
+          issues.push(
+            `${label} field "${f.name}" mapping "${mapping}" uses camelCase field "${accessedField}". Use Title Case matching defined field (e.g. "${prefix}.${toDisplayName(accessedField)}").`,
+          );
+        }
+
+        if (card.kind === "event") {
+          const candidateSources = findCandidateSourcesForEvent(card, input);
+          if (candidateSources.length > 0) {
+            if (
+              prefix.toLowerCase() === "command" ||
+              candidateSources.some(
+                (s) => nameKey(getCardOrObjectName(s)) === nameKey(prefix),
+              )
+            ) {
+              const src =
+                candidateSources.find(
+                  (s) =>
+                    (prefix.toLowerCase() === "command" &&
+                      ("stormData" in s
+                        ? s.stormData?.kind === "command"
+                        : (s as any).kind === "command")) ||
+                    nameKey(getCardOrObjectName(s)) === nameKey(prefix),
+                ) || candidateSources[0];
+              const availableFields = getCardOrObjectFields(src);
+              const matchedField = availableFields.find((srcF) =>
+                fieldNameMatches(srcF.name, accessedField),
+              );
+              if (!matchedField) {
+                issues.push(
+                  `${label} field "${f.name}" mapping "${mapping}" references field "${accessedField}" which does not exist on source card "${getCardOrObjectName(src)}". Available fields: [${availableFields.map((srcF) => `"${srcF.name}"`).join(", ")}].`,
+                );
+              } else if (matchedField.name.trim() !== accessedField.trim()) {
+                issues.push(
+                  `${label} field "${f.name}" mapping "${mapping}" references field "${accessedField}" with incorrect casing. Use exact defined name "${matchedField.name}".`,
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+
     if (card.kind === "actor") {
       const rawList =
         card.writtenPermissions !== undefined
@@ -423,6 +556,68 @@ export function validateStormWrite(input: StormValidationInput): string[] {
     }
 
     for (const [index, item] of (card.queryItems ?? []).entries()) {
+      if (item.set && Object.keys(item.set).length > 0) {
+        const outputFields = [
+          ...(card.outputFields ?? []),
+          ...(card.rawOutputFields?.map((f) => ({ name: f.name } as StormField)) ?? []),
+        ];
+        for (const [key, expr] of Object.entries(item.set)) {
+          if (isCamelOrLower(key)) {
+            const matched = outputFields.find((f) => fieldNameMatches(f.name, key));
+            issues.push(
+              `${label} queryItems[${index}] set key "${key}" is in camelCase. Must match defined output field name "${matched?.name ?? toDisplayName(key)}".`,
+            );
+          } else if (
+            outputFields.length > 0 &&
+            !outputFields.some((f) => f.name === key || (f as any).id === key)
+          ) {
+            issues.push(
+              `${label} queryItems[${index}] set key "${key}" does not match any outputField on this card. Defined output fields: [${outputFields.map((f) => `"${f.name}"`).join(", ")}].`,
+            );
+          }
+
+          if (/\bevent\./i.test(expr)) {
+            const sampleEv = item.types?.[0] ? toDisplayName(item.types[0]) : "Event";
+            issues.push(
+              `${label} queryItems[${index}] set expression "${expr}" for "${key}" uses generic "event.". Prefer explicit Event card name (e.g. "${sampleEv}.${toDisplayName(key)}").`,
+            );
+          }
+
+          const exprMatches = [...expr.matchAll(MEMBER_ACCESS_REGEX)];
+          for (const match of exprMatches) {
+            const prefix = match[1];
+            const accessedField = match[2];
+
+            if (isCamelOrLower(prefix)) {
+              issues.push(
+                `${label} queryItems[${index}] set expression "${expr}" uses camelCase prefix "${prefix}.". Use Title Case matching defined Event card (e.g. "${toDisplayName(prefix)}.${toDisplayName(accessedField)}").`,
+              );
+            } else if (isCamelOrLower(accessedField)) {
+              issues.push(
+                `${label} queryItems[${index}] set expression "${expr}" uses camelCase field "${accessedField}". Use Title Case matching defined field (e.g. "${prefix}.${toDisplayName(accessedField)}").`,
+              );
+            }
+
+            const evCard = findEventCard(prefix, input);
+            if (evCard) {
+              const evFields = getCardOrObjectFields(evCard);
+              const matchedEvField = evFields.find((ef) =>
+                fieldNameMatches(ef.name, accessedField),
+              );
+              if (!matchedEvField) {
+                issues.push(
+                  `${label} queryItems[${index}] set expression "${expr}" references field "${accessedField}" which does not exist on Event "${getCardOrObjectName(evCard)}". Available fields: [${evFields.map((ef) => `"${ef.name}"`).join(", ")}].`,
+                );
+              } else if (matchedEvField.name.trim() !== accessedField.trim()) {
+                issues.push(
+                  `${label} queryItems[${index}] set expression "${expr}" references field "${accessedField}" with incorrect casing. Use exact defined name "${matchedEvField.name}" on Event "${getCardOrObjectName(evCard)}".`,
+                );
+              }
+            }
+          }
+        }
+      }
+
       for (const rawType of item.types ?? []) {
         const type = toDisplayName(rawType);
         if (!eventNames.has(type)) {

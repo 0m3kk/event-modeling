@@ -507,4 +507,117 @@ describe("describeStormOptions", () => {
       "Event types available: (none yet). Event tags available: (none yet). Actions available: (none yet).",
     );
   });
+
+  describe("Title Case enforcement and camelCase rejection", () => {
+    it("rejects camelCase card names and field names", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("command", "placeOrder", [
+            field("orderId", "uuid"),
+            field("Total Amount", "number"),
+          ], { action: "order:create:*" }),
+        ],
+      };
+      const issues = validateStormWrite(input);
+      expect(issues.some((i) => i.includes('Card name "placeOrder" (command) is in camelCase'))).toBe(true);
+      expect(issues.some((i) => i.includes('field "orderId" is in camelCase'))).toBe(true);
+    });
+
+    it("rejects lowercase/camelCase mapping prefixes and field names", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("command", "Place Order", [field("Order ID", "uuid")]),
+          card("event", "Order Placed", [
+            {
+              ...field("Order ID", "uuid", "Order"),
+              mapping: "command.orderId",
+            },
+          ]),
+        ],
+      };
+      const issues = validateStormWrite(input);
+      expect(issues.some((i) => i.includes('mapping "command.orderId" uses lowercase/camelCase prefix "command."'))).toBe(true);
+    });
+
+    it("rejects mapping referencing non-existent field on Command", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("command", "Place Order", [field("Order ID", "uuid")]),
+          card("event", "Order Placed", [
+            {
+              ...field("Order ID", "uuid", "Order"),
+              mapping: "Command.NonExistent",
+            },
+          ]),
+        ],
+      };
+      const issues = validateStormWrite(input);
+      expect(issues.some((i) => i.includes('references field "NonExistent" which does not exist on source card "Place Order"'))).toBe(true);
+    });
+
+    it("rejects camelCase set keys and generic event or camelCase expressions in queryItems", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("event", "Order Placed", [field("Order ID", "uuid", "Order")]),
+          {
+            kind: "state",
+            name: "Order Summary",
+            fields: [],
+            inputFields: [field("Order ID", "uuid", "Order")],
+            outputFields: [field("Order Status", "String")],
+            queryItems: [
+              {
+                types: ["Order Placed"],
+                tagFields: ["Order ID"],
+                set: {
+                  orderStatus: "orderPlaced.status",
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const issues = validateStormWrite(input);
+      expect(issues.some((i) => i.includes('set key "orderStatus" is in camelCase'))).toBe(true);
+      expect(issues.some((i) => i.includes('uses camelCase prefix "orderPlaced."'))).toBe(true);
+    });
+
+    it("passes valid Title Case cards, fields, mappings, and queryItems set", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("command", "Place Order", [field("Order ID", "uuid")], {
+            action: "order:create:*",
+          }),
+          card("event", "Order Placed", [
+            {
+              ...field("Order ID", "uuid", "Order"),
+              mapping: "Command.Order ID",
+            },
+          ]),
+          {
+            kind: "state",
+            name: "Order Summary",
+            fields: [],
+            inputFields: [field("Order ID", "uuid", "Order")],
+            outputFields: [field("Order ID", "uuid")],
+            queryItems: [
+              {
+                types: ["Order Placed"],
+                tagFields: ["Order ID"],
+                set: {
+                  "Order ID": "OrderPlaced.Order ID",
+                },
+              },
+            ],
+          },
+        ],
+      };
+      expect(validateStormWrite(input)).toEqual([]);
+    });
+  });
 });

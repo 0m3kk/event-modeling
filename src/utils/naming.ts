@@ -93,6 +93,16 @@ export function toCamelCase(input: string): string {
   return [first, ...rest].join("");
 }
 
+/**
+ * Returns true if input starts with a lowercase ASCII letter (a-z),
+ * indicating camelCase, snake_case, or lowercase naming instead of Title Case.
+ */
+export function isCamelOrLower(input: string): boolean {
+  const trimmed = input.trim();
+  if (!trimmed) return false;
+  return /^[a-z]/.test(trimmed);
+}
+
 /** Check if two field names/keys match across casing (e.g. "Registered Email" vs "registeredEmail" vs id) */
 export function fieldNameMatches(targetNameOrId: string, testKey: string): boolean {
   if (!targetNameOrId || !testKey) return false;
