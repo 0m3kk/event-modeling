@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useCanvasStore } from "@/store";
 import type { CanvasObject, StormField, StormQueryItem } from "@/types";
 import { ArrowLeftRight, X, Trash2, Sparkles, Plus, Zap } from "lucide-react";
-import { fieldNameMatches } from "@/utils/naming";
+import { fieldNameMatches, nameKey } from "@/utils/naming";
 import { nanoid } from "nanoid";
 
 interface FieldMappingPopoverProps {
@@ -38,6 +38,13 @@ export function FieldMappingPopover({
         null
       );
     }
+    if (section === "params") {
+      return (
+        data.inputFields?.find((f) => f.id === fieldId) ??
+        data.fields.find((f) => f.id === fieldId) ??
+        null
+      );
+    }
     return (
       data.fields.find((f) => f.id === fieldId) ??
       data.inputFields?.find((f) => f.id === fieldId) ??
@@ -49,6 +56,7 @@ export function FieldMappingPopover({
 
   const isOutputField = Boolean(
     (data?.kind === "state" || data?.kind === "constraint") &&
+      section === "response" &&
       targetField &&
       (data.outputFields ?? []).some((f) => f.id === targetField.id),
   );
@@ -133,28 +141,75 @@ export function FieldMappingPopover({
     }
   }, [isOutputField]);
 
+  // All enum model nodes on canvas
+  const enumNodes = useMemo(() => {
+    return objects
+      .filter((o) => o.type === "model" && o.modelData?.kind === "enum")
+      .map((o) => ({
+        name: o.modelData!.name,
+        values: o.modelData!.values?.map((v) => v.name) ?? [],
+      }));
+  }, [objects]);
+
+  const targetEnumNode = useMemo(() => {
+    if (!targetField?.fieldType) return null;
+    const targetTypeKey = nameKey(targetField.fieldType);
+    return enumNodes.find((e) => nameKey(e.name) === targetTypeKey) ?? null;
+  }, [targetField, enumNodes]);
+
   // Standard suggestions for command/response fields
   const standardSuggestions = useMemo(() => {
     const list: { label: string; value: string }[] = [];
+    if (targetEnumNode) {
+      for (const val of targetEnumNode.values) {
+        list.push({
+          label: `"${targetEnumNode.name}"."${val}"`,
+          value: `"${targetEnumNode.name}"."${val}"`,
+        });
+      }
+    }
     if (targetField) {
       const fieldName = targetField.name.trim();
       if (fieldName) {
-        list.push({ label: `Command.${fieldName}`, value: `Command.${fieldName}` });
+        list.push({ label: `"Command"."${fieldName}"`, value: `"Command"."${fieldName}"` });
+        if (data?.kind === "constraint" || data?.kind === "state") {
+          list.push({ label: `"Query"."${fieldName}"`, value: `"Query"."${fieldName}"` });
+        }
+        const relatedCards = objects.filter(
+          (o) =>
+            o.type === "storm" &&
+            (o.stormData?.kind === "command" || o.stormData?.kind === "query"),
+        );
+        for (const rc of relatedCards) {
+          const rcFields = rc.stormData?.fields ?? [];
+          for (const rcf of rcFields) {
+            if (fieldNameMatches(fieldName, rcf.name)) {
+              list.push({
+                label: `"${rc.stormData!.name}"."${rcf.name}"`,
+                value: `"${rc.stormData!.name}"."${rcf.name}"`,
+              });
+            }
+          }
+        }
         if (targetField.fieldType === "UUID") {
           list.push({ label: "uuid()", value: "uuid()" });
         }
         if (targetField.fieldType === "DateTime") {
           list.push({ label: "now()", value: "now()" });
         }
+        if (targetField.fieldType === "String" && !targetEnumNode) {
+          list.push({ label: "'ACTIVE'", value: "'ACTIVE'" });
+          list.push({ label: "'PENDING'", value: "'PENDING'" });
+        }
       }
     }
     list.push(
       { label: "now()", value: "now()" },
       { label: "uuid()", value: "uuid()" },
-      { label: "Constraint.<Output>", value: "Constraint." },
+      { label: '"Constraint"."<Output>"', value: '"Constraint".' },
       {
         label: "hashPassword(...)",
-        value: `hashPassword(Command.${targetField?.name.trim() || "Password"})`,
+        value: `hashPassword("Command"."${targetField?.name.trim() || "Password"}")`,
       },
     );
     const seen = new Set<string>();
@@ -163,7 +218,7 @@ export function FieldMappingPopover({
       seen.add(item.value);
       return true;
     });
-  }, [targetField]);
+  }, [targetField, targetEnumNode]);
 
   // Handle Save for Single Expression
   const handleApplySingle = () => {
@@ -217,7 +272,7 @@ export function FieldMappingPopover({
   const handleAddEventQueryItem = (eventName: string) => {
     if (!eventName || !targetField) return;
     const newQiId = `qi-${nanoid(6)}`;
-    const defaultExpr = `${eventName}.${targetField.name}`;
+    const defaultExpr = `"${eventName}"."${targetField.name}"`;
     const newQi: StormQueryItem = {
       id: newQiId,
       types: [eventName],
@@ -250,7 +305,7 @@ export function FieldMappingPopover({
     <div
       ref={popoverRef}
       className={`fixed z-50 rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 ${
-        isOutputField ? "w-[500px]" : "w-96"
+        isOutputField ? "w-125" : "w-96"
       }`}
       style={{
         left: `${anchorPosition.x}px`,
@@ -259,7 +314,7 @@ export function FieldMappingPopover({
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 px-4 py-3 bg-gradient-to-r from-cyan-50/60 to-transparent dark:from-cyan-950/25">
+      <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 px-4 py-3 bg-linear-to-r from-cyan-50/60 to-transparent dark:from-cyan-950/25">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-100 dark:bg-cyan-900/50 text-cyan-600 dark:text-cyan-400">
             <ArrowLeftRight size={15} />
@@ -390,7 +445,7 @@ export function FieldMappingPopover({
                               [qi.id]: val,
                             }));
                           }}
-                          placeholder={`e.g. ${primaryEvent}.${targetField?.name} or count + 1`}
+                          placeholder={`e.g. "${primaryEvent}"."${targetField?.name}" or count + 1`}
                           className="flex-1 font-mono text-xs rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-1.5 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400"
                         />
                         {currentExpr && (
@@ -415,7 +470,7 @@ export function FieldMappingPopover({
                         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                           <span className="text-[10px] text-gray-400 dark:text-zinc-500">Presets:</span>
                           {matchingEventCard.fields.map((ef) => {
-                            const candidate = `${primaryEvent}.${ef.name}`;
+                            const candidate = `"${primaryEvent}"."${ef.name}"`;
                             const isMatch =
                               targetField &&
                               (fieldNameMatches(targetField.name, ef.name) ||
@@ -440,18 +495,39 @@ export function FieldMappingPopover({
                               </button>
                             );
                           })}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEventExpressions((prev) => ({
-                                ...prev,
-                                [qi.id]: `'ACTIVE'`,
-                              }))
-                            }
-                            className="rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-gray-600 dark:text-zinc-300 hover:border-cyan-400"
-                          >
-                            'ACTIVE'
-                          </button>
+                          {targetEnumNode ? (
+                            targetEnumNode.values.map((val) => {
+                              const enumCandidate = `"${targetEnumNode.name}"."${val}"`;
+                              return (
+                                <button
+                                  key={val}
+                                  type="button"
+                                  onClick={() =>
+                                    setEventExpressions((prev) => ({
+                                      ...prev,
+                                      [qi.id]: enumCandidate,
+                                    }))
+                                  }
+                                  className="rounded border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 px-1.5 py-0.5 font-mono text-[10px] text-cyan-700 dark:text-cyan-300 hover:border-cyan-400"
+                                >
+                                  {enumCandidate}
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEventExpressions((prev) => ({
+                                  ...prev,
+                                  [qi.id]: `'ACTIVE'`,
+                                }))
+                              }
+                              className="rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-gray-600 dark:text-zinc-300 hover:border-cyan-400"
+                            >
+                              'ACTIVE'
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -536,7 +612,7 @@ export function FieldMappingPopover({
                     handleApplySingle();
                   }
                 }}
-                placeholder="e.g. Command.Name, now(), uuid()"
+                placeholder='e.g. "Command"."Name", now(), uuid()'
                 className="w-full font-mono text-xs rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400"
               />
             </div>
@@ -565,10 +641,11 @@ export function FieldMappingPopover({
           <div className="rounded-lg bg-gray-50 dark:bg-zinc-800/60 p-2 text-[10px] text-gray-500 dark:text-zinc-400 space-y-1">
             <p className="font-semibold text-gray-700 dark:text-zinc-300">Supported Formats:</p>
             <ul className="list-disc list-inside space-y-0.5">
-              <li><code className="text-cyan-600 dark:text-cyan-400">Command.&lt;Field&gt;</code> — pass through command payload</li>
-              <li><code className="text-cyan-600 dark:text-cyan-400">Constraint.&lt;Output&gt;</code> — value calculated by constraint</li>
+              <li><code className="text-cyan-600 dark:text-cyan-400">&quot;Command&quot;.&quot;&lt;Field&gt;&quot;</code> — pass through command payload</li>
+              <li><code className="text-cyan-600 dark:text-cyan-400">&quot;Constraint&quot;.&quot;&lt;Output&gt;&quot;</code> — value calculated by constraint</li>
+              <li><code className="text-cyan-600 dark:text-cyan-400">&quot;User Status&quot;.&quot;PENDING&quot;</code> — enum value</li>
               <li><code className="text-cyan-600 dark:text-cyan-400">uuid()</code>, <code className="text-cyan-600 dark:text-cyan-400">now()</code> — system generators</li>
-              <li><code className="text-cyan-600 dark:text-cyan-400">func(Command.A)</code> — transformation expression</li>
+              <li><code className="text-cyan-600 dark:text-cyan-400">func(&quot;Command&quot;.&quot;A&quot;)</code> — transformation expression</li>
             </ul>
           </div>
 

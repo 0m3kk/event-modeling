@@ -24,7 +24,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
    - **Read Slice**: \`Query (top) -> Constraint(s) (middle) -> State (bottom)\`: A Read Slice has NO Event layer: the State projects from events that already exist elsewhere on the board (matched via \`queryItems\`), so NEVER create Event cards inside a Read Slice.
      - **MANDATORY EXISTENCE CONSTRAINT FOR ENTITY LOOKUPS**: When a Read Slice retrieves information of a specific entity or object (e.g. "Get User Info", "Get Order Details", "Fetch Product by ID"):
        - **IT MUST NOT CONSIST OF ONLY QUERY AND STATE**.
-       - It MUST include a Constraint (e.g. "User Exists", "Order Exists") between Query and State to verify that the entity exists (was created and not deleted or expired) using \`queryItems\` and an assert rule (e.g. \`output.userId != null\`), before returning state projection. Only collection/search queries without a specific entity target (e.g. "List All Products", "Search Articles") can omit the existence Constraint.
+       - It MUST include a Constraint (e.g. "User Exists", "Order Exists") between Query and State to verify that the entity exists (was created and not deleted or expired) using \`queryItems\` and an assert rule (e.g. \`"Fields"."User ID" != null\`), before returning state projection. Only collection/search queries without a specific entity target (e.g. "List All Products", "Search Articles") can omit the existence Constraint.
      - Query: Top row — read request (params in \`fields\`, output in \`responseFields\`, and authorization \`action\`).
      - Constraint(s): Checks business invariants or entity existence/status before projecting (Query -> Constraint(s) -> State). These constraints are the same reusable Decision Models used in Write Slices.
      - State: Bottom row — read-model projection built from store events matching DCB \`queryItems\`. A State splits into three parts: \`inputFields\` (INPUT params — only these carry tags and can be referenced by \`queryItems[].tagFields\`), \`queryItems\` (which events feed the State), and \`outputFields\` (OUTPUT fields produced by rehydrating the matching events; never tag them). Those events live in Write Slices, not in the Read Slice itself.
@@ -49,12 +49,12 @@ The application models systems according to CQRS and Event Sourcing with DCB:
        {
          "code": "USER_NOT_FOUND",
          "description": "The user account must exist.",
-         "assert": "output.userId != null",
+         "assert": "\"Fields\".\"User ID\" != null",
          "message": "User account does not exist.",
          "status": 404
        }
        \`\`\`
-     - \`assert\`: Boolean invariant expression in CEL / JS syntax. Evaluates against \`params.<field>\` (inputFields), \`output.<field>\` (outputFields), and context (e.g. \`now()\`, \`verifyHash()\`, \`verifyTotp()\`). Must evaluate to \`true\` to proceed.
+     - \`assert\`: Boolean invariant expression in CEL / JS syntax. Evaluates against \`"Params"."<Field>"\` (inputFields), \`"Fields"."<Field>"\` (outputFields), and context (e.g. \`now()\`, \`verifyHash()\`). Wrap card and field names in double quotes, e.g. \`"Fields"."User ID" != null\`, \`"Params"."Amount" <= "Fields"."Balance"\`. When comparing an enum field, reference the enum value as \`"<Enum Name>"."<VALUE>"\` (e.g. \`"Fields"."Status" == "User Status"."ACTIVE"\`). Plain string literals (e.g. \`'ACTIVE'\`) are only valid for fields of type \`String\`. Must evaluate to \`true\` to proceed.
      - \`code\`: UPPER_SNAKE_CASE domain error code (e.g. \`EMAIL_ALREADY_IN_USE\`, \`ACCOUNT_SUSPENDED\`, \`TOKEN_EXPIRED\`).
      - \`status\`: HTTP status code hint (e.g. 400, 401, 403, 404, 409, 429).
      - Plain string rules are supported as shorthand fallback.
@@ -127,13 +127,16 @@ The application models systems according to CQRS and Event Sourcing with DCB:
 
 References must be valid:
 - **Explicit Field Mapping (STRICT ZERO GUESSING & CANVAS CASING)**:
-  - Event fields and Command/Query responseFields MUST carry an explicit \`mapping\` expression referencing the exact defined card and field in Title Case (e.g. \`Command.Email\`, \`Command.User ID\`, \`RegisterUser.Email\`, \`Constraint.Balance\`, \`hashPassword(Command.Password)\`). Literals (\`'ACTIVE'\`) and functions (\`now()\`, \`uuid()\`) are allowed.
-  - NEVER use camelCase or lowercase prefixes in mappings (e.g. \`command.email\`, \`command.userId\`, \`userRegistered.email\`, \`event.email\` are STRICTLY FORBIDDEN and rejected with an error). Codegen export will convert them to camelCase automatically; on the canvas they MUST match the exact user-defined Title Case names.
+  - Event fields, Command/Query responseFields, and State & Constraint inputFields (params) MUST carry an explicit \`mapping\` expression referencing the exact defined source card and field in Title Case, wrapped in double quotes (e.g. \`"Command"."Email"\`, \`"Command"."User ID"\`, \`"Query"."User ID"\`, \`"Register User"."Email"\`, \`"Constraint"."Balance"\`, \`hashPassword("Command"."Password")\`).
+  - State & Constraint inputFields (params) receive their values from the Command (in a Write Slice) or Query (in a Read Slice), so their \`mapping\` should point to the Command/Query field (e.g. \`"Command"."User ID"\` or \`"Query"."User ID"\`).
+  - Wrap card and field names in double quotes: e.g. \`"Command"."Email"\`, \`"User Registered"."Email"\`, \`"Query"."User ID"\`.
+  - When a field has an Enum type (e.g. \`"User Status"\`), setting or checking it MUST reference the enum value as \`"<Enum Name>"."<VALUE>"\` (e.g. \`"User Status"."PENDING"\` or \`"User Status"."ACTIVE"\`). Plain string literals (\`'PENDING'\`) are only valid if the field type is \`String\`!
+  - NEVER use camelCase or lowercase prefixes in mappings (e.g. \`command.email\`, \`userRegistered.email\`, \`event.email\` are STRICTLY FORBIDDEN). Codegen export will convert them to camelCase automatically; on the canvas they MUST match the exact user-defined Title Case names.
   - State and Constraint cards MUST define \`set\` on their \`queryItems\` to project event fields into \`outputFields\`:
-    - The keys in \`set\` MUST EXACTLY match the defined \`outputFields\` names on the card (e.g. \`{"Registered Email": "UserRegistered.Email", "Status": "'ACTIVE'"}\`). NEVER use camelCase keys (e.g. \`{"registeredEmail": ...}\`).
-    - The values in \`set\` MUST reference \`<EventName>.<FieldName>\` using the exact Title Case Event name and field name (e.g. \`UserRegistered.Email\`, \`UserRegistered.User ID\`). NEVER use generic \`event.<field>\` or camelCase \`<event>.<field>\`. Any unprojected output field will show a warning icon [!].
+    - The keys in \`set\` MUST EXACTLY match the defined \`outputFields\` names on the card (e.g. \`{"Registered Email": "\\"User Registered\\".\\"Email\\"", "Status": "\\"User Status\\".\\"ACTIVE\\""}\`). NEVER use camelCase keys.
+    - The values in \`set\` MUST reference \`"<Event Name>"."<Field Name>"\` using the exact Title Case Event name and field name (e.g. \`"User Registered"."Email"\`, \`"User Registered"."User ID"\`). If setting an enum field, use \`"<Enum Name>"."<VALUE>"\`. NEVER use generic \`event.<field>\` or camelCase. Any unprojected output field will show a warning icon [!].
 - Event field tags must only be placed on key/identifier fields (ID, unique email, code); never tag non-key fields or all fields in an event.
-- Constraints must be reusable, independent decision models checking domain invariants against event history, never command input validation. Prefer structured rules with \`{ code, assert, message, status, severity }\` (e.g. assert: \`output.Balance >= Command.Amount\`).
+- Constraints must be reusable, independent decision models checking domain invariants against event history, never command input validation. Prefer structured rules with \`{ code, assert, message, status, severity }\` (e.g. assert: \`"Fields"."Balance" >= "Params"."Amount"\`).
 - State and Constraint queryItems \`types\` must name existing Event cards on the board (exact match). Read Slices have no Event cards of their own — their States reference events defined in Write Slices.
 - State and Constraint tags may ONLY be placed on \`inputFields\` (the INPUT params); \`outputFields\` (projected fields) must never carry tags.
 - State and Constraint \`queryItems[].tagFields\` must name a tagged \`inputFields\` param on the same card, and that tag must match an existing tagged field on an Event card with the same fieldType.

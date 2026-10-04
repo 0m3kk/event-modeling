@@ -434,6 +434,7 @@ export class StormCardRenderer {
         const isEventField = kind === "event";
         const isResponseField = section === "response" && (kind === "command" || kind === "query");
         const isOutputField = section === "response" && (kind === "state" || kind === "constraint");
+        const isParamField = (kind === "state" || kind === "constraint") && section === "params";
         const hasDirectMapping = Boolean(field.mapping?.trim());
 
         let showMappingBadge = false;
@@ -442,19 +443,19 @@ export class StormCardRenderer {
         let mappingBadgeFill = 0x0891b2;   // cyan-600
         let mappingTooltipText = field.mapping?.trim() || "";
 
-        if (isEventField || isResponseField) {
+        if (isEventField || isResponseField || isParamField) {
           showMappingBadge = true;
           if (hasDirectMapping) {
             mappingBadgeGlyph = "⇄";
             mappingBadgeStroke = 0x06b6d4;
             mappingBadgeFill = 0x0891b2;
-            mappingTooltipText = `Mapping: ${field.mapping}`;
+            mappingTooltipText = `Mapping:\n${field.mapping}`;
           } else {
             // Missing mapping -> warning icon !
             mappingBadgeGlyph = "!";
             mappingBadgeStroke = 0xf59e0b; // amber-500
             mappingBadgeFill = 0xd97706;   // amber-600
-            mappingTooltipText = "Warning: Missing explicit mapping for codegen";
+            mappingTooltipText = "Warning:\nMissing explicit mapping for codegen";
           }
         } else if (isOutputField) {
           // Check if any queryItem.set references this field (by name, camelCase, or id)
@@ -477,9 +478,9 @@ export class StormCardRenderer {
             mappingBadgeStroke = 0x06b6d4; // cyan-500
             mappingBadgeFill = 0x0891b2;   // cyan-600
             if (matchedMappings.length === 1) {
-              mappingTooltipText = `Set in [${matchedMappings[0].eventLabel}]: ${matchedMappings[0].expr}`;
+              mappingTooltipText = `Set in [${matchedMappings[0].eventLabel}]:\n${matchedMappings[0].expr}`;
             } else {
-              mappingTooltipText = `Set in ${matchedMappings.length} events: ${matchedMappings.map((m) => `[${m.eventLabel}]: ${m.expr}`).join("; ")}`;
+              mappingTooltipText = `Set in ${matchedMappings.length} events:\n${matchedMappings.map((m) => `[${m.eventLabel}]: ${m.expr}`).join("\n")}`;
             }
           } else {
             mappingBadgeGlyph = "!";

@@ -8,8 +8,73 @@ import {
 } from "./naming";
 import { matchesPermission } from "./stormAuth";
 
-const MEMBER_ACCESS_REGEX =
-  /\b([a-zA-Z_0-9]+)\.([a-zA-Z_0-9]+(?:\s+[a-zA-Z_0-9]+)*)\b/g;
+export interface ParsedMemberAccess {
+  raw: string;
+  prefix: string;
+  accessedField: string;
+  isQuoted: boolean;
+}
+
+export function parseMemberAccesses(expr: string): ParsedMemberAccess[] {
+  const results: ParsedMemberAccess[] = [];
+  const quotedRegex = /"([^"]+)"\."([^"]+)"/g;
+  let match: RegExpExecArray | null;
+  const quotedRanges: [number, number][] = [];
+  while ((match = quotedRegex.exec(expr)) !== null) {
+    quotedRanges.push([match.index, match.index + match[0].length]);
+    results.push({
+      raw: match[0],
+      prefix: match[1],
+      accessedField: match[2],
+      isQuoted: true,
+    });
+  }
+  const unquotedRegex = /\b([a-zA-Z_0-9]+)\.([a-zA-Z_0-9]+(?:\s+[a-zA-Z_0-9]+)*)\b/g;
+  while ((match = unquotedRegex.exec(expr)) !== null) {
+    const idx = match.index;
+    const end = idx + match[0].length;
+    const overlap = quotedRanges.some(([qStart, qEnd]) => idx >= qStart && end <= qEnd);
+    if (!overlap) {
+      results.push({
+        raw: match[0],
+        prefix: match[1],
+        accessedField: match[2],
+        isQuoted: false,
+      });
+    }
+  }
+  return results;
+}
+
+export interface EnumModelInfo {
+  name: string;
+  values: string[];
+}
+
+export function collectEnumModels(input: StormValidationInput): Map<string, EnumModelInfo> {
+  const map = new Map<string, EnumModelInfo>();
+  for (const obj of input.existing) {
+    if (obj.type === "model" && obj.modelData?.kind === "enum") {
+      map.set(nameKey(obj.modelData.name), {
+        name: obj.modelData.name,
+        values: (obj.modelData.values ?? []).map((v) => v.name.trim()),
+      });
+    }
+  }
+  return map;
+}
+
+export function isPlainStringLiteral(expr: string): boolean {
+  const trimmed = expr.trim();
+  return (
+    (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"') && !trimmed.slice(1, -1).includes('"') && trimmed.length >= 2)
+  );
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 const TAG_KINDS: readonly StormKind[] = ["event", "state", "constraint", "bdd"];
 
@@ -248,6 +313,46 @@ function findCandidateSourcesForEvent(
   return [];
 }
 
+function findCandidateSourcesForDecisionOrReadModel(
+  card: StormValidationCard,
+  input: StormValidationInput,
+): (StormValidationCard | CanvasObject)[] {
+  const batchCommands = input.cards.filter(
+    (c) => c.kind === "command" || c.kind === "query",
+  );
+  if (batchCommands.length === 1) {
+    return batchCommands;
+  }
+  if (batchCommands.length > 1) {
+    const cWords = extractDomainWords(card.name);
+    const matched = batchCommands.filter((cmd) => {
+      const cmdWords = extractDomainWords(cmd.name);
+      return cWords.some((w) => cmdWords.includes(w));
+    });
+    if (matched.length > 0) return matched;
+    return batchCommands;
+  }
+  const existingCommands = input.existing.filter(
+    (o) =>
+      o.type === "storm" &&
+      (o.stormData?.kind === "command" || o.stormData?.kind === "query"),
+  );
+  if (existingCommands.length === 1) {
+    return existingCommands;
+  }
+  if (existingCommands.length > 1) {
+    const cWords = extractDomainWords(card.name);
+    const matched = existingCommands.filter((obj) => {
+      const name = obj.stormData?.name ?? "";
+      const objWords = extractDomainWords(name);
+      return cWords.some((w) => objWords.includes(w));
+    });
+    if (matched.length > 0) return matched;
+    return existingCommands;
+  }
+  return [];
+}
+
 function findEventCard(
   nameOrType: string,
   input: StormValidationInput,
@@ -286,10 +391,10 @@ export interface StormValidationCard {
   outputFields?: StormField[];
   responseFields?: StormField[];
   writtenFields?: StormField[];
-  rawFields?: { name: string; mapping?: string; tag?: string }[];
-  rawInputFields?: { name: string; mapping?: string; tag?: string }[];
-  rawOutputFields?: { name: string; mapping?: string; tag?: string }[];
-  rawResponseFields?: { name: string; mapping?: string; tag?: string }[];
+  rawFields?: { name: string; mapping?: string; tag?: string; fieldType?: string }[];
+  rawInputFields?: { name: string; mapping?: string; tag?: string; fieldType?: string }[];
+  rawOutputFields?: { name: string; mapping?: string; tag?: string; fieldType?: string }[];
+  rawResponseFields?: { name: string; mapping?: string; tag?: string; fieldType?: string }[];
   queryItems?: {
     types?: string[];
     tagFields?: string[];
@@ -384,6 +489,7 @@ export function validateStormWrite(input: StormValidationInput): string[] {
   const eventNames = collectEventNames(input);
   const eventTags = collectEventTagsByType(input);
   const canvasActions = collectCanvasActions(input);
+  const enumModels = collectEnumModels(input);
   const issues: string[] = [];
 
   for (const card of input.cards) {
@@ -426,10 +532,25 @@ export function validateStormWrite(input: StormValidationInput): string[] {
         );
       }
 
-      const dotMatches = [...mapping.matchAll(MEMBER_ACCESS_REGEX)];
-      for (const match of dotMatches) {
-        const prefix = match[1];
-        const accessedField = match[2];
+      // If field type is an enum, disallow plain string literal or bare identifier
+      if (f.fieldType) {
+        const enumInfo = enumModels.get(nameKey(f.fieldType));
+        if (enumInfo) {
+          if (
+            isPlainStringLiteral(mapping) ||
+            (/^[A-Z][A-Z0-9_]*$/.test(mapping) && !mapping.includes("."))
+          ) {
+            issues.push(
+              `${label} field "${f.name}" has enum type "${enumInfo.name}". Use enum reference "${enumInfo.name}"."<VALUE>" (e.g. "${enumInfo.name}"."${enumInfo.values[0] ?? "VALUE"}") instead of plain string literal ${mapping}.`,
+            );
+          }
+        }
+      }
+
+      const accesses = parseMemberAccesses(mapping);
+      for (const match of accesses) {
+        const prefix = match.prefix;
+        const accessedField = match.accessedField;
 
         if (isCamelOrLower(prefix)) {
           issues.push(
@@ -441,7 +562,20 @@ export function validateStormWrite(input: StormValidationInput): string[] {
           );
         }
 
-        if (card.kind === "event") {
+        if (!match.isQuoted && (prefix.includes(" ") || accessedField.includes(" "))) {
+          issues.push(
+            `${label} field "${f.name}" mapping "${mapping}" uses unquoted name with spaces "${match.raw}". Wrap names in double quotes (e.g. "${prefix}"."${accessedField}").`,
+          );
+        }
+
+        const enumInfo = enumModels.get(nameKey(prefix));
+        if (enumInfo) {
+          if (!enumInfo.values.some((v) => v.toLowerCase() === accessedField.toLowerCase())) {
+            issues.push(
+              `${label} field "${f.name}" mapping "${mapping}" references unknown enum value "${accessedField}" in enum "${enumInfo.name}". Valid values: [${enumInfo.values.map((v) => `"${v}"`).join(", ")}].`,
+            );
+          }
+        } else if (card.kind === "event") {
           const candidateSources = findCandidateSourcesForEvent(card, input);
           if (candidateSources.length > 0) {
             if (
@@ -455,6 +589,41 @@ export function validateStormWrite(input: StormValidationInput): string[] {
                   (s) =>
                     (prefix.toLowerCase() === "command" &&
                       getCardOrObjectKind(s) === "command") ||
+                    nameKey(getCardOrObjectName(s)) === nameKey(prefix),
+                ) || candidateSources[0];
+              const availableFields = getCardOrObjectFields(src);
+              const matchedField = availableFields.find((srcF) =>
+                fieldNameMatches(srcF.name, accessedField),
+              );
+              if (!matchedField) {
+                issues.push(
+                  `${label} field "${f.name}" mapping "${mapping}" references field "${accessedField}" which does not exist on source card "${getCardOrObjectName(src)}". Available fields: [${availableFields.map((srcF) => `"${srcF.name}"`).join(", ")}].`,
+                );
+              } else if (matchedField.name.trim() !== accessedField.trim()) {
+                issues.push(
+                  `${label} field "${f.name}" mapping "${mapping}" references field "${accessedField}" with incorrect casing. Use exact defined name "${matchedField.name}".`,
+                );
+              }
+            }
+          }
+        } else if (card.kind === "constraint" || card.kind === "state") {
+          const candidateSources = findCandidateSourcesForDecisionOrReadModel(card, input);
+          if (candidateSources.length > 0) {
+            const isGenericCommandOrQuery =
+              prefix.toLowerCase() === "command" || prefix.toLowerCase() === "query";
+            if (
+              isGenericCommandOrQuery ||
+              candidateSources.some(
+                (s) => nameKey(getCardOrObjectName(s)) === nameKey(prefix),
+              )
+            ) {
+              const src =
+                candidateSources.find(
+                  (s) =>
+                    (prefix.toLowerCase() === "command" &&
+                      getCardOrObjectKind(s) === "command") ||
+                    (prefix.toLowerCase() === "query" &&
+                      getCardOrObjectKind(s) === "query") ||
                     nameKey(getCardOrObjectName(s)) === nameKey(prefix),
                 ) || candidateSources[0];
               const availableFields = getCardOrObjectFields(src);
@@ -552,6 +721,15 @@ export function validateStormWrite(input: StormValidationInput): string[] {
     if (card.kind === "constraint" && card.constraints) {
       const COMMAND_VALIDATION_REGEX =
         /\b(cannot be (empty|blank|null)|must not be (empty|blank|null)|is required|valid email format|characters long)\b/i;
+      const constraintOutputFields = [
+        ...(card.outputFields ?? []),
+        ...(card.rawOutputFields?.map((f) => ({ name: f.name, fieldType: f.fieldType })) ?? []),
+      ];
+      const constraintInputFields = [
+        ...(card.inputFields ?? []),
+        ...(card.rawInputFields?.map((f) => ({ name: f.name, fieldType: f.fieldType })) ?? []),
+      ];
+
       for (const rule of card.constraints) {
         const text = typeof rule === "string" ? rule : rule.text;
         if (text && COMMAND_VALIDATION_REGEX.test(text)) {
@@ -559,14 +737,91 @@ export function validateStormWrite(input: StormValidationInput): string[] {
             `${label} rule "${text}" appears to perform command input validation. Constraints are reusable Decision Models that check business logic invariants against historical events, not command input validation.`,
           );
         }
+
+        if (typeof rule !== "string" && rule.assert) {
+          const assertExpr = rule.assert.trim();
+          if (/\boutput\./i.test(assertExpr) || /\boutput\s*\[/i.test(assertExpr)) {
+            issues.push(
+              `${label} rule assert "${assertExpr}" uses "output.". Use "Fields." with double quotes (e.g. "Fields"."${constraintOutputFields[0]?.name ?? "Field"}").`,
+            );
+          }
+          if (/\bparams\./i.test(assertExpr) || /\bparams\s*\[/i.test(assertExpr)) {
+            issues.push(
+              `${label} rule assert "${assertExpr}" uses "params.". Use "Params." with double quotes (e.g. "Params"."${constraintInputFields[0]?.name ?? "Field"}").`,
+            );
+          }
+
+          const accesses = parseMemberAccesses(assertExpr);
+          for (const acc of accesses) {
+            const pKey = nameKey(acc.prefix);
+            if (pKey === "fields") {
+              const matched = constraintOutputFields.find((f) =>
+                fieldNameMatches(f.name, acc.accessedField),
+              );
+              if (!matched) {
+                issues.push(
+                  `${label} rule assert "${assertExpr}" references "Fields"."${acc.accessedField}" which does not exist in output fields. Defined: [${constraintOutputFields.map((f) => `"${f.name}"`).join(", ")}].`,
+                );
+              } else if (matched.name.trim() !== acc.accessedField.trim()) {
+                issues.push(
+                  `${label} rule assert "${assertExpr}" references "Fields"."${acc.accessedField}" with incorrect casing. Use exact defined name "${matched.name}".`,
+                );
+              } else if (matched.fieldType) {
+                const enumInfo = enumModels.get(nameKey(matched.fieldType));
+                if (enumInfo) {
+                  const plainEnumCompareRegex = new RegExp(
+                    `(?:["']?Fields["']?\\.["']?${escapeRegex(matched.name)}["']?\\s*(?:==|!=)\\s*['"]([^'"]+)['"])|(?:['"]([^'"]+)['"]\\s*(?:==|!=)\\s*["']?Fields["']?\\.["']?${escapeRegex(matched.name)}["']?)`,
+                  );
+                  const m = assertExpr.match(plainEnumCompareRegex);
+                  if (m) {
+                    const rawVal = m[1] || m[2];
+                    issues.push(
+                      `${label} rule assert "${assertExpr}" compares enum field "${matched.name}" with plain string '${rawVal}'. Use enum reference "${enumInfo.name}"."<VALUE>" (e.g. "${enumInfo.name}"."${enumInfo.values[0] ?? rawVal}").`,
+                    );
+                  }
+                }
+              }
+            } else if (pKey === "params") {
+              const matched = constraintInputFields.find((f) =>
+                fieldNameMatches(f.name, acc.accessedField),
+              );
+              if (!matched) {
+                issues.push(
+                  `${label} rule assert "${assertExpr}" references "Params"."${acc.accessedField}" which does not exist in input fields. Defined: [${constraintInputFields.map((f) => `"${f.name}"`).join(", ")}].`,
+                );
+              } else if (matched.name.trim() !== acc.accessedField.trim()) {
+                issues.push(
+                  `${label} rule assert "${assertExpr}" references "Params"."${acc.accessedField}" with incorrect casing. Use exact defined name "${matched.name}".`,
+                );
+              }
+            } else if (enumModels.has(pKey)) {
+              const enumInfo = enumModels.get(pKey)!;
+              if (
+                !enumInfo.values.some(
+                  (v) => v.toLowerCase() === acc.accessedField.toLowerCase(),
+                )
+              ) {
+                issues.push(
+                  `${label} rule assert "${assertExpr}" references unknown enum value "${acc.accessedField}" in enum "${enumInfo.name}". Valid values: [${enumInfo.values.map((v) => `"${v}"`).join(", ")}].`,
+                );
+              }
+            }
+
+            if (!acc.isQuoted && (acc.prefix.includes(" ") || acc.accessedField.includes(" "))) {
+              issues.push(
+                `${label} rule assert "${assertExpr}" uses unquoted name with spaces "${acc.raw}". Wrap names in double quotes (e.g. "${acc.prefix}"."${acc.accessedField}").`,
+              );
+            }
+          }
+        }
       }
     }
 
     for (const [index, item] of (card.queryItems ?? []).entries()) {
       if (item.set && Object.keys(item.set).length > 0) {
-        const outputFields: { name: string; id?: string }[] = [
+        const outputFields: { name: string; id?: string; fieldType?: string }[] = [
           ...(card.outputFields ?? []),
-          ...(card.rawOutputFields?.map((f) => ({ name: f.name })) ?? []),
+          ...(card.rawOutputFields?.map((f) => ({ name: f.name, fieldType: f.fieldType })) ?? []),
         ];
         for (const [key, expr] of Object.entries(item.set)) {
           if (isCamelOrLower(key)) {
@@ -583,6 +838,23 @@ export function validateStormWrite(input: StormValidationInput): string[] {
             );
           }
 
+          const matchedOutputField = outputFields.find(
+            (f) => fieldNameMatches(f.name, key) || fieldNameMatches(f.id ?? "", key),
+          );
+          if (matchedOutputField?.fieldType) {
+            const enumInfo = enumModels.get(nameKey(matchedOutputField.fieldType));
+            if (enumInfo) {
+              if (
+                isPlainStringLiteral(expr) ||
+                (/^[A-Z][A-Z0-9_]*$/.test(expr.trim()) && !expr.includes("."))
+              ) {
+                issues.push(
+                  `${label} queryItems[${index}] set expression "${expr}" for field "${key}" has enum type "${enumInfo.name}". Use enum reference "${enumInfo.name}"."<VALUE>" (e.g. "${enumInfo.name}"."${enumInfo.values[0] ?? "VALUE"}") instead of plain string literal ${expr}.`,
+                );
+              }
+            }
+          }
+
           if (/\bevent\./i.test(expr)) {
             const sampleEv = item.types?.[0] ? toDisplayName(item.types[0]) : "Event";
             issues.push(
@@ -590,10 +862,10 @@ export function validateStormWrite(input: StormValidationInput): string[] {
             );
           }
 
-          const exprMatches = [...expr.matchAll(MEMBER_ACCESS_REGEX)];
+          const exprMatches = parseMemberAccesses(expr);
           for (const match of exprMatches) {
-            const prefix = match[1];
-            const accessedField = match[2];
+            const prefix = match.prefix;
+            const accessedField = match.accessedField;
 
             if (isCamelOrLower(prefix)) {
               issues.push(
@@ -605,20 +877,35 @@ export function validateStormWrite(input: StormValidationInput): string[] {
               );
             }
 
-            const evCard = findEventCard(prefix, input);
-            if (evCard) {
-              const evFields = getCardOrObjectFields(evCard);
-              const matchedEvField = evFields.find((ef) =>
-                fieldNameMatches(ef.name, accessedField),
+            if (!match.isQuoted && (prefix.includes(" ") || accessedField.includes(" "))) {
+              issues.push(
+                `${label} queryItems[${index}] set expression "${expr}" uses unquoted name with spaces "${match.raw}". Wrap names in double quotes (e.g. "${prefix}"."${accessedField}").`,
               );
-              if (!matchedEvField) {
+            }
+
+            const enumInfo = enumModels.get(nameKey(prefix));
+            if (enumInfo) {
+              if (!enumInfo.values.some((v) => v.toLowerCase() === accessedField.toLowerCase())) {
                 issues.push(
-                  `${label} queryItems[${index}] set expression "${expr}" references field "${accessedField}" which does not exist on Event "${getCardOrObjectName(evCard)}". Available fields: [${evFields.map((ef) => `"${ef.name}"`).join(", ")}].`,
+                  `${label} queryItems[${index}] set expression "${expr}" references unknown enum value "${accessedField}" in enum "${enumInfo.name}". Valid values: [${enumInfo.values.map((v) => `"${v}"`).join(", ")}].`,
                 );
-              } else if (matchedEvField.name.trim() !== accessedField.trim()) {
-                issues.push(
-                  `${label} queryItems[${index}] set expression "${expr}" references field "${accessedField}" with incorrect casing. Use exact defined name "${matchedEvField.name}" on Event "${getCardOrObjectName(evCard)}".`,
+              }
+            } else {
+              const evCard = findEventCard(prefix, input);
+              if (evCard) {
+                const evFields = getCardOrObjectFields(evCard);
+                const matchedEvField = evFields.find((ef) =>
+                  fieldNameMatches(ef.name, accessedField),
                 );
+                if (!matchedEvField) {
+                  issues.push(
+                    `${label} queryItems[${index}] set expression "${expr}" references field "${accessedField}" which does not exist on Event "${getCardOrObjectName(evCard)}". Available fields: [${evFields.map((ef) => `"${ef.name}"`).join(", ")}].`,
+                  );
+                } else if (matchedEvField.name.trim() !== accessedField.trim()) {
+                  issues.push(
+                    `${label} queryItems[${index}] set expression "${expr}" references field "${accessedField}" with incorrect casing. Use exact defined name "${matchedEvField.name}" on Event "${getCardOrObjectName(evCard)}".`,
+                  );
+                }
               }
             }
           }

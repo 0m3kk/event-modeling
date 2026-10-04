@@ -596,7 +596,7 @@ describe("describeStormOptions", () => {
           card("event", "Order Placed", [
             {
               ...field("Order ID", "uuid", "Order"),
-              mapping: "Command.Order ID",
+              mapping: '"Command"."Order ID"',
             },
           ]),
           {
@@ -610,7 +610,7 @@ describe("describeStormOptions", () => {
                 types: ["Order Placed"],
                 tagFields: ["Order ID"],
                 set: {
-                  "Order ID": "OrderPlaced.Order ID",
+                  "Order ID": '"Order Placed"."Order ID"',
                 },
               },
             ],
@@ -618,6 +618,163 @@ describe("describeStormOptions", () => {
         ],
       };
       expect(validateStormWrite(input)).toEqual([]);
+    });
+
+    it("rejects deprecated output. and params. in constraint assert, enforces Fields. and Params. with quotes", () => {
+      const input: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("constraint", "User Must Exist", [], {
+            inputFields: [field("User ID", "uuid", "User")],
+            outputFields: [field("User ID", "uuid")],
+            constraints: [
+              {
+                code: "USER_NOT_FOUND",
+                assert: "output.userId != null",
+              },
+            ],
+          }),
+        ],
+      };
+      const issues = validateStormWrite(input);
+      expect(issues.some((i) => i.includes('uses "output.". Use "Fields." with double quotes'))).toBe(true);
+
+      // Now with valid Fields. and Params. syntax
+      const validInput: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("constraint", "User Must Exist", [], {
+            inputFields: [field("User ID", "uuid")],
+            outputFields: [field("User ID", "uuid")],
+            constraints: [
+              {
+                code: "USER_NOT_FOUND",
+                assert: '"Fields"."User ID" != null && "Params"."User ID" != null',
+              },
+            ],
+          }),
+        ],
+      };
+      expect(validateStormWrite(validInput)).toEqual([]);
+    });
+
+    it("enforces Enum model prefix when setting or comparing enum fields, but allows plain strings for String fields", () => {
+      const userStatusEnum: CanvasObject = {
+        id: "enum-user-status",
+        type: "model",
+        x: 0,
+        y: 0,
+        width: 150,
+        height: 100,
+        modelData: {
+          name: "User Status",
+          kind: "enum",
+          values: [
+            { id: "v1", name: "PENDING" },
+            { id: "v2", name: "ACTIVE" },
+            { id: "v3", name: "SUSPENDED" },
+          ],
+        },
+      };
+
+      // 1. Rejects plain string literal 'PENDING' when field type is enum "User Status"
+      const invalidEnumMappingInput: StormValidationInput = {
+        existing: [userStatusEnum],
+        cards: [
+          card("event", "User Registered", [
+            {
+              ...field("Status", "User Status"),
+              mapping: "'PENDING'",
+            },
+          ]),
+        ],
+      };
+      const issues1 = validateStormWrite(invalidEnumMappingInput);
+      expect(
+        issues1.some((i) =>
+          i.includes('has enum type "User Status". Use enum reference "User Status"."<VALUE>"'),
+        ),
+      ).toBe(true);
+
+      // 2. Rejects plain string in queryItems set when target outputField is enum "User Status"
+      const invalidEnumSetInput: StormValidationInput = {
+        existing: [userStatusEnum, stormObject("event", "User Registered", [field("User ID", "uuid", "User")])],
+        cards: [
+          card("state", "User State", [], {
+            inputFields: [field("User ID", "uuid", "User")],
+            outputFields: [field("Status", "User Status")],
+            queryItems: [
+              {
+                types: ["User Registered"],
+                tagFields: ["User ID"],
+                set: {
+                  Status: "'PENDING'",
+                },
+              },
+            ],
+          }),
+        ],
+      };
+      const issues2 = validateStormWrite(invalidEnumSetInput);
+      expect(
+        issues2.some((i) =>
+          i.includes('has enum type "User Status". Use enum reference "User Status"."<VALUE>"'),
+        ),
+      ).toBe(true);
+
+      // 3. Allows plain string 'PENDING' when field type is "String"
+      const validStringInput: StormValidationInput = {
+        existing: [userStatusEnum, stormObject("event", "User Registered", [field("User ID", "uuid", "User")])],
+        cards: [
+          card("event", "User Registered", [
+            {
+              ...field("Status", "String"),
+              mapping: "'PENDING'",
+            },
+          ]),
+          card("state", "User State", [], {
+            inputFields: [field("User ID", "uuid", "User")],
+            outputFields: [field("Status", "String")],
+            queryItems: [
+              {
+                types: ["User Registered"],
+                tagFields: ["User ID"],
+                set: {
+                  Status: "'PENDING'",
+                },
+              },
+            ],
+          }),
+        ],
+      };
+      expect(validateStormWrite(validStringInput)).toEqual([]);
+
+      // 4. Passes when enum reference "User Status"."PENDING" is used
+      const validEnumInput: StormValidationInput = {
+        existing: [userStatusEnum, stormObject("event", "User Registered", [field("User ID", "uuid", "User")])],
+        cards: [
+          card("event", "User Registered", [
+            {
+              ...field("Status", "User Status"),
+              mapping: '"User Status"."PENDING"',
+            },
+          ]),
+          card("state", "User State", [], {
+            inputFields: [field("User ID", "uuid", "User")],
+            outputFields: [field("Status", "User Status")],
+            queryItems: [
+              {
+                types: ["User Registered"],
+                tagFields: ["User ID"],
+                set: {
+                  Status: '"User Status"."PENDING"',
+                },
+              },
+            ],
+          }),
+        ],
+      };
+      expect(validateStormWrite(validEnumInput)).toEqual([]);
     });
   });
 });

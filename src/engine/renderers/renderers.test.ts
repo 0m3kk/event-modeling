@@ -1058,12 +1058,12 @@ describe("Pixi Card Renderers", () => {
 
     // Single event mapped field: Email
     const emailZone = mappingZones.find((z) => z.fieldId === "of-email");
-    expect(emailZone?.currentText).toBe("Set in [UserRegistered]: UserRegistered.email");
+    expect(emailZone?.currentText).toBe("Set in [UserRegistered]:\nUserRegistered.email");
 
     // Multi-event mapped field: Status
     const statusZone = mappingZones.find((z) => z.fieldId === "of-status");
     expect(statusZone?.currentText).toBe(
-      "Set in 2 events: [UserRegistered]: 'PENDING'; [UserActivated]: 'ACTIVE'",
+      "Set in 2 events:\n[UserRegistered]: 'PENDING'\n[UserActivated]: 'ACTIVE'",
     );
 
     // Unmapped field

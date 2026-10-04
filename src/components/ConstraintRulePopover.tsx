@@ -83,19 +83,6 @@ export function ConstraintRulePopover({
       .filter(Boolean);
   }, [card.stormData?.outputFields]);
 
-  // Camel-case helper for expressions
-  const toVarName = (str: string) => {
-    const clean = str.replace(/[^a-zA-Z0-9 ]/g, "").trim();
-    if (!clean) return "field";
-    const parts = clean.split(/\s+/);
-    return (
-      parts[0].toLowerCase() +
-      parts
-        .slice(1)
-        .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
-        .join("")
-    );
-  };
 
   const insertToken = (token: string) => {
     setAssertExpr((prev) => {
@@ -128,34 +115,34 @@ export function ConstraintRulePopover({
       label: "Must Exist",
       code: "ENTITY_NOT_FOUND",
       assert: outputFieldNames[0]
-        ? `output.${toVarName(outputFieldNames[0])} != null`
-        : "output.id != null",
+        ? `"Fields"."${outputFieldNames[0]}" != null`
+        : '"Fields"."ID" != null',
       status: 404,
     },
     {
       label: "Unique / Available",
       code: "ALREADY_EXISTS",
       assert: outputFieldNames[0]
-        ? `output.${toVarName(outputFieldNames[0])} == null`
-        : "output.id == null",
+        ? `"Fields"."${outputFieldNames[0]}" == null`
+        : '"Fields"."ID" == null',
       status: 409,
     },
     {
       label: "Not Deleted",
       code: "ENTITY_DELETED",
-      assert: "!output.isDeleted",
+      assert: '!"Fields"."Is Deleted"',
       status: 410,
     },
     {
       label: "Status Active",
       code: "INVALID_STATUS",
-      assert: "output.status == 'Active'",
+      assert: '"Fields"."Status" == "User Status"."ACTIVE"',
       status: 400,
     },
     {
       label: "Not Expired",
       code: "TOKEN_EXPIRED",
-      assert: "now() < output.expiresAt",
+      assert: 'now() < "Fields"."Expires At"',
       status: 400,
     },
   ];
@@ -221,7 +208,7 @@ export function ConstraintRulePopover({
             type="text"
             value={assertExpr}
             onChange={(e) => setAssertExpr(e.target.value)}
-            placeholder="e.g. output.userId != null && !output.isDeleted"
+            placeholder={`e.g. "Fields"."User ID" != null && !"Fields"."Is Deleted"`}
             className="w-full rounded-md border border-teal-300/80 bg-teal-50/30 px-2.5 py-1.5 font-mono text-xs text-teal-950 placeholder:text-teal-800/40 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-100 dark:placeholder:text-teal-300/40 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
           />
         </div>
@@ -237,22 +224,22 @@ export function ConstraintRulePopover({
                 <button
                   key={name}
                   type="button"
-                  onClick={() => insertToken(`params.${toVarName(name)}`)}
+                  onClick={() => insertToken(`"Params"."${name}"`)}
                   className="rounded bg-sky-50 px-1.5 py-0.5 font-mono text-[10px] text-sky-700 hover:bg-sky-100 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900/60 transition-colors cursor-pointer"
-                  title={`Insert params.${toVarName(name)}`}
+                  title={`Insert "Params"."${name}"`}
                 >
-                  params.{toVarName(name)}
+                  "Params"."{name}"
                 </button>
               ))}
               {outputFieldNames.map((name) => (
                 <button
                   key={name}
                   type="button"
-                  onClick={() => insertToken(`output.${toVarName(name)}`)}
+                  onClick={() => insertToken(`"Fields"."${name}"`)}
                   className="rounded bg-purple-50 px-1.5 py-0.5 font-mono text-[10px] text-purple-700 hover:bg-purple-100 dark:bg-purple-950/60 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-colors cursor-pointer"
-                  title={`Insert output.${toVarName(name)}`}
+                  title={`Insert "Fields"."${name}"`}
                 >
-                  output.{toVarName(name)}
+                  "Fields"."{name}"
                 </button>
               ))}
             </div>

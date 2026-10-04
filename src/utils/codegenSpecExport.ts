@@ -483,7 +483,7 @@ export function buildCodegenSpec(
                   const ruleObj: CodegenConstraintRule = {};
                   if ((c.code ?? "").trim()) ruleObj.code = c.code!.trim();
                   if ((c.text ?? "").trim()) ruleObj.description = c.text.trim();
-                  if ((c.assert ?? "").trim()) ruleObj.assert = c.assert!.trim();
+                  if ((c.assert ?? "").trim()) ruleObj.assert = normalizeExpressionForCodegen(c.assert!.trim());
                   if ((c.message ?? "").trim()) ruleObj.message = c.message!.trim();
                   if (c.severity) ruleObj.severity = c.severity;
                   if (typeof c.status === "number" && !Number.isNaN(c.status)) {

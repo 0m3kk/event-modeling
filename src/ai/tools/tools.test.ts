@@ -1555,7 +1555,7 @@ describe("AI Model & Write Tools", () => {
                 {
                   code: "USER_NOT_FOUND",
                   description: "User account must exist in the event stream",
-                  assert: "output.userId != null",
+                  assert: '"Fields"."Is Deleted" == false',
                   message: "User account not found.",
                   status: 404,
                   severity: "error",
@@ -1576,7 +1576,7 @@ describe("AI Model & Write Tools", () => {
     expect(createdCard?.stormData?.constraints).toHaveLength(2);
     expect(createdCard?.stormData?.constraints?.[0]?.text).toBe("Legacy string rule");
     expect(createdCard?.stormData?.constraints?.[1]?.code).toBe("USER_NOT_FOUND");
-    expect(createdCard?.stormData?.constraints?.[1]?.assert).toBe("output.userId != null");
+    expect(createdCard?.stormData?.constraints?.[1]?.assert).toBe('"Fields"."Is Deleted" == false');
     expect(createdCard?.stormData?.constraints?.[1]?.status).toBe(404);
 
     // 2. Update card with additional structured rule
@@ -1589,7 +1589,7 @@ describe("AI Model & Write Tools", () => {
           constraints: [
             {
               code: "USER_DELETED",
-              assert: "!output.isDeleted",
+              assert: '!"Fields"."Is Deleted"',
               message: "Account is deleted.",
               status: 410,
             },
@@ -1604,7 +1604,7 @@ describe("AI Model & Write Tools", () => {
     const updatedConstraints = updatedCard?.stormData?.constraints;
     expect(updatedConstraints).toHaveLength(1);
     expect(updatedConstraints?.[0]?.code).toBe("USER_DELETED");
-    expect(updatedConstraints?.[0]?.assert).toBe("!output.isDeleted");
+    expect(updatedConstraints?.[0]?.assert).toBe('!"Fields"."Is Deleted"');
     expect(updatedConstraints?.[0]?.status).toBe(410);
   });
 
@@ -1627,12 +1627,12 @@ describe("AI Model & Write Tools", () => {
                   name: "Cart ID",
                   fieldType: "UUID",
                   tag: "Cart",
-                  mapping: "Command.Cart ID",
+                  mapping: '"Command"."Cart ID"',
                 },
                 {
                   name: "Item ID",
                   fieldType: "UUID",
-                  mapping: "Command.Item ID",
+                  mapping: '"Command"."Item ID"',
                 },
                 {
                   name: "Added At",
@@ -1655,7 +1655,7 @@ describe("AI Model & Write Tools", () => {
                   types: ["Item Added To Cart"],
                   tagFields: ["Cart ID"],
                   set: {
-                    "Total Items": "Total Items + 1",
+                    "Total Items": "count + 1",
                   },
                 },
               ],
@@ -1671,8 +1671,8 @@ describe("AI Model & Write Tools", () => {
       (o) => o.stormData?.name === "Item Added To Cart",
     );
     expect(eventCard).toBeDefined();
-    expect(eventCard?.stormData?.fields[0].mapping).toBe("Command.Cart ID");
-    expect(eventCard?.stormData?.fields[1].mapping).toBe("Command.Item ID");
+    expect(eventCard?.stormData?.fields[0].mapping).toBe('"Command"."Cart ID"');
+    expect(eventCard?.stormData?.fields[1].mapping).toBe('"Command"."Item ID"');
     expect(eventCard?.stormData?.fields[2].mapping).toBe("now()");
 
     const stateCard = fake.objects.find(
@@ -1680,7 +1680,7 @@ describe("AI Model & Write Tools", () => {
     );
     expect(stateCard).toBeDefined();
     expect(stateCard?.stormData?.queryItems?.[0].set).toEqual({
-      "Total Items": "Total Items + 1",
+      "Total Items": "count + 1",
     });
 
     // 2. Update Event card to change mapping

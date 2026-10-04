@@ -237,6 +237,10 @@ describe("toCamelCase and fieldNameMatches", () => {
     expect(normalizeExpressionForCodegen("'ACTIVE'")).toBe("'ACTIVE'");
     expect(normalizeExpressionForCodegen("event.email")).toBe("event.email");
     expect(normalizeExpressionForCodegen("command.displayName")).toBe("command.displayName");
+    expect(normalizeExpressionForCodegen('"Fields"."User ID" != null')).toBe("output.userId != null");
+    expect(normalizeExpressionForCodegen('"Params"."Amount" <= "Fields"."Balance"')).toBe("params.amount <= output.balance");
+    expect(normalizeExpressionForCodegen('"Fields"."Status" == "User Status"."PENDING"')).toBe("output.status == UserStatus.PENDING");
+    expect(normalizeExpressionForCodegen('"User Registered"."Email"')).toBe("userRegistered.email");
     expect(normalizeExpressionForCodegen("")).toBe("");
   });
 });

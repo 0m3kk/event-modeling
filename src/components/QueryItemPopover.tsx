@@ -409,7 +409,7 @@ export function QueryItemPopover({
                 State Updates (set)
               </span>
               <span className="text-[10px] text-gray-400 dark:text-zinc-500">
-                e.g. &lt;EventName&gt;.&lt;field&gt;
+                e.g. &quot;&lt;EventName&gt;&quot;.&quot;&lt;field&gt;&quot;
               </span>
             </div>
 
@@ -455,7 +455,7 @@ export function QueryItemPopover({
                           return next;
                         });
                       }}
-                      placeholder={`e.g. ${sampleEvent}.${of.name} or count + 1`}
+                      placeholder={`e.g. "${sampleEvent}"."${of.name}" or count + 1`}
                       className="flex-1 font-mono text-[11px] rounded border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:border-cyan-500 dark:focus:border-cyan-400 focus:outline-none"
                     />
                   </div>

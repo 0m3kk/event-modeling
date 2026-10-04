@@ -115,19 +115,60 @@ export function fieldNameMatches(targetNameOrId: string, testKey: string): boole
   return false;
 }
 
+/** Convert string to PascalCase, e.g. "User Status" -> "UserStatus" */
+export function toPascalCase(input: string): string {
+  const words = splitWords(input.trim());
+  if (words.length === 0) return "";
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
+}
+
 /**
  * Normalizes an expression for codegen output spec by converting component.field
  * references into camelCase identifier accesses (e.g. "Command.Name" -> "command.name",
  * "RegisterUser.Email" -> "registerUser.email", "hashPassword(Command.Password)" -> "hashPassword(command.password)").
+ * Also supports double-quoted references like "Command"."Email" -> "command.email",
+ * "Fields"."User ID" -> "output.userId", and enum references "User Status"."PENDING" -> "UserStatus.PENDING".
  */
 export function normalizeExpressionForCodegen(expr: string): string {
   if (!expr || !expr.trim()) return "";
-  return expr.replace(
-    /\b([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*(?:\s+[A-Za-z][A-Za-z0-9_]*)*)\b/g,
-    (_, prefix, field) => {
+  // 1. First replace quoted references: "Prefix"."Field"
+  let result = expr.replace(
+    /"([^"]+)"\."([^"]+)"/g,
+    (_, prefix: string, field: string) => {
+      const pKey = nameKey(prefix);
+      if (pKey === "fields" || pKey === "output") {
+        return `output.${toCamelCase(field)}`;
+      }
+      if (pKey === "params" || pKey === "input") {
+        return `params.${toCamelCase(field)}`;
+      }
+      if (/^[A-Z][A-Z0-9_]*$/.test(field.trim())) {
+        // Enum value reference, e.g. "User Status"."PENDING" -> UserStatus.PENDING
+        return `${toPascalCase(prefix)}.${field.trim()}`;
+      }
       return `${toCamelCase(prefix)}.${toCamelCase(field)}`;
     },
   );
+
+  // 2. Then replace unquoted references: Prefix.Field
+  result = result.replace(
+    /\b([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*(?:\s+[A-Za-z][A-Za-z0-9_]*)*)\b/g,
+    (_, prefix: string, field: string) => {
+      const pKey = prefix.toLowerCase();
+      if (pKey === "fields" || pKey === "output") {
+        return `output.${toCamelCase(field)}`;
+      }
+      if (pKey === "params" || pKey === "input") {
+        return `params.${toCamelCase(field)}`;
+      }
+      if (/^[A-Z][A-Z0-9_]*$/.test(field.trim())) {
+        return `${toPascalCase(prefix)}.${field.trim()}`;
+      }
+      return `${toCamelCase(prefix)}.${toCamelCase(field)}`;
+    },
+  );
+
+  return result;
 }
 
 /**

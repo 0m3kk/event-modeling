@@ -1738,8 +1738,12 @@ export const useCanvasStore = create<CanvasStore>()(
           nextData = { ...nextData, responseFields: updateList(nextData.responseFields) };
         } else if (section === "response" && nextData.outputFields) {
           nextData = { ...nextData, outputFields: updateList(nextData.outputFields) };
+        } else if (section === "params" && nextData.inputFields) {
+          nextData = { ...nextData, inputFields: updateList(nextData.inputFields) };
         } else if (nextData.fields.some((f) => f.id === fieldId)) {
           nextData = { ...nextData, fields: updateList(nextData.fields) };
+        } else if (nextData.inputFields?.some((f) => f.id === fieldId)) {
+          nextData = { ...nextData, inputFields: updateList(nextData.inputFields) };
         } else if (nextData.responseFields?.some((f) => f.id === fieldId)) {
           nextData = { ...nextData, responseFields: updateList(nextData.responseFields) };
         } else if (nextData.outputFields?.some((f) => f.id === fieldId)) {

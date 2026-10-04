@@ -118,7 +118,7 @@ export const constraintRuleSpec = z.union([
     text: z.string().optional().describe("Human-readable rule text or description"),
     description: z.string().optional().describe("Alternative alias for text"),
     code: z.string().optional().describe("Machine-readable error/rule code, e.g. USER_NOT_FOUND, EMAIL_ALREADY_IN_USE"),
-    assert: z.string().optional().describe("Boolean invariant expression in CEL / JS syntax, e.g. output.userId != null, !output.isDeleted, now() < output.expiresAt"),
+    assert: z.string().optional().describe('Boolean invariant expression in CEL / JS syntax. Wrap card and field names in double quotes and use "Fields"."<Name>" (for output fields) and "Params"."<Name>" (for input params), e.g. "Fields"."User ID" != null, "Fields"."Status" == "User Status"."ACTIVE", "Params"."Amount" <= "Fields"."Balance"'),
     message: z.string().optional().describe("Client error message, e.g. User account does not exist"),
     severity: z.enum(["error", "warning"]).optional(),
     status: z.number().int().optional().describe("HTTP status code for API codegen, e.g. 400, 401, 403, 404, 409"),
