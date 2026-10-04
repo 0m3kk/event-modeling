@@ -99,17 +99,17 @@ function PlanRow({ step }: { step: AIPlanStep }) {
         className={cn(
           "mt-0.5 h-4 w-4 shrink-0",
           step.status === "done"
-            ? "text-emerald-400"
+            ? "text-emerald-500 dark:text-emerald-400"
             : step.status === "in_progress"
-              ? "text-violet-400 animate-pulse"
-              : "text-gray-500",
+              ? "text-violet-500 dark:text-violet-400 animate-pulse"
+              : "text-gray-400 dark:text-gray-500",
         )}
       />
       <span
         className={cn(
           step.status === "done"
-            ? "text-gray-500 line-through"
-            : "text-gray-100",
+            ? "text-gray-400 dark:text-gray-500 line-through"
+            : "text-gray-800 dark:text-gray-100",
         )}
       >
         {step.text}
@@ -126,7 +126,7 @@ function ToolRow({ message }: { message: AIChatMessage }) {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-2 self-start rounded-md px-1.5 py-1 text-[12px] text-gray-400 transition-colors hover:bg-gray-700/50 hover:text-gray-100"
+        className="flex items-center gap-2 self-start rounded-md px-1.5 py-1 text-[12px] text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-gray-100"
       >
         <ChevronRight
           className={cn(
@@ -135,12 +135,17 @@ function ToolRow({ message }: { message: AIChatMessage }) {
           )}
         />
         <Wrench className="h-3.5 w-3.5 shrink-0" />
-        <span className={cn("text-left font-mono", isError && "text-red-400")}>
+        <span
+          className={cn(
+            "text-left font-mono",
+            isError && "text-red-600 dark:text-red-400",
+          )}
+        >
           {toolLabel(message.toolName)} · {summarizeToolResult(message)}
         </span>
       </button>
       {open && (
-        <pre className="mt-1.5 max-h-56 overflow-auto rounded-lg bg-gray-950/80 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-gray-400">
+        <pre className="mt-1.5 max-h-56 overflow-auto rounded-lg bg-gray-100 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-gray-600 dark:bg-gray-950/80 dark:text-gray-400">
           {message.toolResults?.[0]?.content ?? message.content}
         </pre>
       )}
@@ -167,7 +172,7 @@ function MessageBubble({ message }: { message: AIChatMessage }) {
   return (
     <div className="flex flex-col gap-2">
       {message.content && (
-        <div className="max-w-[92%] self-start rounded-2xl rounded-bl-sm bg-gray-800 px-4 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap text-gray-100 shadow-sm border border-gray-700/50">
+        <div className="max-w-[92%] self-start rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap text-gray-800 shadow-sm border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700/50">
           {message.content}
         </div>
       )}
@@ -176,7 +181,7 @@ function MessageBubble({ message }: { message: AIChatMessage }) {
           {message.toolNames?.map((name, index) => (
             <span
               key={`${name}-${index}`}
-              className="rounded-full bg-gray-800/80 border border-gray-700/60 px-2.5 py-0.5 font-mono text-[11px] text-gray-400"
+              className="rounded-full bg-gray-100 border border-gray-200 px-2.5 py-0.5 font-mono text-[11px] text-gray-500 dark:bg-gray-800/80 dark:border-gray-700/60 dark:text-gray-400"
             >
               {toolLabel(name)}
             </span>
@@ -184,7 +189,9 @@ function MessageBubble({ message }: { message: AIChatMessage }) {
         </div>
       )}
       {message.status === "stopped" && (
-        <span className="text-[11.5px] text-gray-500 pl-1 font-mono">Stopped.</span>
+        <span className="text-[11.5px] text-gray-400 dark:text-gray-500 pl-1 font-mono">
+          Stopped.
+        </span>
       )}
     </div>
   );
@@ -217,7 +224,7 @@ function ResizeHandles({
         className="group absolute top-0 left-0 z-50 flex h-4 w-4 cursor-nwse-resize touch-none items-start justify-start"
         title="Drag to resize"
       >
-        <span className="m-0.5 h-2.5 w-2.5 rounded-tl-lg border-t-2 border-l-2 border-gray-500 transition-colors group-hover:border-violet-400" />
+        <span className="m-0.5 h-2.5 w-2.5 rounded-tl-lg border-t-2 border-l-2 border-gray-400 dark:border-gray-500 transition-colors group-hover:border-violet-400" />
       </div>
     </>
   );
@@ -364,26 +371,26 @@ export function AIPanel() {
     <div
       ref={panelRef}
       tabIndex={-1}
-      className="fixed right-6 bottom-6 z-40 flex max-h-[calc(100vh-5rem)] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-gray-900 border border-gray-700/80 shadow-2xl text-gray-200 outline-none"
+      className="fixed right-6 bottom-6 z-40 flex max-h-[calc(100vh-5rem)] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl bg-white border border-gray-200 shadow-2xl text-gray-800 outline-none dark:bg-gray-900 dark:border-gray-700/80 dark:text-gray-200"
       style={{ width: size.width, height: size.height }}
       onMouseDown={handlePanelMouseDown}
       onKeyDown={handlePanelKeyDown}
     >
       <ResizeHandles beginResize={beginResize} />
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-gray-800 px-4 py-3.5 bg-gray-900/90 backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3.5 bg-white/90 backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/90">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="p-1 rounded-lg bg-violet-600/20 text-violet-400">
+          <div className="p-1 rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-600/20 dark:text-violet-400">
             <Sparkles className="h-4 w-4 shrink-0" />
           </div>
-          <span className="truncate text-[14px] font-semibold tracking-tight text-white">
+          <span className="truncate text-[14px] font-semibold tracking-tight text-gray-900 dark:text-white">
             {aiConversation.title === "New chat" ? t("ai.newChat") : aiConversation.title}
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={newAIConversation}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white cursor-pointer"
+            className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 cursor-pointer dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
             title={t("ai.newConversation")}
           >
             <Plus className="h-4 w-4" />
@@ -397,8 +404,10 @@ export function AIPanel() {
               }
             }}
             className={cn(
-              "rounded-lg p-1.5 transition-colors hover:bg-gray-800 hover:text-white",
-              showSettings ? "text-violet-400 bg-gray-800" : "text-gray-400",
+              "rounded-lg p-1.5 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-white",
+              showSettings
+                ? "text-violet-500 bg-gray-100 dark:text-violet-400 dark:bg-gray-800"
+                : "text-gray-500 dark:text-gray-400",
             )}
             title="Model & API settings"
           >
@@ -410,7 +419,7 @@ export function AIPanel() {
               setShowSettings(false);
               clearAIError();
             }}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+            className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
             title="Close"
           >
             <X className="h-4 w-4" />
@@ -420,17 +429,17 @@ export function AIPanel() {
 
       {/* Settings Modal/Overlay */}
       {showSettings && (
-        <div className="absolute inset-0 z-30 flex flex-col bg-gray-900">
-          <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3.5 bg-gray-900/90">
+        <div className="absolute inset-0 z-30 flex flex-col bg-white dark:bg-gray-900">
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3.5 bg-white/90 dark:border-gray-800 dark:bg-gray-900/90">
             <div className="flex items-center gap-2">
-              <Settings className="h-4 w-4 text-violet-400" />
-              <span className="text-[14px] font-semibold text-white">
+              <Settings className="h-4 w-4 text-violet-500 dark:text-violet-400" />
+              <span className="text-[14px] font-semibold text-gray-900 dark:text-white">
                 {t("ai.settingsTitle")}
               </span>
             </div>
             <button
               onClick={() => setShowSettings(false)}
-              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+              className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
               title={t("common.close")}
             >
               <X className="h-4 w-4" />
@@ -439,7 +448,7 @@ export function AIPanel() {
 
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12.5px] font-medium text-gray-300">
+              <span className="text-[12.5px] font-medium text-gray-700 dark:text-gray-300">
                 {t("ai.baseUrl")}
               </span>
               <input
@@ -447,24 +456,26 @@ export function AIPanel() {
                 value={baseUrlInput}
                 onChange={(e) => setBaseUrlInput(e.target.value)}
                 placeholder={DEFAULT_AI_SETTINGS.baseUrl}
-                className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-[13px] text-white outline-none focus:border-violet-500 font-mono"
+                className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-1.5 text-[13px] text-gray-900 outline-none focus:border-violet-500 font-mono dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               />
-              <span className="text-[11px] text-gray-500">
+              <span className="text-[11px] text-gray-400 dark:text-gray-500">
                 {t("ai.baseUrlHelp")}
               </span>
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12.5px] font-medium text-gray-300">{t("ai.model")}</span>
+              <span className="text-[12.5px] font-medium text-gray-700 dark:text-gray-300">
+                {t("ai.model")}
+              </span>
               <input
                 type="text"
                 value={modelInput}
                 onChange={(e) => setModelInput(e.target.value)}
                 placeholder={DEFAULT_AI_SETTINGS.model}
-                className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-[13px] text-white outline-none focus:border-violet-500 font-mono"
+                className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-1.5 text-[13px] text-gray-900 outline-none focus:border-violet-500 font-mono dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12.5px] font-medium text-gray-300">
+              <span className="text-[12.5px] font-medium text-gray-700 dark:text-gray-300">
                 {t("ai.maxTokens")}
               </span>
               <input
@@ -475,11 +486,11 @@ export function AIPanel() {
                 value={maxTokensInput}
                 onChange={(e) => setMaxTokensInput(e.target.value)}
                 placeholder={String(DEFAULT_AI_SETTINGS.maxTokens)}
-                className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-[13px] text-white outline-none focus:border-violet-500 font-mono"
+                className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-1.5 text-[13px] text-gray-900 outline-none focus:border-violet-500 font-mono dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12.5px] font-medium text-gray-300">
+              <span className="text-[12.5px] font-medium text-gray-700 dark:text-gray-300">
                 {t("ai.apiKey")}
               </span>
               <input
@@ -487,15 +498,15 @@ export function AIPanel() {
                 value={keyInput}
                 onChange={(e) => setKeyInput(e.target.value)}
                 placeholder={t("ai.apiKeyHelp")}
-                className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-[13px] text-white outline-none focus:border-violet-500 font-mono"
+                className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-1.5 text-[13px] text-gray-900 outline-none focus:border-violet-500 font-mono dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               />
             </label>
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-gray-800 p-3 bg-gray-900/90">
+          <div className="flex items-center justify-end gap-2 border-t border-gray-100 p-3 bg-white/90 dark:border-gray-800 dark:bg-gray-900/90">
             <button
               onClick={() => setShowSettings(false)}
-              className="rounded-lg px-3 py-1.5 text-[13px] text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              className="rounded-lg px-3 py-1.5 text-[13px] text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800"
             >
               {t("common.cancel")}
             </button>
@@ -511,14 +522,14 @@ export function AIPanel() {
 
       {/* Error Banner */}
       {aiError && (
-        <div className="flex items-start gap-2.5 border-b border-gray-800 bg-red-950/30 px-4 py-2.5">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-          <div className="flex-1 text-[12.5px] leading-relaxed text-red-400">
+        <div className="flex items-start gap-2.5 border-b border-red-200 bg-red-50 px-4 py-2.5 dark:border-gray-800 dark:bg-red-950/30">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
+          <div className="flex-1 text-[12.5px] leading-relaxed text-red-600 dark:text-red-400">
             {aiError}
           </div>
           <button
             onClick={clearAIError}
-            className="text-gray-500 hover:text-gray-300"
+            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -527,26 +538,26 @@ export function AIPanel() {
 
       {/* Plan checklist */}
       {plan.length > 0 && (
-        <div className="shrink-0 border-b border-gray-800 bg-gray-950/40">
+        <div className="shrink-0 border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40">
           <button
             type="button"
             onClick={() => setPlanOpen((value) => !value)}
-            className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-gray-800/40"
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-gray-100 dark:hover:bg-gray-800/40"
           >
             <ChevronRight
               className={cn(
-                "h-3.5 w-3.5 shrink-0 text-gray-500 transition-transform",
+                "h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform dark:text-gray-500",
                 planOpen && "rotate-90",
               )}
             />
-            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400">
               {t("ai.workingPlan")}
             </span>
-            <span className="rounded-full bg-gray-800 px-2 py-0.5 font-mono text-[10.5px] text-gray-400">
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[10.5px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
               {planDone}/{plan.length}
             </span>
             {aiRunning && planDone < plan.length && (
-              <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-violet-400" />
+              <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-violet-500 dark:text-violet-400" />
             )}
           </button>
           {planOpen && (
@@ -570,15 +581,15 @@ export function AIPanel() {
         ))}
 
         {aiRunning && (
-          <div className="flex items-center gap-2.5 text-[12.5px] text-violet-400 bg-gray-800/40 rounded-xl p-2.5 border border-gray-800">
+          <div className="flex items-center gap-2.5 text-[12.5px] text-violet-500 bg-gray-50 rounded-xl p-2.5 border border-gray-100 dark:text-violet-400 dark:bg-gray-800/40 dark:border-gray-800">
             <Loader2 className="h-4 w-4 animate-spin shrink-0" />
             <span>{t("ai.thinking")}</span>
             <span
               className={cn(
                 "ml-auto shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10.5px]",
                 stepsRemaining <= 3
-                  ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-                  : "border-violet-500/30 bg-violet-500/10 text-violet-300",
+                  ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+                  : "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300",
               )}
             >
               {t("ai.stepsLeft", { count: stepsRemaining })}
@@ -588,7 +599,7 @@ export function AIPanel() {
       </div>
 
       {/* Composer Input */}
-      <div className="border-t border-gray-800 p-3 bg-gray-900/90">
+      <div className="border-t border-gray-100 p-3 bg-white/90 dark:border-gray-800 dark:bg-gray-900/90">
         <div className="relative">
           <textarea
             ref={inputRef}
@@ -602,12 +613,12 @@ export function AIPanel() {
             }
             disabled={!canSend || aiRunning}
             rows={2}
-            className="w-full resize-none rounded-xl border border-gray-700 bg-gray-800/80 px-3.5 py-2.5 pr-11 text-[13px] leading-relaxed text-white placeholder-gray-500 outline-none focus:border-violet-500 transition-colors disabled:opacity-50"
+            className="w-full resize-none rounded-xl border border-gray-300 bg-white/80 px-3.5 py-2.5 pr-11 text-[13px] leading-relaxed text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 transition-colors disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800/80 dark:text-white dark:placeholder-gray-500"
           />
           {aiRunning ? (
             <button
               onClick={stopAI}
-              className="absolute right-2.5 bottom-3 rounded-lg p-1.5 text-red-400 transition-colors hover:bg-gray-700"
+              className="absolute right-2.5 bottom-3 rounded-lg p-1.5 text-red-500 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-gray-700"
               title={t("ai.stop")}
             >
               <Square className="h-4 w-4" />
@@ -616,7 +627,7 @@ export function AIPanel() {
             <button
               onClick={handleSend}
               disabled={!prompt.trim() || !canSend}
-              className="absolute right-2.5 bottom-3 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white disabled:opacity-30"
+              className="absolute right-2.5 bottom-3 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-30 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
               title={t("ai.send")}
             >
               <Send className="h-4 w-4" />
@@ -624,7 +635,7 @@ export function AIPanel() {
           )}
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-2 px-1 text-[11px] text-gray-500 font-mono">
+        <div className="mt-2 flex items-center justify-between gap-2 px-1 text-[11px] text-gray-400 font-mono dark:text-gray-500">
           <span className="truncate max-w-50">
             {aiSettings.model} · {host}
           </span>
@@ -634,14 +645,14 @@ export function AIPanel() {
                 className={cn(
                   "rounded-full px-1.5 py-0.5",
                   stepsRemaining <= 0
-                    ? "bg-amber-500/10 text-amber-300"
-                    : "text-gray-400",
+                    ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                    : "text-gray-500 dark:text-gray-400",
                 )}
               >
                 {aiStepUsed}/{aiStepLimit} steps
               </span>
             )}
-            <span className="text-gray-600">{t("ai.undoTurnInfo")}</span>
+            <span className="text-gray-400 dark:text-gray-600">{t("ai.undoTurnInfo")}</span>
           </div>
         </div>
       </div>
