@@ -22,7 +22,11 @@ import {
 } from "@/utils/objectClipboard";
 import { alignObjects, distributeObjects } from "@/utils/align";
 import { componentNameOf, ensureUniqueComponentName } from "@/utils/naming";
-import { arrangeStormLanes, type StormLaneCard } from "@/utils/stormLayout";
+import {
+  arrangeStormLanes,
+  arrangeVerticalSlice,
+  type StormLaneCard,
+} from "@/utils/stormLayout";
 import {
   findAdoptableLines,
   getObjectUnionBounds,
@@ -2136,6 +2140,40 @@ export const useCanvasStore = create<CanvasStore>()(
           });
 
         get().updateObjects(updates);
+      },
+
+      arrangeSlice: (cardIds) => {
+        const { objects, isLocked } = get();
+        if (isLocked) return;
+        const wanted = cardIds ? new Set(cardIds) : null;
+        const cards = objects.filter(
+          (o) =>
+            o.type === "storm" &&
+            o.stormData &&
+            (!wanted || wanted.has(o.id)),
+        );
+        if (cards.length === 0) return;
+
+        let minX = Infinity;
+        let minY = Infinity;
+        for (const o of cards) {
+          minX = Math.min(minX, o.x);
+          minY = Math.min(minY, o.y);
+        }
+
+        const positions = arrangeVerticalSlice(
+          cards.map((o) => ({
+            id: o.id,
+            kind: o.stormData!.kind,
+            width: o.width,
+            height: o.height,
+          })),
+          { origin: { x: minX, y: minY } },
+        );
+
+        get().updateObjects(
+          positions.map((p) => ({ id: p.id, patch: { x: p.x, y: p.y } })),
+        );
       },
 
       setInlineEdit: (inlineEdit) =>

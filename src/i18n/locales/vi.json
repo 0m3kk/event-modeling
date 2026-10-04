@@ -271,7 +271,8 @@
       "createRef": "Tạo Bản sao Tham chiếu",
       "delete": "Xóa đối tượng",
       "ungroup": "Hủy gom nhóm (Cmd+Shift+G)",
-      "arrangeLanes": "Sắp xếp các Làn Storm (Actor → Command → Event → External → Query → State → Constraint)"
+      "arrangeLanes": "Sắp xếp các Làn Storm (Actor → Command → Event → External → Query → State → Constraint)",
+      "arrangeSlice": "Căn giữa lại lát cắt dọc (Command/Query → Constraint/State → Event)"
     }
   },
   "language": {

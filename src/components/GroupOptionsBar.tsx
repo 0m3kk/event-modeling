@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { LineStyle } from "@/types";
-import { Lock, Unlock, FolderMinus, Edit2, Check } from "lucide-react";
+import { Lock, Unlock, FolderMinus, Edit2, Check, Rows3 } from "lucide-react";
 
 const GROUP_STROKE_COLORS = [
   "#6366f1", // Indigo
@@ -39,9 +39,11 @@ export function GroupOptionsBar() {
   const { t } = useTranslation();
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const groups = useCanvasStore((s) => s.groups);
+  const objects = useCanvasStore((s) => s.objects);
   const viewport = useCanvasStore((s) => s.viewport);
   const updateGroup = useCanvasStore((s) => s.updateGroup);
   const ungroupObjects = useCanvasStore((s) => s.ungroupObjects);
+  const arrangeSlice = useCanvasStore((s) => s.arrangeSlice);
   const isLocked = useCanvasStore((s) => s.isLocked);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
@@ -56,6 +58,16 @@ export function GroupOptionsBar() {
       : sel;
     return groups.find((g) => g.id === groupId) || null;
   }, [selectedIds, groups, isLocked]);
+
+  const sliceCardIds = useMemo(() => {
+    if (!selectedGroup) return [];
+    return objects
+      .filter(
+        (o) =>
+          o.groupId === selectedGroup.id && o.type === "storm" && o.stormData,
+      )
+      .map((o) => o.id);
+  }, [objects, selectedGroup]);
 
   if (!selectedGroup || !selectedGroup.customBounds || isDragging) return null;
 
@@ -189,6 +201,20 @@ export function GroupOptionsBar() {
       </div>
 
       <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
+
+      {/* Re-center Vertical Slice */}
+      {sliceCardIds.length >= 2 && (
+        <>
+          <button
+            onClick={() => arrangeSlice(sliceCardIds)}
+            title={t("popovers.optionsBar.arrangeSlice")}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 active:scale-95 cursor-pointer"
+          >
+            <Rows3 size={16} className="text-indigo-600 dark:text-indigo-400" />
+          </button>
+          <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
+        </>
+      )}
 
       {/* Toggle Lock */}
       <button

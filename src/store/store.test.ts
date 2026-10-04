@@ -1320,6 +1320,69 @@ describe("useCanvasStore", () => {
     expect(cmdObj!.x).toBeLessThan(evtObj!.x);
   });
 
+  it("arrangeSlice re-centers a slice's layers and leaves non-members put", () => {
+    const cmd: CanvasObject = {
+      id: "cmd",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 80,
+      stormData: { kind: "command", name: "Place Order", fields: [] },
+    };
+    const cst: CanvasObject = {
+      id: "cst",
+      type: "storm",
+      x: 500,
+      y: 200,
+      width: 300,
+      height: 80,
+      stormData: { kind: "constraint", name: "Check Stock", fields: [] },
+    };
+    const evt: CanvasObject = {
+      id: "evt",
+      type: "storm",
+      x: 800,
+      y: 400,
+      width: 120,
+      height: 80,
+      stormData: { kind: "event", name: "Order Placed", fields: [] },
+    };
+    const outsider: CanvasObject = {
+      id: "outsider",
+      type: "storm",
+      x: 2000,
+      y: 2000,
+      width: 200,
+      height: 80,
+      stormData: { kind: "event", name: "Other", fields: [] },
+    };
+
+    useCanvasStore.getState().addObjects([cmd, cst, evt, outsider]);
+    useCanvasStore.getState().arrangeSlice(["cmd", "cst", "evt"]);
+
+    const objs = useCanvasStore.getState().objects;
+    const cmd2 = objs.find((o) => o.id === "cmd")!;
+    const cst2 = objs.find((o) => o.id === "cst")!;
+    const evt2 = objs.find((o) => o.id === "evt")!;
+    const out2 = objs.find((o) => o.id === "outsider")!;
+
+    const center = (o: CanvasObject) => o.x + o.width / 2;
+    // Every layer centers on the widest layer (the 300px constraint).
+    expect(Math.round(center(cmd2))).toBe(Math.round(center(cst2)));
+    expect(Math.round(center(evt2))).toBe(Math.round(center(cst2)));
+    // Layers stack top-to-bottom.
+    expect(cmd2.y).toBeLessThan(cst2.y);
+    expect(cst2.y).toBeLessThan(evt2.y);
+    // Anchored at the slice's current top-left.
+    expect(cmd2.x).toBe(100);
+    expect(cst2.x).toBe(0);
+    expect(evt2.x).toBe(90);
+    // Non-member stays untouched.
+    expect(out2.x).toBe(2000);
+    expect(out2.y).toBe(2000);
+  });
+
   it("handles cascading model popups correctly", () => {
     // Level 0: open popup for Model A
     useCanvasStore.getState().openModelPopup({

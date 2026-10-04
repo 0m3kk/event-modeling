@@ -271,7 +271,8 @@
       "createRef": "Create Reference Copy",
       "delete": "Delete",
       "ungroup": "Ungroup (Cmd+Shift+G)",
-      "arrangeLanes": "Arrange Storm Lanes (Actor → Command → Event → External → Query → State → Constraint)"
+      "arrangeLanes": "Arrange Storm Lanes (Actor → Command → Event → External → Query → State → Constraint)",
+      "arrangeSlice": "Re-center the vertical slice (Command/Query → Constraint/State → Event)"
     }
   },
   "language": {

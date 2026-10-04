@@ -266,6 +266,8 @@ export interface CanvasStoreActions {
   alignObjects: (direction: AlignDirection) => void;
   distributeObjects: (direction: DistributeDirection) => void;
   arrangeLanes: () => void;
+  /** Re-center a vertical slice's layers on the widest layer, in place. */
+  arrangeSlice: (cardIds?: string[]) => void;
 
   // Viewport
   setViewport: (viewport: Partial<Viewport>) => void;
