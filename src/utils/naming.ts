@@ -84,6 +84,42 @@ export function toDisplayName(input: string): string {
   return splitWords(trimmed).map(formatWord).join(" ");
 }
 
+/** Convert string to lower camelCase, e.g. "Registered Email" -> "registeredEmail" */
+export function toCamelCase(input: string): string {
+  const words = splitWords(input.trim());
+  if (words.length === 0) return "";
+  const first = words[0].toLowerCase();
+  const rest = words.slice(1).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  return [first, ...rest].join("");
+}
+
+/** Check if two field names/keys match across casing (e.g. "Registered Email" vs "registeredEmail" vs id) */
+export function fieldNameMatches(targetNameOrId: string, testKey: string): boolean {
+  if (!targetNameOrId || !testKey) return false;
+  if (targetNameOrId === testKey) return true;
+  const targetLower = targetNameOrId.trim().toLowerCase();
+  const testLower = testKey.trim().toLowerCase();
+  if (targetLower === testLower) return true;
+  if (nameKey(targetNameOrId) === nameKey(testKey)) return true;
+  if (toCamelCase(targetNameOrId).toLowerCase() === toCamelCase(testKey).toLowerCase()) return true;
+  return false;
+}
+
+/**
+ * Normalizes an expression for codegen output spec by converting component.field
+ * references into camelCase identifier accesses (e.g. "Command.Name" -> "command.name",
+ * "RegisterUser.Email" -> "registerUser.email", "hashPassword(Command.Password)" -> "hashPassword(command.password)").
+ */
+export function normalizeExpressionForCodegen(expr: string): string {
+  if (!expr || !expr.trim()) return "";
+  return expr.replace(
+    /\b([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*(?:\s+[A-Za-z][A-Za-z0-9_]*)*)\b/g,
+    (_, prefix, field) => {
+      return `${toCamelCase(prefix)}.${toCamelCase(field)}`;
+    },
+  );
+}
+
 /**
  * Comparison key for component names. Two names are considered the same when
  * their display form matches, so `"create order"`, `"CreateOrder"` and

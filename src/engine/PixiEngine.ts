@@ -930,6 +930,7 @@ export class PixiEngine {
         state.clearModelPopups();
         state.selectObject(id, e.shiftKey || e.metaKey || e.ctrlKey);
         state.setStormSelectedField({ objectId: id, fieldId: accurateZone.fieldId });
+        state.setQueryItemPopup(null);
         state.setMappingTarget({
           objectId: id,
           fieldId: accurateZone.fieldId,

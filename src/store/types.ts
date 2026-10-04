@@ -45,6 +45,15 @@ export interface BddStepPopupTarget {
 }
 
 /**
+ * Target of the DCB Query Item popover. `queryItemId` omitted means "add a
+ * new query item" on the card; present means "edit that query item".
+ */
+export interface QueryItemPopupTarget {
+  objectId: string;
+  queryItemId?: string;
+}
+
+/**
  * Target of the description (ⓘ) hover tooltip / edit popover.
  * `fieldId` omitted means the card's own description. `iconBounds` is the ⓘ
  * hit box in card-local coordinates, used to anchor the tooltip/editor.
@@ -137,6 +146,8 @@ export interface CanvasStoreState {
   validationTarget: StormFieldSelection | null;
   /** Open BDD scenario step popover target (create when stepId is omitted). */
   bddStepPopup: BddStepPopupTarget | null;
+  /** Open DCB query item popover target (create when queryItemId is omitted). */
+  queryItemPopup: QueryItemPopupTarget | null;
   /** Hovered validation ✓ badge, used to anchor its tooltip. */
   validationHover: ValidationTarget | null;
   /** Open field mapping popover target (Event field / Response field). */
@@ -240,6 +251,8 @@ export interface CanvasStoreActions {
   ) => void;
   /** Open / close the BDD scenario step popover. */
   setBddStepPopup: (target: BddStepPopupTarget | null) => void;
+  /** Open / close the DCB query item popover. */
+  setQueryItemPopup: (target: QueryItemPopupTarget | null) => void;
   addModelField: (objectId: string) => string | undefined;
   addModelEnumValue: (objectId: string) => string | undefined;
 

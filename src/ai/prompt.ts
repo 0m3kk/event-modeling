@@ -120,7 +120,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
 References must be valid:
 - **Explicit Field Mapping (Zero Guessing / Codegen)**:
   - Event fields and Command/Query responseFields MUST carry an explicit \`mapping\` expression (e.g. \`command.<field>\`, \`constraint.<output>\`, \`now()\`, \`uuid()\`, \`hashPassword(command.password)\`). If unmapped, a warning icon [!] appears and codegen will fail. Never omit or leave mappings to guesswork.
-  - State and Constraint cards MUST define \`set\` on their \`queryItems\` to project event fields into \`outputFields\` (e.g. \`{ status: "event.newStatus", balance: "balance - event.amount" }\`). Any unprojected output field will show a warning icon [!].
+  - State and Constraint cards MUST define \`set\` on their \`queryItems\` to project event fields into \`outputFields\` (e.g. \`{ status: "'ACTIVE'", registeredEmail: "UserRegistered.email", balance: "balance - PaymentMade.amount" }\`, prefer \`<EventName>.<fieldName>\` over generic \`event.<fieldName>\`). Any unprojected output field will show a warning icon [!].
 - Event field tags must only be placed on key/identifier fields (ID, unique email, code); never tag non-key fields or all fields in an event.
 - Constraints must be reusable, independent decision models checking domain invariants against event history, never command input validation. Prefer structured rules with \`{ code, assert, message, status, severity }\` (e.g. assert: \`output.balance >= command.amount\`).
 - State and Constraint queryItems \`types\` must name existing Event cards on the board (exact match). Read Slices have no Event cards of their own — their States reference events defined in Write Slices.

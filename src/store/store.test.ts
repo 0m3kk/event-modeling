@@ -1186,6 +1186,27 @@ describe("useCanvasStore", () => {
     expect(useCanvasStore.getState().bddStepPopup).toBeNull();
   });
 
+  it("tracks the QueryItem popover and clears it on selection changes", () => {
+    expect(useCanvasStore.getState().queryItemPopup).toBeNull();
+    useCanvasStore.getState().setQueryItemPopup({ objectId: "card-A", queryItemId: "qi-1" });
+    expect(useCanvasStore.getState().queryItemPopup).toEqual({
+      objectId: "card-A",
+      queryItemId: "qi-1",
+    });
+
+    // Selecting a different card drops the stale popup target.
+    useCanvasStore.getState().selectObject("other-card");
+    expect(useCanvasStore.getState().queryItemPopup).toBeNull();
+
+    useCanvasStore.getState().setQueryItemPopup({ objectId: "card-A" });
+    useCanvasStore.getState().clearSelection();
+    expect(useCanvasStore.getState().queryItemPopup).toBeNull();
+
+    useCanvasStore.getState().setQueryItemPopup({ objectId: "card-A" });
+    useCanvasStore.getState().resetBoard();
+    expect(useCanvasStore.getState().queryItemPopup).toBeNull();
+  });
+
   it("handles alignObjects, distributeObjects, and arrangeLanes", () => {
     const c1: CanvasObject = {
       id: "c1",

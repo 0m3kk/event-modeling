@@ -108,7 +108,7 @@ const queryItemSpec = z.object({
     .record(z.string(), z.string())
     .optional()
     .describe(
-      "State projection dictionary mapping output field names to event expressions (e.g. { 'status': 'event.newStatus', 'count': 'count + 1' }). Explains how this event mutates the state.",
+      "State projection dictionary mapping output field names to event expressions (e.g. { 'status': \"'ACTIVE'\", 'registeredEmail': 'UserRegistered.email', 'count': 'count + 1' }). Prefer <EventName>.<fieldName> over generic event.<fieldName>. Explains how this event mutates the state.",
     ),
 });
 

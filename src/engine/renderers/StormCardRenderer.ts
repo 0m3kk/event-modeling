@@ -40,6 +40,7 @@ import {
   BDD_STEP_PLACEHOLDER_HEIGHT,
 } from "@/utils/cardDimensions";
 import { getActorPermissions } from "@/utils/stormAuth";
+import { fieldNameMatches } from "@/utils/naming";
 
 function truncateText(str: string, maxLen: number): string {
   if (!str) return "";
@@ -456,15 +457,34 @@ export class StormCardRenderer {
             mappingTooltipText = "Warning: Missing explicit mapping for codegen";
           }
         } else if (isOutputField) {
-          // Check if any queryItem.set references this field (by name or id)
-          const isProjected = (data.queryItems ?? []).some(
-            (q) => q.set && (Boolean(q.set[field.name]) || Boolean(q.set[field.id])),
-          );
-          if (!isProjected) {
-            showMappingBadge = true;
+          // Check if any queryItem.set references this field (by name, camelCase, or id)
+          const matchedMappings: { eventLabel: string; expr: string }[] = [];
+
+          for (const q of data.queryItems ?? []) {
+            if (!q.set) continue;
+            for (const [key, expr] of Object.entries(q.set)) {
+              if (fieldNameMatches(field.name, key) || fieldNameMatches(field.id, key)) {
+                const evLabel = q.types?.length ? q.types.join(", ") : "Query Item";
+                matchedMappings.push({ eventLabel: evLabel, expr });
+                break;
+              }
+            }
+          }
+
+          showMappingBadge = true;
+          if (matchedMappings.length > 0) {
+            mappingBadgeGlyph = "⇄";
+            mappingBadgeStroke = 0x06b6d4; // cyan-500
+            mappingBadgeFill = 0x0891b2;   // cyan-600
+            if (matchedMappings.length === 1) {
+              mappingTooltipText = `Set in [${matchedMappings[0].eventLabel}]: ${matchedMappings[0].expr}`;
+            } else {
+              mappingTooltipText = `Set in ${matchedMappings.length} events: ${matchedMappings.map((m) => `[${m.eventLabel}]: ${m.expr}`).join("; ")}`;
+            }
+          } else {
             mappingBadgeGlyph = "!";
-            mappingBadgeStroke = 0xf59e0b;
-            mappingBadgeFill = 0xd97706;
+            mappingBadgeStroke = 0xf59e0b; // amber-500
+            mappingBadgeFill = 0xd97706;   // amber-600
             mappingTooltipText = "Warning: Field is never updated in any Query Item set";
           }
         }

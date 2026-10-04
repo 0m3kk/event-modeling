@@ -5,8 +5,11 @@ import {
   componentNameOf,
   defaultComponentName,
   ensureUniqueComponentName,
+  fieldNameMatches,
   makeUniqueName,
   nameKey,
+  normalizeExpressionForCodegen,
+  toCamelCase,
 } from "./naming";
 
 function storm(id: string, name: string, kind = "event"): CanvasObject {
@@ -197,7 +200,43 @@ describe("ensureUniqueComponentName", () => {
 
   it("ignores the object's own current name", () => {
     const object = storm("s1", "Order");
-    // Renaming to the same name is a no-op, not a self-collision.
+    // Renaming to the same name is a no-ops, not a self-collision.
     expect(ensureUniqueComponentName(object, [object])).toBe(object);
+  });
+});
+
+describe("toCamelCase and fieldNameMatches", () => {
+  it("converts strings to camelCase", () => {
+    expect(toCamelCase("Registered Email")).toBe("registeredEmail");
+    expect(toCamelCase("order_item_count")).toBe("orderItemCount");
+    expect(toCamelCase("user-id")).toBe("userId");
+    expect(toCamelCase("alreadyCamel")).toBe("alreadyCamel");
+    expect(toCamelCase("")).toBe("");
+  });
+
+  it("matches field names flexibly across casing styles", () => {
+    expect(fieldNameMatches("Registered Email", "registeredEmail")).toBe(true);
+    expect(fieldNameMatches("registeredEmail", "Registered Email")).toBe(true);
+    expect(fieldNameMatches("registered_email", "Registered Email")).toBe(true);
+    expect(fieldNameMatches("Registered Email", "Registered Email")).toBe(true);
+    expect(fieldNameMatches("Email", "email")).toBe(true);
+    expect(fieldNameMatches("id_123", "id_123")).toBe(true);
+    expect(fieldNameMatches("otherField", "registeredEmail")).toBe(false);
+    expect(fieldNameMatches("", "registeredEmail")).toBe(false);
+  });
+
+  it("normalizes expressions for codegen to camelCase identifier access", () => {
+    expect(normalizeExpressionForCodegen("Command.Name")).toBe("command.name");
+    expect(normalizeExpressionForCodegen("Command.Email")).toBe("command.email");
+    expect(normalizeExpressionForCodegen("Command.Display Name")).toBe("command.displayName");
+    expect(normalizeExpressionForCodegen("RegisterUser.Email")).toBe("registerUser.email");
+    expect(normalizeExpressionForCodegen("UserRegistered.Registered Email")).toBe("userRegistered.registeredEmail");
+    expect(normalizeExpressionForCodegen("hashPassword(Command.Password)")).toBe("hashPassword(command.password)");
+    expect(normalizeExpressionForCodegen("now()")).toBe("now()");
+    expect(normalizeExpressionForCodegen("uuid()")).toBe("uuid()");
+    expect(normalizeExpressionForCodegen("'ACTIVE'")).toBe("'ACTIVE'");
+    expect(normalizeExpressionForCodegen("event.email")).toBe("event.email");
+    expect(normalizeExpressionForCodegen("command.displayName")).toBe("command.displayName");
+    expect(normalizeExpressionForCodegen("")).toBe("");
   });
 });

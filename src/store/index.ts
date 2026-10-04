@@ -92,6 +92,7 @@ export const initialCanvasState: CanvasStoreState = {
   stormSelectedField: null,
   validationTarget: null,
   bddStepPopup: null,
+  queryItemPopup: null,
   validationHover: null,
   mappingTarget: null,
   mappingHover: null,
@@ -160,8 +161,8 @@ export const useCanvasStore = create<CanvasStore>()(
             set({ selectedIds: [...selectedIds, id] });
           }
         } else {
-          // Selecting a different card drops any step popover from the old one.
-          set({ selectedIds: [id], bddStepPopup: null });
+          // Selecting a different card drops any step/query popover from the old one.
+          set({ selectedIds: [id], bddStepPopup: null, queryItemPopup: null });
         }
       },
 
@@ -172,13 +173,19 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       clearSelection: () => {
-        const { selectedIds, stormSelectedField, modelPopupChain, bddStepPopup } =
-          get();
+        const {
+          selectedIds,
+          stormSelectedField,
+          modelPopupChain,
+          bddStepPopup,
+          queryItemPopup,
+        } = get();
         if (
           selectedIds.length > 0 ||
           stormSelectedField ||
           modelPopupChain.length > 0 ||
-          bddStepPopup
+          bddStepPopup ||
+          queryItemPopup
         ) {
           // A storm field selection only makes sense while its card is
           // selected, so clear both together. Also clear active model popups.
@@ -187,6 +194,7 @@ export const useCanvasStore = create<CanvasStore>()(
             stormSelectedField: null,
             modelPopupChain: [],
             bddStepPopup: null,
+            queryItemPopup: null,
           });
         }
       },
@@ -1247,6 +1255,8 @@ export const useCanvasStore = create<CanvasStore>()(
 
       setBddStepPopup: (bddStepPopup) => set({ bddStepPopup }),
 
+      setQueryItemPopup: (queryItemPopup) => set({ queryItemPopup }),
+
       setValidationHover: (validationHover) => set({ validationHover }),
 
       setMappingTarget: (mappingTarget) => set({ mappingTarget }),
@@ -2008,6 +2018,7 @@ export const useCanvasStore = create<CanvasStore>()(
           stormSelectedField: null,
           validationTarget: null,
           bddStepPopup: null,
+          queryItemPopup: null,
           validationHover: null,
           stormActionHover: null,
           aiHighlightIds: [],

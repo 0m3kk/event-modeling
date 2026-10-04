@@ -8,6 +8,11 @@ import type {
   FieldValidation,
 } from "@/types";
 import { fullTagOf } from "@/utils/stormQuery";
+import {
+  fieldNameMatches,
+  normalizeExpressionForCodegen,
+  toCamelCase,
+} from "@/utils/naming";
 
 export interface CodegenField {
   name: string;
@@ -183,9 +188,15 @@ function cleanField(field: StormField): CodegenField {
     result.validation = field.validation;
   }
   if ((field.mapping ?? "").trim()) {
-    result.mapping = field.mapping!.trim();
+    result.mapping = normalizeExpressionForCodegen(field.mapping!.trim());
   }
   return result;
+}
+
+function cleanOutputField(field: StormField): CodegenField {
+  const f = cleanField(field);
+  delete f.mapping;
+  return f;
 }
 
 function resolveQueryItems(
@@ -227,8 +238,18 @@ function resolveQueryItems(
       for (const [key, expr] of Object.entries(item.set)) {
         const cleanExpr = expr.trim();
         if (!cleanExpr) continue;
-        const fieldName = outputFieldMap.get(key) || key.trim();
-        resolvedSet[fieldName] = cleanExpr;
+        let fieldName = outputFieldMap.get(key);
+        if (!fieldName) {
+          for (const f of outputFields) {
+            if (fieldNameMatches(f.name, key) || fieldNameMatches(f.id, key)) {
+              fieldName = f.name.trim();
+              break;
+            }
+          }
+        }
+        // In codegen spec, set keys are camelCase identifiers (e.g. "registeredEmail")
+        const specKey = toCamelCase(fieldName || key.trim());
+        resolvedSet[specKey] = normalizeExpressionForCodegen(cleanExpr);
       }
       if (Object.keys(resolvedSet).length > 0) {
         queryItem.set = resolvedSet;
@@ -417,7 +438,7 @@ export function buildCodegenSpec(
               inputFields,
               storm.outputFields ?? [],
             ),
-            outputFields: (storm.outputFields ?? []).map(cleanField),
+            outputFields: (storm.outputFields ?? []).map(cleanOutputField),
           });
           break;
         }
@@ -448,7 +469,7 @@ export function buildCodegenSpec(
               inputFields,
               storm.outputFields ?? [],
             ),
-            outputFields: (storm.outputFields ?? []).map(cleanField),
+            outputFields: (storm.outputFields ?? []).map(cleanOutputField),
             rules: (storm.constraints ?? [])
               .map((c) => {
                 const hasStructured = Boolean(

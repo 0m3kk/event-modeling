@@ -670,9 +670,91 @@ describe("codegenSpecExport", () => {
 
     const state = spec.readModels.find((s) => s.name === "UserState")!;
     expect(state).toBeDefined();
+    // outputFields should not have redundant mapping exported
+    expect(state.outputFields[0].mapping).toBeUndefined();
+    expect(state.outputFields[1].mapping).toBeUndefined();
     expect(state.queryItems[0].set).toEqual({
       email: "event.email",
       status: "'active'",
     });
   });
+
+  it("resolves query item set keys flexibly across naming conventions and omits outputFields mapping", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "c1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "constraint",
+          name: "EmailMustBeUnique",
+          fields: [],
+          inputFields: [],
+          outputFields: [
+            { id: "of1", name: "Registered Email", fieldType: "Email", mapping: "event.email" },
+          ],
+          queryItems: [
+            {
+              id: "qi1",
+              types: ["UserRegistered"],
+              tagFieldIds: [],
+              set: {
+                registeredEmail: "event.email",
+              },
+            },
+          ],
+          constraints: [],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, []);
+    const constraint = spec.constraints.find((c) => c.name === "EmailMustBeUnique")!;
+    expect(constraint).toBeDefined();
+    // outputFields should omit mapping
+    expect(constraint.outputFields[0].mapping).toBeUndefined();
+    // In output spec, queryItem.set keys are camelCase identifiers
+    expect(constraint.queryItems[0].set).toEqual({
+      registeredEmail: "event.email",
+    });
+  });
+
+  it("normalizes Command.Field and Event.Field expressions in output spec while preserving original field names", () => {
+    const objects: CanvasObject[] = [
+      {
+        id: "ev1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: {
+          kind: "event",
+          name: "User Registered",
+          fields: [
+            { id: "f1", name: "Email", fieldType: "Email", mapping: "Command.Email" },
+            { id: "f2", name: "Password Hash", fieldType: "String", mapping: "hashPassword(Command.Password)" },
+            { id: "f3", name: "Display Name", fieldType: "String", mapping: "Command.Display Name" },
+          ],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, []);
+    const event = spec.events.find((e) => e.name === "User Registered")!;
+    expect(event).toBeDefined();
+    // Field names retain their original naming
+    expect(event.fields[0].name).toBe("Email");
+    expect(event.fields[1].name).toBe("Password Hash");
+    expect(event.fields[2].name).toBe("Display Name");
+
+    // Mappings in output spec are normalized to camelCase identifier access
+    expect(event.fields[0].mapping).toBe("command.email");
+    expect(event.fields[1].mapping).toBe("hashPassword(command.password)");
+    expect(event.fields[2].mapping).toBe("command.displayName");
+  });
 });
+

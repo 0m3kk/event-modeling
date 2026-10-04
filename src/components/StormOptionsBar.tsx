@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
-import type { BddPhase } from "@/types";
+import type { BddPhase, StormQueryItem } from "@/types";
 import {
   STORM_PHASE_COLORS,
   STORM_PHASE_LABELS,
@@ -33,6 +33,7 @@ import {
   describeValidationRules,
   hasValidationRules,
 } from "@/utils/fieldValidation";
+import { fieldNameMatches } from "@/utils/naming";
 import {
   Shield,
   Trash2,
@@ -73,6 +74,8 @@ export function StormOptionsBar() {
   const setMappingTarget = useCanvasStore((s) => s.setMappingTarget);
   const bddStepPopup = useCanvasStore((s) => s.bddStepPopup);
   const setBddStepPopup = useCanvasStore((s) => s.setBddStepPopup);
+  const queryItemPopup = useCanvasStore((s) => s.queryItemPopup);
+  const setQueryItemPopup = useCanvasStore((s) => s.setQueryItemPopup);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [showActionPopover, setShowActionPopover] = useState(false);
@@ -156,15 +159,44 @@ export function StormOptionsBar() {
       : `Set Validation for "${validationField.name}"`
     : "Set Field Validation";
 
-  // Field mapping applies to Event fields and Command/Query response fields
+  // Field mapping applies to Event fields and Command/Query response fields,
+  // plus State/Constraint outputFields (which configure projection via Query Items).
+  const isOutputField = Boolean(
+    (kind === "state" || kind === "constraint") &&
+      selectedField &&
+      (data.outputFields ?? []).some((f) => f.id === selectedField.id),
+  );
+
+  let outputFieldProjectedExpr: string | undefined;
+  let outputFieldMatchedQi: StormQueryItem | undefined;
+  if (isOutputField && selectedField) {
+    for (const q of data.queryItems ?? []) {
+      if (!q.set) continue;
+      for (const [key, expr] of Object.entries(q.set)) {
+        if (
+          fieldNameMatches(selectedField.name, key) ||
+          fieldNameMatches(selectedField.id, key)
+        ) {
+          outputFieldProjectedExpr = expr;
+          outputFieldMatchedQi = q;
+          break;
+        }
+      }
+      if (outputFieldProjectedExpr) break;
+    }
+  }
+
   const isMappableField =
     selectedField &&
     (kind === "event" ||
       ((kind === "command" || kind === "query") &&
-        (data.responseFields ?? []).some((f) => f.id === selectedField.id)));
+        (data.responseFields ?? []).some((f) => f.id === selectedField.id)) ||
+      isOutputField);
 
   const mappingSection: "params" | "response" | undefined =
-    selectedField && (data.responseFields ?? []).some((f) => f.id === selectedField.id)
+    selectedField &&
+    ((data.responseFields ?? []).some((f) => f.id === selectedField.id) ||
+      (data.outputFields ?? []).some((f) => f.id === selectedField.id))
       ? "response"
       : undefined;
 
@@ -175,14 +207,20 @@ export function StormOptionsBar() {
   );
 
   const hasMappingActive = Boolean(
-    showMappingPopover || (isMappableField && selectedField?.mapping?.trim()),
+    showMappingPopover ||
+      (isOutputField && outputFieldProjectedExpr) ||
+      (!isOutputField && isMappableField && selectedField?.mapping?.trim()),
   );
 
-  const mappingButtonTitle = isMappableField
-    ? selectedField?.mapping?.trim()
-      ? `Mapping: ${selectedField.mapping}`
-      : `Set Field Mapping for "${selectedField.name}" (Required for Codegen)`
-    : "Set Field Mapping";
+  const mappingButtonTitle = isOutputField
+    ? outputFieldProjectedExpr
+      ? `Projection: ${outputFieldProjectedExpr} (Query Item: ${outputFieldMatchedQi?.types?.join(", ") || "item"})`
+      : `Set Projection for "${selectedField?.name}" (Configured in Query Item)`
+    : isMappableField
+      ? selectedField?.mapping?.trim()
+        ? `Mapping: ${selectedField.mapping}`
+        : `Set Field Mapping for "${selectedField?.name}" (Required for Codegen)`
+      : "Set Field Mapping";
 
   const selectedQueryItem =
     sf && sf.objectId === selectedStorm.id && sf.fieldId
@@ -244,10 +282,25 @@ export function StormOptionsBar() {
             : "Delete Field"
       : "Delete Card";
 
+  const hasStoreQueryItemPopup = Boolean(
+    queryItemPopup && queryItemPopup.objectId === selectedStorm.id,
+  );
+  const showQueryItemActive =
+    (showQueryItemPopover &&
+      (queryItemPopoverMode === "create" ||
+        selectedQueryItem ||
+        Boolean(data.queryItems?.length))) ||
+    hasStoreQueryItemPopup;
+  const queryItemEffectiveMode = hasStoreQueryItemPopup
+    ? queryItemPopup?.queryItemId
+      ? "edit"
+      : "create"
+    : queryItemPopoverMode;
+
   const hasTagActive = Boolean(selectedField?.tag || showTagPopover);
   const hasQueryItemActive = Boolean(
     selectedQueryItem ||
-      (showQueryItemPopover && queryItemPopoverMode === "edit"),
+      (showQueryItemActive && queryItemEffectiveMode === "edit"),
   );
 
   const tagButtonTitle = selectedField
@@ -265,6 +318,7 @@ export function StormOptionsBar() {
     setValidationTarget(null);
     setMappingTarget(null);
     setBddStepPopup(null);
+    setQueryItemPopup(null);
   };
 
   const handleToggleMappingPopover = () => {
@@ -299,8 +353,9 @@ export function StormOptionsBar() {
   };
 
   const handleOpenEditQueryItem = () => {
-    if (showQueryItemPopover && queryItemPopoverMode === "edit") {
+    if (showQueryItemActive && queryItemEffectiveMode === "edit") {
       setShowQueryItemPopover(false);
+      setQueryItemPopup(null);
       return;
     }
     closeAllPopovers();
@@ -309,8 +364,9 @@ export function StormOptionsBar() {
   };
 
   const handleOpenAddQueryItem = () => {
-    if (showQueryItemPopover && queryItemPopoverMode === "create") {
+    if (showQueryItemActive && queryItemEffectiveMode === "create") {
       setShowQueryItemPopover(false);
+      setQueryItemPopup(null);
       return;
     }
     closeAllPopovers();
@@ -815,19 +871,23 @@ export function StormOptionsBar() {
       )}
 
       {/* Query Item Popover */}
-      {showQueryItemPopover &&
-        (queryItemPopoverMode === "create" || selectedQueryItem) && (
-          <QueryItemPopover
-            card={selectedStorm}
-            queryItemId={
-              queryItemPopoverMode === "edit"
-                ? selectedQueryItem?.id
-                : undefined
-            }
-            onClose={() => setShowQueryItemPopover(false)}
-            anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
-          />
-        )}
+      {showQueryItemActive && (
+        <QueryItemPopover
+          card={selectedStorm}
+          queryItemId={
+            queryItemEffectiveMode === "edit"
+              ? (selectedQueryItem?.id ??
+                queryItemPopup?.queryItemId ??
+                data.queryItems?.[0]?.id)
+              : undefined
+          }
+          onClose={() => {
+            setShowQueryItemPopover(false);
+            setQueryItemPopup(null);
+          }}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
+        />
+      )}
 
       {/* BDD Scenario Step Popover (create when stepId is omitted) */}
       {showBddStepPopover && bddStepPopup && (

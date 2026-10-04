@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import type { CanvasObject, StormQueryItem } from "@/types";
 import { Filter, X, Trash2, Plus, ArrowLeftRight } from "lucide-react";
+import { fieldNameMatches } from "@/utils/naming";
 
 interface QueryItemPopoverProps {
   card: CanvasObject;
@@ -229,9 +230,9 @@ export function QueryItemPopover({
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 flex w-84 flex-col rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+      className="absolute z-50 flex w-104 flex-col rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
       style={{
-        left: Math.max(12, anchorPosition.x - 165),
+        left: Math.max(12, anchorPosition.x - 208),
         top: Math.max(12, anchorPosition.y + 8),
       }}
       onPointerDown={(e) => e.stopPropagation()}
@@ -408,34 +409,54 @@ export function QueryItemPopover({
                 State Updates (set)
               </span>
               <span className="text-[10px] text-gray-400 dark:text-zinc-500">
-                Maps event fields → state
+                e.g. &lt;EventName&gt;.&lt;field&gt;
               </span>
             </div>
 
-            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               {outputFields.map((of) => {
-                const currentVal = setMappings[of.name] ?? setMappings[of.id] ?? "";
+                const sampleEvent =
+                  selectedTypes[0] ||
+                  customTypeInput.trim() ||
+                  "Event";
+                // Find matching expression across direct name, id, or camelCase
+                let currentVal = setMappings[of.name] ?? setMappings[of.id] ?? "";
+                if (!currentVal) {
+                  for (const [key, expr] of Object.entries(setMappings)) {
+                    if (fieldNameMatches(of.name, key) || fieldNameMatches(of.id, key)) {
+                      currentVal = expr;
+                      break;
+                    }
+                  }
+                }
                 return (
                   <div key={of.id} className="flex items-center gap-2">
                     <span
                       title={of.name}
-                      className="w-24 truncate text-right font-mono text-[11px] font-medium text-gray-700 dark:text-zinc-300"
+                      className="w-32 shrink-0 truncate text-right font-mono text-[11px] font-semibold text-gray-800 dark:text-zinc-200"
                     >
                       {of.name}
                     </span>
-                    <span className="text-[11px] text-gray-400 dark:text-zinc-500">=</span>
+                    <span className="text-[11px] font-bold text-gray-400 dark:text-zinc-500">=</span>
                     <input
                       type="text"
                       value={currentVal}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setSetMappings((prev) => ({
-                          ...prev,
-                          [of.name]: val,
-                        }));
+                        setSetMappings((prev) => {
+                          const next = { ...prev };
+                          // Clear any alternative casing keys for this field first
+                          for (const key of Object.keys(next)) {
+                            if (fieldNameMatches(of.name, key) || fieldNameMatches(of.id, key)) {
+                              delete next[key];
+                            }
+                          }
+                          next[of.name] = val;
+                          return next;
+                        });
                       }}
-                      placeholder={`e.g. event.${of.name} or count + 1`}
-                      className="flex-1 font-mono text-[11px] rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-gray-800 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:border-cyan-500 dark:focus:border-cyan-400 focus:outline-none"
+                      placeholder={`e.g. ${sampleEvent}.${of.name} or count + 1`}
+                      className="flex-1 font-mono text-[11px] rounded border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:border-cyan-500 dark:focus:border-cyan-400 focus:outline-none"
                     />
                   </div>
                 );

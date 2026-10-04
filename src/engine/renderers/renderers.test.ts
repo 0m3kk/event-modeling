@@ -1009,5 +1009,67 @@ describe("Pixi Card Renderers", () => {
     // Primitive type text uses normal weight and slate color (0x64748b)
     expect(noteText?.style.fill).toBe(0x64748b);
   });
+
+  it("renders mapping badges for outputFields across single and multiple events", () => {
+    const stateCard: CanvasObject = {
+      id: "state-1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 200,
+      stormData: {
+        kind: "state",
+        name: "UserState",
+        fields: [],
+        inputFields: [],
+        outputFields: [
+          { id: "of-email", name: "Email", fieldType: "string" },
+          { id: "of-status", name: "Status", fieldType: "string" },
+          { id: "of-unmapped", name: "Unmapped", fieldType: "string" },
+        ],
+        queryItems: [
+          {
+            id: "qi-1",
+            types: ["UserRegistered"],
+            tagFieldIds: [],
+            set: {
+              Email: "UserRegistered.email",
+              Status: "'PENDING'",
+            },
+          },
+          {
+            id: "qi-2",
+            types: ["UserActivated"],
+            tagFieldIds: [],
+            set: {
+              Status: "'ACTIVE'",
+            },
+          },
+        ],
+      },
+    };
+
+    const container = new Container();
+    const res = StormCardRenderer.draw(container, stateCard, 1, false);
+
+    const mappingZones = res.hitZones.filter((z) => z.type === "mapping");
+    expect(mappingZones.length).toBe(3);
+
+    // Single event mapped field: Email
+    const emailZone = mappingZones.find((z) => z.fieldId === "of-email");
+    expect(emailZone?.currentText).toBe("Set in [UserRegistered]: UserRegistered.email");
+
+    // Multi-event mapped field: Status
+    const statusZone = mappingZones.find((z) => z.fieldId === "of-status");
+    expect(statusZone?.currentText).toBe(
+      "Set in 2 events: [UserRegistered]: 'PENDING'; [UserActivated]: 'ACTIVE'",
+    );
+
+    // Unmapped field
+    const unmappedZone = mappingZones.find((z) => z.fieldId === "of-unmapped");
+    expect(unmappedZone?.currentText).toContain("Warning: Field is never updated in any Query Item set");
+  });
 });
+
 
