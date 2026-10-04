@@ -218,7 +218,7 @@ export function FieldMappingPopover({
       seen.add(item.value);
       return true;
     });
-  }, [targetField, targetEnumNode]);
+  }, [targetField, targetEnumNode, data?.kind, objects]);
 
   // Handle Save for Single Expression
   const handleApplySingle = () => {

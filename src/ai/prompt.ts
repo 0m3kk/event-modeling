@@ -49,7 +49,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
        {
          "code": "USER_NOT_FOUND",
          "description": "The user account must exist.",
-         "assert": "\"Fields\".\"User ID\" != null",
+          "assert": ""Fields"."User ID" != null",
          "message": "User account does not exist.",
          "status": 404
        }
