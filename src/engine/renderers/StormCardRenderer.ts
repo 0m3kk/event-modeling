@@ -425,13 +425,13 @@ export class StormCardRenderer {
         //   selected), dimmed when no rules are set so it doubles as an
         //   "add validation" cue
         // - ⇄ / ! shows mapping status:
-        //   - On Event cards (kind === "event") or Command/Query Response rows (section === "response"):
+        //   - On Event / External cards (kind === "event" || kind === "external") or Command/Query Response rows (section === "response"):
         //     If field.mapping is set, shows ⇄ (cyan).
         //     If field.mapping is missing, shows ! (amber warning) to indicate unmapped source.
         //   - On State / Constraint outputFields:
         //     If any queryItem.set targets this field, mapped.
         //     If unmapped, shows ! (amber warning) to indicate unprojected output field.
-        const isEventField = kind === "event";
+        const isEventField = kind === "event" || kind === "external";
         const isResponseField = section === "response" && (kind === "command" || kind === "query");
         const isOutputField = section === "response" && (kind === "state" || kind === "constraint");
         const isParamField = (kind === "state" || kind === "constraint") && section === "params";

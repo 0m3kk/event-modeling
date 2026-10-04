@@ -189,6 +189,7 @@ export function StormOptionsBar() {
   const isMappableField =
     selectedField &&
     (kind === "event" ||
+      kind === "external" ||
       ((kind === "command" || kind === "query") &&
         (data.responseFields ?? []).some((f) => f.id === selectedField.id)) ||
       isOutputField);

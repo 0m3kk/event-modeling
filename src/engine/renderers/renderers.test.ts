@@ -1070,6 +1070,46 @@ describe("Pixi Card Renderers", () => {
     const unmappedZone = mappingZones.find((z) => z.fieldId === "of-unmapped");
     expect(unmappedZone?.currentText).toContain("Warning: Field is never updated in any Query Item set");
   });
+
+  it("renders mapping badges for external cards (mapped and unmapped)", () => {
+    const externalCard: CanvasObject = {
+      id: "ext-1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 120,
+      stormData: {
+        kind: "external",
+        name: "StripeGateway",
+        fields: [
+          {
+            id: "f-token",
+            name: "Payment Token",
+            fieldType: "String",
+            mapping: '"Command"."Token"',
+          },
+          {
+            id: "f-amount",
+            name: "Amount",
+            fieldType: "Number",
+          },
+        ],
+      },
+    };
+
+    const container = new Container();
+    const res = StormCardRenderer.draw(container, externalCard, 1, false);
+
+    const mappingZones = res.hitZones.filter((z) => z.type === "mapping");
+    expect(mappingZones.length).toBe(2);
+
+    const tokenZone = mappingZones.find((z) => z.fieldId === "f-token");
+    expect(tokenZone?.currentText).toBe('Mapping:\n"Command"."Token"');
+
+    const amountZone = mappingZones.find((z) => z.fieldId === "f-amount");
+    expect(amountZone?.currentText).toContain("Warning:\nMissing explicit mapping for codegen");
+  });
 });
 
 

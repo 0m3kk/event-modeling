@@ -575,7 +575,7 @@ export function validateStormWrite(input: StormValidationInput): string[] {
               `${label} field "${f.name}" mapping "${mapping}" references unknown enum value "${accessedField}" in enum "${enumInfo.name}". Valid values: [${enumInfo.values.map((v) => `"${v}"`).join(", ")}].`,
             );
           }
-        } else if (card.kind === "event") {
+        } else if (card.kind === "event" || card.kind === "external") {
           const candidateSources = findCandidateSourcesForEvent(card, input);
           if (candidateSources.length > 0) {
             if (

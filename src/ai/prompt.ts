@@ -55,7 +55,7 @@ All systems are organized into cohesive vertical slices arranged vertically from
   - Actors declare wildcard \`permissions\` (e.g., \`order:*\`). Permissions MUST match existing Command/Query actions on canvas. Do NOT invent unmatched permissions.
   - NEVER connect Actor to Command/Query with connector lines.
 - **Explicit Field Mapping (STRICT Title Case)**:
-  - Event fields, Command/Query responseFields, and State/Constraint inputFields MUST have an explicit \`mapping\` expression: \`"Command"."Field"\`, \`"Query"."Field"\`, \`"Event Name"."Field"\`.
+  - Event & External fields, Command/Query responseFields, and State/Constraint inputFields MUST have an explicit \`mapping\` expression: \`"Command"."Field"\`, \`"Query"."Field"\`, \`"Event Name"."Field"\`.
   - \`queryItems[].set\` on State/Constraint: Keys MUST match exact Title Case \`outputFields\` names. Values MUST be \`"Event Name"."Field"\` or \`"Enum Name"."VALUE"\`. NEVER use camelCase or generic \`event.<field>\`.
 
 ## 5. Naming, Types & Language
