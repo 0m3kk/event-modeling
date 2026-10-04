@@ -176,6 +176,15 @@ function getCardOrObjectName(
   return (source as StormValidationCard).name;
 }
 
+function getCardOrObjectKind(
+  source: StormValidationCard | CanvasObject,
+): StormKind | undefined {
+  if ("stormData" in source) {
+    return source.stormData?.kind;
+  }
+  return (source as StormValidationCard).kind;
+}
+
 function findCandidateSourcesForEvent(
   eventCard: StormValidationCard,
   input: StormValidationInput,
@@ -445,9 +454,7 @@ export function validateStormWrite(input: StormValidationInput): string[] {
                 candidateSources.find(
                   (s) =>
                     (prefix.toLowerCase() === "command" &&
-                      ("stormData" in s
-                        ? s.stormData?.kind === "command"
-                        : (s as any).kind === "command")) ||
+                      getCardOrObjectKind(s) === "command") ||
                     nameKey(getCardOrObjectName(s)) === nameKey(prefix),
                 ) || candidateSources[0];
               const availableFields = getCardOrObjectFields(src);
@@ -557,9 +564,9 @@ export function validateStormWrite(input: StormValidationInput): string[] {
 
     for (const [index, item] of (card.queryItems ?? []).entries()) {
       if (item.set && Object.keys(item.set).length > 0) {
-        const outputFields = [
+        const outputFields: { name: string; id?: string }[] = [
           ...(card.outputFields ?? []),
-          ...(card.rawOutputFields?.map((f) => ({ name: f.name } as StormField)) ?? []),
+          ...(card.rawOutputFields?.map((f) => ({ name: f.name })) ?? []),
         ];
         for (const [key, expr] of Object.entries(item.set)) {
           if (isCamelOrLower(key)) {
@@ -569,7 +576,7 @@ export function validateStormWrite(input: StormValidationInput): string[] {
             );
           } else if (
             outputFields.length > 0 &&
-            !outputFields.some((f) => f.name === key || (f as any).id === key)
+            !outputFields.some((f) => f.name === key || f.id === key)
           ) {
             issues.push(
               `${label} queryItems[${index}] set key "${key}" does not match any outputField on this card. Defined output fields: [${outputFields.map((f) => `"${f.name}"`).join(", ")}].`,
