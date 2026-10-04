@@ -2027,6 +2027,9 @@ export const useCanvasStore = create<CanvasStore>()(
           actionHover: null,
           modelPopupChain: [],
           isDragging: false,
+          tool: "select",
+          mappingTarget: null,
+          mappingHover: null,
           viewport: {
             ...DEFAULT_VIEWPORT,
             // Keep the live canvas size — the engine owns it and only resyncs

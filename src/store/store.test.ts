@@ -118,9 +118,13 @@ describe("useCanvasStore", () => {
     useCanvasStore.getState().resetBoard([], [], "Loaded Project");
     expect(useCanvasStore.getState().projectName).toBe("Loaded Project");
 
+    useCanvasStore.getState().setTool("line");
     // Resetting board without project name defaults to Untitled
     useCanvasStore.getState().resetBoard();
     expect(useCanvasStore.getState().projectName).toBe("Untitled");
+    expect(useCanvasStore.getState().tool).toBe("select");
+    expect(useCanvasStore.getState().mappingTarget).toBeNull();
+    expect(useCanvasStore.getState().mappingHover).toBeNull();
   });
 
   it("adds objects and auto-selects them", () => {

@@ -2311,7 +2311,9 @@ export class PixiEngine {
             this.invalidateView();
             this.cardRefineDirty = true;
             this.scheduleRender();
-            return;
+            if (!contentChanged) {
+              return;
+            }
           }
         }
       }
