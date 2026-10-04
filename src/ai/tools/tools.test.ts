@@ -1012,6 +1012,65 @@ describe("AI Model & Write Tools", () => {
     expect(fake.objects).toHaveLength(0);
   });
 
+  it("create_model_nodes creates service model nodes with methods and parameters", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_model_nodes",
+        arguments: JSON.stringify({
+          nodes: [
+            {
+              kind: "object",
+              name: "User Credentials",
+              fields: [
+                { name: "Username", fieldType: "string" },
+                { name: "Password", fieldType: "string" },
+              ],
+            },
+            {
+              kind: "service",
+              name: "Auth Service",
+              methods: [
+                {
+                  name: "hashPassword",
+                  returnType: "string",
+                  params: [{ name: "password", paramType: "string" }],
+                },
+                {
+                  name: "verifyCredentials",
+                  returnType: "boolean",
+                  params: [
+                    { name: "creds", paramType: "user credentials" },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects).toHaveLength(2);
+    const service = fake.objects.find((o) => o.modelData?.name === "Auth Service")!;
+    expect(service.modelData?.kind).toBe("service");
+    expect(service.modelData?.methods).toHaveLength(2);
+    expect(service.modelData?.methods?.[0].name).toBe("hashPassword");
+    expect(service.modelData?.methods?.[0].returnType).toBe("String");
+    expect(service.modelData?.methods?.[0].params).toEqual([
+      expect.objectContaining({ name: "password", paramType: "String" }),
+    ]);
+    expect(service.modelData?.methods?.[1].name).toBe("verifyCredentials");
+    expect(service.modelData?.methods?.[1].returnType).toBe("Boolean");
+    expect(service.modelData?.methods?.[1].params).toEqual([
+      expect.objectContaining({ name: "creds", paramType: "User Credentials" }),
+    ]);
+  });
+
   it("connect_objects creates orthogonal elbow connector between cards", async () => {
     const fake = createFakeStore();
     fake.objects.push(

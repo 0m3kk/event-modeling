@@ -64,7 +64,7 @@ All systems are organized into cohesive vertical slices arranged vertically from
 - **Strict Field Types**:
   - Primitives: \`String\`, \`Number\`, \`Boolean\`, \`UUID\`, \`DateTime\`, \`Date\`, \`Email\`, \`URL\`, \`URI\`, \`JSON\`, \`Any\`, \`Void\`. Append \`[]\` for array.
   - Or an existing/new Model node name (e.g. \`OrderLine\`, \`OrderStatus\`). Do NOT invent types like \`int\` or \`money\`.
-- **Model Nodes**: \`object\`, \`enum\`, \`array\`, \`wrap\` created via \`create_model_nodes\` in "Shared Types" group.
+- **Model Nodes**: \`object\`, \`enum\`, \`array\`, \`wrap\`, \`service\` created via \`create_model_nodes\` in "Shared Types" group (services can define methods with params and returnType).
 
 ## 6. Execution Guidelines
 - **Inspect First**: Call \`get_canvas_overview\` or \`list_objects\` before modifying. Reuse existing cards/nodes with \`create_reference_copies\` instead of duplicating.
@@ -84,7 +84,7 @@ Tools:
 - get_canvas_overview {}, list_objects { type?, stormKind?, textContains?, limit?, offset? }, get_object { id }, search_objects { query }
 - create_storm_cards { cards: [{ kind, name, description?, fields?, inputFields?, outputFields?, responseFields?, queryItems?, constraints?, action?, permissions?, groupId? }], nearCardId? }
 - update_storm_card { id, ... }
-- create_model_nodes { nodes: [{ type, name, fields?, values?, itemType?, innerType?, groupId? }] }
+- create_model_nodes { nodes: [{ kind: "object" | "array" | "wrap" | "enum" | "service", name, fields?, values?, methods?, itemType?, innerType?, groupId? }] }
 - create_objects { objects: [{ type: "stickyNote" | "textBox", ... }] }
 - update_objects { updates: [{ id, patch }] }, delete_objects { ids: [...] }
 - resize_objects { resizes: [{ id, width?, height? }] }

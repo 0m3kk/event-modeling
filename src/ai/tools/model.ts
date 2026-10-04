@@ -6,6 +6,8 @@ import type {
   ModelData,
   ModelField,
   ModelEnumValue,
+  ServiceMethod,
+  ServiceMethodParam,
 } from "@/types";
 import {
   computeModelNodeHeight,
@@ -45,12 +47,12 @@ function modelValidation(
 export const createModelNodesTool = defineTool({
   name: "create_model_nodes",
   description:
-    "Create data-model nodes (object / array / wrap / enum). Object nodes carry a field list; array/wrap carry an item/inner type; enum carries values. Object fields and array/wrap nodes may set `validation` (an object field uses the full rule set; an array node only uses minItems/maxItems; a wrap node validates the whole wrapped value). Enum never validates.",
+    "Create data-model nodes (object / array / wrap / enum / service). Object nodes carry a field list; array/wrap carry an item/inner type; enum carries values; service carries methods (with parameters and return types). Object fields and array/wrap nodes may set `validation` (an object field uses the full rule set; an array node only uses minItems/maxItems; a wrap node validates the whole wrapped value). Enum and service never validate.",
   schema: z.object({
     nodes: z
       .array(
         z.object({
-          kind: z.enum(["object", "array", "wrap", "enum"]),
+          kind: z.enum(["object", "array", "wrap", "enum", "service"]),
           name: z.string().min(1),
           description: z.string().optional(),
           x: z.number().optional(),
@@ -73,6 +75,36 @@ export const createModelNodesTool = defineTool({
               }),
             )
             .optional(),
+          methods: z
+            .array(
+              z.object({
+                name: z.string(),
+                returnType: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "Primitive type or Model node name; append '[]' for an array. Defaults to String. Invalid types are rejected.",
+                  ),
+                description: z.string().optional(),
+                params: z
+                  .array(
+                    z.object({
+                      name: z.string(),
+                      paramType: z
+                        .string()
+                        .optional()
+                        .describe(
+                          "Primitive type or Model node name; append '[]' for an array. Defaults to String.",
+                        ),
+                    }),
+                  )
+                  .optional(),
+              }),
+            )
+            .optional()
+            .describe(
+              "Service nodes only: functions/methods provided by this service.",
+            ),
           itemType: z
             .string()
             .optional()
@@ -149,6 +181,21 @@ export const createModelNodesTool = defineTool({
       } else if (spec.kind === "wrap") {
         const { error } = resolveFieldType(spec.innerType, typeEnv);
         if (error) typeErrors.push(`${label} innerType ${error}`);
+      } else if (spec.kind === "service") {
+        for (const m of spec.methods ?? []) {
+          const { error: retErr } = resolveFieldType(m.returnType, typeEnv);
+          if (retErr) {
+            typeErrors.push(`${label} method "${m.name}" returnType ${retErr}`);
+          }
+          for (const p of m.params ?? []) {
+            const { error: paramErr } = resolveFieldType(p.paramType, typeEnv);
+            if (paramErr) {
+              typeErrors.push(
+                `${label} method "${m.name}" param "${p.name}" ${paramErr}`,
+              );
+            }
+          }
+        }
       }
     }
     if (typeErrors.length > 0) {
@@ -188,6 +235,20 @@ export const createModelNodesTool = defineTool({
           resolveFieldType(spec.innerType, typeEnv).type || DEFAULT_FIELD_TYPE;
         const validation = modelValidation(spec.validation, "wrap");
         if (validation) data.validation = validation;
+      } else if (spec.kind === "service") {
+        data.methods = (spec.methods ?? []).map((m): ServiceMethod => ({
+          id: nanoid(),
+          name: m.name,
+          returnType:
+            resolveFieldType(m.returnType, typeEnv).type || DEFAULT_FIELD_TYPE,
+          description: m.description,
+          params: (m.params ?? []).map((p): ServiceMethodParam => ({
+            id: nanoid(),
+            name: p.name,
+            paramType:
+              resolveFieldType(p.paramType, typeEnv).type || DEFAULT_FIELD_TYPE,
+          })),
+        }));
       } else {
         data.values = (spec.values ?? []).map((v): ModelEnumValue => ({
           id: nanoid(),
