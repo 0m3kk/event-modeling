@@ -118,7 +118,7 @@ export function ServiceParamsPopover({
   return (
     <div
       ref={popoverRef}
-      className="fixed z-50 flex w-[440px] max-w-[90vw] flex-col gap-3 rounded-xl border border-gray-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 p-4 shadow-2xl backdrop-blur-md text-xs text-gray-800 dark:text-zinc-200 overflow-x-hidden"
+      className="fixed z-50 flex w-[480px] max-w-[92vw] flex-col gap-3.5 rounded-xl border border-gray-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 p-4 shadow-2xl backdrop-blur-md text-sm text-gray-800 dark:text-zinc-200 overflow-x-hidden"
       style={{
         left: `${anchorPosition.x}px`,
         top: `${anchorPosition.y}px`,
@@ -129,26 +129,26 @@ export function ServiceParamsPopover({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2.5">
         <div className="flex items-center gap-2 font-semibold text-gray-900 dark:text-zinc-100 text-sm">
-          <Sliders size={15} className="text-indigo-500 shrink-0" />
+          <Sliders size={16} className="text-indigo-500 shrink-0" />
           <span className="truncate">Method: {method.name || "Untitled"}</span>
         </div>
         <button
           onClick={onClose}
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 cursor-pointer"
+          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 cursor-pointer"
         >
-          <X size={15} />
+          <X size={16} />
         </button>
       </div>
 
       {/* Return Type Row */}
-      <div className="flex items-center justify-between gap-3 bg-gray-50/70 dark:bg-zinc-800/40 p-2 rounded-lg border border-gray-100 dark:border-zinc-800">
-        <label className="text-[11px] font-medium text-gray-600 dark:text-zinc-400 shrink-0">
+      <div className="flex items-center justify-between gap-3 bg-gray-50/70 dark:bg-zinc-800/40 p-2.5 rounded-lg border border-gray-100 dark:border-zinc-800">
+        <label className="text-xs font-semibold text-gray-700 dark:text-zinc-300 shrink-0">
           Return Type:
         </label>
         <select
           value={returnType}
           onChange={(e) => handleReturnTypeChange(e.target.value)}
-          className="flex-1 max-w-[200px] rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 font-mono text-[11px] outline-none focus:border-indigo-500"
+          className="flex-1 max-w-[220px] h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 font-mono text-xs outline-none focus:border-indigo-500 cursor-pointer"
         >
           {availableTypes.map((t) => (
             <option key={t} value={t}>
@@ -159,22 +159,22 @@ export function ServiceParamsPopover({
       </div>
 
       {/* Params Section */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-medium text-gray-600 dark:text-zinc-400">
+          <span className="text-xs font-semibold text-gray-700 dark:text-zinc-300">
             Parameters ({params.length}):
           </span>
           <button
             onClick={handleAddParam}
-            className="flex items-center gap-1.5 rounded-md bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer"
           >
-            <Plus size={13} />
+            <Plus size={14} />
             Add Param
           </button>
         </div>
 
         {params.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-200 dark:border-zinc-800 p-3 text-center text-[11px] text-gray-400 dark:text-zinc-500">
+          <div className="rounded-lg border border-dashed border-gray-200 dark:border-zinc-800 p-4 text-center text-xs text-gray-400 dark:text-zinc-500">
             No parameters yet. Click &quot;Add Param&quot; above to add one.
           </div>
         ) : (
@@ -189,13 +189,13 @@ export function ServiceParamsPopover({
                   placeholder="param name"
                   value={p.name}
                   onChange={(e) => handleParamNameChange(p.id, e.target.value)}
-                  className="flex-1 min-w-0 rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 font-mono text-[11px] outline-none focus:border-indigo-500"
+                  className="flex-1 min-w-0 h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 font-mono text-xs outline-none focus:border-indigo-500"
                 />
-                <span className="text-gray-400 shrink-0">:</span>
+                <span className="text-gray-400 font-semibold shrink-0">:</span>
                 <select
                   value={p.paramType}
                   onChange={(e) => handleParamTypeChange(p.id, e.target.value)}
-                  className="w-32 shrink-0 rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 font-mono text-[11px] outline-none focus:border-indigo-500"
+                  className="w-36 shrink-0 h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 font-mono text-xs outline-none focus:border-indigo-500 cursor-pointer"
                 >
                   {availableTypes.map((t) => (
                     <option key={t} value={t}>
@@ -205,10 +205,10 @@ export function ServiceParamsPopover({
                 </select>
                 <button
                   onClick={() => handleDeleteParam(p.id)}
-                  className="shrink-0 rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
                   title="Delete parameter"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={14} />
                 </button>
               </div>
             ))}

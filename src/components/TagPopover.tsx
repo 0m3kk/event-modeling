@@ -137,33 +137,33 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 flex w-76 flex-col rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3.5 shadow-2xl"
+      className="absolute z-50 flex w-88 flex-col rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-2xl"
       style={{
-        left: Math.max(12, anchorPosition.x - 150),
+        left: Math.max(12, anchorPosition.x - 176),
         top: Math.max(12, anchorPosition.y + 8),
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2">
-        <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-100">
-          <Tag size={15} className="shrink-0 text-orange-600 dark:text-orange-400" />
+      <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2.5">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-100">
+          <Tag size={16} className="shrink-0 text-orange-600 dark:text-orange-400" />
           <span className="truncate">
             {currentField ? t("popovers.tag.titleNamed", { name: currentField.name }) : t("popovers.tag.title")}
           </span>
         </div>
         <button
           onClick={onClose}
-          className="flex h-5 w-5 items-center justify-center rounded-md text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
           title={t("common.close")}
         >
-          <X size={13} />
+          <X size={16} />
         </button>
       </div>
 
-      <div className="mt-2.5 space-y-2.5">
+      <div className="mt-3 space-y-3">
         {/* Tag Name Input */}
         <div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <input
                 ref={inputRef}
@@ -177,13 +177,13 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
                   }
                 }}
                 placeholder={t("popovers.tag.placeholder")}
-                className="w-full rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 text-xs text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:outline-none"
+                className="w-full h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-sm text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-orange-500 focus:outline-none"
               />
             </div>
             <button
               type="button"
               onClick={() => handleApply(tagInput)}
-              className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 transition-colors cursor-pointer"
+              className="h-9 rounded-lg bg-orange-600 px-3.5 text-xs font-semibold text-white hover:bg-orange-700 transition-colors cursor-pointer shrink-0"
             >
               {t("common.apply")}
             </button>
@@ -192,9 +192,9 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
                 type="button"
                 onClick={handleRemoveTag}
                 title={t("popovers.tag.deleteTag")}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-400 dark:text-zinc-400 hover:border-red-200 dark:hover:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-400 dark:text-zinc-400 hover:border-red-200 dark:hover:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
               >
-                <Trash2 size={13} />
+                <Trash2 size={14} />
               </button>
             )}
           </div>
@@ -202,17 +202,17 @@ export function TagPopover({ card, onClose, anchorPosition }: TagPopoverProps) {
 
         {/* Existing Tags on Board */}
         {existingTags.length > 0 && (
-          <div className="border-t border-gray-100 dark:border-zinc-800 pt-2">
-            <div className="mb-1 text-[11px] font-semibold text-gray-500 dark:text-zinc-400">
+          <div className="border-t border-gray-100 dark:border-zinc-800 pt-2.5">
+            <div className="mb-1.5 text-xs font-semibold text-gray-500 dark:text-zinc-400">
               {t("popovers.tag.existingTags")}
             </div>
-            <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto">
+            <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
               {existingTags.map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => handleApply(tag)}
-                  className={`rounded-md px-2 py-0.5 text-[11px] transition-colors cursor-pointer ${
+                  className={`rounded-md px-2.5 py-1 text-xs transition-colors cursor-pointer ${
                     tagInput.trim() === tag
                       ? "border border-orange-300 dark:border-orange-700 bg-orange-100 dark:bg-orange-950/60 font-bold text-orange-800 dark:text-orange-300"
                       : "bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700"

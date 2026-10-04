@@ -99,9 +99,9 @@ export function ActionPopover({
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 flex w-88 flex-col rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-2xl"
+      className="absolute z-50 flex w-96 flex-col rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-2xl"
       style={{
-        left: Math.max(12, anchorPosition.x - 176),
+        left: Math.max(12, anchorPosition.x - 192),
         top: Math.max(12, anchorPosition.y + 8),
       }}
       onPointerEnter={() => {
@@ -112,48 +112,48 @@ export function ActionPopover({
       }}
     >
       <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2.5">
-        <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 dark:text-zinc-100">
-          <Shield size={16} className="text-blue-600 dark:text-blue-400" />
+        <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-100">
+          <Shield size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
           <span>{t("popovers.action.title")}</span>
         </div>
         <button
           onClick={onClose}
-          className="rounded-lg p-1 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
+          className="rounded-lg p-1.5 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
         >
-          <X size={15} />
+          <X size={16} />
         </button>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2">
-        <div className="flex items-center gap-1.5">
+      <div className="mt-3.5 flex flex-col gap-2.5">
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={actionInput}
             onChange={(e) => handleApplyAction(e.target.value)}
             placeholder={t("popovers.action.placeholder")}
-            className="flex-1 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-blue-500 focus:outline-none"
+            className="flex-1 h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 font-mono text-sm text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-blue-500 focus:outline-none"
           />
           <button
             onClick={handleSuggest}
             title={t("popovers.action.autoSuggest")}
-            className="flex items-center gap-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-2 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 cursor-pointer"
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-3 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 cursor-pointer"
           >
-            <Sparkles size={13} />
+            <Sparkles size={14} />
             {t("popovers.action.suggest")}
           </button>
         </div>
 
         {/* Verbs Chips */}
         <div className="mt-1">
-          <div className="text-[11px] font-medium tracking-wider text-gray-500 dark:text-zinc-400 uppercase">
+          <div className="text-xs font-semibold tracking-wider text-gray-500 dark:text-zinc-400 uppercase">
             Verb
           </div>
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {COMMON_VERBS.map((v) => (
               <button
                 key={v}
                 onClick={() => handleSelectVerb(v)}
-                className={`rounded px-2 py-0.5 font-mono text-[11px] transition-all cursor-pointer ${
+                className={`rounded-md px-2.5 py-1 font-mono text-xs transition-all cursor-pointer ${
                   parsed.verb === v
                     ? "bg-blue-600 text-white"
                     : "bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700"
@@ -167,15 +167,15 @@ export function ActionPopover({
 
         {/* Scope Chips */}
         <div className="mt-1">
-          <div className="text-[11px] font-medium tracking-wider text-gray-500 dark:text-zinc-400 uppercase">
+          <div className="text-xs font-semibold tracking-wider text-gray-500 dark:text-zinc-400 uppercase">
             Scope
           </div>
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {COMMON_SCOPES.map((s) => (
               <button
                 key={s}
                 onClick={() => handleSelectScope(s)}
-                className={`rounded px-2 py-0.5 font-mono text-[11px] transition-all cursor-pointer ${
+                className={`rounded-md px-2.5 py-1 font-mono text-xs transition-all cursor-pointer ${
                   parsed.scope === s
                     ? "bg-blue-600 text-white"
                     : "bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700"
@@ -190,19 +190,19 @@ export function ActionPopover({
         {/* Existing Canvas Actions */}
         {existingActions.length > 0 && (
           <div className="mt-1">
-            <div className="text-[11px] font-medium tracking-wider text-gray-500 dark:text-zinc-400 uppercase">
+            <div className="text-xs font-semibold tracking-wider text-gray-500 dark:text-zinc-400 uppercase">
               {t("popovers.action.usedOnCanvas")}
             </div>
-            <div className="mt-1 flex max-h-24 flex-col gap-1 overflow-y-auto pr-1">
+            <div className="mt-1.5 flex max-h-28 flex-col gap-1 overflow-y-auto pr-1">
               {existingActions.map((act) => (
                 <button
                   key={act}
                   onClick={() => handleApplyAction(act)}
-                  className="flex items-center justify-between rounded px-2 py-1 text-left font-mono text-xs text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer"
+                  className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left font-mono text-xs text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer"
                 >
                   <span>{act}</span>
                   {actionInput === act && (
-                    <Check size={12} className="text-blue-600 dark:text-blue-400" />
+                    <Check size={14} className="text-blue-600 dark:text-blue-400" />
                   )}
                 </button>
               ))}
@@ -211,27 +211,27 @@ export function ActionPopover({
         )}
 
         {/* Authorized Actors Inspection */}
-        <div className="mt-2 rounded-lg border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/60 p-2.5">
+        <div className="mt-2 rounded-lg border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/60 p-3">
           <div className="flex items-center justify-between text-xs text-gray-600 dark:text-zinc-300">
-            <span className="font-medium">{t("popovers.action.authorizedActors")}</span>
-            <span className="py-0.2 rounded-full bg-blue-100 dark:bg-blue-950/60 px-1.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+            <span className="font-semibold">{t("popovers.action.authorizedActors")}</span>
+            <span className="rounded-full bg-blue-100 dark:bg-blue-950/60 px-2 py-0.5 text-xs font-bold text-blue-700 dark:text-blue-300">
               {authorizedActors.length}
             </span>
           </div>
 
-          <div className="mt-1.5 max-h-20 overflow-y-auto">
+          <div className="mt-2 max-h-24 overflow-y-auto">
             {authorizedActors.length === 0 ? (
-              <div className="text-[11px] text-gray-400 dark:text-zinc-500 italic">
+              <div className="text-xs text-gray-400 dark:text-zinc-500 italic">
                 {t("popovers.action.noMatchingActors")}
               </div>
             ) : (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 {authorizedActors.map((actor) => (
                   <span
                     key={actor.id}
-                    className="inline-flex items-center gap-1 rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-0.5 text-xs text-gray-800 dark:text-zinc-200 shadow-2xs"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1 text-xs text-gray-800 dark:text-zinc-200 shadow-2xs"
                   >
-                    <User size={11} className="text-pink-600 dark:text-pink-400" />
+                    <User size={12} className="text-pink-600 dark:text-pink-400" />
                     {actor.stormData?.name || "Actor"}
                   </span>
                 ))}

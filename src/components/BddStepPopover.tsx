@@ -133,35 +133,35 @@ export function BddStepPopover({
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 flex w-88 flex-col rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3.5 shadow-2xl"
+      className="absolute z-50 flex w-96 flex-col rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-2xl"
       style={{
-        left: Math.max(12, anchorPosition.x - 176),
+        left: Math.max(12, anchorPosition.x - 192),
         top: Math.max(12, anchorPosition.y + 8),
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2">
-        <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-100">
-          <ListChecks size={15} className="shrink-0 text-sky-600 dark:text-sky-400" />
+      <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2.5">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-100">
+          <ListChecks size={16} className="shrink-0 text-sky-600 dark:text-sky-400" />
           <span className="truncate">
             {t("popovers.bddStep.title")}
           </span>
         </div>
         <button
           onClick={onClose}
-          className="flex h-5 w-5 items-center justify-center rounded-md text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
         >
-          <X size={13} />
+          <X size={16} />
         </button>
       </div>
 
-      <div className="mt-2.5 space-y-3">
+      <div className="mt-3.5 space-y-3.5">
         {/* What the step stands for */}
         <div>
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
             {t("popovers.bddStep.stepType")}
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {allowedRefs.map((r) => {
               const isSelected = ref === r;
               const color = BDD_STEP_REF_COLORS[r];
@@ -170,7 +170,7 @@ export function BddStepPopover({
                   key={r}
                   type="button"
                   onClick={() => setRef(r)}
-                  className="rounded-md border border-gray-200 dark:border-zinc-700 px-2 py-0.5 text-[11px] font-semibold transition-colors cursor-pointer"
+                  className="rounded-md border border-gray-200 dark:border-zinc-700 px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer"
                   style={
                     isSelected
                       ? { borderColor: color, backgroundColor: `${color}1a`, color }
@@ -189,7 +189,7 @@ export function BddStepPopover({
 
         {/* Name of the referenced card */}
         <div>
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
             {t("popovers.bddStep.stepTitle")}
           </div>
           <input
@@ -204,32 +204,32 @@ export function BddStepPopover({
               }
             }}
             placeholder="e.g. OrderPlaced"
-            className="w-full rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-xs text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-sky-500 focus:outline-none"
+            className="w-full h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-sm text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-sky-500 focus:outline-none"
           />
         </div>
 
         {/* Concrete payload values (partial) */}
         <div>
-          <div className="mb-1 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
               Payload ({payload.length})
             </span>
             <button
               type="button"
               onClick={addPayloadRow}
-              className="flex items-center gap-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
+              className="flex items-center gap-1 text-xs font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
             >
-              <Plus size={11} />
+              <Plus size={13} />
               <span>Add value</span>
             </button>
           </div>
 
           {payload.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-200 dark:border-zinc-700 px-2 py-2 text-[11px] italic text-gray-400 dark:text-zinc-500">
+            <div className="rounded-lg border border-dashed border-gray-200 dark:border-zinc-700 p-3 text-xs italic text-gray-400 dark:text-zinc-500">
               No values yet — add just the fields this scenario needs.
             </div>
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {payload.map((p) => (
                 <div key={p.id} className="flex items-center gap-1.5">
                   <input
@@ -239,9 +239,9 @@ export function BddStepPopover({
                       updatePayloadRow(p.id, { key: e.target.value })
                     }
                     placeholder="key"
-                    className="w-24 shrink-0 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-1.5 py-1 text-[11px] font-semibold text-gray-700 dark:text-zinc-300 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-sky-500 focus:outline-none"
+                    className="w-28 shrink-0 h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-sky-500 focus:outline-none"
                   />
-                  <span className="text-gray-300 dark:text-zinc-600">=</span>
+                  <span className="text-gray-300 dark:text-zinc-600 font-bold">=</span>
                   <input
                     type="text"
                     value={p.value}
@@ -255,14 +255,14 @@ export function BddStepPopover({
                       }
                     }}
                     placeholder="value"
-                    className="min-w-0 flex-1 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-1.5 py-1 text-[11px] text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-sky-500 focus:outline-none"
+                    className="min-w-0 flex-1 h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 text-xs text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-sky-500 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => removePayloadRow(p.id)}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-300 dark:text-zinc-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 dark:text-zinc-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
                   >
-                    <X size={12} />
+                    <X size={14} />
                   </button>
                 </div>
               ))}
@@ -271,21 +271,21 @@ export function BddStepPopover({
         </div>
 
         {/* Bottom actions */}
-        <div className="flex items-center justify-end gap-1.5 border-t border-gray-100 dark:border-zinc-800 pt-2.5">
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 dark:border-zinc-800 pt-3">
           {isEditMode && (
             <button
               type="button"
               onClick={handleDelete}
               title={t("popovers.bddStep.deleteStep")}
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-400 dark:text-zinc-400 transition-colors hover:border-red-200 dark:hover:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-400 dark:text-zinc-400 transition-colors hover:border-red-200 dark:hover:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
             >
-              <Trash2 size={13} />
+              <Trash2 size={14} />
             </button>
           )}
           <button
             type="button"
             onClick={handleApply}
-            className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-700 cursor-pointer"
+            className="h-9 rounded-lg bg-sky-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-sky-700 cursor-pointer"
           >
             {t("common.apply")}
           </button>

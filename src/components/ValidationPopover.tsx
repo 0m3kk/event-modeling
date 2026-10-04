@@ -188,47 +188,47 @@ export function ValidationPopover({
       : editor.data.name || MODEL_KIND_LABELS[editor.data.kind];
 
   const inputClass =
-    "w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800 placeholder-gray-400 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500";
+    "w-full h-9 rounded-lg border border-gray-200 px-3 text-sm text-gray-800 placeholder-gray-400 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500";
 
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 flex w-84 flex-col rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+      className="absolute z-50 flex w-96 flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
       style={{
-        left: Math.max(12, anchorPosition.x - 165),
+        left: Math.max(12, anchorPosition.x - 192),
         top: Math.max(12, anchorPosition.y + 8),
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between border-b border-gray-100 pb-2 dark:border-zinc-800">
-        <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-zinc-100">
-          <ListChecks size={15} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+      <div className="flex items-center justify-between border-b border-gray-100 pb-2.5 dark:border-zinc-800">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-100">
+          <ListChecks size={16} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
           <span className="truncate">{t("popovers.validation.title")}: {title}</span>
         </div>
         <button
           onClick={onClose}
           title={t("common.close")}
-          className="flex h-5 w-5 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 cursor-pointer"
         >
-          <X size={13} />
+          <X size={16} />
         </button>
       </div>
 
-      <div className="mt-3 space-y-3">
+      <div className="mt-3.5 space-y-3.5">
         {/* Well-known string format (email, uuid, …). Only string-like values
             can carry a format, so it is hidden for numbers/booleans/models.
             A custom dropdown (not a native <select>) keeps a single outside
             click enough to dismiss the whole panel. */}
         {showFormat && (
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-gray-600 dark:text-zinc-300">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-gray-700 dark:text-zinc-300">
               Format
             </span>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowFormatList((v) => !v)}
-                className={`${inputClass} flex items-center justify-between text-left`}
+                className={`${inputClass} flex items-center justify-between text-left cursor-pointer`}
               >
                 <span>
                   {draft.format
@@ -236,7 +236,7 @@ export function ValidationPopover({
                       draft.format)
                     : "None"}
                 </span>
-                <ChevronDown size={13} className="shrink-0 text-gray-400 dark:text-zinc-500" />
+                <ChevronDown size={14} className="shrink-0 text-gray-400 dark:text-zinc-500" />
               </button>
 
               {showFormatList && (
@@ -251,7 +251,7 @@ export function ValidationPopover({
                           updateField("format")(format);
                           setShowFormatList(false);
                         }}
-                        className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs transition-colors cursor-pointer ${
                           isSelected
                             ? "bg-emerald-50 font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
                             : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
@@ -269,7 +269,7 @@ export function ValidationPopover({
               )}
             </div>
             {impliedFormat && draft.format !== impliedFormat && (
-              <span className="text-[10px] text-gray-400 dark:text-zinc-500">
+              <span className="text-xs text-gray-400 dark:text-zinc-500">
                 Type &ldquo;{valueType}&rdquo; already implies format{" "}
                 {impliedFormat}.
               </span>
@@ -280,12 +280,12 @@ export function ValidationPopover({
         {/* Array nodes only bound the item count. */}
         {isArrayScope ? (
           <div>
-            <div className="mb-1 text-[11px] font-semibold text-gray-600 dark:text-zinc-300">
+            <div className="mb-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300">
               Array length
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2.5">
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] text-gray-400 dark:text-zinc-500">Min items</span>
+                <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Min items</span>
                 <input
                   type="number"
                   min={0}
@@ -296,7 +296,7 @@ export function ValidationPopover({
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] text-gray-400 dark:text-zinc-500">Max items</span>
+                <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Max items</span>
                 <input
                   type="number"
                   min={0}
@@ -312,12 +312,12 @@ export function ValidationPopover({
           <>
             {/* String length bounds */}
             <div>
-              <div className="mb-1 text-[11px] font-semibold text-gray-600 dark:text-zinc-300">
+              <div className="mb-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300">
                 String length
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{t("popovers.validation.minLength")}</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">{t("popovers.validation.minLength")}</span>
                   <input
                     type="number"
                     min={0}
@@ -328,7 +328,7 @@ export function ValidationPopover({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{t("popovers.validation.maxLength")}</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">{t("popovers.validation.maxLength")}</span>
                   <input
                     type="number"
                     min={0}
@@ -343,7 +343,7 @@ export function ValidationPopover({
 
             {/* Regex pattern */}
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-gray-600 dark:text-zinc-300">
+              <span className="text-xs font-semibold text-gray-700 dark:text-zinc-300">
                 {t("popovers.validation.pattern")}
               </span>
               <input
@@ -357,12 +357,12 @@ export function ValidationPopover({
 
             {/* Numeric bounds */}
             <div>
-              <div className="mb-1 text-[11px] font-semibold text-gray-600 dark:text-zinc-300">
+              <div className="mb-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300">
                 Numeric range
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{t("popovers.validation.minVal")}</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">{t("popovers.validation.minVal")}</span>
                   <input
                     type="number"
                     value={draft.min}
@@ -372,7 +372,7 @@ export function ValidationPopover({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{t("popovers.validation.maxVal")}</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">{t("popovers.validation.maxVal")}</span>
                   <input
                     type="number"
                     value={draft.max}
@@ -386,7 +386,7 @@ export function ValidationPopover({
 
             {/* Allowed values (enum) */}
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-gray-600 dark:text-zinc-300">
+              <span className="text-xs font-semibold text-gray-700 dark:text-zinc-300">
                 {t("popovers.validation.enumVals")}
               </span>
               <input
@@ -400,8 +400,8 @@ export function ValidationPopover({
           </>
         )}
 
-        <div className="flex items-center justify-between border-t border-gray-100 pt-2.5 dark:border-zinc-800">
-          <span className="text-[10px] text-gray-400 dark:text-zinc-500">
+        <div className="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-zinc-800">
+          <span className="text-xs text-gray-400 dark:text-zinc-500">
             Mapped into the exported JSON Schema.
           </span>
           <button
@@ -409,9 +409,9 @@ export function ValidationPopover({
             onClick={() => commit(EMPTY_VALIDATION_DRAFT)}
             disabled={!currentValidation}
             title={t("popovers.validation.clearValidation")}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-gray-500 transition-all hover:bg-gray-100 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-red-400"
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-500 transition-all hover:bg-gray-100 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-red-400 cursor-pointer"
           >
-            <Trash2 size={13} />
+            <Trash2 size={14} />
             {t("common.delete")}
           </button>
         </div>

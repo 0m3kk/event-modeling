@@ -89,23 +89,23 @@ export function DescriptionPopover({
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 flex w-88 flex-col rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-2xl"
+      className="absolute z-50 flex w-96 flex-col rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-2xl"
       style={{
-        left: Math.max(12, anchorPosition.x - 176),
+        left: Math.max(12, anchorPosition.x - 192),
         top: Math.max(12, anchorPosition.y + 8),
       }}
     >
       <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2.5">
-        <div className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-gray-800 dark:text-zinc-100">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-100">
           <Info size={16} className="shrink-0 text-sky-600 dark:text-sky-400" />
           <span className="truncate">{scopeLabel}</span>
         </div>
         <button
           onClick={onClose}
           title={t("common.close")}
-          className="rounded-lg p-1 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
+          className="rounded-lg p-1.5 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
         >
-          <X size={15} />
+          <X size={16} />
         </button>
       </div>
 
@@ -115,19 +115,19 @@ export function DescriptionPopover({
         value={text}
         onChange={(e) => apply(e.target.value)}
         placeholder={t("popovers.description.placeholder")}
-        className="mt-3 w-full resize-none rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-2 text-xs leading-relaxed text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-sky-500 focus:outline-none"
+        className="mt-3.5 w-full resize-none rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2.5 text-sm leading-relaxed text-gray-800 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:border-sky-500 focus:outline-none"
       />
 
-      <div className="mt-2 flex items-center justify-between">
-        <span className="text-[11px] text-gray-400 dark:text-zinc-500">
+      <div className="mt-2.5 flex items-center justify-between">
+        <span className="text-xs text-gray-400 dark:text-zinc-500">
           {text.trim().length} characters
         </span>
         <button
           onClick={() => apply("")}
           disabled={!text.trim()}
-          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-gray-500 dark:text-zinc-400 transition-all hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-red-500 dark:hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-500 dark:text-zinc-400 transition-all hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-red-500 dark:hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
-          <Trash2 size={13} />
+          <Trash2 size={14} />
           {t("common.delete")}
         </button>
       </div>

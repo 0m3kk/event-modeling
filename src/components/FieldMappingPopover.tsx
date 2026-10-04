@@ -335,16 +335,16 @@ export function FieldMappingPopover({
       <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 px-4 py-3 bg-linear-to-r from-cyan-50/60 to-transparent dark:from-cyan-950/25">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-100 dark:bg-cyan-900/50 text-cyan-600 dark:text-cyan-400">
-            <ArrowLeftRight size={15} />
+            <ArrowLeftRight size={16} />
           </div>
           <div>
-            <h3 className="text-xs font-semibold text-gray-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100 flex items-center gap-1.5">
               <span>{isOutputField ? "Field Projections" : "Field Mapping"}</span>
-              <span className="rounded bg-cyan-100 dark:bg-cyan-900/60 px-1.5 py-0.2 text-[9px] font-bold text-cyan-700 dark:text-cyan-300">
+              <span className="rounded bg-cyan-100 dark:bg-cyan-900/60 px-1.5 py-0.5 text-[10px] font-bold text-cyan-700 dark:text-cyan-300">
                 Codegen
               </span>
             </h3>
-            <p className="text-[10px] text-gray-500 dark:text-zinc-400">
+            <p className="text-xs text-gray-500 dark:text-zinc-400">
               Field: <span className="font-semibold text-cyan-600 dark:text-cyan-400">{targetField?.name || "Untitled"}</span>
               {targetField?.fieldType ? ` (${targetField.fieldType})` : ""}
               {" · "}
@@ -354,9 +354,9 @@ export function FieldMappingPopover({
         </div>
         <button
           onClick={onClose}
-          className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 cursor-pointer"
         >
-          <X size={15} />
+          <X size={16} />
         </button>
       </div>
 
@@ -365,11 +365,11 @@ export function FieldMappingPopover({
         <div className="p-4 space-y-3.5 max-h-[72vh] overflow-y-auto">
           {/* Warning if no projections */}
           {activeProjectionCount === 0 && (
-            <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
-              <span className="font-bold text-amber-600 dark:text-amber-400 text-xs mt-0.5">⚠️</span>
+            <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+              <span className="font-bold text-amber-600 dark:text-amber-400 text-sm mt-0.5">⚠️</span>
               <div>
                 <p className="font-semibold">Missing event projection</p>
-                <p className="text-[10px] text-amber-700 dark:text-amber-400/90">
+                <p className="text-xs text-amber-700 dark:text-amber-400/90">
                   This field is never updated by any event. Configure at least one event mapping below so codegen knows how to project this field.
                 </p>
               </div>
@@ -379,21 +379,21 @@ export function FieldMappingPopover({
           {/* List of Events updating this field */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-zinc-400 flex items-center gap-1.5">
-                <Zap size={12} className="text-amber-500" />
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-zinc-400 flex items-center gap-1.5">
+                <Zap size={13} className="text-amber-500" />
                 Events Updating This Field ({queryItems.length})
               </label>
-              <span className="text-[10px] text-gray-400 dark:text-zinc-500">
+              <span className="text-xs text-gray-400 dark:text-zinc-500">
                 Format: <code className="text-cyan-600 dark:text-cyan-400">&lt;EventName&gt;.&lt;field&gt;</code>
               </span>
             </div>
 
             {queryItems.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-200 dark:border-zinc-800 p-4 text-center">
-                <p className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">
+                <p className="text-sm font-medium text-gray-600 dark:text-zinc-400 mb-1">
                   No events connected to this {data?.kind} yet
                 </p>
-                <p className="text-[11px] text-gray-400 dark:text-zinc-500 mb-3">
+                <p className="text-xs text-gray-400 dark:text-zinc-500 mb-3">
                   Select an event from the canvas below to start projecting this field:
                 </p>
                 {allEventCards.length > 0 ? (
@@ -403,15 +403,15 @@ export function FieldMappingPopover({
                         key={ev.id}
                         type="button"
                         onClick={() => handleAddEventQueryItem(ev.name)}
-                        className="flex items-center gap-1 rounded-lg border border-orange-200 dark:border-orange-800/80 bg-orange-50 dark:bg-orange-950/30 px-2.5 py-1 text-xs font-semibold text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors"
+                        className="flex items-center gap-1 rounded-lg border border-orange-200 dark:border-orange-800/80 bg-orange-50 dark:bg-orange-950/30 px-3 py-1.5 text-xs font-semibold text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors cursor-pointer"
                       >
-                        <Zap size={11} className="text-orange-500" />
+                        <Zap size={12} className="text-orange-500" />
                         {ev.name}
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[11px] italic text-gray-400">
+                  <p className="text-xs italic text-gray-400">
                     Create an Event card on the board first.
                   </p>
                 )}
@@ -427,16 +427,16 @@ export function FieldMappingPopover({
                   return (
                     <div
                       key={qi.id}
-                      className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50/70 dark:bg-zinc-800/40 p-3 space-y-2 transition-all hover:border-gray-300 dark:hover:border-zinc-700"
+                      className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50/70 dark:bg-zinc-800/40 p-3 space-y-2.5 transition-all hover:border-gray-300 dark:hover:border-zinc-700"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {eventLabels.map((t) => (
                             <span
                               key={t}
-                              className="inline-flex items-center gap-1 rounded-md border border-orange-200 dark:border-orange-900/60 bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 text-xs font-semibold text-orange-800 dark:text-orange-300"
+                              className="inline-flex items-center gap-1 rounded-md border border-orange-200 dark:border-orange-900/60 bg-orange-50 dark:bg-orange-950/40 px-2.5 py-1 text-xs font-semibold text-orange-800 dark:text-orange-300"
                             >
-                              <Zap size={11} className="text-orange-500" />
+                              <Zap size={12} className="text-orange-500" />
                               {t}
                             </span>
                           ))}
@@ -445,9 +445,9 @@ export function FieldMappingPopover({
                           type="button"
                           onClick={() => handleRemoveQueryItem(qi.id)}
                           title="Remove this event from card"
-                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
+                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors cursor-pointer"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
 
@@ -464,7 +464,7 @@ export function FieldMappingPopover({
                             }));
                           }}
                           placeholder={`e.g. "${primaryEvent}"."${targetField?.name}" or count + 1`}
-                          className="flex-1 font-mono text-xs rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-1.5 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400"
+                          className="flex-1 h-9 font-mono text-sm rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400"
                         />
                         {currentExpr && (
                           <button
@@ -475,7 +475,7 @@ export function FieldMappingPopover({
                                 [qi.id]: "",
                               }))
                             }
-                            className="text-[10px] text-gray-400 hover:text-red-500 px-1.5 py-1"
+                            className="h-9 text-xs text-gray-400 hover:text-red-500 px-2 py-1 cursor-pointer"
                             title="Clear expression"
                           >
                             Clear
@@ -486,7 +486,7 @@ export function FieldMappingPopover({
                       {/* Suggestions for this event */}
                       {matchingEventCard && matchingEventCard.fields.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                          <span className="text-[10px] text-gray-400 dark:text-zinc-500">Presets:</span>
+                          <span className="text-xs text-gray-400 dark:text-zinc-500">Presets:</span>
                           {matchingEventCard.fields.map((ef) => {
                             const candidate = `"${primaryEvent}"."${ef.name}"`;
                             const isMatch =
@@ -503,7 +503,7 @@ export function FieldMappingPopover({
                                     [qi.id]: candidate,
                                   }))
                                 }
-                                className={`rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
+                                className={`rounded-md px-2 py-1 font-mono text-xs transition-colors cursor-pointer ${
                                   isMatch
                                     ? "border border-cyan-300 dark:border-cyan-700 bg-cyan-50 dark:bg-cyan-950/50 text-cyan-800 dark:text-cyan-200 font-semibold"
                                     : "border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 hover:border-cyan-400"
@@ -526,7 +526,7 @@ export function FieldMappingPopover({
                                       [qi.id]: enumCandidate,
                                     }))
                                   }
-                                  className="rounded border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 px-1.5 py-0.5 font-mono text-[10px] text-cyan-700 dark:text-cyan-300 hover:border-cyan-400"
+                                  className="rounded-md border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 px-2 py-1 font-mono text-xs text-cyan-700 dark:text-cyan-300 hover:border-cyan-400 cursor-pointer"
                                 >
                                   {enumCandidate}
                                 </button>
@@ -541,7 +541,7 @@ export function FieldMappingPopover({
                                   [qi.id]: `'ACTIVE'`,
                                 }))
                               }
-                              className="rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-gray-600 dark:text-zinc-300 hover:border-cyan-400"
+                              className="rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs text-gray-600 dark:text-zinc-300 hover:border-cyan-400 cursor-pointer"
                             >
                               'ACTIVE'
                             </button>
@@ -560,7 +560,7 @@ export function FieldMappingPopover({
                 <select
                   value={selectedNewEvent}
                   onChange={(e) => setSelectedNewEvent(e.target.value)}
-                  className="flex-1 text-xs rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 text-gray-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="flex-1 h-9 text-xs rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-gray-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer"
                 >
                   <option value="">+ Connect another Event on canvas...</option>
                   {unlinkedEventCards.map((ev) => (
@@ -573,9 +573,9 @@ export function FieldMappingPopover({
                   type="button"
                   disabled={!selectedNewEvent}
                   onClick={() => handleAddEventQueryItem(selectedNewEvent)}
-                  className="flex items-center gap-1 rounded-lg bg-orange-600 hover:bg-orange-700 disabled:opacity-50 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors"
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 disabled:opacity-50 px-3.5 text-xs font-semibold text-white shadow-sm transition-colors cursor-pointer shrink-0"
                 >
-                  <Plus size={13} />
+                  <Plus size={14} />
                   Add Event
                 </button>
               </div>
@@ -587,14 +587,14 @@ export function FieldMappingPopover({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              className="rounded-lg h-9 px-3.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleApplyMulti}
-              className="rounded-lg bg-cyan-600 hover:bg-cyan-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors"
+              className="rounded-lg h-9 bg-cyan-600 hover:bg-cyan-700 px-4 text-xs font-semibold text-white shadow-sm transition-colors cursor-pointer"
             >
               Save Projections
             </button>
@@ -602,11 +602,11 @@ export function FieldMappingPopover({
         </div>
       ) : (
         /* Body: Single Expression Mapping for Event and Response fields */
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-3.5">
           {/* Warning if empty */}
           {!singleMapping.trim() && (
-            <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
-              <span className="font-bold text-amber-600 dark:text-amber-400 text-xs">⚠️</span>
+            <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+              <span className="font-bold text-amber-600 dark:text-amber-400 text-sm mt-0.5">⚠️</span>
               <span>
                 Explicit mapping is required for code generation. Without a mapping, codegen will fail on this field.
               </span>
@@ -615,7 +615,7 @@ export function FieldMappingPopover({
 
           {/* Input */}
           <div>
-            <label className="block text-[11px] font-semibold text-gray-700 dark:text-zinc-300 mb-1">
+            <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300 mb-1.5">
               Source Expression
             </label>
             <div className="relative">
@@ -631,15 +631,15 @@ export function FieldMappingPopover({
                   }
                 }}
                 placeholder='e.g. "Command"."Name", now(), uuid()'
-                className="w-full font-mono text-xs rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400"
+                className="w-full h-9 font-mono text-sm rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400"
               />
             </div>
           </div>
 
           {/* Suggestions chips */}
           <div>
-            <div className="text-[10px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <Sparkles size={11} className="text-cyan-500" />
+            <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Sparkles size={12} className="text-cyan-500" />
               Quick Presets
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -648,7 +648,7 @@ export function FieldMappingPopover({
                   key={s.label}
                   type="button"
                   onClick={() => setSingleMapping(s.value)}
-                  className="rounded-md border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 px-2 py-0.5 font-mono text-[11px] text-gray-700 dark:text-zinc-300 hover:border-cyan-400 hover:bg-cyan-50 dark:hover:border-cyan-600 dark:hover:bg-cyan-950/40 transition-colors"
+                  className="rounded-md border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 px-2.5 py-1 font-mono text-xs text-gray-700 dark:text-zinc-300 hover:border-cyan-400 hover:bg-cyan-50 dark:hover:border-cyan-600 dark:hover:bg-cyan-950/40 transition-colors cursor-pointer"
                 >
                   {s.label}
                 </button>
@@ -656,7 +656,7 @@ export function FieldMappingPopover({
             </div>
           </div>
 
-          <div className="rounded-lg bg-gray-50 dark:bg-zinc-800/60 p-2 text-[10px] text-gray-500 dark:text-zinc-400 space-y-1">
+          <div className="rounded-lg bg-gray-50 dark:bg-zinc-800/60 p-2.5 text-xs text-gray-500 dark:text-zinc-400 space-y-1">
             <p className="font-semibold text-gray-700 dark:text-zinc-300">Supported Formats:</p>
             <ul className="list-disc list-inside space-y-0.5">
               <li><code className="text-cyan-600 dark:text-cyan-400">&quot;Command&quot;.&quot;&lt;Field&gt;&quot;</code> — pass through command payload</li>
@@ -673,9 +673,9 @@ export function FieldMappingPopover({
               <button
                 type="button"
                 onClick={handleClearSingle}
-                className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                className="flex items-center gap-1.5 h-9 text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 cursor-pointer"
               >
-                <Trash2 size={13} />
+                <Trash2 size={14} />
                 Clear Mapping
               </button>
             ) : (
@@ -686,14 +686,14 @@ export function FieldMappingPopover({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                className="rounded-lg h-9 px-3.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleApplySingle}
-                className="rounded-lg bg-cyan-600 hover:bg-cyan-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors"
+                className="rounded-lg h-9 bg-cyan-600 hover:bg-cyan-700 px-4 text-xs font-semibold text-white shadow-sm transition-colors cursor-pointer"
               >
                 Apply Mapping
               </button>

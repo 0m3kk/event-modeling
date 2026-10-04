@@ -288,21 +288,21 @@ export function TypeSelectPopover() {
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 w-64 rounded-xl border border-gray-200 bg-white p-2.5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
+      className="absolute z-50 w-72 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
       style={{
         left: `${clampedX}px`,
         top: `${clampedY}px`,
       }}
     >
-      <div className="mb-2 flex items-center justify-between border-b border-gray-100 pb-2 dark:border-zinc-800">
-        <span className="text-xs font-semibold text-gray-700 dark:text-zinc-200">
+      <div className="mb-2.5 flex items-center justify-between border-b border-gray-100 pb-2 dark:border-zinc-800">
+        <span className="text-sm font-semibold text-gray-800 dark:text-zinc-100">
           {t("popovers.typeSelect.title")}
         </span>
         <button
           onClick={() => setTypeSelect(null)}
-          className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 cursor-pointer"
         >
-          <X size={14} />
+          <X size={15} />
         </button>
       </div>
 
@@ -332,10 +332,10 @@ export function TypeSelectPopover() {
       </div>
 
       {/* Search Input */}
-      <div className="relative mb-2">
+      <div className="relative mb-2.5">
         <Search
-          size={14}
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500"
+          size={15}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500"
         />
         <input
           ref={searchInputRef}
@@ -344,26 +344,26 @@ export function TypeSelectPopover() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={handleKeyDownSearch}
-          className="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-2.5 text-xs text-gray-800 outline-none focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:bg-zinc-800"
+          className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-800 outline-none focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:bg-zinc-800"
         />
       </div>
 
-      <div className="max-h-56 overflow-y-auto space-y-2">
+      <div className="max-h-60 overflow-y-auto space-y-2.5">
         {/* Custom Type Option */}
         {showCustomOption && (
           <div>
-            <div className="px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
+            <div className="px-1.5 py-0.5 text-xs font-semibold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
               {t("popovers.typeSelect.customType")}
             </div>
             <button
               onClick={() => handleSelectType(trimmedSearch)}
-              className="mt-0.5 flex w-full items-center justify-between rounded-md bg-emerald-50 px-2 py-1.5 text-xs font-mono font-medium text-emerald-800 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+              className="mt-1 flex w-full items-center justify-between rounded-lg bg-emerald-50 px-2.5 py-2 text-xs font-mono font-medium text-emerald-800 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 cursor-pointer"
             >
-              <span className="flex items-center gap-1">
-                <Plus size={13} className="text-emerald-600 dark:text-emerald-400" />
+              <span className="flex items-center gap-1.5">
+                <Plus size={14} className="text-emerald-600 dark:text-emerald-400" />
                 <span>Use &ldquo;{trimmedSearch}&rdquo;</span>
               </span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Enter ↵</span>
+              <span className="text-xs text-emerald-600 dark:text-emerald-400">Enter ↵</span>
             </button>
           </div>
         )}
@@ -371,17 +371,17 @@ export function TypeSelectPopover() {
         {/* Primitives Section */}
         {filteredPrimitives.length > 0 && (
           <div>
-            <div className="px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-zinc-500">
+            <div className="px-1.5 py-0.5 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-zinc-500">
               Primitives
             </div>
-            <div className="mt-0.5 space-y-0.5">
+            <div className="mt-1 space-y-0.5">
               {filteredPrimitives.map((prim) => {
                 const isSelected = baseType === prim;
                 return (
                   <button
                     key={prim}
                     onClick={() => handleSelectType(prim)}
-                    className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs font-mono transition-colors ${
+                    className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-mono transition-colors cursor-pointer ${
                       isSelected
                         ? "bg-blue-50 font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
                         : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -389,7 +389,7 @@ export function TypeSelectPopover() {
                   >
                     <span>{prim}</span>
                     {isSelected && (
-                      <Check size={13} className="text-blue-600 dark:text-blue-400" />
+                      <Check size={14} className="text-blue-600 dark:text-blue-400" />
                     )}
                   </button>
                 );
@@ -401,7 +401,7 @@ export function TypeSelectPopover() {
         {/* Model References Section */}
         {filteredModels.length > 0 && (
           <div>
-            <div className="px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-slate-500 uppercase dark:text-zinc-400">
+            <div className="px-1.5 py-0.5 text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-zinc-400">
               Model Nodes
             </div>
             <div className="mt-0.5 space-y-0.5">

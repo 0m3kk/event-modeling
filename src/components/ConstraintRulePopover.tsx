@@ -158,31 +158,31 @@ export function ConstraintRulePopover({
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-100 pb-2.5 dark:border-zinc-800">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-teal-50 text-teal-600 dark:bg-teal-950/60 dark:text-teal-400">
-            <ShieldAlert size={14} />
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-950/60 dark:text-teal-400">
+            <ShieldAlert size={16} />
           </div>
           <div>
-            <h3 className="text-xs font-semibold text-gray-800 dark:text-zinc-100">
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-zinc-100">
               Constraint Rule (Codegen)
             </h3>
-            <p className="text-[10px] text-gray-400 dark:text-zinc-500">
+            <p className="text-xs text-gray-400 dark:text-zinc-500">
               Executable invariant assertion & error spec
             </p>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 transition-colors"
+          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 transition-colors cursor-pointer"
         >
-          <X size={14} />
+          <X size={16} />
         </button>
       </div>
 
-      <div className="mt-3 space-y-3">
+      <div className="mt-3.5 space-y-3.5">
         {/* Description / Text */}
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-gray-700 dark:text-zinc-300">
+          <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-zinc-300">
             Rule Description
           </label>
           <input
@@ -190,18 +190,18 @@ export function ConstraintRulePopover({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="e.g. User account must exist and not be deleted"
-            className="w-full rounded-md border border-gray-200 bg-gray-50/70 px-2.5 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-100 dark:placeholder:text-zinc-400 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
+            className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50/70 px-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-100 dark:placeholder:text-zinc-400 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
           />
         </div>
 
         {/* Assertion Expression (CEL / JS) */}
         <div>
-          <div className="mb-1 flex items-center justify-between">
-            <label className="flex items-center gap-1 text-[11px] font-medium text-gray-700 dark:text-zinc-300">
-              <Code2 size={12} className="text-teal-600 dark:text-teal-400" />
-              Invariant Assertion (<code className="text-[10px] text-teal-700 dark:text-teal-300">assert</code>)
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300">
+              <Code2 size={14} className="text-teal-600 dark:text-teal-400" />
+              Invariant Assertion (<code className="text-xs text-teal-700 dark:text-teal-300 font-mono">assert</code>)
             </label>
-            <span className="text-[10px] text-gray-400 dark:text-zinc-400">must evaluate to true</span>
+            <span className="text-xs text-gray-400 dark:text-zinc-400">must evaluate to true</span>
           </div>
           <input
             ref={assertInputRef}
@@ -209,23 +209,23 @@ export function ConstraintRulePopover({
             value={assertExpr}
             onChange={(e) => setAssertExpr(e.target.value)}
             placeholder={`e.g. "Fields"."User ID" != null && !"Fields"."Is Deleted"`}
-            className="w-full rounded-md border border-teal-300/80 bg-teal-50/30 px-2.5 py-1.5 font-mono text-xs text-teal-950 placeholder:text-teal-800/40 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-100 dark:placeholder:text-teal-300/40 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
+            className="w-full h-9 rounded-lg border border-teal-300/80 bg-teal-50/30 px-3 font-mono text-sm text-teal-950 placeholder:text-teal-800/40 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-100 dark:placeholder:text-teal-300/40 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
           />
         </div>
 
         {/* Quick Insert Tokens */}
         {(inputParamNames.length > 0 || outputFieldNames.length > 0) && (
           <div>
-            <div className="mb-1 text-[10px] font-medium text-gray-500 dark:text-zinc-400">
+            <div className="mb-1.5 text-xs font-medium text-gray-500 dark:text-zinc-400">
               Click to insert reference:
             </div>
-            <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+            <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
               {inputParamNames.map((name) => (
                 <button
                   key={name}
                   type="button"
                   onClick={() => insertToken(`"Params"."${name}"`)}
-                  className="rounded bg-sky-50 px-1.5 py-0.5 font-mono text-[10px] text-sky-700 hover:bg-sky-100 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900/60 transition-colors cursor-pointer"
+                  className="rounded-md bg-sky-50 px-2 py-1 font-mono text-xs text-sky-700 hover:bg-sky-100 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900/60 transition-colors cursor-pointer"
                   title={`Insert "Params"."${name}"`}
                 >
                   "Params"."{name}"
@@ -236,7 +236,7 @@ export function ConstraintRulePopover({
                   key={name}
                   type="button"
                   onClick={() => insertToken(`"Fields"."${name}"`)}
-                  className="rounded bg-purple-50 px-1.5 py-0.5 font-mono text-[10px] text-purple-700 hover:bg-purple-100 dark:bg-purple-950/60 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-colors cursor-pointer"
+                  className="rounded-md bg-purple-50 px-2 py-1 font-mono text-xs text-purple-700 hover:bg-purple-100 dark:bg-purple-950/60 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-colors cursor-pointer"
                   title={`Insert "Fields"."${name}"`}
                 >
                   "Fields"."{name}"
@@ -248,11 +248,11 @@ export function ConstraintRulePopover({
 
         {/* Quick Presets */}
         <div>
-          <div className="mb-1 flex items-center gap-1 text-[10px] font-medium text-gray-500 dark:text-zinc-400">
-            <Sparkles size={11} className="text-amber-500" />
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-zinc-400">
+            <Sparkles size={13} className="text-amber-500" />
             Quick Presets
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {presets.map((p) => (
               <button
                 key={p.label}
@@ -262,7 +262,7 @@ export function ConstraintRulePopover({
                   if (!code) setCode(p.code);
                   if (!status) setStatus(p.status);
                 }}
-                className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] text-gray-700 hover:border-gray-300 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-gray-700 hover:border-gray-300 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
               >
                 {p.label}
               </button>
@@ -271,9 +271,9 @@ export function ConstraintRulePopover({
         </div>
 
         {/* Error Code & HTTP Status */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-gray-700 dark:text-zinc-300">
+            <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-zinc-300">
               Error Code
             </label>
             <input
@@ -281,17 +281,17 @@ export function ConstraintRulePopover({
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
               placeholder="e.g. USER_NOT_FOUND"
-              className="w-full rounded-md border border-gray-200 bg-gray-50/70 px-2.5 py-1.5 font-mono text-xs text-gray-900 placeholder:text-gray-400 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-100 dark:placeholder:text-zinc-400 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
+              className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50/70 px-3 font-mono text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-100 dark:placeholder:text-zinc-400 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-gray-700 dark:text-zinc-300">
+            <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-zinc-300">
               HTTP Status
             </label>
             <select
               value={status ?? ""}
               onChange={(e) => setStatus(e.target.value ? Number(e.target.value) : undefined)}
-              className="w-full rounded-md border border-gray-200 bg-gray-50/70 px-2 py-1.5 text-xs text-gray-900 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-100 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
+              className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50/70 px-3 text-sm text-gray-900 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-100 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors cursor-pointer"
             >
               <option value="" className="dark:bg-zinc-800 dark:text-zinc-100">Default (400)</option>
               <option value="400" className="dark:bg-zinc-800 dark:text-zinc-100">400 Bad Request</option>
@@ -307,7 +307,7 @@ export function ConstraintRulePopover({
 
         {/* Client Error Message */}
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-gray-700 dark:text-zinc-300">
+          <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-zinc-300">
             Error Message (Client Response)
           </label>
           <input
@@ -315,12 +315,12 @@ export function ConstraintRulePopover({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="e.g. User account does not exist or has been deleted."
-            className="w-full rounded-md border border-gray-200 bg-gray-50/70 px-2.5 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-100 dark:placeholder:text-zinc-400 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
+            className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50/70 px-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-teal-500 focus:bg-white focus:ring-1 focus:ring-teal-500/20 dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-100 dark:placeholder:text-zinc-400 dark:focus:border-teal-400 dark:focus:bg-zinc-800 dark:focus:ring-teal-400/20 transition-colors"
           />
         </div>
 
         {/* Severity */}
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex items-center gap-4 text-xs font-medium">
           <label className="flex items-center gap-1.5 cursor-pointer text-gray-700 dark:text-zinc-300">
             <input
               type="radio"
@@ -344,27 +344,27 @@ export function ConstraintRulePopover({
         </div>
 
         {/* Bottom Actions */}
-        <div className="flex items-center justify-between border-t border-gray-100 pt-2.5 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-zinc-800">
           <button
             type="button"
             onClick={handleDelete}
             title="Delete this constraint rule"
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors cursor-pointer"
           >
-            <Trash2 size={13} />
+            <Trash2 size={14} />
           </button>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+              className="rounded-lg h-9 px-3 text-xs text-gray-600 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleApply}
-              className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 transition-colors"
+              className="rounded-lg bg-teal-600 h-9 px-4 text-xs font-semibold text-white hover:bg-teal-700 transition-colors cursor-pointer"
             >
               {t("common.apply")}
             </button>
