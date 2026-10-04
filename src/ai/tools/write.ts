@@ -523,14 +523,6 @@ export const groupObjectsTool = defineTool({
       };
     }
 
-    if (existing.length < 2) {
-      return {
-        grouped: false,
-        error: "Need at least two existing objects to create a new group.",
-        notFound,
-      };
-    }
-
     const before = new Set(state.groups.map((g) => g.id));
     state.groupObjects(
       existing,

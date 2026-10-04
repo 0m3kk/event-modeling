@@ -82,7 +82,7 @@ function createFakeStore(): FakeStore {
       const targetIds = ids ?? store.selectedIds;
       const wanted = new Set(targetIds);
       const members = objects.filter((o) => wanted.has(o.id));
-      if (members.length < 2) return;
+      if (members.length === 0) return;
       const groupId = `group-${groups.length + 1}`;
       groups.push({
         id: groupId,
@@ -1414,6 +1414,34 @@ describe("AI Model & Write Tools", () => {
     expect(ungroupRes.isError).toBeFalsy();
     expect(fake.groups).toHaveLength(0);
     expect(fake.objects[0]!.groupId).toBeUndefined();
+  });
+
+  it("group_objects creates a section from a single object", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "o1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    });
+    const { ctx } = createContext(fake);
+
+    const groupRes = await executeToolCall(
+      {
+        id: "1",
+        name: "group_objects",
+        arguments: JSON.stringify({ ids: ["o1"], name: "Solo Section" }),
+      },
+      ctx,
+    );
+    expect(groupRes.isError).toBeFalsy();
+    const groupData = JSON.parse(groupRes.content);
+    expect(groupData.grouped).toBe(true);
+    expect(fake.groups).toHaveLength(1);
+    expect(fake.groups[0]!.name).toBe("Solo Section");
+    expect(fake.objects[0]!.groupId).toBe(fake.groups[0]!.id);
   });
 
   it("update_plan updates working plan steps", async () => {
