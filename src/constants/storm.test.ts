@@ -76,8 +76,10 @@ describe("storm kind helpers", () => {
     expect(stormHasFields("constraint")).toBe(true);
     expect(stormHasFields("state")).toBe(true);
     expect(stormHasFields("command")).toBe(true);
-    // Constraint fields are typed and taggable, feeding DCB matching
+    // Constraint and External fields are typed, Actor is typeless
     expect(stormHasFieldTypes("constraint")).toBe(true);
+    expect(stormHasFieldTypes("external")).toBe(true);
+    expect(stormHasFieldTypes("actor")).toBe(false);
     expect(stormHasTags("constraint")).toBe(true);
   });
 

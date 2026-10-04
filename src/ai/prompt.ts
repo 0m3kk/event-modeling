@@ -123,7 +123,7 @@ The application models systems according to CQRS and Event Sourcing with DCB:
 - **event**: Immutable domain fact in past tense (orange) — bottom card in Write Slice. Read Slices do not contain Event cards; their States query existing events. Fields carry tags (\`tag\`) defining dynamic consistency boundaries.
 - **state**: DCB read-model projection (green) — the bottom card in a Read Slice, below the Query and any optional Constraint layer. Splits into \`inputFields\` (params, tags live here), \`queryItems\`, and \`outputFields\` (rehydrated read-model fields).
 - **query**: Read request (indigo) — top card in Read Slice. \`fields\` (query params), \`responseFields\` (output payload), and \`action\`.
-- **external**: Interaction with a system outside the bounded context (sky) — typeless payload fields; e.g. an outbound user notification / message.
+- **external**: Interaction with a system outside the bounded context (sky) — typed payload fields; e.g. an outbound user notification / message.
 
 References must be valid:
 - **Explicit Field Mapping (STRICT ZERO GUESSING & CANVAS CASING)**:

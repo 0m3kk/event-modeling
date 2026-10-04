@@ -65,7 +65,7 @@ const fieldSpec = z.object({
     .string()
     .optional()
     .describe(
-      "Primitive type (String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void) or the name of a Model node on the canvas; append '[]' for an array. Defaults to String. Invalid types are rejected. External/Actor cards ignore type.",
+      "Primitive type (String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void) or the name of a Model node on the canvas; append '[]' for an array. Defaults to String. Invalid types are rejected. Actor cards ignore type.",
     ),
   required: z.boolean().optional(),
   description: z
@@ -209,7 +209,7 @@ function buildFields(
     label?: string;
   } = {},
 ): StormField[] {
-  const typeless = kind === "external" || kind === "actor";
+  const typeless = kind === "actor";
   return (specs ?? []).map((spec) => {
     let fieldType: string;
     if (typeless) {

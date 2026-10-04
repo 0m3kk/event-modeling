@@ -147,7 +147,7 @@ export function Toolbar() {
   // the options bar, so the card carries no prefilled defaults.
   const handleAddStormCard = (kind: StormKind) => {
     const id = `storm-${kind}-${Date.now().toString(36)}`;
-    const width = kind === "actor" ? 220 : kind === "external" ? 240 : 260;
+    const width = kind === "actor" ? 220 : 260;
 
     const stormData: StormData = {
       kind,

@@ -190,8 +190,8 @@ export function stormHasTags(kind: StormKind): boolean {
   return STORM_TAGGABLE_KINDS.includes(kind);
 }
 
-/** Kinds without type zones on field rows (External names the outside system / interaction; Actor names permissions) */
-export const STORM_TYPELESS_KINDS: readonly StormKind[] = ["external", "actor"];
+/** Kinds without type zones on field rows (Actor names permissions) */
+export const STORM_TYPELESS_KINDS: readonly StormKind[] = ["actor"];
 
 export function stormHasFieldTypes(kind: StormKind): boolean {
   return !STORM_TYPELESS_KINDS.includes(kind);
