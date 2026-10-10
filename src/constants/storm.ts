@@ -11,7 +11,6 @@ export const STORM_KIND_COLORS: Record<StormKind, string> = {
   actor: "#db2777", // pink
   state: "#7c3aed", // violet
   constraint: "#0f766e", // teal
-  external: "#0369a1", // sky
   query: "#4338ca", // indigo
   bdd: "#0284c7", // sky (default Given) — replaced by the phase color
 };
@@ -23,7 +22,6 @@ export const STORM_KIND_DARK_COLORS: Record<StormKind, string> = {
   actor: "#9d174d", // pink 800
   state: "#5b21b6", // violet 800
   constraint: "#115e59", // teal 800
-  external: "#075985", // sky 800
   query: "#3730a3", // indigo 800
   bdd: "#075985", // sky 800
 };
@@ -35,7 +33,6 @@ export const STORM_KIND_LABELS: Record<StormKind, string> = {
   actor: "Actor",
   state: "State",
   constraint: "Constraint",
-  external: "External",
   query: "Query",
   bdd: "Given/When/Then",
 };
@@ -141,7 +138,6 @@ export const BDD_STEP_REF_LABELS: Record<BddStepRef, string> = {
   query: "Query",
   state: "State",
   error: "Error",
-  external: "External",
 };
 
 /** Accent color per scenario step ref (reuses kind colors, adds Error). */
@@ -151,7 +147,6 @@ export const BDD_STEP_REF_COLORS: Record<BddStepRef, string> = {
   query: STORM_KIND_COLORS.query,
   state: STORM_KIND_COLORS.state,
   error: "#dc2626", // Red 600
-  external: STORM_KIND_COLORS.external,
 };
 
 /**
@@ -161,7 +156,7 @@ export const BDD_STEP_REF_COLORS: Record<BddStepRef, string> = {
 const BDD_PHASE_REFS: Record<BddPhase, readonly BddStepRef[]> = {
   given: ["event"],
   when: ["command", "query"],
-  then: ["event", "state", "error", "external"],
+  then: ["event", "state", "error"],
 };
 
 /** The step refs allowed on a card's phase (fallback: Given events). */

@@ -35,10 +35,10 @@ Opinionated around **CQRS**, **Event Sourcing**, and **Dynamic Consistency Bound
 - ♾️ Infinite, pannable/zoomable canvas — Pixi.js (GPU) with a spatial index for fast hit-testing
 - ✍️ **Write slices**: Command → Constraint(s) → Event(s)
 - 📖 **Read slices**: Query → State (optional Constraint layer)
-- 🃏 **8 storm card kinds**: command, event, actor, state, constraint, external, query, BDD
+- 🃏 **7 storm card kinds**: command, event, actor, state, constraint, query, BDD
 - 🧩 **Data model nodes**: object, enum, array, wrapper + 12 primitives (`String`, `Number`, `Boolean`, `UUID`, `DateTime`, `Date`, `Email`, `URL`, `URI`, `JSON`, `Any`, `Void`, plus `[]`)
 - 🔒 **DCB + RBAC**: consistency boundaries as query items; `resource:verb:scope` actions with actor wildcards
-- 🥒 **BDD cards**: Given/When/Then referencing events, commands, queries, states, errors, externals
+- 🥒 **BDD cards**: Given/When/Then referencing events, commands, queries, states, errors
 - 📐 Groups, connectors, sticky notes, text boxes, reference copies, auto-layout, snapping & guides
 
 ### ⚡ Editing experience

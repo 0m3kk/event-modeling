@@ -9,7 +9,6 @@ export const STORM_LANE_ORDER: StormKind[] = [
   "actor",
   "command",
   "event",
-  "external",
   "query",
   "state",
   "constraint",
@@ -19,7 +18,6 @@ export const STORM_LANE_LABELS: Record<StormKind, string> = {
   actor: "Actor",
   command: "Command",
   event: "Event",
-  external: "External",
   query: "Query",
   state: "State",
   constraint: "Constraint",
@@ -51,7 +49,7 @@ export interface StormLaneLayoutOptions {
 
 /**
  * Places event-storming cards into vertical lanes ordered left-to-right by
- * kind (Actor -> Command -> Event -> External -> Query -> State -> Constraint),
+ * kind (Actor -> Command -> Event -> Query -> State -> Constraint),
  * stacking cards within each lane.
  */
 export function arrangeStormLanes(
@@ -100,8 +98,7 @@ export interface VerticalSliceLayoutOptions {
  * - Layer 0 (Top): Command, Query
  * - Layer 1 (Middle): Constraint — and State when the slice has no read-side
  *   Constraint
- * - Layer 2 (Bottom): Event, External — or State when a read-side Constraint
- *   occupies layer 1
+ * - Layer 2 (Bottom): Event — or State when a read-side Constraint occupies layer 1
  * - Layer 3: Actor, etc.
  *
  * A Constraint is treated as read-side (sitting between Query and State) when
@@ -137,7 +134,7 @@ export function arrangeVerticalSlice(
       layers[1].push(card);
     } else if (card.kind === "state") {
       layers[1 + offset].push(card);
-    } else if (card.kind === "event" || card.kind === "external") {
+    } else if (card.kind === "event") {
       layers[2 + offset].push(card);
     } else {
       layers[3 + offset].push(card);

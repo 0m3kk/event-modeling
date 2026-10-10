@@ -71,7 +71,6 @@
       "actor": "Actor",
       "state": "State",
       "constraint": "Constraint",
-      "external": "External",
       "query": "Query",
       "bdd": "Given/When/Then",
       "object": "Object",
@@ -271,7 +270,7 @@
       "createRef": "Create Reference Copy",
       "delete": "Delete",
       "ungroup": "Ungroup (Cmd+Shift+G)",
-      "arrangeLanes": "Arrange Storm Lanes (Actor → Command → Event → External → Query → State → Constraint)",
+      "arrangeLanes": "Arrange Storm Lanes (Actor → Command → Event → Query → State → Constraint)",
       "arrangeSlice": "Re-center the vertical slice (Command/Query → Constraint/State → Event)"
     }
   },

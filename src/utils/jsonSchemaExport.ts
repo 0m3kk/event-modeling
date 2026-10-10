@@ -25,7 +25,7 @@ export interface JsonSchemaDefinition {
   /**
    * Custom vendor-extension marker (ignored by standard validators) naming the
    * source domain kind: object/enum/array/wrap for Model nodes, or
-   * command/event/state/constraint/query/actor/external/bdd for Storm cards.
+   * command/event/state/constraint/query/actor/bdd for Storm cards.
    */
   "x-kind"?: ModelNodeKind | StormKind;
   title: string;
@@ -380,7 +380,7 @@ function generateBddCardJsonSchema(storm: StormData): JsonSchemaDefinition {
               type: "string",
               enum: Object.keys(BDD_STEP_REF_LABELS),
               description:
-                "What the step stands for (Event, Command, Query, State, Error, External).",
+                "What the step stands for (Event, Command, Query, State, Error).",
             },
             name: {
               type: "string",

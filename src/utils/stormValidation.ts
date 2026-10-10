@@ -334,7 +334,7 @@ function findEventCard(
 export interface StormValidationCard {
   kind: StormKind;
   name: string;
-  /** Primary fields (Command/Event/External/BDD payload; Query params). */
+  /** Primary fields (Command/Event/BDD payload; Query params). */
   fields: StormField[];
   /** State/Constraint INPUT params (the only tag-bearing rows on those cards). */
   inputFields?: StormField[];

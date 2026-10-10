@@ -6,7 +6,7 @@ import type { CanvasObject, ModelData, StormData } from "@/types";
  * Reorderable lists:
  * - model "object": modelData.fields
  * - model "enum": modelData.values
- * - storm (command/event/state/constraint/external/query): stormData.fields
+ * - storm (command/event/state/constraint/query): stormData.fields
  * - storm query/command: stormData.responseFields
  * - storm state/constraint: stormData.queryItems
  * - storm constraint: stormData.constraints

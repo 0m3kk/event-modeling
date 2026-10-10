@@ -177,7 +177,7 @@ describe("codegenSpecExport", () => {
     });
   });
 
-  it("exports models, queries, constraints, actors, externals, and bdd scenarios", () => {
+  it("exports models, queries, constraints, actors, and bdd scenarios", () => {
     const objects: CanvasObject[] = [
       {
         id: "m1",
@@ -260,19 +260,6 @@ describe("codegenSpecExport", () => {
         },
       },
       {
-        id: "x1",
-        type: "storm",
-        x: 0,
-        y: 0,
-        width: 200,
-        height: 100,
-        stormData: {
-          kind: "external",
-          name: "StripeGateway",
-          fields: [{ id: "xf1", name: "apiKey", fieldType: "string", required: true }],
-        },
-      },
-      {
         id: "b1",
         type: "storm",
         x: 0,
@@ -340,11 +327,6 @@ describe("codegenSpecExport", () => {
     expect(spec.actors[0]).toEqual({
       name: "StoreManager",
       permissions: ["order:*", "inventory:update"],
-    });
-
-    expect(spec.externals[0]).toEqual({
-      name: "StripeGateway",
-      fields: [{ name: "apiKey", type: "string", required: true }],
     });
 
     expect(spec.scenarios[0]).toEqual({

@@ -21,7 +21,6 @@ const OBJECT_TYPES = [
 const STORM_KINDS = [
   "command",
   "event",
-  "external",
   "query",
   "actor",
   "state",
@@ -89,7 +88,7 @@ export const listObjectsTool = defineTool({
       .enum(STORM_KINDS)
       .optional()
       .describe(
-        "Filter storm cards by kind (command, event, constraint, state, query, actor, external).",
+        "Filter storm cards by kind (command, event, constraint, state, query, actor).",
       ),
     textContains: z
       .string()

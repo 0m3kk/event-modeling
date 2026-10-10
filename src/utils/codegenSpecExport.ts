@@ -92,15 +92,8 @@ export interface CodegenActor {
   permissions: string[];
 }
 
-export interface CodegenExternal {
-  name: string;
-  description?: string;
-  slice?: string;
-  fields: CodegenField[];
-}
-
 export interface CodegenScenarioStep {
-  ref: "event" | "command" | "query" | "state" | "error" | "external";
+  ref: "event" | "command" | "query" | "state" | "error";
   name: string;
   payload: Record<string, string>;
 }
@@ -185,7 +178,6 @@ export interface CodegenSpec {
   queries: CodegenQuery[];
   constraints: CodegenConstraint[];
   actors: CodegenActor[];
-  externals: CodegenExternal[];
   scenarios: CodegenScenario[];
   flows: CodegenFlow[];
 }
@@ -392,7 +384,6 @@ export function buildCodegenSpec(
     queries: [],
     constraints: [],
     actors: [],
-    externals: [],
     scenarios: [],
     flows: [],
   };
@@ -558,15 +549,6 @@ export function buildCodegenSpec(
           break;
         }
 
-        case "external": {
-          spec.externals.push({
-            name,
-            ...(desc ? { description: desc } : {}),
-            ...(slice ? { slice } : {}),
-            fields: (storm.fields ?? []).map(cleanField),
-          });
-          break;
-        }
 
         case "bdd": {
           const steps: CodegenScenarioStep[] = (storm.steps ?? []).map((step) => {

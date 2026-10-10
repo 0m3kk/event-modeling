@@ -479,7 +479,6 @@ describe("jsonSchemaExport", () => {
       "constraint",
       "query",
       "actor",
-      "external",
       "bdd",
     ];
     for (const kind of stormKinds) {
@@ -489,7 +488,7 @@ describe("jsonSchemaExport", () => {
     }
   });
 
-  it("exports Query, Actor, External and BDD cards with their x-kind", () => {
+  it("exports Query, Actor and BDD cards with their x-kind", () => {
     const objects: CanvasObject[] = [
       {
         id: "q",
@@ -517,19 +516,6 @@ describe("jsonSchemaExport", () => {
           name: "Admin",
           fields: [],
           permissions: ["order:*"],
-        },
-      },
-      {
-        id: "x",
-        type: "storm",
-        x: 0,
-        y: 0,
-        width: 200,
-        height: 100,
-        stormData: {
-          kind: "external",
-          name: "PaymentGateway",
-          fields: [{ id: "xf", name: "provider", fieldType: "string" }],
         },
       },
       {
@@ -567,11 +553,6 @@ describe("jsonSchemaExport", () => {
 
     expect(parsed.definitions.admin["x-kind"]).toBe("actor");
     expect(parsed.definitions.admin.properties.permissions.type).toBe("array");
-
-    expect(parsed.definitions.paymentGateway["x-kind"]).toBe("external");
-    expect(parsed.definitions.paymentGateway.properties.provider.type).toBe(
-      "string",
-    );
 
     expect(parsed.definitions.given["x-kind"]).toBe("bdd");
     expect(parsed.definitions.given.properties.phase.enum).toEqual([

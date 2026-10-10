@@ -61,7 +61,6 @@ describe("storm kind helpers", () => {
       "event",
       "state",
       "error",
-      "external",
     ]);
     expect(bddDefaultRefForPhase("given")).toBe("event");
     expect(bddDefaultRefForPhase("when")).toBe("command");
@@ -76,9 +75,8 @@ describe("storm kind helpers", () => {
     expect(stormHasFields("constraint")).toBe(true);
     expect(stormHasFields("state")).toBe(true);
     expect(stormHasFields("command")).toBe(true);
-    // Constraint and External fields are typed, Actor is typeless
+    // Constraint fields are typed, Actor is typeless
     expect(stormHasFieldTypes("constraint")).toBe(true);
-    expect(stormHasFieldTypes("external")).toBe(true);
     expect(stormHasFieldTypes("actor")).toBe(false);
     expect(stormHasTags("constraint")).toBe(true);
   });

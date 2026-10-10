@@ -50,7 +50,6 @@ import { groupAndAncestorIds } from "@/utils/groupBounds";
 const STORM_KINDS = [
   "command",
   "event",
-  "external",
   "query",
   "actor",
   "state",
@@ -318,7 +317,7 @@ function layoutSize(
 export const createStormCardsTool = defineTool({
   name: "create_storm_cards",
   description:
-    "Create event-storming cards (command, constraint, event, state, query, actor, external) in vertical slices. Command/Query specify action. Constraints act as Decision Models checking historical events. Events carry DCB tags on key fields.",
+    "Create event-storming cards (command, constraint, event, state, query, actor) in vertical slices. Command/Query specify action. Constraints act as Decision Models checking historical events. Events carry DCB tags on key fields.",
   schema: z.object({
     cards: z
       .array(
@@ -383,7 +382,7 @@ export const createStormCardsTool = defineTool({
       .enum(["verticalSlice", "lanes", "none"])
       .optional()
       .describe(
-        "Layout arrangement: 'verticalSlice' (default for slices: Command/Query top -> Constraint/State middle -> Event/External bottom; a read-side Constraint stacks between Query and State) or 'lanes' (horizontal lanes).",
+        "Layout arrangement: 'verticalSlice' (default for slices: Command/Query top -> Constraint/State middle -> Event bottom; a read-side Constraint stacks between Query and State) or 'lanes' (horizontal lanes).",
       ),
     nearCardId: z
       .string()
@@ -824,7 +823,7 @@ export const updateStormCardTool = defineTool({
 export const arrangeStormLanesTool = defineTool({
   name: "arrange_storm_lanes",
   description:
-    "Re-arrange event-storming cards into Actor→Command→Event→External→Query→State→Constraint lanes.",
+    "Re-arrange event-storming cards into Actor→Command→Event→Query→State→Constraint lanes.",
   schema: z.object({
     cardIds: z.array(z.string()).optional(),
     origin: z

@@ -7,7 +7,6 @@ import {
   Database,
   Search,
   Ban,
-  Globe,
   Box,
   List,
   Brackets,
@@ -267,7 +266,6 @@ export function Toolbar() {
     state: <Database size={20} />,
     query: <Search size={20} />,
     constraint: <Ban size={20} />,
-    external: <Globe size={20} />,
     bdd: <ListChecks size={20} />,
   };
 
@@ -286,7 +284,6 @@ export function Toolbar() {
     "state",
     "query",
     "constraint",
-    "external",
   ];
 
   const modelKinds: ModelNodeKind[] = [

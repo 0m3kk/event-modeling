@@ -131,15 +131,14 @@ export function PixiCanvas() {
         return;
       }
 
-      // 1-7: Switch card kind for selected storm card
+      // 1-6: Switch card kind for selected storm card
       const KIND_DIGIT_MAP: Record<string, StormKind> = {
         Digit1: "command",
         Digit2: "event",
         Digit3: "actor",
         Digit4: "state",
         Digit5: "constraint",
-        Digit6: "external",
-        Digit7: "query",
+        Digit6: "query",
       };
       if (
         KIND_DIGIT_MAP[e.code] &&

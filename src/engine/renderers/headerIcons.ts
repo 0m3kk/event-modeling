@@ -94,13 +94,6 @@ export function drawHeaderKindIcon(
       break;
     }
 
-    case "external": {
-      // Globe: a system outside the current bounded context
-      g.circle(cx, cy, 6).stroke({ color, width: 1.2 });
-      g.ellipse(cx, cy, 2.9, 6).stroke({ color, width: 1 });
-      g.moveTo(cx - 6, cy).lineTo(cx + 6, cy).stroke({ color, width: 1 });
-      break;
-    }
 
     case "error": {
       // Warning: triangle with an exclamation mark
