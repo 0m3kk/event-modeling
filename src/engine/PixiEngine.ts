@@ -1889,6 +1889,20 @@ export class PixiEngine {
           }
         }
 
+        // Groups and slices live outside the card spatial index (they carry a
+        // `__group:` selection id), so include any whose frame the marquee
+        // crosses — otherwise a Cmd/Ctrl drag can never select them.
+        const { groups, objects } = useCanvasStore.getState();
+        for (const group of groups) {
+          const gb = computeGroupBounds(group, objects, groups);
+          const overlaps =
+            gb.x <= maxX &&
+            gb.x + gb.width >= minX &&
+            gb.y <= maxY &&
+            gb.y + gb.height >= minY;
+          if (overlaps) hits.push(`__group:${group.id}`);
+        }
+
         if (this.marqueeInitialSelectedIds.length > 0) {
           const merged = Array.from(
             new Set([...this.marqueeInitialSelectedIds, ...hits]),
