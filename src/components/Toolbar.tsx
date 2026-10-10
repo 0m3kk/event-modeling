@@ -96,54 +96,74 @@ export function Toolbar() {
   const objects = useCanvasStore((state) => state.objects);
   const groups = useCanvasStore((state) => state.groups);
 
-  const groupTooltip = React.useMemo(() => {
-    const explicitGroupIds = new Set(
-      selectedIds
-        .filter((id) => id.startsWith("__group:"))
-        .map((id) => id.replace("__group:", "")),
-    );
+  const { groupTooltip, sliceTooltip } = React.useMemo(() => {
+    const explicitAllIds = new Set<string>();
+    const explicitRegularIds = new Set<string>();
+    const explicitSliceIds = new Set<string>();
+    for (const id of selectedIds) {
+      if (!id.startsWith("__group:")) continue;
+      const gid = id.replace("__group:", "");
+      const group = groups.find((g) => g.id === gid);
+      if (!group) continue;
+      explicitAllIds.add(gid);
+      if (group.isSlice) explicitSliceIds.add(gid);
+      else explicitRegularIds.add(gid);
+    }
+
     const cardIds = selectedIds.filter((id) => !id.startsWith("__group:"));
-    const memberGroup = cardIds.some((id) => {
-      const obj = objects.find((o) => o.id === id);
-      return obj?.groupId && groups.some((g) => g.id === obj.groupId);
+    const groupIdOf = (id: string) => objects.find((o) => o.id === id)?.groupId;
+    const isSliceGroup = (gid: string | undefined) =>
+      Boolean(gid && groups.some((g) => g.id === gid && g.isSlice));
+
+    // A slice is not a valid Group target — that is the Slice button's job.
+    const memberRegularGroup = cardIds.some((id) => {
+      const gid = groupIdOf(id);
+      return Boolean(gid && groups.some((g) => g.id === gid && !g.isSlice));
     });
+    const memberSlice = cardIds.some((id) => isSliceGroup(groupIdOf(id)));
     const hasUnassigned = cardIds.some((id) => {
       const obj = objects.find((o) => o.id === id);
       return obj && !obj.groupId;
     });
 
+    let group = t("toolbar.group");
     // Two or more selected groups wrap into a new parent group.
-    if (explicitGroupIds.size >= 2) {
-      return t("toolbar.nestGroups");
+    if (explicitAllIds.size >= 2) {
+      group = t("toolbar.nestGroups");
+    } else {
+      // Every selected card already lives in the same group -> child group.
+      const memberGroupIds = new Set(
+        cardIds
+          .map((id) => groupIdOf(id))
+          .filter((gid): gid is string => Boolean(gid)),
+      );
+      const allInExistingGroup =
+        cardIds.length > 0 &&
+        cardIds.every((id) => {
+          const gid = groupIdOf(id);
+          return Boolean(gid) && groups.some((g) => g.id === gid);
+        });
+      if (
+        explicitAllIds.size === 0 &&
+        allInExistingGroup &&
+        memberGroupIds.size === 1
+      ) {
+        group = t("toolbar.createSubgroup");
+      } else if (
+        (explicitRegularIds.size === 1 || memberRegularGroup) &&
+        hasUnassigned
+      ) {
+        group = t("toolbar.addToGroup");
+      }
     }
-    // Every selected card already lives in the same group -> child group.
-    const memberGroupIds = new Set(
-      cardIds
-        .map((id) => objects.find((o) => o.id === id)?.groupId)
-        .filter((gid): gid is string => Boolean(gid)),
-    );
-    const allInExistingGroup =
-      cardIds.length > 0 &&
-      cardIds.every((id) => {
-        const gid = objects.find((o) => o.id === id)?.groupId;
-        return Boolean(gid) && groups.some((g) => g.id === gid);
-      });
-    if (
-      explicitGroupIds.size === 0 &&
-      allInExistingGroup &&
-      memberGroupIds.size === 1
-    ) {
-      return t("toolbar.createSubgroup");
-    }
-    if ((explicitGroupIds.size === 1 || memberGroup) && hasUnassigned) {
-      return t("toolbar.addToGroup");
-    }
-    return t("toolbar.group");
-  }, [selectedIds, objects, groups, t]);
 
-  const sliceTooltip = React.useMemo(() => {
-    return t("toolbar.slice", { defaultValue: "Slice" });
-  }, [t]);
+    const slice =
+      (explicitSliceIds.size === 1 || memberSlice) && hasUnassigned
+        ? t("toolbar.addToSlice", { defaultValue: "Add to Slice" })
+        : t("toolbar.slice", { defaultValue: "Slice" });
+
+    return { groupTooltip: group, sliceTooltip: slice };
+  }, [selectedIds, objects, groups, t]);
 
   // Add specific Storm Card
   //

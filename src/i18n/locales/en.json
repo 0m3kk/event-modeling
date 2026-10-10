@@ -66,6 +66,7 @@
     "nestGroups": "Nest Groups (Cmd+G)",
     "createSubgroup": "Create Sub-group (Cmd+G)",
     "addToGroup": "Add to Group (Cmd+G)",
+    "addToSlice": "Add to Slice",
     "clearCanvas": "Clear Canvas",
     "kinds": {
       "command": "Command",

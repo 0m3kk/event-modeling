@@ -1128,6 +1128,22 @@ export const useCanvasStore = create<CanvasStore>()(
           ? state.groups.find((g) => g.id === targetGroupId)
           : undefined;
 
+        // Moving components into a slice is the Slice button's job, not the
+        // generic Group action. When the would-be target is a slice, drop it
+        // and leave the slice-bound cards where they are: only the free cards
+        // form the new group.
+        if (targetGroup?.isSlice) {
+          targetGroupId = undefined;
+          for (let i = candidateObjectIds.length - 1; i >= 0; i--) {
+            const gid = state.objects.find(
+              (o) => o.id === candidateObjectIds[i],
+            )?.groupId;
+            if (gid && state.groups.some((g) => g.id === gid && g.isSlice)) {
+              candidateObjectIds.splice(i, 1);
+            }
+          }
+        }
+
         // If a target group is found and not overridden by an explicit new group name
         if (
           targetGroupId &&
@@ -1222,8 +1238,14 @@ export const useCanvasStore = create<CanvasStore>()(
 
         // 1. Identify candidate object IDs
         const candidateObjectIds: string[] = [];
+        const explicitSliceIds = new Set<string>();
         for (const id of rawIds) {
-          if (!id.startsWith("__group:")) {
+          if (id.startsWith("__group:")) {
+            const gid = id.replace("__group:", "");
+            if (state.groups.some((g) => g.id === gid && g.isSlice)) {
+              explicitSliceIds.add(gid);
+            }
+          } else {
             const obj = state.objects.find((o) => o.id === id);
             if (obj && obj.type !== "connector") {
               candidateObjectIds.push(obj.id);
@@ -1263,6 +1285,38 @@ export const useCanvasStore = create<CanvasStore>()(
             }
             set({ selectedIds: [`__group:${existingSlice.id}`] });
             return existingSlice.id;
+          }
+        }
+
+        // The Slice button adds components to the slice they already relate to
+        // — a selected slice, or cards already living in one — instead of
+        // spawning a duplicate. An explicit new name still wins, so callers can
+        // force a fresh slice.
+        if (!options?.name) {
+          const targetSliceIds = new Set(explicitSliceIds);
+          for (const id of candidateObjectIds) {
+            const gid = state.objects.find((o) => o.id === id)?.groupId;
+            if (gid && state.groups.some((g) => g.id === gid && g.isSlice)) {
+              targetSliceIds.add(gid);
+            }
+          }
+          if (targetSliceIds.size === 1) {
+            const sliceId = Array.from(targetSliceIds)[0];
+            const incoming = candidateObjectIds.filter(
+              (id) =>
+                state.objects.find((o) => o.id === id)?.groupId !== sliceId,
+            );
+            if (incoming.length > 0) get().addToGroup(sliceId, incoming);
+            if (domain) {
+              get().updateGroup(sliceId, { domain, tag: domain });
+            }
+            if (options?.commandOrQueryId) {
+              get().updateGroup(sliceId, {
+                commandOrQueryId: options.commandOrQueryId,
+              });
+            }
+            set({ selectedIds: [`__group:${sliceId}`] });
+            return sliceId;
           }
         }
 

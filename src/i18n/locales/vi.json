@@ -66,6 +66,7 @@
     "nestGroups": "Lồng nhóm (Cmd+G)",
     "createSubgroup": "Tạo nhóm con (Cmd+G)",
     "addToGroup": "Thêm vào nhóm (Cmd+G)",
+    "addToSlice": "Thêm vào slice",
     "clearCanvas": "Xóa bảng vẽ",
     "kinds": {
       "command": "Lệnh",

@@ -1064,6 +1064,159 @@ describe("useCanvasStore", () => {
     expect(state.objects.find((o) => o.id === "c2")?.groupId).toBe(gid);
   });
 
+  it("Group leaves slice members alone and groups only free cards", () => {
+    const cmd: CanvasObject = {
+      id: "slice-cmd",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 120,
+      stormData: { kind: "command", name: "Place Order", fields: [] },
+    };
+    const free: CanvasObject = {
+      id: "free-1",
+      type: "storm",
+      x: 500,
+      y: 100,
+      width: 200,
+      height: 100,
+      stormData: { kind: "event", name: "Order Placed", fields: [] },
+    };
+    useCanvasStore.getState().addObjects([cmd, free]);
+
+    const sliceId = useCanvasStore.getState().createSlice({
+      objectIds: ["slice-cmd"],
+      name: "Order Slice",
+    })!;
+
+    // Selecting a slice member + a free card then pressing Group must not
+    // move the free card into the slice.
+    useCanvasStore.getState().setSelectedIds(["slice-cmd", "free-1"]);
+    const groupId = useCanvasStore.getState().groupObjects();
+
+    const state = useCanvasStore.getState();
+    expect(groupId).toBeDefined();
+    expect(groupId).not.toBe(sliceId);
+    expect(state.groups.find((g) => g.id === groupId)?.isSlice).toBeFalsy();
+    expect(state.objects.find((o) => o.id === "slice-cmd")?.groupId).toBe(
+      sliceId,
+    );
+    expect(state.objects.find((o) => o.id === "free-1")?.groupId).toBe(groupId);
+  });
+
+  it("Group makes a regular group for a free card selected together with a slice", () => {
+    const cmd: CanvasObject = {
+      id: "slice-cmd",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 120,
+      stormData: { kind: "command", name: "Place Order", fields: [] },
+    };
+    const free: CanvasObject = {
+      id: "free-1",
+      type: "storm",
+      x: 500,
+      y: 100,
+      width: 200,
+      height: 100,
+      stormData: { kind: "event", name: "Order Placed", fields: [] },
+    };
+    useCanvasStore.getState().addObjects([cmd, free]);
+    const sliceId = useCanvasStore.getState().createSlice({
+      objectIds: ["slice-cmd"],
+      name: "Order Slice",
+    })!;
+
+    useCanvasStore.getState().setSelectedIds([`__group:${sliceId}`, "free-1"]);
+    const groupId = useCanvasStore.getState().groupObjects();
+
+    const state = useCanvasStore.getState();
+    expect(groupId).toBeDefined();
+    expect(groupId).not.toBe(sliceId);
+    expect(state.groups.find((g) => g.id === groupId)?.isSlice).toBeFalsy();
+    expect(state.objects.find((o) => o.id === "free-1")?.groupId).toBe(groupId);
+    expect(state.objects.find((o) => o.id === "slice-cmd")?.groupId).toBe(
+      sliceId,
+    );
+  });
+
+  it("Slice adds free cards to the slice they already relate to", () => {
+    const cmd: CanvasObject = {
+      id: "slice-cmd",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 120,
+      stormData: { kind: "command", name: "Place Order", fields: [] },
+    };
+    const free: CanvasObject = {
+      id: "free-1",
+      type: "storm",
+      x: 100,
+      y: 300,
+      width: 260,
+      height: 100,
+      stormData: { kind: "event", name: "Order Placed", fields: [] },
+    };
+    useCanvasStore.getState().addObjects([cmd, free]);
+    const sliceId = useCanvasStore.getState().createSlice({
+      objectIds: ["slice-cmd"],
+      name: "Order Slice",
+    })!;
+
+    useCanvasStore.getState().setSelectedIds(["slice-cmd", "free-1"]);
+    const returned = useCanvasStore.getState().createSlice();
+
+    const state = useCanvasStore.getState();
+    expect(returned).toBe(sliceId);
+    expect(state.groups).toHaveLength(1);
+    expect(state.objects.find((o) => o.id === "slice-cmd")?.groupId).toBe(
+      sliceId,
+    );
+    expect(state.objects.find((o) => o.id === "free-1")?.groupId).toBe(sliceId);
+    expect(state.selectedIds).toEqual([`__group:${sliceId}`]);
+  });
+
+  it("Slice adds a free card to an explicitly selected slice", () => {
+    const cmd: CanvasObject = {
+      id: "slice-cmd",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 120,
+      stormData: { kind: "command", name: "Place Order", fields: [] },
+    };
+    const free: CanvasObject = {
+      id: "free-1",
+      type: "storm",
+      x: 100,
+      y: 300,
+      width: 260,
+      height: 100,
+      stormData: { kind: "event", name: "Order Placed", fields: [] },
+    };
+    useCanvasStore.getState().addObjects([cmd, free]);
+    const sliceId = useCanvasStore.getState().createSlice({
+      objectIds: ["slice-cmd"],
+      name: "Order Slice",
+    })!;
+
+    useCanvasStore
+      .getState()
+      .setSelectedIds([`__group:${sliceId}`, "free-1"]);
+    const returned = useCanvasStore.getState().createSlice();
+
+    const state = useCanvasStore.getState();
+    expect(returned).toBe(sliceId);
+    expect(state.groups).toHaveLength(1);
+    expect(state.objects.find((o) => o.id === "free-1")?.groupId).toBe(sliceId);
+  });
+
   it("handles moveRow and deleteSelectedRow", () => {
     const card: CanvasObject = {
       id: "storm-1",
