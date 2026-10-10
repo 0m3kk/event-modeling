@@ -41,9 +41,12 @@ export class CardLayer extends Container {
 
   // Model lookup + fingerprint keyed by the source array reference. Pan frames
   // pass the same `allObjects`, so the O(all) map build is skipped entirely.
+  // `byId` resolves any object by id — cards reference each other (e.g. a
+  // constraint points at a State card) and need the referenced card's name.
   private modelsCache: {
     source: CanvasObject[];
     map: ReturnType<typeof buildModelMap>;
+    byId: Map<string, CanvasObject>;
     key: string;
   } | null = null;
 
@@ -147,14 +150,18 @@ export class CardLayer extends Container {
     // is off-screen, and so the key below stays stable while panning.
     let modelsCache = this.modelsCache;
     if (modelsCache?.source !== allObjects) {
+      const byId = new Map<string, CanvasObject>();
+      for (const o of allObjects) byId.set(o.id, o);
       modelsCache = {
         source: allObjects,
         map: buildModelMap(allObjects),
+        byId,
         key: this.computeModelsKey(allObjects),
       };
       this.modelsCache = modelsCache;
     }
     const modelsMap = modelsCache.map;
+    const objectsById = modelsCache.byId;
     const modelsKey = modelsCache.key;
 
     // Render or update each card
@@ -219,6 +226,13 @@ export class CardLayer extends Container {
             : obj.type === "model"
               ? this.tokenFor(obj.modelData)
               : 0,
+          // A constraint renders the name of the State card it links to, so the
+          // referenced state's name is part of its draw signature.
+          obj.type === "storm" &&
+          obj.stormData?.kind === "constraint" &&
+          obj.stormData.stateId
+            ? (objectsById.get(obj.stormData.stateId)?.stormData?.name ?? "\u0000")
+            : "",
           modelsKey,
         ].join("|");
 
@@ -245,6 +259,7 @@ export class CardLayer extends Container {
           cardSelectedFieldId,
           modelsMap,
           this.isDark,
+          objectsById,
         );
       } else if (obj.type === "model") {
         result = ModelNodeRenderer.draw(

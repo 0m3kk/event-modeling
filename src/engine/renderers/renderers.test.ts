@@ -597,6 +597,51 @@ describe("Pixi Card Renderers", () => {
     expect(unlinkedRes.hitZones.find((z) => z.type === "constraintState")).toBeUndefined();
   });
 
+  it("resolves a linked State via an id-keyed lookup map", () => {
+    // Production passes an id-keyed map (CardLayer.modelsCache.byId) rather than
+    // an array, so the linked state name must resolve from that map too.
+    const stateObj: CanvasObject = {
+      id: "state-order",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 120,
+      stormData: { kind: "state", name: "Order State", fields: [] },
+    };
+    const obj: CanvasObject = {
+      id: "c-1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 140,
+      stormData: {
+        kind: "constraint",
+        name: "OrderConstraints",
+        stateId: "state-order",
+        fields: [],
+        constraints: [],
+      },
+    };
+
+    const byId = new Map<string, CanvasObject>([[stateObj.id, stateObj]]);
+    const res = StormCardRenderer.draw(
+      new Container(),
+      obj,
+      1,
+      false,
+      undefined,
+      undefined,
+      false,
+      byId,
+    );
+
+    const stateZone = res.hitZones.find((z) => z.type === "constraintState");
+    expect(stateZone).toBeDefined();
+    expect(stateZone?.currentText).toBe("Order State");
+  });
+
   it("renders constraint card with wrapped text and expanded height for long rules", () => {
     const container = new Container();
     const obj: CanvasObject = {

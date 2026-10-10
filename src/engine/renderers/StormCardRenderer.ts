@@ -56,6 +56,7 @@ export class StormCardRenderer {
     selectedFieldId?: string,
     allObjects?: CanvasObject[] | Map<string, CanvasObject>,
     isDark: boolean = false,
+    objectsById?: Map<string, CanvasObject>,
   ): RenderResult {
     container.removeChildren();
 
@@ -702,7 +703,13 @@ export class StormCardRenderer {
       }
     } else if (isConstraint) {
       const findObjectById = (id?: string): CanvasObject | undefined => {
-        if (!id || !allObjects) return undefined;
+        if (!id) return undefined;
+        // The canonical lookup is id-keyed; `allObjects` is a name-keyed model
+        // map in production, so it is only a fallback for callers passing an
+        // array of objects.
+        const direct = objectsById?.get(id);
+        if (direct) return direct;
+        if (!allObjects) return undefined;
         if (allObjects instanceof Map) return allObjects.get(id);
         if (Array.isArray(allObjects)) return allObjects.find((o) => o.id === id);
         return undefined;

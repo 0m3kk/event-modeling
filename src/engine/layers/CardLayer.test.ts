@@ -156,4 +156,48 @@ describe("CardLayer incremental drawing", () => {
 
     layer.destroy();
   });
+
+  it("renders the linked State card's name on a constraint card", () => {
+    const layer = new CardLayer();
+    const state: CanvasObject = {
+      id: "state-1",
+      type: "storm",
+      x: 400,
+      y: 0,
+      width: 240,
+      height: 120,
+      stormData: { kind: "state", name: "Order State", fields: [] },
+    };
+    const constraint: CanvasObject = {
+      id: "c1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 140,
+      stormData: {
+        kind: "constraint",
+        name: "OrderConstraints",
+        stateId: "state-1",
+        fields: [],
+        constraints: [],
+      },
+    };
+
+    const textsOf = (id: string) =>
+      containerOf(layer, id).children.filter((c) => c instanceof Text) as Text[];
+
+    layer.renderCards([constraint, state], 1, []);
+    expect(textsOf("c1").some((t) => t.text === "⟡ Order State")).toBe(true);
+
+    // Renaming the linked state must repaint the constraint card.
+    const renamed: CanvasObject = {
+      ...state,
+      stormData: { ...state.stormData!, name: "Purchase State" },
+    };
+    layer.renderCards([constraint, renamed], 1, []);
+    expect(textsOf("c1").some((t) => t.text === "⟡ Purchase State")).toBe(true);
+
+    layer.destroy();
+  });
 });
