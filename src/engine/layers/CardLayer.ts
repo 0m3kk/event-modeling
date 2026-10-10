@@ -200,24 +200,29 @@ export class CardLayer extends Container {
 
       // Everything the renderers read, folded into one signature. Only when it
       // changes do we throw away and rebuild the card's children.
-      const drawKey = [
-        this.isDark ? 1 : 0,
-        textResolution,
-        isSelected ? 1 : 0,
-        cardSelectedFieldId ?? "",
-        obj.width,
-        obj.type,
-        obj.text ?? "",
-        obj.fill ?? "",
-        obj.stroke ?? "",
-        obj.referenceId ?? "",
-        obj.type === "storm"
-          ? this.tokenFor(obj.stormData)
-          : obj.type === "model"
-            ? this.tokenFor(obj.modelData)
-            : 0,
-        modelsKey,
-      ].join("|");
+      const buildDrawKey = (height: number) =>
+        [
+          this.isDark ? 1 : 0,
+          textResolution,
+          isSelected ? 1 : 0,
+          cardSelectedFieldId ?? "",
+          obj.width,
+          height,
+          obj.type,
+          obj.text ?? "",
+          obj.fill ?? "",
+          obj.stroke ?? "",
+          obj.referenceId ?? "",
+          obj.hiddenMethodIds ? obj.hiddenMethodIds.join(",") : "",
+          obj.type === "storm"
+            ? this.tokenFor(obj.stormData)
+            : obj.type === "model"
+              ? this.tokenFor(obj.modelData)
+              : 0,
+          modelsKey,
+        ].join("|");
+
+      const drawKey = buildDrawKey(obj.height);
 
       if (this.cardDrawKeys.get(obj.id) === drawKey) continue;
 
@@ -257,14 +262,14 @@ export class CardLayer extends Container {
         result = TextBoxRenderer.draw(card, obj, textResolution, isSelected);
       }
 
-      this.cardDrawKeys.set(obj.id, drawKey);
-
       if (result) {
         this.cardZones.set(obj.id, result.hitZones);
         if (result.height && result.height !== obj.height) {
           obj.height = result.height;
         }
       }
+
+      this.cardDrawKeys.set(obj.id, buildDrawKey(obj.height));
     }
   }
 

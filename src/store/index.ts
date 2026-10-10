@@ -132,6 +132,7 @@ export const initialCanvasState: CanvasStoreState = {
   validationTarget: null,
   bddStepPopup: null,
   queryItemPopup: null,
+  serviceMethodVisibilityPopup: null,
   validationHover: null,
   fieldClipboard: null,
   objectClipboard: null,
@@ -547,9 +548,20 @@ export const useCanvasStore = create<CanvasStore>()(
 
           if (clones.length === 0) return {};
 
+          const singleServiceClone =
+            clones.length === 1 &&
+            clones[0].type === "model" &&
+            clones[0].modelData?.kind === "service" &&
+            (clones[0].modelData.methods?.length ?? 0) > 1
+              ? clones[0]
+              : null;
+
           return {
             objects: [...objects, ...clones],
             selectedIds: cloneIds,
+            serviceMethodVisibilityPopup: singleServiceClone
+              ? { objectId: singleServiceClone.id }
+              : state.serviceMethodVisibilityPopup,
           };
         }),
 
@@ -1434,14 +1446,37 @@ export const useCanvasStore = create<CanvasStore>()(
               (m) => m.id !== rowId,
             );
           }
-          const newHeight = computeModelNodeHeight(nextData);
+          const nextHidden = obj.hiddenMethodIds?.filter((id) => id !== rowId);
+          const newHeight = computeModelNodeHeight(
+            nextData,
+            nextHidden && nextHidden.length > 0 ? nextHidden : undefined,
+          );
           set({
             objects: syncReferenceAfterChange(
-              state.objects.map((o) =>
-                o.id === objectId
-                  ? { ...o, height: newHeight, modelData: nextData }
-                  : o,
-              ),
+              state.objects.map((o) => {
+                if (o.id === objectId) {
+                  return {
+                    ...o,
+                    height: newHeight,
+                    modelData: nextData,
+                    hiddenMethodIds:
+                      nextHidden && nextHidden.length > 0
+                        ? nextHidden
+                        : undefined,
+                  };
+                }
+                if (
+                  o.referenceId === obj.referenceId &&
+                  o.hiddenMethodIds?.includes(rowId)
+                ) {
+                  const cleaned = o.hiddenMethodIds.filter((id) => id !== rowId);
+                  return {
+                    ...o,
+                    hiddenMethodIds: cleaned.length > 0 ? cleaned : undefined,
+                  };
+                }
+                return o;
+              }),
               objectId,
             ),
             stormSelectedField:
@@ -2001,7 +2036,7 @@ export const useCanvasStore = create<CanvasStore>()(
         };
         const nextMethods = [...(obj.modelData.methods ?? []), newMethod];
         const nextData = { ...obj.modelData, methods: nextMethods };
-        const newHeight = computeModelNodeHeight(nextData);
+        const newHeight = computeModelNodeHeight(nextData, obj.hiddenMethodIds);
         set({
           objects: syncReferenceAfterChange(
             objects.map((o) =>
@@ -2028,7 +2063,7 @@ export const useCanvasStore = create<CanvasStore>()(
           m.id === methodId ? { ...m, ...patch } : m,
         );
         const nextData = { ...obj.modelData, methods: nextMethods };
-        const newHeight = computeModelNodeHeight(nextData);
+        const newHeight = computeModelNodeHeight(nextData, obj.hiddenMethodIds);
         set({
           objects: syncReferenceAfterChange(
             objects.map((o) =>
@@ -2037,6 +2072,151 @@ export const useCanvasStore = create<CanvasStore>()(
                 : o,
             ),
             obj.id,
+          ),
+        });
+      },
+
+      setServiceMethodVisibilityPopup: (target) => {
+        set({ serviceMethodVisibilityPopup: target });
+      },
+
+      toggleServiceModelMethodVisibility: (objectId, methodId) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "model" || !obj.modelData || obj.locked)
+          return;
+        if (obj.modelData.kind !== "service") return;
+
+        const currentHidden = obj.hiddenMethodIds ?? [];
+        const isHidden = currentHidden.includes(methodId);
+        const nextHidden = isHidden
+          ? currentHidden.filter((id) => id !== methodId)
+          : [...currentHidden, methodId];
+
+        const newHeight = computeModelNodeHeight(
+          obj.modelData,
+          nextHidden.length > 0 ? nextHidden : undefined,
+        );
+
+        set({
+          objects: objects.map((o) =>
+            o.id === objectId
+              ? {
+                  ...o,
+                  hiddenMethodIds:
+                    nextHidden.length > 0 ? nextHidden : undefined,
+                  height: newHeight,
+                }
+              : o,
+          ),
+          stormSelectedField:
+            !isHidden && get().stormSelectedField?.fieldId === methodId
+              ? null
+              : get().stormSelectedField,
+        });
+      },
+
+      setServiceModelMethodVisibility: (objectId, hiddenMethodIds) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "model" || !obj.modelData || obj.locked)
+          return;
+        if (obj.modelData.kind !== "service") return;
+
+        const nextHidden =
+          hiddenMethodIds.length > 0 ? hiddenMethodIds : undefined;
+        const newHeight = computeModelNodeHeight(obj.modelData, nextHidden);
+
+        set({
+          objects: objects.map((o) =>
+            o.id === objectId
+              ? {
+                  ...o,
+                  hiddenMethodIds: nextHidden,
+                  height: newHeight,
+                }
+              : o,
+          ),
+        });
+      },
+
+      hideServiceModelMethod: (objectId, methodId) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "model" || !obj.modelData || obj.locked)
+          return;
+        if (obj.modelData.kind !== "service") return;
+
+        const currentHidden = obj.hiddenMethodIds ?? [];
+        if (currentHidden.includes(methodId)) return;
+        const nextHidden = [...currentHidden, methodId];
+        const newHeight = computeModelNodeHeight(obj.modelData, nextHidden);
+
+        set({
+          objects: objects.map((o) =>
+            o.id === objectId
+              ? {
+                  ...o,
+                  hiddenMethodIds: nextHidden,
+                  height: newHeight,
+                }
+              : o,
+          ),
+          stormSelectedField:
+            get().stormSelectedField?.fieldId === methodId
+              ? null
+              : get().stormSelectedField,
+        });
+      },
+
+      showAllServiceModelMethods: (objectId) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "model" || !obj.modelData || obj.locked)
+          return;
+        if (obj.modelData.kind !== "service") return;
+
+        const newHeight = computeModelNodeHeight(obj.modelData, undefined);
+
+        set({
+          objects: objects.map((o) =>
+            o.id === objectId
+              ? {
+                  ...o,
+                  hiddenMethodIds: undefined,
+                  height: newHeight,
+                }
+              : o,
+          ),
+        });
+      },
+
+      showOnlyServiceModelMethod: (objectId, methodId) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "model" || !obj.modelData || obj.locked)
+          return;
+        if (obj.modelData.kind !== "service") return;
+
+        const allMethods = obj.modelData.methods ?? [];
+        const nextHidden = allMethods
+          .map((m) => m.id)
+          .filter((id) => id !== methodId);
+        const newHeight = computeModelNodeHeight(
+          obj.modelData,
+          nextHidden.length > 0 ? nextHidden : undefined,
+        );
+
+        set({
+          objects: objects.map((o) =>
+            o.id === objectId
+              ? {
+                  ...o,
+                  hiddenMethodIds:
+                    nextHidden.length > 0 ? nextHidden : undefined,
+                  height: newHeight,
+                }
+              : o,
           ),
         });
       },

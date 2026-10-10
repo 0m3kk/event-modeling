@@ -2035,5 +2035,68 @@ describe("useCanvasStore", () => {
     expect(card?.modelData?.methods).toHaveLength(1);
     expect(card?.modelData?.methods?.[0].name).toBe("hashPassword");
   });
+
+  it("manages service method visibility: toggle, hide, show all, show only, and cleans on delete", () => {
+    const serviceCard: CanvasObject = {
+      id: "srv-vis-1",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 154,
+      modelData: {
+        kind: "service",
+        name: "PaymentService",
+        methods: [
+          { id: "m1", name: "charge", params: [], returnType: "Receipt" },
+          { id: "m2", name: "refund", params: [], returnType: "bool" },
+          { id: "m3", name: "getHistory", params: [], returnType: "Receipt[]" },
+        ],
+      },
+    };
+
+    useCanvasStore.getState().addObject(serviceCard);
+
+    // 1. Hide method m2
+    useCanvasStore.getState().hideServiceModelMethod("srv-vis-1", "m2");
+    let card = useCanvasStore.getState().objects.find((o) => o.id === "srv-vis-1")!;
+    expect(card.hiddenMethodIds).toEqual(["m2"]);
+    expect(card.height).toBe(128); // 2 visible + 1 indicator row
+
+    // 2. Toggle m3 (hides it)
+    useCanvasStore.getState().toggleServiceModelMethodVisibility("srv-vis-1", "m3");
+    card = useCanvasStore.getState().objects.find((o) => o.id === "srv-vis-1")!;
+    expect(card.hiddenMethodIds).toEqual(["m2", "m3"]);
+    expect(card.height).toBe(102); // 1 visible + 1 indicator row
+
+    // 3. Toggle m2 again (unhides it)
+    useCanvasStore.getState().toggleServiceModelMethodVisibility("srv-vis-1", "m2");
+    card = useCanvasStore.getState().objects.find((o) => o.id === "srv-vis-1")!;
+    expect(card.hiddenMethodIds).toEqual(["m3"]);
+
+    // 4. showAllServiceModelMethods
+    useCanvasStore.getState().showAllServiceModelMethods("srv-vis-1");
+    card = useCanvasStore.getState().objects.find((o) => o.id === "srv-vis-1")!;
+    expect(card.hiddenMethodIds).toBeUndefined();
+    expect(card.height).toBe(128); // 3 visible, no indicator: 34 + 6 + 3*26 + 10 = 128
+
+    // 5. showOnlyServiceModelMethod (call only 1 method in a flow)
+    useCanvasStore.getState().showOnlyServiceModelMethod("srv-vis-1", "m1");
+    card = useCanvasStore.getState().objects.find((o) => o.id === "srv-vis-1")!;
+    expect(card.hiddenMethodIds).toEqual(["m2", "m3"]);
+    expect(card.height).toBe(102);
+
+    // 6. Delete a hidden method -> cleans up from hiddenMethodIds
+    useCanvasStore.getState().deleteSelectedRow("srv-vis-1", "m2");
+    card = useCanvasStore.getState().objects.find((o) => o.id === "srv-vis-1")!;
+    expect(card.modelData?.methods?.map((m) => m.id)).toEqual(["m1", "m3"]);
+    expect(card.hiddenMethodIds).toEqual(["m3"]);
+
+    // 7. createReferenceCopy of service with 2+ methods sets serviceMethodVisibilityPopup
+    useCanvasStore.getState().createReferenceCopy(["srv-vis-1"]);
+    const state = useCanvasStore.getState();
+    const clone = state.objects.find((o) => o.id !== "srv-vis-1")!;
+    expect(state.serviceMethodVisibilityPopup?.objectId).toBe(clone.id);
+  });
 });
 

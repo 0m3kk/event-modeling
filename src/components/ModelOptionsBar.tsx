@@ -7,6 +7,7 @@ import { DescriptionPopover } from "./DescriptionPopover";
 import { ValidationPopover } from "./ValidationPopover";
 import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 import { ServiceParamsPopover } from "./ServiceParamsPopover";
+import { ServiceMethodVisibilityPopover } from "./ServiceMethodVisibilityPopover";
 import { findDescriptionText } from "@/utils/description";
 import {
   describeValidationRules,
@@ -20,6 +21,8 @@ import {
   Info,
   ListChecks,
   Sliders,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export function ModelOptionsBar() {
@@ -41,9 +44,19 @@ export function ModelOptionsBar() {
   const setValidationTarget = useCanvasStore((s) => s.setValidationTarget);
   const isDragging = useCanvasStore((s) => s.isDragging);
   const addServiceModelMethod = useCanvasStore((s) => s.addServiceModelMethod);
+  const serviceMethodVisibilityPopup = useCanvasStore(
+    (s) => s.serviceMethodVisibilityPopup,
+  );
+  const setServiceMethodVisibilityPopup = useCanvasStore(
+    (s) => s.setServiceMethodVisibilityPopup,
+  );
+  const hideServiceModelMethod = useCanvasStore(
+    (s) => s.hideServiceModelMethod,
+  );
 
   const [showDescriptionPopover, setShowDescriptionPopover] = useState(false);
   const [showParamsPopover, setShowParamsPopover] = useState(false);
+  const [localShowVisibilityPopover, setLocalShowVisibilityPopover] = useState(false);
 
   const selectedModel = useMemo(() => {
     if (selectedIds.length !== 1 || isLocked) return null;
@@ -151,11 +164,37 @@ export function ModelOptionsBar() {
       ? ((selectedModelRow as import("@/types").ServiceMethod | null) ?? null)
       : null;
 
+  const showMethodVisibilityPopover = Boolean(
+    localShowVisibilityPopover ||
+      (serviceMethodVisibilityPopup &&
+        serviceMethodVisibilityPopup.objectId === selectedModel.id),
+  );
+
+  const handleCloseMethodVisibilityPopover = () => {
+    setLocalShowVisibilityPopover(false);
+    if (serviceMethodVisibilityPopup?.objectId === selectedModel.id) {
+      setServiceMethodVisibilityPopup(null);
+    }
+  };
+
+  const handleToggleMethodVisibilityPopover = () => {
+    if (showMethodVisibilityPopover) {
+      handleCloseMethodVisibilityPopover();
+      return;
+    }
+    setShowDescriptionPopover(false);
+    setShowParamsPopover(false);
+    setValidationTarget(null);
+    setLocalShowVisibilityPopover(true);
+    setServiceMethodVisibilityPopup({ objectId: selectedModel.id });
+  };
+
   const handleToggleParamsPopover = () => {
     const next = !showParamsPopover;
     if (next) {
       setShowDescriptionPopover(false);
       setValidationTarget(null);
+      handleCloseMethodVisibilityPopover();
     }
     setShowParamsPopover(next);
   };
@@ -167,6 +206,7 @@ export function ModelOptionsBar() {
     }
     setShowDescriptionPopover(false);
     setShowParamsPopover(false);
+    handleCloseMethodVisibilityPopover();
     if (canValidate) {
       setValidationTarget({
         objectId: selectedModel.id,
@@ -180,6 +220,7 @@ export function ModelOptionsBar() {
     if (next) {
       setValidationTarget(null);
       setShowParamsPopover(false);
+      handleCloseMethodVisibilityPopover();
     }
     setShowDescriptionPopover(next);
   };
@@ -205,10 +246,19 @@ export function ModelOptionsBar() {
       ? selectedModelRow?.name
         ? `Delete Value "${selectedModelRow.name}"`
         : "Delete Value"
-      : selectedModelRow?.name
-        ? `Delete Field "${selectedModelRow.name}"`
-        : "Delete Field"
+      : kind === "service"
+        ? selectedModelRow?.name
+          ? `Delete Method "${selectedModelRow.name}" from service`
+          : "Delete Method from service"
+        : selectedModelRow?.name
+          ? `Delete Field "${selectedModelRow.name}"`
+          : "Delete Field"
     : "Delete Model";
+
+  const serviceMethods = kind === "service" ? data.methods ?? [] : [];
+  const serviceHiddenIds = selectedModel.hiddenMethodIds ?? [];
+  const serviceHiddenCount = serviceHiddenIds.length;
+  const serviceVisibleCount = serviceMethods.length - serviceHiddenCount;
 
   return (
     <>
@@ -285,6 +335,31 @@ export function ModelOptionsBar() {
 
         <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
+        {/* Service Method Visibility button — toggle visibility of methods on this card */}
+        {kind === "service" && (
+          <button
+            onClick={handleToggleMethodVisibilityPopover}
+            title={
+              serviceHiddenCount > 0
+                ? t("popovers.optionsBar.manageMethodsVisibilityCount", {
+                    defaultValue: `Manage visible methods (${serviceVisibleCount}/${serviceMethods.length} visible)`,
+                    visible: serviceVisibleCount,
+                    total: serviceMethods.length,
+                  })
+                : t("popovers.optionsBar.manageMethodsVisibility", {
+                    defaultValue: "Manage visible methods",
+                  })
+            }
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
+              showMethodVisibilityPopover || serviceHiddenCount > 0
+                ? "border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
+                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            {serviceHiddenCount > 0 ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        )}
+
         {/* Service Method Parameters button */}
         {selectedServiceMethod && (
           <button
@@ -304,6 +379,22 @@ export function ModelOptionsBar() {
                   : "text-gray-600 dark:text-zinc-400"
               }
             />
+          </button>
+        )}
+
+        {/* Hide Selected Method on this card */}
+        {selectedServiceMethod && (
+          <button
+            onClick={() => {
+              hideServiceModelMethod(selectedModel.id, selectedServiceMethod.id);
+            }}
+            title={t("popovers.optionsBar.hideMethod", {
+              defaultValue: `Hide method "${selectedServiceMethod.name || "method"}" on this card`,
+              name: selectedServiceMethod.name || "method",
+            })}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 dark:text-zinc-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer"
+          >
+            <EyeOff size={16} />
           </button>
         )}
 
@@ -364,6 +455,15 @@ export function ModelOptionsBar() {
           card={selectedModel}
           method={selectedServiceMethod}
           onClose={() => setShowParamsPopover(false)}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
+        />
+      )}
+
+      {/* Service Method Visibility Panel */}
+      {showMethodVisibilityPopover && kind === "service" && (
+        <ServiceMethodVisibilityPopover
+          card={selectedModel}
+          onClose={handleCloseMethodVisibilityPopover}
           anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}

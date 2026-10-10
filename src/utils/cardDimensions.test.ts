@@ -240,6 +240,31 @@ describe("cardDimensions", () => {
     expect(h4).toBe(h2 + 2 * 26);
   });
 
+  it("calculates service model node height based on visible methods and hidden indicator", () => {
+    const service: ModelData = {
+      kind: "service",
+      name: "AuthService",
+      methods: [
+        { id: "m1", name: "login", params: [], returnType: "Token" },
+        { id: "m2", name: "logout", params: [], returnType: "void" },
+        { id: "m3", name: "register", params: [], returnType: "User" },
+        { id: "m4", name: "verify", params: [], returnType: "bool" },
+      ],
+    };
+
+    // All 4 methods visible: 34 + 6 + 4 * 26 + 10 = 154
+    const fullHeight = computeModelNodeHeight(service);
+    expect(fullHeight).toBe(154);
+
+    // 2 methods hidden: 2 visible + 1 indicator row: 34 + 6 + 2 * 26 + 1 * 26 + 10 = 128
+    const partialHeight = computeModelNodeHeight(service, ["m2", "m3"]);
+    expect(partialHeight).toBe(128);
+
+    // 3 methods hidden (1 visible): 1 visible + 1 indicator row: 34 + 6 + 1 * 26 + 1 * 26 + 10 = 102
+    const singleVisibleHeight = computeModelNodeHeight(service, ["m2", "m3", "m4"]);
+    expect(singleVisibleHeight).toBe(102);
+  });
+
   describe("getCardMinDimensions", () => {
     it("returns computed min dimensions for storm card", () => {
       const obj: CanvasObject = {

@@ -260,6 +260,17 @@
       "enumVals": "Các giá trị hợp lệ (Enum)",
       "clearValidation": "Xóa kiểm tra"
     },
+    "serviceMethodVisibility": {
+      "title": "Hiển thị Method Dịch vụ",
+      "subtitle": "Chọn các method hiển thị trên thẻ này trong flow hiện tại",
+      "visible": "hiển thị",
+      "showAll": "Hiện tất cả",
+      "onlyThis": "Chỉ hiện method này",
+      "onlyThisTooltip": "Chỉ hiển thị method này và ẩn các method khác",
+      "noMethods": "Dịch vụ này chưa có method nào.",
+      "info": "Các method bị ẩn vẫn được lưu trong dịch vụ và dùng được ở các flow khác.",
+      "done": "Xong"
+    },
     "optionsBar": {
       "arrayCollection": "Bật/Tắt Tập hợp Mảng []",
       "addStep": "Thêm Bước Kịch bản",
@@ -269,6 +280,10 @@
       "addConstraint": "Thêm Quy tắc Ràng buộc",
       "createRef": "Tạo Bản sao Tham chiếu",
       "delete": "Xóa đối tượng",
+      "manageMethodsVisibility": "Quản lý hiển thị Method",
+      "manageMethodsVisibilityCount": "Quản lý method hiển thị ({{visible}}/{{total}} hiển thị)",
+      "hideMethod": "Ẩn method \"{{name}}\" trên thẻ này",
+      "deleteMethod": "Xóa method \"{{name}}\" khỏi dịch vụ",
       "ungroup": "Hủy gom nhóm (Cmd+Shift+G)",
       "arrangeLanes": "Sắp xếp các Làn Storm (Actor → Command → Event → Query → State → Constraint)",
       "arrangeSlice": "Căn giữa lại lát cắt dọc (Command/Query → Constraint/State → Event)"

@@ -50,6 +50,13 @@ export interface CanvasObject {
    */
   referenceId?: string;
 
+  /**
+   * For Service model nodes: IDs of methods hidden on this specific card
+   * instance. Allows reference copies in flows to show only the method(s)
+   * called in that flow while keeping the service definition in sync.
+   */
+  hiddenMethodIds?: string[];
+
   // Specific object payloads
   stormData?: StormData;
   modelData?: ModelData;

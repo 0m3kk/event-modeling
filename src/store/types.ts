@@ -128,6 +128,8 @@ export interface CanvasStoreState {
   bddStepPopup: BddStepPopupTarget | null;
   /** Open DCB query item popover target (create when queryItemId is omitted). */
   queryItemPopup: QueryItemPopupTarget | null;
+  /** Open Service Method Visibility popover target. */
+  serviceMethodVisibilityPopup: { objectId: string } | null;
   /** Hovered validation ✓ badge, used to anchor its tooltip. */
   validationHover: ValidationTarget | null;
   fieldClipboard: FieldClipboard | null;
@@ -229,6 +231,12 @@ export interface CanvasStoreActions {
     methodId: string,
     patch: Partial<import("@/types").ServiceMethod>,
   ) => void;
+  setServiceMethodVisibilityPopup: (target: { objectId: string } | null) => void;
+  toggleServiceModelMethodVisibility: (objectId: string, methodId: string) => void;
+  setServiceModelMethodVisibility: (objectId: string, hiddenMethodIds: string[]) => void;
+  hideServiceModelMethod: (objectId: string, methodId: string) => void;
+  showAllServiceModelMethods: (objectId: string) => void;
+  showOnlyServiceModelMethod: (objectId: string, methodId: string) => void;
 
   // Alignment, Distribution & Layout
   alignObjects: (direction: AlignDirection) => void;

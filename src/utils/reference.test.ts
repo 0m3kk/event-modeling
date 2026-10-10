@@ -264,4 +264,67 @@ describe("createReferenceCopy (store)", () => {
       ),
     ).toBe(false);
   });
+
+  it("keeps hiddenMethodIds and heights independent between service reference copies", () => {
+    const serviceModel: CanvasObject = {
+      id: "srv-orig",
+      type: "model",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 154,
+      modelData: {
+        kind: "service",
+        name: "OrderService",
+        methods: [
+          { id: "m1", name: "createOrder", params: [], returnType: "Order" },
+          { id: "m2", name: "cancelOrder", params: [], returnType: "bool" },
+          { id: "m3", name: "getOrder", params: [], returnType: "Order" },
+          { id: "m4", name: "refundOrder", params: [], returnType: "bool" },
+        ],
+      },
+    };
+
+    const store = useCanvasStore.getState();
+    store.addObject(serviceModel);
+    store.createReferenceCopy(["srv-orig"]);
+
+    let state = useCanvasStore.getState();
+    const orig = state.objects.find((o) => o.id === "srv-orig")!;
+    const copy = state.objects.find((o) => o.id !== "srv-orig")!;
+
+    expect(orig.referenceId).toBeTruthy();
+    expect(copy.referenceId).toBe(orig.referenceId);
+
+    // Hide 3 methods on the copy (leaving only m1 visible for the flow)
+    store.hideServiceModelMethod(copy.id, "m2");
+    store.hideServiceModelMethod(copy.id, "m3");
+    store.hideServiceModelMethod(copy.id, "m4");
+
+    state = useCanvasStore.getState();
+    const updatedCopy = state.objects.find((o) => o.id === copy.id)!;
+    const unchangedOrig = state.objects.find((o) => o.id === "srv-orig")!;
+
+    expect(updatedCopy.hiddenMethodIds).toEqual(["m2", "m3", "m4"]);
+    expect(unchangedOrig.hiddenMethodIds).toBeUndefined();
+    expect(updatedCopy.height).toBe(102); // 1 visible + 1 hidden indicator row
+    expect(unchangedOrig.height).toBe(154); // All 4 methods visible
+
+    // When the original service's method is updated, both keep their independent heights
+    store.updateServiceModelMethod("srv-orig", "m1", { name: "placeOrder" });
+
+    state = useCanvasStore.getState();
+    const syncedOrig = state.objects.find((o) => o.id === "srv-orig")!;
+    const syncedCopy = state.objects.find((o) => o.id === copy.id)!;
+
+    // Method name synced to both
+    expect(syncedOrig.modelData?.methods?.[0].name).toBe("placeOrder");
+    expect(syncedCopy.modelData?.methods?.[0].name).toBe("placeOrder");
+
+    // Hidden methods and heights remain independent
+    expect(syncedCopy.hiddenMethodIds).toEqual(["m2", "m3", "m4"]);
+    expect(syncedOrig.hiddenMethodIds).toBeUndefined();
+    expect(syncedCopy.height).toBe(102);
+    expect(syncedOrig.height).toBe(154);
+  });
 });

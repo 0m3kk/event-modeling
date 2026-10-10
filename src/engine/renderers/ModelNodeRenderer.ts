@@ -349,7 +349,11 @@ export class ModelNodeRenderer {
       }
     } else if (kind === "service") {
       const methods = data.methods ?? [];
-      for (const m of methods) {
+      const hiddenSet = new Set(obj.hiddenMethodIds ?? []);
+      const visibleMethods = methods.filter((m) => !hiddenSet.has(m.id));
+      const hiddenCount = methods.length - visibleMethods.length;
+
+      for (const m of visibleMethods) {
         const rowY = renderY;
 
         // Selection highlight
@@ -448,6 +452,36 @@ export class ModelNodeRenderer {
             currentText: m.description,
           });
         }
+
+        renderY += rowHeight;
+      }
+
+      if (hiddenCount > 0) {
+        const rowY = renderY;
+        const hiddenLabel = `• +${hiddenCount} hidden method${hiddenCount > 1 ? "s" : ""}`;
+        const hiddenText = new Text({
+          text: hiddenLabel,
+          style: {
+            fontSize: 10,
+            fontStyle: "italic",
+            fontFamily: APP_FONT_FAMILY,
+            fill: isDark ? 0xa1a1aa : 0x71717a,
+          },
+          resolution: textResolution,
+        });
+        hiddenText.x = 10;
+        hiddenText.y = rowY + 5;
+        container.addChild(hiddenText);
+
+        hitZones.push({
+          type: "hiddenMethodsIndicator",
+          bounds: {
+            x: 0,
+            y: rowY,
+            width: w,
+            height: rowHeight,
+          },
+        });
 
         renderY += rowHeight;
       }

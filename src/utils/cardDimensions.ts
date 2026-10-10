@@ -211,7 +211,10 @@ export function computeStormCardHeight(
 /**
  * Calculates the exact pixel height required for a Model node.
  */
-export function computeModelNodeHeight(data: ModelData): number {
+export function computeModelNodeHeight(
+  data: ModelData,
+  hiddenMethodIds?: string[],
+): number {
   const headerHeight = 34;
   const rowHeight = 26;
   let h = headerHeight + 6;
@@ -226,7 +229,18 @@ export function computeModelNodeHeight(data: ModelData): number {
   } else if (kind === "enum") {
     h += values.length * rowHeight;
   } else if (kind === "service") {
-    h += methods.length * rowHeight;
+    const hiddenSet =
+      hiddenMethodIds && hiddenMethodIds.length > 0
+        ? new Set(hiddenMethodIds)
+        : null;
+    const visibleCount = hiddenSet
+      ? methods.filter((m) => !hiddenSet.has(m.id)).length
+      : methods.length;
+    const hiddenCount = methods.length - visibleCount;
+    h += visibleCount * rowHeight;
+    if (hiddenCount > 0) {
+      h += rowHeight;
+    }
   } else if (kind === "array" || kind === "wrap") {
     h += rowHeight;
   }
@@ -272,7 +286,7 @@ export function getCardMinDimensions(obj: CanvasObject): {
   if (obj.type === "model" && obj.modelData) {
     return {
       minWidth: MIN_CARD_WIDTH.model,
-      minHeight: computeModelNodeHeight(obj.modelData),
+      minHeight: computeModelNodeHeight(obj.modelData, obj.hiddenMethodIds),
     };
   }
   if (obj.type === "stickyNote") {
@@ -464,6 +478,7 @@ export function computeOptimalModelNodeWidth(
   minWidth: number = 200,
   maxWidth: number = 700,
   objects?: CanvasObject[],
+  hiddenMethodIds?: string[],
 ): number {
   let requiredWidth = minWidth;
 
@@ -489,7 +504,13 @@ export function computeOptimalModelNodeWidth(
     requiredWidth = Math.max(requiredWidth, vWidth);
   }
 
+  const hiddenSet =
+    hiddenMethodIds && hiddenMethodIds.length > 0
+      ? new Set(hiddenMethodIds)
+      : null;
+
   for (const m of data.methods ?? []) {
+    if (hiddenSet && hiddenSet.has(m.id)) continue;
     const rawReturnType = m.returnType || DEFAULT_FIELD_TYPE;
     const targetModel = objects ? resolveTargetModel(objects, rawReturnType) : null;
     const isModel = Boolean(targetModel && targetModel.modelData);
@@ -527,7 +548,13 @@ export function computeOptimalCardWidth(
     return computeOptimalStormCardWidth(obj.stormData, minWidth, maxWidth, objects);
   }
   if (obj.type === "model" && obj.modelData) {
-    return computeOptimalModelNodeWidth(obj.modelData, minWidth, maxWidth, objects);
+    return computeOptimalModelNodeWidth(
+      obj.modelData,
+      minWidth,
+      maxWidth,
+      objects,
+      obj.hiddenMethodIds,
+    );
   }
   return obj.width || 200;
 }

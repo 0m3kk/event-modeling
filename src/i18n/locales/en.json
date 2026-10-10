@@ -260,6 +260,17 @@
       "enumVals": "Allowed Values (Enum)",
       "clearValidation": "Clear validation"
     },
+    "serviceMethodVisibility": {
+      "title": "Service Methods Visibility",
+      "subtitle": "Choose which methods are visible on this card in this flow",
+      "visible": "visible",
+      "showAll": "Show All",
+      "onlyThis": "Only this",
+      "onlyThisTooltip": "Show only this method and hide others",
+      "noMethods": "This service has no methods defined yet.",
+      "info": "Hidden methods stay defined in the service and remain accessible from all references.",
+      "done": "Done"
+    },
     "optionsBar": {
       "arrayCollection": "Toggle Array Collection []",
       "addStep": "Add Scenario Step",
@@ -269,6 +280,10 @@
       "addConstraint": "Add Constraint Rule",
       "createRef": "Create Reference Copy",
       "delete": "Delete",
+      "manageMethodsVisibility": "Manage Visible Methods",
+      "manageMethodsVisibilityCount": "Manage visible methods ({{visible}}/{{total}} visible)",
+      "hideMethod": "Hide method \"{{name}}\" on this card",
+      "deleteMethod": "Delete method \"{{name}}\" from service",
       "ungroup": "Ungroup (Cmd+Shift+G)",
       "arrangeLanes": "Arrange Storm Lanes (Actor → Command → Event → Query → State → Constraint)",
       "arrangeSlice": "Re-center the vertical slice (Command/Query → Constraint/State → Event)"

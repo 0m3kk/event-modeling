@@ -940,6 +940,15 @@ export class PixiEngine {
         return;
       }
 
+      // Click on hidden methods indicator opens the method visibility panel
+      if (accurateZone?.type === "hiddenMethodsIndicator") {
+        state.clearModelPopups();
+        state.selectObject(id, e.shiftKey || e.metaKey || e.ctrlKey);
+        state.setStormSelectedField(null);
+        state.setServiceMethodVisibilityPopup({ objectId: id });
+        return;
+      }
+
       // Single-click row selection: clicking anywhere on a field row (name, tag, type,
       // enum value, query item, constraint, BDD scenario step) selects and
       // highlights that row.
@@ -1113,7 +1122,11 @@ export class PixiEngine {
       // Description ⓘ icons are not edited inline — the options-bar panel
       // handles both the card and the selected row. The action badge is also
       // not edited here.
-      if (zone?.type === "desc" || zone?.type === "action") {
+      if (
+        zone?.type === "desc" ||
+        zone?.type === "action" ||
+        zone?.type === "hiddenMethodsIndicator"
+      ) {
         return;
       }
 

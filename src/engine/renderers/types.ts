@@ -19,7 +19,8 @@ export type CardHitZoneType =
   | "stickyText"
   | "textBoxText"
   | "methodName"
-  | "methodReturnType";
+  | "methodReturnType"
+  | "hiddenMethodsIndicator";
 
 export interface CardHitZone {
   type: CardHitZoneType;

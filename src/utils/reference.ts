@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import type { CanvasObject, ModelData, StormData } from "@/types";
+import { computeModelNodeHeight } from "./cardDimensions";
 
 // ============================================================================
 // Reference Copies (Linked Duplicates)
@@ -143,6 +144,23 @@ export function syncReferenceSet(
       touched = true;
     }
 
+    // For service model nodes, card height is determined by the visible methods
+    // on THIS specific card (hiddenMethodIds is independent per reference copy).
+    const nextModelData =
+      (merged.modelData as ModelData | undefined) ?? obj.modelData;
+    if (obj.type === "model" && nextModelData?.kind === "service") {
+      const expectedHeight = computeModelNodeHeight(
+        nextModelData,
+        obj.hiddenMethodIds,
+      );
+      if (obj.height !== expectedHeight) {
+        merged.height = expectedHeight;
+        touched = true;
+      } else {
+        delete merged.height;
+      }
+    }
+
     if (!touched) return obj;
     changed = true;
     return { ...obj, ...merged };
@@ -178,9 +196,15 @@ export function buildReferenceCopy(source: CanvasObject): CanvasObject {
     locked: false,
   };
   delete copy.groupId;
+  if (source.hiddenMethodIds) {
+    copy.hiddenMethodIds = [...source.hiddenMethodIds];
+  }
   // Never share nested mutable data with the source
   if (copy.stormData) copy.stormData = cloneStormData(copy.stormData);
   if (copy.modelData) copy.modelData = cloneModelData(copy.modelData);
+  if (copy.type === "model" && copy.modelData?.kind === "service") {
+    copy.height = computeModelNodeHeight(copy.modelData, copy.hiddenMethodIds);
+  }
   return copy;
 }
 
