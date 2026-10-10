@@ -370,6 +370,14 @@ export const createStormCardsTool = defineTool({
             .string()
             .optional()
             .describe("Group ID or Section name to add this card to."),
+          sliceId: z
+            .string()
+            .optional()
+            .describe("Slice ID or Slice name to add this card to."),
+          slice: z
+            .string()
+            .optional()
+            .describe("Slice ID or Slice name to add this card to."),
         }),
       )
       .min(1)
@@ -440,7 +448,9 @@ export const createStormCardsTool = defineTool({
 
       const width = computeOptimalStormCardWidth(data);
       const height = computeStormCardHeight(data, width);
-      const resolvedGroupId = resolveGroupId(spec.groupId);
+      const resolvedGroupId = resolveGroupId(
+        spec.sliceId ?? spec.slice ?? spec.groupId,
+      );
       const obj: CanvasObject = {
         id: `storm-${nanoid()}`,
         type: "storm",

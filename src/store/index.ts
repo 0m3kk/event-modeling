@@ -53,6 +53,7 @@ import {
   syncReferenceSet,
   touchesSyncedReferenceField,
 } from "@/utils/reference";
+import { spawnAtViewportCenter } from "@/utils/viewport";
 import type { CanvasObject, GroupInfo } from "@/types";
 import type { BddStep } from "@/types";
 import type { CanvasStore, CanvasStoreState } from "./types";
@@ -874,6 +875,7 @@ export const useCanvasStore = create<CanvasStore>()(
         // removeFromGroup's behaviour.
         const survivingGroups = state.groups.filter((g) => {
           if (!affectedGroupIds.has(g.id)) return true;
+          if (g.isSlice) return true;
           const hasMembers = nextObjects.some((o) => o.groupId === g.id);
           const hasChildren = state.groups.some((c) => c.parentId === g.id);
           return hasMembers || hasChildren;
@@ -911,6 +913,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
         const remainingGroups = state.groups.filter((g) => {
           if (!affectedGroupIds.has(g.id)) return true;
+          if (g.isSlice) return true;
           const hasMembers = nextObjects.some((o) => o.groupId === g.id);
           const hasChildren = state.groups.some(
             (child) => child.parentId === g.id,
@@ -1178,6 +1181,7 @@ export const useCanvasStore = create<CanvasStore>()(
         // Source groups left empty dissolve, so no stale boundary lingers.
         const survivingGroups = [...state.groups, newGroupBase].filter((g) => {
           if (!affectedGroupIds.has(g.id)) return true;
+          if (g.isSlice) return true;
           const hasMembers = nextObjects.some((o) => o.groupId === g.id);
           const hasChildren = state.groups.some((c) => c.parentId === g.id);
           return hasMembers || hasChildren;
@@ -1196,6 +1200,203 @@ export const useCanvasStore = create<CanvasStore>()(
         });
 
         return groupId;
+      },
+
+      createSlice: (options) => {
+        const state = get();
+        if (state.isLocked) return;
+
+        const rawIds =
+          options?.objectIds && options.objectIds.length > 0
+            ? options.objectIds
+            : state.selectedIds;
+
+        // 1. Identify candidate object IDs
+        const candidateObjectIds: string[] = [];
+        for (const id of rawIds) {
+          if (!id.startsWith("__group:")) {
+            const obj = state.objects.find((o) => o.id === id);
+            if (obj && obj.type !== "connector") {
+              candidateObjectIds.push(obj.id);
+            }
+          }
+        }
+
+        const domain =
+          options?.domain?.trim() || options?.tag?.trim() || undefined;
+
+        // Check if adding to an existing slice by name
+        if (options?.name) {
+          const existingSlice = state.groups.find(
+            (g) =>
+              g.isSlice &&
+              g.name.toLowerCase() === options.name!.trim().toLowerCase(),
+          );
+          if (existingSlice) {
+            const unassigned = candidateObjectIds.filter(
+              (id) =>
+                state.objects.find((o) => o.id === id)?.groupId !==
+                existingSlice.id,
+            );
+            if (unassigned.length > 0) {
+              get().addToGroup(existingSlice.id, unassigned);
+            }
+            if (domain) {
+              get().updateGroup(existingSlice.id, {
+                domain,
+                tag: domain,
+              });
+            }
+            if (options.commandOrQueryId) {
+              get().updateGroup(existingSlice.id, {
+                commandOrQueryId: options.commandOrQueryId,
+              });
+            }
+            set({ selectedIds: [`__group:${existingSlice.id}`] });
+            return existingSlice.id;
+          }
+        }
+
+        const baseTargetObjects = state.objects.filter((o) =>
+          candidateObjectIds.includes(o.id),
+        );
+
+        // If no candidate objects, create an independent empty slice
+        if (baseTargetObjects.length === 0) {
+          const defaultWidth = options?.width ?? 320;
+          const defaultHeight = options?.height ?? 240;
+          const centerBounds = spawnAtViewportCenter(
+            state.viewport,
+            defaultWidth,
+            defaultHeight,
+          );
+          const bounds: import("@/types").GroupBounds = options?.customBounds ?? {
+            x: options?.x ?? centerBounds.x,
+            y: options?.y ?? centerBounds.y,
+            width: defaultWidth,
+            height: defaultHeight,
+          };
+
+          let rootCardName: string | undefined;
+          if (options?.commandOrQueryId) {
+            const card = state.objects.find(
+              (o) => o.id === options.commandOrQueryId,
+            );
+            rootCardName = card?.stormData?.name;
+          }
+
+          const sliceName =
+            options?.name?.trim() ||
+            (rootCardName ? `${rootCardName} Slice` : "Slice");
+          const sliceId = `slice-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+          const newSlice: import("@/types").GroupInfo = {
+            id: sliceId,
+            name: sliceName,
+            isSlice: true,
+            domain,
+            tag: domain,
+            commandOrQueryId: options?.commandOrQueryId,
+            commandOrQueryName: rootCardName,
+            stroke: "#0284c7",
+            fill: "#f0f9ff",
+            strokeWidth: 2,
+            lineStyle: "dashed",
+            tagColor: "#0284c7",
+            customBounds: bounds,
+          };
+
+          set({
+            groups: [...state.groups, newSlice],
+            selectedIds: [`__group:${sliceId}`],
+          });
+
+          return sliceId;
+        }
+
+        // Adopt any separator lines in region
+        const targetIdSet = new Set(baseTargetObjects.map((o) => o.id));
+        const adoptRegion = getObjectUnionBounds(baseTargetObjects);
+        if (adoptRegion) {
+          for (const line of findAdoptableLines(state.objects, adoptRegion)) {
+            targetIdSet.add(line.id);
+          }
+        }
+        const targetObjects = state.objects.filter((o) =>
+          targetIdSet.has(o.id),
+        );
+
+        // Auto-detect root command or query card
+        let rootCardId = options?.commandOrQueryId;
+        let rootCardName: string | undefined;
+        if (rootCardId) {
+          const card = state.objects.find((o) => o.id === rootCardId);
+          rootCardName = card?.stormData?.name;
+        } else {
+          const rootCard = targetObjects.find(
+            (o) =>
+              o.type === "storm" &&
+              (o.stormData?.kind === "command" ||
+                o.stormData?.kind === "query"),
+          );
+          if (rootCard) {
+            rootCardId = rootCard.id;
+            rootCardName = rootCard.stormData?.name;
+          }
+        }
+
+        const sliceName =
+          options?.name?.trim() ||
+          (rootCardName ? `${rootCardName} Slice` : "Slice");
+
+        const sliceId = `slice-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const nextObjects = state.objects.map((obj) =>
+          targetIdSet.has(obj.id) ? { ...obj, groupId: sliceId } : obj,
+        );
+
+        const affectedGroupIds = new Set<string>([sliceId]);
+        for (const obj of targetObjects) {
+          if (obj.groupId && obj.groupId !== sliceId) {
+            affectedGroupIds.add(obj.groupId);
+          }
+        }
+
+        const newSlice: import("@/types").GroupInfo = {
+          id: sliceId,
+          name: sliceName,
+          isSlice: true,
+          domain,
+          tag: domain,
+          commandOrQueryId: rootCardId,
+          commandOrQueryName: rootCardName,
+          stroke: "#0284c7",
+          fill: "#f0f9ff",
+          strokeWidth: 2,
+          lineStyle: "dashed",
+          tagColor: "#0284c7",
+        };
+
+        const survivingGroups = [...state.groups, newSlice].filter((g) => {
+          if (!affectedGroupIds.has(g.id)) return true;
+          if (g.isSlice) return true;
+          const hasMembers = nextObjects.some((o) => o.groupId === g.id);
+          const hasChildren = state.groups.some((c) => c.parentId === g.id);
+          return hasMembers || hasChildren;
+        });
+
+        const updatedGroups = recomputeGroupBoundsForGroupIds(
+          nextObjects,
+          survivingGroups,
+          affectedGroupIds,
+        );
+
+        set({
+          groups: updatedGroups,
+          objects: nextObjects,
+          selectedIds: [`__group:${sliceId}`],
+        });
+
+        return sliceId;
       },
 
       ungroupObjects: (targetIds) => {

@@ -642,6 +642,139 @@ describe("useCanvasStore", () => {
     expect(bounds?.width).toBe(340 - 60 + 48);
   });
 
+  it("createSlice creates a vertical slice with domain tag and links root Command", () => {
+    const cmd: CanvasObject = {
+      id: "cmd-1",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 120,
+      stormData: {
+        kind: "command",
+        name: "Place Order",
+        fields: [],
+      },
+    };
+    const evt: CanvasObject = {
+      id: "evt-1",
+      type: "storm",
+      x: 100,
+      y: 300,
+      width: 260,
+      height: 100,
+      stormData: {
+        kind: "event",
+        name: "Order Placed",
+        fields: [],
+      },
+    };
+    useCanvasStore.getState().addObjects([cmd, evt]);
+
+    const sliceId = useCanvasStore.getState().createSlice({
+      objectIds: ["cmd-1", "evt-1"],
+      name: "Place Order Slice",
+      domain: "Order",
+    });
+
+    expect(sliceId).toBeDefined();
+    const state = useCanvasStore.getState();
+    const slice = state.groups.find((g) => g.id === sliceId);
+    expect(slice).toBeDefined();
+    expect(slice?.isSlice).toBe(true);
+    expect(slice?.name).toBe("Place Order Slice");
+    expect(slice?.domain).toBe("Order");
+    expect(slice?.tag).toBe("Order");
+    expect(slice?.commandOrQueryId).toBe("cmd-1");
+    expect(slice?.commandOrQueryName).toBe("Place Order");
+    expect(state.objects.find((o) => o.id === "cmd-1")?.groupId).toBe(sliceId);
+    expect(state.objects.find((o) => o.id === "evt-1")?.groupId).toBe(sliceId);
+  });
+
+  it("createSlice auto-detects name and command when name is omitted", () => {
+    const cmd: CanvasObject = {
+      id: "cmd-cancel",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 120,
+      stormData: {
+        kind: "command",
+        name: "Cancel Order",
+        fields: [],
+      },
+    };
+    useCanvasStore.getState().addObjects([cmd]);
+
+    const sliceId = useCanvasStore.getState().createSlice({
+      objectIds: ["cmd-cancel"],
+    });
+
+    expect(sliceId).toBeDefined();
+    const slice = useCanvasStore.getState().groups.find((g) => g.id === sliceId);
+    expect(slice?.name).toBe("Cancel Order Slice");
+    expect(slice?.commandOrQueryId).toBe("cmd-cancel");
+  });
+
+  it("createSlice can create an independent slice without any child objects", () => {
+    useCanvasStore.getState().resetBoard();
+    const sliceId = useCanvasStore.getState().createSlice({
+      name: "Empty Order Slice",
+      domain: "Order",
+    });
+
+    expect(sliceId).toBeDefined();
+    const state = useCanvasStore.getState();
+    const slice = state.groups.find((g) => g.id === sliceId);
+    expect(slice).toBeDefined();
+    expect(slice?.isSlice).toBe(true);
+    expect(slice?.name).toBe("Empty Order Slice");
+    expect(slice?.domain).toBe("Order");
+    expect(slice?.customBounds).toBeDefined();
+    expect(slice?.customBounds?.width).toBe(320);
+    expect(slice?.customBounds?.height).toBe(240);
+    expect(state.selectedIds).toEqual([`__group:${sliceId}`]);
+  });
+
+  it("a slice remains intact when its member objects are removed or deleted, unlike standard groups", () => {
+    useCanvasStore.getState().resetBoard();
+    const cmd: CanvasObject = {
+      id: "cmd-order",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 120,
+      stormData: { kind: "command", name: "Create Order", fields: [] },
+    };
+    useCanvasStore.getState().addObject(cmd);
+
+    const sliceId = useCanvasStore.getState().createSlice({
+      objectIds: ["cmd-order"],
+      name: "Order Slice",
+      domain: "Order",
+    });
+    expect(sliceId).toBeDefined();
+
+    // Now remove the object from the group/slice
+    useCanvasStore.getState().removeFromGroup(["cmd-order"]);
+
+    // Slice still exists even with 0 members!
+    const state = useCanvasStore.getState();
+    const slice = state.groups.find((g) => g.id === sliceId);
+    expect(slice).toBeDefined();
+    expect(slice?.name).toBe("Order Slice");
+
+    // Standard group behavior for comparison:
+    useCanvasStore.getState().groupObjects(["cmd-order"], "Temp Group");
+    const tempGroup = useCanvasStore.getState().groups.find((g) => g.name === "Temp Group");
+    expect(tempGroup).toBeDefined();
+    useCanvasStore.getState().removeFromGroup(["cmd-order"]);
+    // Standard group dissolves when empty:
+    expect(useCanvasStore.getState().groups.find((g) => g.id === tempGroup?.id)).toBeUndefined();
+  });
+
   it("removes objects from a group without destroying the group (removeFromGroup)", () => {
     const card1: CanvasObject = {
       id: "c1",

@@ -16,6 +16,7 @@ import {
   Trash2,
   Workflow,
   FolderPlus,
+  Layers,
   ListChecks,
   PenLine,
   Cpu,
@@ -139,6 +140,10 @@ export function Toolbar() {
     }
     return t("toolbar.group");
   }, [selectedIds, objects, groups, t]);
+
+  const sliceTooltip = React.useMemo(() => {
+    return t("toolbar.slice", { defaultValue: "Slice" });
+  }, [t]);
 
   // Add specific Storm Card
   //
@@ -374,6 +379,12 @@ export function Toolbar() {
           onClick={handleAddText}
           icon={<Type size={20} />}
           tooltip={t("toolbar.text")}
+        />
+        <ToolButton
+          onClick={() => useCanvasStore.getState().createSlice()}
+          icon={<Layers size={20} />}
+          tooltip={sliceTooltip}
+          color="#0284c7"
         />
         <ToolButton
           onClick={() => useCanvasStore.getState().groupObjects()}

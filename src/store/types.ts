@@ -1,4 +1,4 @@
-import type { CanvasObject, GroupInfo, Tool, Viewport, AISettings, AIConversation, BddStep, BddStepRef, StormConstraint } from "@/types";
+import type { CanvasObject, GroupInfo, GroupBounds, Tool, Viewport, AISettings, AIConversation, BddStep, BddStepRef, StormConstraint } from "@/types";
 import type { CardHitZone } from "@/engine/renderers/types";
 
 export interface AlignmentGuide {
@@ -264,6 +264,18 @@ export interface CanvasStoreActions {
     snapToGrid?: boolean,
   ) => void;
   selectGroup: (groupId: string, multi?: boolean) => void;
+  createSlice: (options?: {
+    objectIds?: string[];
+    name?: string;
+    domain?: string;
+    tag?: string;
+    commandOrQueryId?: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    customBounds?: GroupBounds;
+  }) => string | undefined;
 
   // Lock & Canvas settings
   setLocked: (locked: boolean) => void;

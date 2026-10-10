@@ -204,6 +204,8 @@ export function groupHasContent(
   objects: CanvasObject[],
   groups: GroupInfo[],
 ): boolean {
+  const g = groups.find((group) => group.id === groupId);
+  if (g?.isSlice) return true;
   return (
     objects.some((o) => o.groupId === groupId) ||
     groups.some((g) => g.parentId === groupId)

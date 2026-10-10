@@ -60,6 +60,8 @@
     "line": "Đường vẽ (D)",
     "note": "Ghi chú (S)",
     "text": "Văn bản (T)",
+    "slice": "Slice",
+    "createSliceFromSelection": "Slice",
     "group": "Góm nhóm (Cmd+G)",
     "nestGroups": "Lồng nhóm (Cmd+G)",
     "createSubgroup": "Tạo nhóm con (Cmd+G)",

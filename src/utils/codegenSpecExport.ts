@@ -30,10 +30,19 @@ export interface CodegenQueryItem {
   set?: Record<string, string>;
 }
 
+export interface CodegenSliceDef {
+  name: string;
+  domain?: string;
+  tag?: string;
+  command?: string;
+  query?: string;
+}
+
 export interface CodegenCommand {
   name: string;
   description?: string;
   slice?: string;
+  domain?: string;
   action?: string;
   payload: CodegenField[];
   response?: CodegenField[];
@@ -43,6 +52,7 @@ export interface CodegenEvent {
   name: string;
   description?: string;
   slice?: string;
+  domain?: string;
   fields: CodegenField[];
 }
 
@@ -50,6 +60,7 @@ export interface CodegenReadModel {
   name: string;
   description?: string;
   slice?: string;
+  domain?: string;
   isArray?: boolean;
   params: CodegenField[];
   queryItems: CodegenQueryItem[];
@@ -60,6 +71,7 @@ export interface CodegenQuery {
   name: string;
   description?: string;
   slice?: string;
+  domain?: string;
   params: CodegenField[];
   response?: CodegenField[];
 }
@@ -79,6 +91,7 @@ export interface CodegenConstraint {
   name: string;
   description?: string;
   slice?: string;
+  domain?: string;
   params: CodegenField[];
   queryItems: CodegenQueryItem[];
   outputFields: CodegenField[];
@@ -170,6 +183,8 @@ export interface CodegenSpec {
   title: string;
   createdAt: string;
   slices?: string[];
+  sliceDefinitions?: CodegenSliceDef[];
+  domains?: Record<string, string[]>;
   models: CodegenModelDef[];
   services: CodegenService[];
   commands: CodegenCommand[];
@@ -338,16 +353,55 @@ export function buildCodegenSpec(
     }
   }
 
-  // Differentiate between actual slices (groups containing at least 1 storm card)
+  // Differentiate between actual slices (isSlice: true or groups containing at least 1 storm card)
   // and shared model groups (groups containing only models, 0 storm cards).
   const sliceGroups = new Set<string>();
   const modelOnlyGroups = new Set<string>();
+  const sliceDefMap = new Map<string, CodegenSliceDef>();
+  const groupDomainMap = new Map<string, string>();
 
   for (const g of groups) {
     const members = safeObjects.filter((o) => o.groupId === g.id);
     const hasStorm = members.some((o) => o.type === "storm" && !!o.stormData);
-    if (hasStorm) {
+    if (g.isSlice || hasStorm) {
       sliceGroups.add(g.id);
+      const name = g.name.trim();
+      const domain = g.domain?.trim() || g.tag?.trim();
+      if (domain) {
+        groupDomainMap.set(g.id, domain);
+      }
+
+      let commandName: string | undefined;
+      let queryName: string | undefined;
+      if (g.commandOrQueryId) {
+        const rootObj = safeObjects.find((o) => o.id === g.commandOrQueryId);
+        if (rootObj?.stormData?.kind === "command") {
+          commandName = rootObj.stormData.name.trim();
+        } else if (rootObj?.stormData?.kind === "query") {
+          queryName = rootObj.stormData.name.trim();
+        }
+      }
+      if (!commandName && !queryName) {
+        const rootCard = members.find(
+          (o) =>
+            o.type === "storm" &&
+            (o.stormData?.kind === "command" || o.stormData?.kind === "query"),
+        );
+        if (rootCard?.stormData?.kind === "command") {
+          commandName = rootCard.stormData.name.trim();
+        } else if (rootCard?.stormData?.kind === "query") {
+          queryName = rootCard.stormData.name.trim();
+        }
+      }
+
+      if (name) {
+        sliceDefMap.set(g.id, {
+          name,
+          ...(domain ? { domain, tag: domain } : {}),
+          ...(commandName ? { command: commandName } : {}),
+          ...(queryName ? { query: queryName } : {}),
+        });
+      }
     } else {
       const hasModel = members.some((o) => o.type === "model" && !!o.modelData);
       if (hasModel) {
@@ -357,11 +411,25 @@ export function buildCodegenSpec(
   }
 
   const sliceNames: string[] = [];
+  const sliceDefinitions: CodegenSliceDef[] = [];
+  const domains: Record<string, string[]> = {};
+
   for (const g of groups) {
     if (sliceGroups.has(g.id)) {
       const name = groupNameMap.get(g.id);
       if (name && !sliceNames.includes(name)) {
         sliceNames.push(name);
+      }
+      const def = sliceDefMap.get(g.id);
+      if (def) {
+        sliceDefinitions.push(def);
+        const domainKey = def.domain || def.tag;
+        if (domainKey) {
+          if (!domains[domainKey]) domains[domainKey] = [];
+          if (!domains[domainKey].includes(def.name)) {
+            domains[domainKey].push(def.name);
+          }
+        }
       }
     }
   }
@@ -376,6 +444,8 @@ export function buildCodegenSpec(
     title: (projectName ?? "Domain Model").trim() || "Domain Model",
     createdAt: new Date().toISOString(),
     ...(sliceNames.length > 0 ? { slices: sliceNames } : {}),
+    ...(sliceDefinitions.length > 0 ? { sliceDefinitions } : {}),
+    ...(Object.keys(domains).length > 0 ? { domains } : {}),
     models: [],
     services: [],
     commands: [],
@@ -394,6 +464,7 @@ export function buildCodegenSpec(
     const isSlice = groupId ? sliceGroups.has(groupId) : false;
     const isModelOnly = groupId ? modelOnlyGroups.has(groupId) : false;
     const groupName = groupId ? groupNameMap.get(groupId) : undefined;
+    const domain = groupId ? groupDomainMap.get(groupId) : undefined;
 
     if (obj.type === "model" && obj.modelData) {
       const location = isSlice
@@ -439,6 +510,7 @@ export function buildCodegenSpec(
             name,
             ...(desc ? { description: desc } : {}),
             ...(slice ? { slice } : {}),
+            ...(domain ? { domain } : {}),
             ...(storm.action?.trim() ? { action: storm.action.trim() } : {}),
             payload: (storm.fields ?? []).map(cleanField),
           };
@@ -454,6 +526,7 @@ export function buildCodegenSpec(
             name,
             ...(desc ? { description: desc } : {}),
             ...(slice ? { slice } : {}),
+            ...(domain ? { domain } : {}),
             fields: (storm.fields ?? []).map(cleanField),
           });
           break;
@@ -465,6 +538,7 @@ export function buildCodegenSpec(
             name,
             ...(desc ? { description: desc } : {}),
             ...(slice ? { slice } : {}),
+            ...(domain ? { domain } : {}),
             ...(storm.isArray ? { isArray: true } : {}),
             params: inputFields.map(cleanField),
             queryItems: resolveQueryItems(
@@ -482,6 +556,7 @@ export function buildCodegenSpec(
             name,
             ...(desc ? { description: desc } : {}),
             ...(slice ? { slice } : {}),
+            ...(domain ? { domain } : {}),
             params: (storm.fields ?? []).map(cleanField),
           };
           if (storm.responseFields && storm.responseFields.length > 0) {
@@ -497,6 +572,7 @@ export function buildCodegenSpec(
             name,
             ...(desc ? { description: desc } : {}),
             ...(slice ? { slice } : {}),
+            ...(domain ? { domain } : {}),
             params: inputFields.map(cleanField),
             queryItems: resolveQueryItems(
               storm.queryItems,

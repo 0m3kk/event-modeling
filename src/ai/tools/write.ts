@@ -492,6 +492,182 @@ export const createReferenceCopiesTool = defineTool({
   },
 });
 
+const sliceSchema = z.object({
+  name: z
+    .string()
+    .describe(
+      "Slice name in Title Case (e.g. 'Create Order Slice', 'Get User Details Slice').",
+    ),
+  domain: z
+    .string()
+    .optional()
+    .describe(
+      "Domain name used to group slices of the same domain together (e.g. 'Order', 'User', 'Payment', 'Inventory').",
+    ),
+  tag: z
+    .string()
+    .optional()
+    .describe("Deprecated alias for domain."),
+  commandOrQuery: z
+    .string()
+    .optional()
+    .describe(
+      "Name or ID of the root Command or Query card associated with this slice. If omitted, auto-detected from the cards in ids.",
+    ),
+  ids: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Card/object IDs to enclose in this slice (Command/Query, Constraints, Events/State, Separators). Can be omitted to create an independent slice without children.",
+    ),
+  x: z.number().optional().describe("X position for independent slice."),
+  y: z.number().optional().describe("Y position for independent slice."),
+  width: z.number().optional().describe("Width for independent slice (default 320)."),
+  height: z.number().optional().describe("Height for independent slice (default 240)."),
+});
+
+const executeCreateSlice = (
+  args: z.infer<typeof sliceSchema>,
+  ctx: import("./types").AIToolContext,
+) => {
+  const state = ctx.getState();
+  const rawIds = args.ids ?? [];
+  const existing = rawIds.filter((id) =>
+    state.objects.some((o) => o.id === id),
+  );
+  const notFound = rawIds.filter((id) => !existing.includes(id));
+
+  // Resolve commandOrQuery card ID if specified
+  let rootCardId: string | undefined;
+  if (args.commandOrQuery) {
+    const target = state.objects.find(
+      (o) =>
+        o.id === args.commandOrQuery ||
+        (o.type === "storm" &&
+          o.stormData?.name.toLowerCase() ===
+            args.commandOrQuery!.trim().toLowerCase()),
+    );
+    if (target) rootCardId = target.id;
+  }
+
+  const domainVal = args.domain ?? args.tag;
+  const sliceId = state.createSlice({
+    objectIds: existing.length > 0 ? existing : undefined,
+    name: toDisplayName(args.name),
+    domain: domainVal ? toDisplayName(domainVal) : undefined,
+    tag: domainVal ? toDisplayName(domainVal) : undefined,
+    commandOrQueryId: rootCardId,
+    x: args.x,
+    y: args.y,
+    width: args.width,
+    height: args.height,
+  });
+
+  if (!sliceId) {
+    return {
+      created: false,
+      error: "Failed to create slice.",
+      notFound,
+    };
+  }
+
+  const createdSlice = ctx.getState().groups.find((g) => g.id === sliceId);
+
+  return {
+    created: true,
+    sliceId,
+    name: createdSlice?.name ?? args.name,
+    domain: createdSlice?.domain ?? createdSlice?.tag,
+    tag: createdSlice?.tag ?? createdSlice?.domain,
+    commandOrQuery: createdSlice?.commandOrQueryName,
+    memberIds: existing,
+    count: existing.length,
+    notFound,
+  };
+};
+
+export const createSliceTool = defineTool({
+  name: "create_slice",
+  description:
+    "Create a vertical slice (either independent empty slice or grouping existing components). Each slice has a name, can be associated with a Command or Query, and has a domain to group related slices into one domain. Unlike general groups, slices can be created independently without children.",
+  schema: sliceSchema,
+  execute: executeCreateSlice,
+});
+
+export const sliceTool = defineTool({
+  name: "slice",
+  description:
+    "Alias for create_slice. Create a vertical slice grouping components.",
+  schema: sliceSchema,
+  execute: executeCreateSlice,
+});
+
+export const updateSliceTool = defineTool({
+  name: "update_slice",
+  description:
+    "Update a slice's name, domain, or associated command/query.",
+  schema: z.object({
+    id: z.string().describe("Slice ID or current slice name."),
+    name: z.string().optional().describe("New slice name."),
+    domain: z
+      .string()
+      .optional()
+      .describe(
+        "New domain name to group related slices into one domain (e.g. 'Order', 'User').",
+      ),
+    tag: z
+      .string()
+      .optional()
+      .describe("Deprecated alias for domain."),
+    commandOrQuery: z
+      .string()
+      .optional()
+      .describe("New associated command or query name/ID."),
+  }),
+  execute: (args, ctx) => {
+    const state = ctx.getState();
+    const slice = state.groups.find(
+      (g) =>
+        g.id === args.id ||
+        g.name.toLowerCase() === args.id.trim().toLowerCase(),
+    );
+    if (!slice) {
+      return { updated: false, error: `Slice "${args.id}" not found.` };
+    }
+
+    const patch: Partial<import("@/types").GroupInfo> = {};
+    if (args.name) patch.name = toDisplayName(args.name);
+    const domainArg = args.domain ?? args.tag;
+    if (domainArg !== undefined) {
+      const val = domainArg.trim() ? toDisplayName(domainArg) : undefined;
+      patch.domain = val;
+      patch.tag = val;
+    }
+    if (args.commandOrQuery) {
+      const card = state.objects.find(
+        (o) =>
+          o.id === args.commandOrQuery ||
+          (o.type === "storm" &&
+            o.stormData?.name.toLowerCase() ===
+              args.commandOrQuery!.trim().toLowerCase()),
+      );
+      if (card) {
+        patch.commandOrQueryId = card.id;
+        patch.commandOrQueryName = card.stormData?.name;
+      }
+    }
+
+    state.updateGroup(slice.id, patch);
+    return {
+      updated: true,
+      sliceId: slice.id,
+      ...patch,
+      domain: patch.domain ?? slice.domain ?? slice.tag,
+      tag: patch.tag ?? slice.tag ?? slice.domain,
+    };
+  },
+});
+
 export const groupObjectsTool = defineTool({
   name: "group_objects",
   description:
@@ -812,6 +988,9 @@ export const writeTools = [
   connectObjectsTool,
   separateLayersTool,
   createReferenceCopiesTool,
+  createSliceTool,
+  sliceTool,
+  updateSliceTool,
   groupObjectsTool,
   ungroupObjectsTool,
   highlightObjectsTool,

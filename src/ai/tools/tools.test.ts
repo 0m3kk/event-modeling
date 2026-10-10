@@ -112,6 +112,63 @@ function createFakeStore(): FakeStore {
         }
       }
     },
+    createSlice: (options?: {
+      objectIds?: string[];
+      name?: string;
+      domain?: string;
+      tag?: string;
+      commandOrQueryId?: string;
+    }) => {
+      const targetIds = options?.objectIds ?? store.selectedIds;
+      const wanted = new Set(targetIds);
+      const members = objects.filter((o) => wanted.has(o.id));
+      const sliceId = `slice-${groups.length + 1}`;
+      let cmdOrQueryId = options?.commandOrQueryId;
+      let cmdOrQueryName: string | undefined;
+      if (!cmdOrQueryId) {
+        const found = members.find(
+          (m) =>
+            m.type === "storm" &&
+            (m.stormData?.kind === "command" || m.stormData?.kind === "query"),
+        );
+        if (found) {
+          cmdOrQueryId = found.id;
+          cmdOrQueryName = found.stormData?.name;
+        }
+      } else {
+        const found = objects.find((o) => o.id === cmdOrQueryId);
+        cmdOrQueryName = found?.stormData?.name;
+      }
+      const domain = options?.domain ?? options?.tag;
+      groups.push({
+        id: sliceId,
+        name: options?.name ?? `Slice ${groups.length + 1}`,
+        isSlice: true,
+        domain,
+        tag: domain,
+        commandOrQueryId: cmdOrQueryId,
+        commandOrQueryName: cmdOrQueryName,
+        customBounds: {
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 240,
+        },
+      });
+      for (let i = 0; i < objects.length; i++) {
+        if (wanted.has(objects[i]!.id)) {
+          objects[i] = { ...objects[i]!, groupId: sliceId };
+        }
+      }
+      return sliceId;
+    },
+    updateGroup: (
+      groupId: string,
+      patch: Partial<import("@/types").GroupInfo>,
+    ) => {
+      const target = groups.find((g) => g.id === groupId);
+      if (target) Object.assign(target, patch);
+    },
   } as unknown as CanvasStore;
 
   return { store, objects, groups };
@@ -1675,6 +1732,181 @@ describe("AI Model & Write Tools", () => {
     );
     expect(res.isError).toBeFalsy();
     expect(fake.objects[0]!.groupId).toBe("group-1");
+  });
+
+  it("create_slice creates a vertical slice with name, domain, and auto-detects command", async () => {
+    const fake = createFakeStore();
+    fake.objects.push(
+      {
+        id: "cmd-1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 260,
+        height: 120,
+        stormData: {
+          kind: "command",
+          name: "Create Order",
+          action: "order:create:own",
+          fields: [],
+        },
+      },
+      {
+        id: "evt-1",
+        type: "storm",
+        x: 0,
+        y: 200,
+        width: 260,
+        height: 100,
+        stormData: {
+          kind: "event",
+          name: "Order Created",
+          fields: [],
+        },
+      },
+    );
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_slice",
+        arguments: JSON.stringify({
+          ids: ["cmd-1", "evt-1"],
+          name: "Create Order Slice",
+          domain: "Order",
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const data = JSON.parse(res.content);
+    expect(data.created).toBe(true);
+    expect(data.name).toBe("Create Order Slice");
+    expect(data.domain).toBe("Order");
+    expect(data.tag).toBe("Order");
+    expect(data.commandOrQuery).toBe("Create Order");
+    expect(fake.groups).toHaveLength(1);
+    expect(fake.groups[0]!.isSlice).toBe(true);
+    expect(fake.groups[0]!.domain).toBe("Order");
+    expect(fake.groups[0]!.tag).toBe("Order");
+    expect(fake.groups[0]!.commandOrQueryId).toBe("cmd-1");
+    expect(fake.objects[0]!.groupId).toBe(fake.groups[0]!.id);
+    expect(fake.objects[1]!.groupId).toBe(fake.groups[0]!.id);
+  });
+
+  it("slice tool alias works and update_slice updates domain and name", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "qry-1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 120,
+      stormData: {
+        kind: "query",
+        name: "Get Order",
+        action: "order:read:own",
+        fields: [],
+      },
+    });
+    const { ctx } = createContext(fake);
+
+    const sliceRes = await executeToolCall(
+      {
+        id: "1",
+        name: "slice",
+        arguments: JSON.stringify({
+          ids: ["qry-1"],
+          name: "Get Order Slice",
+          domain: "Order",
+        }),
+      },
+      ctx,
+    );
+    expect(sliceRes.isError).toBeFalsy();
+    expect(fake.groups[0]!.name).toBe("Get Order Slice");
+    expect(fake.groups[0]!.domain).toBe("Order");
+    expect(fake.groups[0]!.tag).toBe("Order");
+
+    const updateRes = await executeToolCall(
+      {
+        id: "2",
+        name: "update_slice",
+        arguments: JSON.stringify({
+          id: fake.groups[0]!.id,
+          name: "Fetch Order Slice",
+          domain: "Sales",
+        }),
+      },
+      ctx,
+    );
+    expect(updateRes.isError).toBeFalsy();
+    expect(fake.groups[0]!.name).toBe("Fetch Order Slice");
+    expect(fake.groups[0]!.domain).toBe("Sales");
+    expect(fake.groups[0]!.tag).toBe("Sales");
+  });
+
+  it("create_slice can create an independent slice without any child cards", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_slice",
+        arguments: JSON.stringify({
+          name: "Checkout Slice",
+          domain: "Checkout",
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    const data = JSON.parse(res.content);
+    expect(data.created).toBe(true);
+    expect(data.name).toBe("Checkout Slice");
+    expect(data.domain).toBe("Checkout");
+    expect(data.count).toBe(0);
+    expect(fake.groups).toHaveLength(1);
+    expect(fake.groups[0]!.isSlice).toBe(true);
+    expect(fake.groups[0]!.name).toBe("Checkout Slice");
+    expect(fake.groups[0]!.domain).toBe("Checkout");
+  });
+
+  it("create_storm_cards assigns sliceId or slice to created cards", async () => {
+    const fake = createFakeStore();
+    fake.groups.push({
+      id: "slice-orders",
+      name: "Orders Slice",
+      isSlice: true,
+      tag: "Order",
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            {
+              kind: "command",
+              name: "Submit Order",
+              slice: "Orders Slice",
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+    expect(res.isError).toBeFalsy();
+    const created = fake.objects.find((o) => o.stormData?.name === "Submit Order");
+    expect(created).toBeDefined();
+    expect(created?.groupId).toBe("slice-orders");
   });
 
   it("create_storm_cards and update_storm_card support structured codegen constraint rules", async () => {

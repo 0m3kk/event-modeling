@@ -70,6 +70,16 @@ export const getCanvasOverviewTool = defineTool({
       groups: state.groups.map((group) => ({
         id: group.id,
         name: group.name,
+        ...(group.isSlice ? { isSlice: true } : {}),
+        ...(group.domain || group.tag
+          ? {
+              domain: group.domain ?? group.tag,
+              tag: group.tag ?? group.domain,
+            }
+          : {}),
+        ...(group.commandOrQueryName
+          ? { commandOrQuery: group.commandOrQueryName }
+          : {}),
         memberCount: state.objects.filter((o) => o.groupId === group.id).length,
       })),
       viewport: state.viewport,

@@ -60,6 +60,8 @@
     "line": "Line (D)",
     "note": "Note (S)",
     "text": "Text (T)",
+    "slice": "Slice",
+    "createSliceFromSelection": "Slice",
     "group": "Group (Cmd+G)",
     "nestGroups": "Nest Groups (Cmd+G)",
     "createSubgroup": "Create Sub-group (Cmd+G)",

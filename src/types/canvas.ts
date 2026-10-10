@@ -24,7 +24,8 @@ export type Tool =
   | "model"
   | "stickyNote"
   | "textBox"
-  | "group";
+  | "group"
+  | "slice";
 
 export interface CanvasObject {
   id: string;

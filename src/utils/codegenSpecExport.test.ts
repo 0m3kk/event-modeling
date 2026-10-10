@@ -177,6 +177,119 @@ describe("codegenSpecExport", () => {
     });
   });
 
+  it("exports slice definitions with domain tags and groups slices by domain", () => {
+    const groups: GroupInfo[] = [
+      {
+        id: "slice-order-1",
+        name: "Create Order Slice",
+        isSlice: true,
+        domain: "Order",
+        tag: "Order",
+        commandOrQueryId: "cmd-1",
+      },
+      {
+        id: "slice-order-2",
+        name: "Cancel Order Slice",
+        isSlice: true,
+        domain: "Order",
+        tag: "Order",
+      },
+      {
+        id: "slice-user-1",
+        name: "Get User Slice",
+        isSlice: true,
+        domain: "User",
+        tag: "User",
+        commandOrQueryId: "qry-1",
+      },
+    ];
+
+    const objects: CanvasObject[] = [
+      {
+        id: "cmd-1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        groupId: "slice-order-1",
+        stormData: {
+          kind: "command",
+          name: "CreateOrder",
+          fields: [{ id: "f1", name: "orderId", fieldType: "uuid" }],
+        },
+      },
+      {
+        id: "cmd-2",
+        type: "storm",
+        x: 300,
+        y: 0,
+        width: 200,
+        height: 100,
+        groupId: "slice-order-2",
+        stormData: {
+          kind: "command",
+          name: "CancelOrder",
+          fields: [{ id: "f2", name: "orderId", fieldType: "uuid" }],
+        },
+      },
+      {
+        id: "qry-1",
+        type: "storm",
+        x: 600,
+        y: 0,
+        width: 200,
+        height: 100,
+        groupId: "slice-user-1",
+        stormData: {
+          kind: "query",
+          name: "GetUser",
+          fields: [{ id: "f3", name: "userId", fieldType: "uuid" }],
+        },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, groups, "E-Commerce");
+    expect(spec.slices).toEqual([
+      "Create Order Slice",
+      "Cancel Order Slice",
+      "Get User Slice",
+    ]);
+
+    expect(spec.domains).toEqual({
+      Order: ["Create Order Slice", "Cancel Order Slice"],
+      User: ["Get User Slice"],
+    });
+
+    expect(spec.sliceDefinitions).toEqual([
+      {
+        name: "Create Order Slice",
+        domain: "Order",
+        tag: "Order",
+        command: "CreateOrder",
+      },
+      {
+        name: "Cancel Order Slice",
+        domain: "Order",
+        tag: "Order",
+        command: "CancelOrder",
+      },
+      {
+        name: "Get User Slice",
+        domain: "User",
+        tag: "User",
+        query: "GetUser",
+      },
+    ]);
+
+    expect(spec.commands[0]?.domain).toBe("Order");
+    expect(spec.commands[0]?.slice).toBe("Create Order Slice");
+    expect(spec.commands[1]?.domain).toBe("Order");
+    expect(spec.commands[1]?.slice).toBe("Cancel Order Slice");
+    expect(spec.queries[0]?.domain).toBe("User");
+    expect(spec.queries[0]?.slice).toBe("Get User Slice");
+  });
+
   it("exports models, queries, constraints, actors, and bdd scenarios", () => {
     const objects: CanvasObject[] = [
       {

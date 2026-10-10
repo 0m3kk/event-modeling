@@ -99,8 +99,10 @@ export function getGroupAt(
     const bounds = computeGroupBounds(group, objects, groups);
 
     // Approximate header badge bounds
-    const title = group.name || "Group";
-    const approxTextWidth = Math.max(60, title.length * 7.5 + 24);
+    const title = group.name || (group.isSlice ? "Slice" : "Group");
+    const domain = group.domain ?? group.tag;
+    const displayText = domain ? `[${domain}] ${title}` : title;
+    const approxTextWidth = Math.max(60, displayText.length * 7.5 + 24);
     const badgeBounds: GroupBounds = {
       x: bounds.x + 16,
       y: bounds.y - 12,
@@ -202,19 +204,21 @@ export class GroupLayer extends Container {
         selectedIds.includes(`__group:${group.id}`);
 
       // 1. Draw boundary fill
+      const defaultFill = group.isSlice ? 0xf0f9ff : 0xf8fafc;
       const fillColor = group.fill
         ? parseInt(group.fill.replace("#", "0x"), 16)
-        : 0xf8fafc;
+        : defaultFill;
       this.graphics
         .roundRect(bounds.x, bounds.y, bounds.width, bounds.height, 12)
         .fill({ color: fillColor, alpha: isSelected ? 0.35 : 0.2 });
 
       // 2. Draw styled boundary stroke (solid, dashed, or dotted)
+      const defaultStroke = group.isSlice ? 0x0284c7 : 0x6366f1;
       const strokeColor = isSelected
         ? 0x2563eb
         : group.stroke
           ? parseInt(group.stroke.replace("#", "0x"), 16)
-          : 0x6366f1;
+          : defaultStroke;
       const strokeWidth = isSelected
         ? Math.max(2.5, (group.strokeWidth ?? 2) + 0.5)
         : (group.strokeWidth ?? 2);
@@ -236,18 +240,21 @@ export class GroupLayer extends Container {
       );
 
       // 3. Draw Header Badge (tagColor pill)
+      const defaultTagColor = group.isSlice ? 0x0284c7 : 0x6366f1;
       const tagColorHex = group.tagColor
         ? parseInt(group.tagColor.replace("#", "0x"), 16)
-        : 0x6366f1;
+        : defaultTagColor;
 
-      const title = group.name || "Group";
-      const labelKey = `${title}|${textResolution}`;
+      const title = group.name || (group.isSlice ? "Slice" : "Group");
+      const domain = group.domain ?? group.tag;
+      const displayText = domain ? `[${domain}] ${title}` : title;
+      const labelKey = `${displayText}|${textResolution}`;
       let entry = this.labelNodes.get(group.id);
       if (!entry || entry.key !== labelKey) {
         entry?.node.destroy();
         entry = {
           node: new Text({
-            text: title,
+            text: displayText,
             style: {
               fontSize: 11,
               fontFamily: APP_FONT_FAMILY,
