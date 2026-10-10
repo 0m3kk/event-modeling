@@ -4,6 +4,7 @@ import { useCanvasStore } from "@/store";
 import type { ModelField } from "@/types";
 import { MODEL_KIND_LABELS } from "@/constants/model";
 import { DescriptionPopover } from "./DescriptionPopover";
+import { DomainChip } from "./DomainChip";
 import { ValidationPopover } from "./ValidationPopover";
 import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 import { ServiceParamsPopover } from "./ServiceParamsPopover";
@@ -31,6 +32,7 @@ export function ModelOptionsBar() {
   const objects = useCanvasStore((s) => s.objects);
   const groups = useCanvasStore((s) => s.groups);
   const viewport = useCanvasStore((s) => s.viewport);
+  const updateObject = useCanvasStore((s) => s.updateObject);
   const deleteObjects = useCanvasStore((s) => s.deleteObjects);
   const deleteSelectedStormField = useCanvasStore(
     (s) => s.deleteSelectedStormField,
@@ -310,6 +312,14 @@ export function ModelOptionsBar() {
         >
           <Info size={16} className="text-sky-600 dark:text-sky-400" />
         </button>
+
+        {/* Domain Chip — labels this node with a domain for grouping/export */}
+        <DomainChip
+          value={selectedModel.domain}
+          onCommit={(value) =>
+            updateObject(selectedModel.id, { domain: value || undefined })
+          }
+        />
 
         {/* Field / node validation ✓ — object fields, array length, wrap rules */}
         {canValidate && (

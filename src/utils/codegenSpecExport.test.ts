@@ -290,6 +290,105 @@ describe("codegenSpecExport", () => {
     expect(spec.queries[0]?.slice).toBe("Get User Slice");
   });
 
+  it("emits per-element domain and lets it override the group's domain", () => {
+    const groups: GroupInfo[] = [
+      {
+        id: "slice-1",
+        name: "Create Order Slice",
+        isSlice: true,
+        domain: "Order",
+        tag: "Order",
+      },
+      { id: "shared", name: "Shared Types" },
+    ];
+
+    const objects: CanvasObject[] = [
+      {
+        id: "cmd-1",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        groupId: "slice-1",
+        stormData: { kind: "command", name: "CreateOrder", fields: [] },
+      },
+      {
+        id: "evt-1",
+        type: "storm",
+        x: 0,
+        y: 200,
+        width: 200,
+        height: 100,
+        groupId: "slice-1",
+        domain: "Billing",
+        stormData: { kind: "event", name: "OrderPlaced", fields: [] },
+      },
+      {
+        id: "act-1",
+        type: "storm",
+        x: 0,
+        y: 400,
+        width: 200,
+        height: 100,
+        domain: "Identity",
+        stormData: { kind: "actor", name: "Customer", fields: [], permissions: [] },
+      },
+      {
+        id: "bdd-1",
+        type: "storm",
+        x: 0,
+        y: 600,
+        width: 200,
+        height: 100,
+        domain: "Sales",
+        stormData: {
+          kind: "bdd",
+          name: "Given Card",
+          phase: "given",
+          fields: [],
+          steps: [],
+        },
+      },
+      {
+        id: "obj-1",
+        type: "model",
+        x: 400,
+        y: 0,
+        width: 200,
+        height: 100,
+        groupId: "shared",
+        domain: "Catalog",
+        modelData: { kind: "object", name: "OrderLine", fields: [] },
+      },
+      {
+        id: "svc-1",
+        type: "model",
+        x: 400,
+        y: 200,
+        width: 200,
+        height: 100,
+        groupId: "shared",
+        domain: "Payments",
+        modelData: { kind: "service", name: "PaymentGateway", methods: [] },
+      },
+    ];
+
+    const spec = buildCodegenSpec(objects, groups, "Shop");
+
+    // The element's own domain wins over the slice's domain...
+    expect(spec.events[0]?.domain).toBe("Billing");
+    expect(spec.events[0]?.slice).toBe("Create Order Slice");
+    // ...and the slice domain remains the fallback when the element has none.
+    expect(spec.commands[0]?.domain).toBe("Order");
+    expect(spec.commands[0]?.slice).toBe("Create Order Slice");
+
+    expect(spec.actors[0]?.domain).toBe("Identity");
+    expect(spec.scenarios[0]?.domain).toBe("Sales");
+    expect(spec.models[0]?.domain).toBe("Catalog");
+    expect(spec.services[0]?.domain).toBe("Payments");
+  });
+
   it("exports models, queries, constraints, actors, and bdd scenarios", () => {
     const objects: CanvasObject[] = [
       {

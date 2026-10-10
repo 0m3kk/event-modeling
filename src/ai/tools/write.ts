@@ -232,6 +232,12 @@ export const createObjectsTool = defineTool({
 
 const objectPatch = z.object({
   text: z.string().optional(),
+  domain: z
+    .string()
+    .optional()
+    .describe(
+      "Domain label grouping this element with others (e.g. 'Order', 'User').",
+    ),
   x: z.number().optional(),
   y: z.number().optional(),
   width: z.number().positive().optional(),

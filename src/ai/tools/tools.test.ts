@@ -997,6 +997,80 @@ describe("AI Model & Write Tools", () => {
     expect(fake.objects[1]!.modelData?.kind).toBe("enum");
   });
 
+  it("create_model_nodes stores an element domain on the node", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_model_nodes",
+        arguments: JSON.stringify({
+          nodes: [{ kind: "object", name: "Order Line", domain: "catalog" }],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects[0]!.domain).toBe("Catalog");
+  });
+
+  it("update_objects sets an element domain", async () => {
+    const fake = createFakeStore();
+    fake.objects.push({
+      id: "evt-dom",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      stormData: { kind: "event", name: "Order Placed", fields: [] },
+    });
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "update_objects",
+        arguments: JSON.stringify({
+          updates: [{ id: "evt-dom", patch: { domain: "Order" } }],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects[0]!.domain).toBe("Order");
+  });
+
+  it("create_storm_cards stores an element domain on each card", async () => {
+    const fake = createFakeStore();
+    const { ctx } = createContext(fake);
+
+    const res = await executeToolCall(
+      {
+        id: "1",
+        name: "create_storm_cards",
+        arguments: JSON.stringify({
+          cards: [
+            { kind: "command", name: "Place Order", domain: "sales" },
+            {
+              kind: "event",
+              name: "Order Placed",
+              domain: "sales",
+              fields: [{ name: "Order ID", fieldType: "string", tag: "Order" }],
+            },
+          ],
+        }),
+      },
+      ctx,
+    );
+
+    expect(res.isError).toBeFalsy();
+    expect(fake.objects.map((o) => o.domain)).toEqual(["Sales", "Sales"]);
+  });
+
   it("create_model_nodes applies validation by model kind", async () => {
     const fake = createFakeStore();
     const { ctx } = createContext(fake);

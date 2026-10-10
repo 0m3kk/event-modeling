@@ -333,6 +333,12 @@ export const createStormCardsTool = defineTool({
             .string()
             .optional()
             .describe("Concise, clear explanation of domain purpose."),
+          domain: z
+            .string()
+            .optional()
+            .describe(
+              "Domain label grouping this card with others (e.g. 'Order', 'User'). Independent of the slice domain and of DCB field tags.",
+            ),
           isArray: z.boolean().optional(),
           fields: z.array(fieldSpec).optional(),
           inputFields: z
@@ -501,6 +507,7 @@ export const createStormCardsTool = defineTool({
         height,
         stormData: data,
         ...(resolvedGroupId ? { groupId: resolvedGroupId } : {}),
+        ...(spec.domain ? { domain: toDisplayName(spec.domain) } : {}),
       };
       return { spec, obj };
     });
@@ -718,6 +725,12 @@ export const updateStormCardTool = defineTool({
       .string()
       .optional()
       .describe("Concise, clear explanation of domain purpose."),
+    domain: z
+      .string()
+      .optional()
+      .describe(
+        "New domain label grouping this card with others (e.g. 'Order'). Send an empty string to clear it.",
+      ),
     isArray: z.boolean().optional(),
     fields: z.array(fieldSpec).optional(),
     inputFields: z
@@ -898,6 +911,9 @@ export const updateStormCardTool = defineTool({
       stormData: data,
       width: newWidth,
       height: newHeight,
+      ...(args.domain !== undefined
+        ? { domain: args.domain.trim() ? toDisplayName(args.domain) : undefined }
+        : {}),
     });
     return {
       updated: true,

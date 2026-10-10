@@ -29,6 +29,7 @@ export interface ObjectRow {
   type: CanvasObject["type"];
   label: string;
   kind?: string;
+  domain?: string;
   action?: string;
   sourceId?: string;
   targetId?: string;
@@ -51,6 +52,7 @@ export function toObjectRow(
   };
   const kind = obj.stormData?.kind ?? obj.modelData?.kind;
   if (kind) row.kind = kind;
+  if (obj.domain) row.domain = obj.domain;
   if (obj.stormData?.action) row.action = obj.stormData.action;
   if (obj.connectorData) {
     row.sourceId = obj.connectorData.start.objectId;

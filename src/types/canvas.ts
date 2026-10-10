@@ -45,6 +45,13 @@ export interface CanvasObject {
   widthLocked?: boolean;
 
   /**
+   * Domain this element belongs to (e.g. "Order", "User"). Independent of the
+   * slice/group domain; shown as a pill on the card header and emitted in the
+   * codegen spec.
+   */
+  domain?: string;
+
+  /**
    * Reference-copy set id. Objects sharing a `referenceId` are linked
    * duplicates: content/style/size stay in sync across the set while position
    * and group membership stay independent (see utils/reference.ts).

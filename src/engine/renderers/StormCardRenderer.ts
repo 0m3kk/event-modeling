@@ -24,6 +24,11 @@ import type { CardHitZone, RenderResult } from "./types";
 import { drawActionIcon, drawHeaderKindIcon } from "./headerIcons";
 import { drawInfoBadge } from "./infoBadge";
 import { drawLinkBadge } from "./linkBadge";
+import {
+  drawDomainPill,
+  measureDomainPill,
+  DOMAIN_PILL_HEIGHT,
+} from "./domainPill";
 import { hasValidationRules, describeValidationRules } from "@/utils/fieldValidation";
 import {
   computeTypeZoneWidth,
@@ -216,10 +221,18 @@ export class StormCardRenderer {
       rightEdgeBoundary = actionX - 6;
     }
 
+    // Domain pill sits to the right of the title, so the title reserves room
+    // for it when truncating.
+    const domain = obj.domain?.trim();
+    const titleX = 12;
+    const pillReserve = domain
+      ? measureDomainPill(domain, textResolution) + 8
+      : 0;
+
     // Header Title on the left edge (vertically centered)
     const maxTitleChars = Math.max(
       8,
-      Math.floor((rightEdgeBoundary - 14) / 7.5),
+      Math.floor((rightEdgeBoundary - titleX - 2 - pillReserve) / 7.5),
     );
     const displayTitle = truncateText(fullTitle, maxTitleChars);
 
@@ -233,9 +246,20 @@ export class StormCardRenderer {
       },
       resolution: textResolution,
     });
-    titleText.x = 12;
+    titleText.x = titleX;
     titleText.y = 9;
     container.addChild(titleText);
+
+    if (domain) {
+      drawDomainPill(
+        g,
+        container,
+        titleX + titleText.width + 8,
+        (headerHeight - DOMAIN_PILL_HEIGHT) / 2,
+        domain,
+        { headerColor, textResolution },
+      );
+    }
 
     // 4. Render Body Fields
     let renderY = currentY + 6;

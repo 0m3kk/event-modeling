@@ -103,6 +103,7 @@ export interface CodegenActor {
   name: string;
   description?: string;
   slice?: string;
+  domain?: string;
   permissions: string[];
 }
 
@@ -117,6 +118,7 @@ export interface CodegenScenario {
   phase: "given" | "when" | "then";
   description?: string;
   slice?: string;
+  domain?: string;
   steps: CodegenScenarioStep[];
 }
 
@@ -140,6 +142,7 @@ export interface CodegenModelDef {
   description?: string;
   slice?: string;
   group?: string;
+  domain?: string;
   fields?: CodegenModelField[];
   values?: CodegenEnumValue[];
   itemType?: string;
@@ -176,6 +179,7 @@ export interface CodegenService {
   description?: string;
   slice?: string;
   group?: string;
+  domain?: string;
   methods: CodegenServiceMethod[];
 }
 
@@ -287,6 +291,7 @@ function resolveQueryItems(
 function toModelDef(
   model: ModelData,
   location?: { slice?: string; group?: string },
+  domain?: string,
 ): CodegenModelDef {
   const def: CodegenModelDef = {
     kind: model.kind as "object" | "enum" | "array" | "wrap",
@@ -295,6 +300,7 @@ function toModelDef(
   if (model.description?.trim()) def.description = model.description.trim();
   if (location?.slice) def.slice = location.slice;
   if (location?.group) def.group = location.group;
+  if (domain) def.domain = domain;
 
   switch (model.kind) {
     case "enum":
@@ -465,7 +471,10 @@ export function buildCodegenSpec(
     const isSlice = groupId ? sliceGroups.has(groupId) : false;
     const isModelOnly = groupId ? modelOnlyGroups.has(groupId) : false;
     const groupName = groupId ? groupNameMap.get(groupId) : undefined;
-    const domain = groupId ? groupDomainMap.get(groupId) : undefined;
+    // An element's own domain wins over the domain of the slice/group it sits
+    // in, so a card can be re-labelled without moving it.
+    const domain =
+      obj.domain?.trim() || (groupId ? groupDomainMap.get(groupId) : undefined);
 
     if (obj.type === "model" && obj.modelData) {
       const location = isSlice
@@ -491,10 +500,11 @@ export function buildCodegenSpec(
             : {}),
           ...(location?.slice ? { slice: location.slice } : {}),
           ...(location?.group ? { group: location.group } : {}),
+          ...(domain ? { domain } : {}),
         };
         spec.services.push(sDef);
       } else {
-        spec.models.push(toModelDef(obj.modelData, location));
+        spec.models.push(toModelDef(obj.modelData, location, domain));
       }
       continue;
     }
@@ -636,6 +646,7 @@ export function buildCodegenSpec(
             name,
             ...(desc ? { description: desc } : {}),
             ...(slice ? { slice } : {}),
+            ...(domain ? { domain } : {}),
             permissions: (storm.permissions ?? [])
               .map((p) => p.trim())
               .filter(Boolean),
@@ -664,6 +675,7 @@ export function buildCodegenSpec(
             phase: storm.phase ?? "given",
             ...(desc ? { description: desc } : {}),
             ...(slice ? { slice } : {}),
+            ...(domain ? { domain } : {}),
             steps,
           });
           break;

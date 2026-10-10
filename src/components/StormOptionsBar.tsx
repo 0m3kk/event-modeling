@@ -20,6 +20,7 @@ import {
 import { ActionPopover } from "./ActionPopover";
 import { BddStepPopover } from "./BddStepPopover";
 import { DescriptionPopover } from "./DescriptionPopover";
+import { DomainChip } from "./DomainChip";
 import { PermissionsPopover } from "./PermissionsPopover";
 import { TagPopover } from "./TagPopover";
 import { QueryItemPopover } from "./QueryItemPopover";
@@ -501,6 +502,14 @@ export function StormOptionsBar() {
         >
           <Info size={16} className="text-sky-600 dark:text-sky-400" />
         </button>
+
+        {/* Domain Chip — labels this card with a domain for grouping/export */}
+        <DomainChip
+          value={selectedStorm.domain}
+          onCommit={(value) =>
+            updateObject(selectedStorm.id, { domain: value || undefined })
+          }
+        />
 
         {/* Set Field Tag Button — only visible when a taggable row is selected */}
         {taggableField && (

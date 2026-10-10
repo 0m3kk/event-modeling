@@ -28,6 +28,7 @@ const SYNCED_REFERENCE_FIELDS = [
   "width",
   "height",
   "widthLocked",
+  "domain",
   "text",
   "fill",
   "stroke",

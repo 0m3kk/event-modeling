@@ -55,6 +55,12 @@ export const createModelNodesTool = defineTool({
           kind: z.enum(["object", "array", "wrap", "enum", "service"]),
           name: z.string().min(1),
           description: z.string().optional(),
+          domain: z
+            .string()
+            .optional()
+            .describe(
+              "Domain label grouping this node with others (e.g. 'Order', 'User'). Independent of any slice/group domain.",
+            ),
           x: z.number().optional(),
           y: z.number().optional(),
           fields: z
@@ -311,6 +317,7 @@ export const createModelNodesTool = defineTool({
         height,
         modelData: data,
         ...(resolvedGroupId ? { groupId: resolvedGroupId } : {}),
+        ...(spec.domain ? { domain: toDisplayName(spec.domain) } : {}),
       };
 
       state.addObject(obj);

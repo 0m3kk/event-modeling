@@ -109,6 +109,16 @@ describe("syncReferenceSet", () => {
     expect(next[1].widthLocked).toBe(true);
   });
 
+  it("propagates the element domain across the set", () => {
+    const objects = [
+      storm({ id: "a", referenceId: "ref-1", domain: "Order" }),
+      storm({ id: "b", referenceId: "ref-1" }),
+    ];
+
+    const next = syncReferenceSet(objects, "a")!;
+    expect(next[1].domain).toBe("Order");
+  });
+
   it("does not share nested arrays between synced siblings", () => {
     const source = storm({
       id: "a",

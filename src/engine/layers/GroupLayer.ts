@@ -98,11 +98,10 @@ export function getGroupAt(
   for (const group of groups) {
     const bounds = computeGroupBounds(group, objects, groups);
 
-    // Approximate header badge bounds
+    // Approximate header badge bounds (name badge only; the domain pill that
+    // may sit to its right is not a hit target).
     const title = group.name || (group.isSlice ? "Slice" : "Group");
-    const domain = group.domain ?? group.tag;
-    const displayText = domain ? `[${domain}] ${title}` : title;
-    const approxTextWidth = Math.max(60, displayText.length * 7.5 + 24);
+    const approxTextWidth = Math.max(60, title.length * 7.5 + 24);
     const badgeBounds: GroupBounds = {
       x: bounds.x + 16,
       y: bounds.y - 12,
@@ -169,7 +168,10 @@ export class GroupLayer extends Container {
    * depends on the title text and the zoom-derived resolution, so dragging or
    * panning just repositions existing nodes instead of rebuilding them.
    */
-  private labelNodes: Map<string, { node: Text; key: string }> = new Map();
+  private labelNodes: Map<
+    string,
+    { node: Text; domainNode: Text | null; key: string }
+  > = new Map();
 
   constructor() {
     super();
@@ -247,14 +249,14 @@ export class GroupLayer extends Container {
 
       const title = group.name || (group.isSlice ? "Slice" : "Group");
       const domain = group.domain ?? group.tag;
-      const displayText = domain ? `[${domain}] ${title}` : title;
-      const labelKey = `${displayText}|${textResolution}`;
+      const labelKey = `${title}|${domain ?? ""}|${textResolution}|${tagColorHex}`;
       let entry = this.labelNodes.get(group.id);
       if (!entry || entry.key !== labelKey) {
         entry?.node.destroy();
+        entry?.domainNode?.destroy();
         entry = {
           node: new Text({
-            text: displayText,
+            text: title,
             style: {
               fontSize: 11,
               fontFamily: APP_FONT_FAMILY,
@@ -263,6 +265,18 @@ export class GroupLayer extends Container {
             },
             resolution: textResolution,
           }),
+          domainNode: domain
+            ? new Text({
+                text: domain,
+                style: {
+                  fontSize: 10,
+                  fontFamily: APP_FONT_FAMILY,
+                  fontWeight: "bold",
+                  fill: tagColorHex,
+                },
+                resolution: textResolution,
+              })
+            : null,
           key: labelKey,
         };
         this.labelNodes.set(group.id, entry);
@@ -291,12 +305,35 @@ export class GroupLayer extends Container {
       if (label.parent !== this.labelsContainer) {
         this.labelsContainer.addChild(label);
       }
+
+      // Domain pill sits to the right of the name badge (light fill, colored
+      // text), matching the domain pill on element cards.
+      if (entry.domainNode) {
+        const domainLabel = entry.domainNode;
+        const dPaddingX = 8;
+        const dWidth = domainLabel.width + dPaddingX * 2;
+        const dHeight = 20;
+        const dX = badgeX + badgeWidth + 6;
+        const dY = badgeY + (badgeHeight - dHeight) / 2;
+
+        this.graphics
+          .roundRect(dX, dY, dWidth, dHeight, dHeight / 2)
+          .fill({ color: 0xffffff, alpha: 0.95 })
+          .stroke({ color: tagColorHex, width: 1, alpha: 0.9 });
+
+        domainLabel.x = dX + dPaddingX;
+        domainLabel.y = dY + (dHeight - domainLabel.height) / 2;
+        if (domainLabel.parent !== this.labelsContainer) {
+          this.labelsContainer.addChild(domainLabel);
+        }
+      }
     }
 
     // Drop labels whose group disappeared.
     for (const [id, entry] of this.labelNodes) {
       if (!activeLabelIds.has(id)) {
         entry.node.destroy();
+        entry.domainNode?.destroy();
         this.labelNodes.delete(id);
       }
     }

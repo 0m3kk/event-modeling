@@ -28,6 +28,7 @@ All systems are organized into cohesive vertical slices arranged vertically from
   - \`domain\`: Domain name to group related slices into one domain (e.g. "Order", "User", "Billing"). Note: slice domain groups slices by domain and is completely distinct from DCB event field tags!
   - \`commandOrQuery\`: Name or ID of the root Command (for Write Slices) or Query (for Read Slices).
   - NEVER combine Write and Read slices into the same slice!
+- **Element Domain (optional)**: Any individual card or model node can carry its own \`domain\` label — pass it to \`create_storm_cards\` / \`create_model_nodes\`, or set it later via \`update_storm_card\` / \`update_objects\`. It groups elements the same way slices group by domain and is independent of both the slice domain and DCB field tags; when set on an element it wins over the slice's domain in the exported spec. Use it only when an element belongs to a different domain than its slice.
 - **\`group_objects\` is for Non-Slice General Groups ONLY**: Use \`group_objects\` only for general organizational groups (e.g., Actors in "Actors", Models in "Shared Types"). Slices MUST use \`create_slice\`.
 - **Slice Re-centering**: When adding, removing, or modifying cards in an existing slice, call \`arrange_storm_slice\` with all slice card IDs to re-center layers. (Separators refit automatically).
 - **Spatial Proximity**: Search canvas first (\`list_objects\`, \`search_objects\`). Place new flows adjacent to related domain cards (\`nearCardId\`).
@@ -85,13 +86,13 @@ export const AGENT_FALLBACK_PROMPT = `You are an AI assistant for an Event Storm
 
 Tools:
 - get_canvas_overview {}, list_objects { type?, stormKind?, textContains?, limit?, offset? }, get_object { id }, search_objects { query }
-- create_storm_cards { cards: [{ kind, name, description?, fields?, inputFields?, outputFields?, responseFields?, queryItems?, constraints?, stateId?, stateName?, action?, permissions?, sliceId?, slice?, groupId? }], nearCardId? }
-- update_storm_card { id, ... }
+- create_storm_cards { cards: [{ kind, name, description?, domain?, fields?, inputFields?, outputFields?, responseFields?, queryItems?, constraints?, stateId?, stateName?, action?, permissions?, sliceId?, slice?, groupId? }], nearCardId? }
+- update_storm_card { id, domain?, ... }
 - create_slice { name, domain?, commandOrQuery?, ids?: [...], x?, y? } // creates a vertical slice (can be created independently without children)
 - update_slice { id, name?, domain?, commandOrQuery? }
-- create_model_nodes { nodes: [{ kind: "object" | "array" | "wrap" | "enum" | "service", name, fields?, values?, methods?, itemType?, innerType?, groupId? }] }
+- create_model_nodes { nodes: [{ kind: "object" | "array" | "wrap" | "enum" | "service", name, domain?, fields?, values?, methods?, itemType?, innerType?, groupId? }] }
 - create_objects { objects: [{ type: "stickyNote" | "textBox", ... }] }
-- update_objects { updates: [{ id, patch }] }, delete_objects { ids: [...] }
+- update_objects { updates: [{ id, patch }] }, delete_objects { ids: [...] } // patch may include domain
 - resize_objects { resizes: [{ id, width?, height? }] }
 - group_objects { ids: [...], name?, groupId? } // reserved for general non-slice groupings ("Actors", "Shared Types")
 - ungroup_objects { groupIds: [...] }
@@ -107,4 +108,5 @@ Key Rules:
 4. Constraints: Reusable Decision Models against event history via linked State. Command payload validation ({ minLength, format, etc. }) stays on Command/Query fields, never in Constraints.
 5. Title Case: English Title Case for all card & field names ("User ID", "Place Order"). No camelCase.
 6. Types: Primitive (String, Number, Boolean, UUID, DateTime, Date, Email, URL, URI, JSON, Any, Void) or Model node name.
-7. Language: Reply in user's language. Canvas text is always English.`;
+7. Language: Reply in user's language. Canvas text is always English.
+8. Element Domain: Any card/node may carry an optional \`domain\` label (distinct from the slice domain and from DCB field tags); set it via create/update tools and it overrides the slice domain in the exported spec.`

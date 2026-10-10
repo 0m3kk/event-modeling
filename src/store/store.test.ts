@@ -691,6 +691,36 @@ describe("useCanvasStore", () => {
     expect(state.objects.find((o) => o.id === "evt-1")?.groupId).toBe(sliceId);
   });
 
+  it("updateObject persists an element domain on a storm card and a model node", () => {
+    useCanvasStore.getState().addObjects([
+      {
+        id: "evt-dom",
+        type: "storm",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        stormData: { kind: "event", name: "Order Placed", fields: [] },
+      },
+      {
+        id: "obj-dom",
+        type: "model",
+        x: 0,
+        y: 200,
+        width: 200,
+        height: 100,
+        modelData: { kind: "object", name: "Order Line", fields: [] },
+      },
+    ]);
+
+    useCanvasStore.getState().updateObject("evt-dom", { domain: "Order" });
+    useCanvasStore.getState().updateObject("obj-dom", { domain: "Catalog" });
+
+    const state = useCanvasStore.getState();
+    expect(state.objects.find((o) => o.id === "evt-dom")?.domain).toBe("Order");
+    expect(state.objects.find((o) => o.id === "obj-dom")?.domain).toBe("Catalog");
+  });
+
   it("createSlice auto-detects name and command when name is omitted", () => {
     const cmd: CanvasObject = {
       id: "cmd-cancel",
