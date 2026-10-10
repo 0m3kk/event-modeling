@@ -129,7 +129,7 @@ export function collectMatchingEventIds(
   stateObject: CanvasObject,
 ): string[] {
   const data = stateObject.type === "storm" ? stateObject.stormData : undefined;
-  if (!data || (data.kind !== "state" && data.kind !== "constraint")) {
+  if (!data || data.kind !== "state") {
     return [];
   }
   const queryItems = data.queryItems ?? [];
@@ -158,8 +158,7 @@ export function renameStormEventReferences(
   const next = objects.map((obj) => {
     if (
       obj.type !== "storm" ||
-      (obj.stormData?.kind !== "state" &&
-        obj.stormData?.kind !== "constraint") ||
+      obj.stormData?.kind !== "state" ||
       !obj.stormData.queryItems?.some((item) => item.types.includes(oldName))
     ) {
       return obj;

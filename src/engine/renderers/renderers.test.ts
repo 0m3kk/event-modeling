@@ -535,8 +535,17 @@ describe("Pixi Card Renderers", () => {
     expect(qZone?.queryItemId).toBe("qi1");
   });
 
-  it("renders Storm constraint card with field rows, query items and constraint lines", () => {
+  it("renders Storm constraint card with linked state and constraint lines", () => {
     const container = new Container();
+    const stateObj: CanvasObject = {
+      id: "state-order",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 120,
+      stormData: { kind: "state", name: "Order State", fields: [] },
+    };
     const obj: CanvasObject = {
       id: "c-1",
       type: "storm",
@@ -547,34 +556,20 @@ describe("Pixi Card Renderers", () => {
       stormData: {
         kind: "constraint",
         name: "OrderConstraints",
-        // Constraint shares the State body: INPUT params + Related Events
-        // + projected FIELDS, then the free-text Constraints section.
+        stateId: "state-order",
         fields: [],
-        inputFields: [
-          { id: "cf1", name: "total", fieldType: "number", tag: "order" },
-        ],
-        queryItems: [
-          { id: "cqi1", types: ["OrderPlaced"], tagFieldIds: ["cf1"] },
-        ],
         constraints: [
           { id: "c1", text: "Total amount must be greater than zero" },
         ],
       },
     };
 
-    const res = StormCardRenderer.draw(container, obj, 1, false);
-    // Field rows render for constraint cards (typed + taggable)
-    expect(res.hitZones.filter((z) => z.type === "fieldName").length).toBe(1);
-    expect(res.hitZones.some((z) => z.type === "fieldType")).toBe(true);
-    expect(
-      res.hitZones.some(
-        (z) => z.type === "fieldTag" && z.currentText === "order",
-      ),
-    ).toBe(true);
-    // Related Events (DCB Query Items) render for constraint cards too
-    const qZone = res.hitZones.find((z) => z.type === "queryItem");
-    expect(qZone).toBeDefined();
-    expect(qZone?.queryItemId).toBe("cqi1");
+    const res = StormCardRenderer.draw(container, obj, 1, false, undefined, [stateObj]);
+    // State link hitZone renders for linked constraint cards
+    const stateZone = res.hitZones.find((z) => z.type === "constraintState");
+    expect(stateZone).toBeDefined();
+    expect(stateZone?.currentText).toBe("Order State");
+
     // And the free-text constraints section
     const cZone = res.hitZones.find((z) => z.type === "constraint");
     expect(cZone).toBeDefined();
@@ -592,6 +587,14 @@ describe("Pixi Card Renderers", () => {
       (c) => (c as Text).text === "•",
     ) as Text | undefined;
     expect(bulletChild).toBeDefined();
+
+    // When no state is linked, no link box is rendered in the card content
+    const unlinkedObj: CanvasObject = {
+      ...obj,
+      stormData: { ...obj.stormData!, stateId: undefined },
+    };
+    const unlinkedRes = StormCardRenderer.draw(new Container(), unlinkedObj, 1, false);
+    expect(unlinkedRes.hitZones.find((z) => z.type === "constraintState")).toBeUndefined();
   });
 
   it("renders constraint card with wrapped text and expanded height for long rules", () => {

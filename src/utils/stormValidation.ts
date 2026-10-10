@@ -76,7 +76,7 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-const TAG_KINDS: readonly StormKind[] = ["event", "state", "constraint", "bdd"];
+const TAG_KINDS: readonly StormKind[] = ["event", "state", "bdd"];
 
 const KEY_WORDS = new Set([
   "id",
@@ -232,13 +232,19 @@ function getCardOrObjectFields(
   return card.fields;
 }
 
+function isCanvasObject(
+  source: StormValidationCard | CanvasObject,
+): source is CanvasObject {
+  return "type" in source;
+}
+
 function getCardOrObjectName(
   source: StormValidationCard | CanvasObject,
 ): string {
-  if ("stormData" in source) {
+  if (isCanvasObject(source)) {
     return source.stormData?.name ?? "";
   }
-  return (source as StormValidationCard).name;
+  return source.name;
 }
 
 function findCandidateSourcesForEvent(
@@ -248,8 +254,29 @@ function findCandidateSourcesForEvent(
   const batchCommands = input.cards.filter((c) => c.kind === "command");
   const batchConstraints = input.cards.filter((c) => c.kind === "constraint");
 
+  const resolveLinkedStates = (candidates: (StormValidationCard | CanvasObject)[]) => {
+    const result = [...candidates];
+    for (const c of candidates) {
+      const stateId = isCanvasObject(c) ? c.stormData?.stateId : c.stateId;
+      const stateName = isCanvasObject(c) ? undefined : c.stateName;
+      if (stateId) {
+        const stateObj =
+          input.existing.find((o) => o.id === stateId) ??
+          input.cards.find((card) => card.id === stateId);
+        if (stateObj && !result.includes(stateObj)) result.push(stateObj);
+      }
+      if (stateName) {
+        const stateObj =
+          input.cards.find((card) => card.kind === "state" && fieldNameMatches(card.name, stateName)) ??
+          input.existing.find((o) => o.type === "storm" && o.stormData?.kind === "state" && fieldNameMatches(o.stormData.name, stateName));
+        if (stateObj && !result.includes(stateObj)) result.push(stateObj);
+      }
+    }
+    return result;
+  };
+
   if (batchCommands.length === 1) {
-    return [...batchCommands, ...batchConstraints];
+    return resolveLinkedStates([...batchCommands, ...batchConstraints]);
   }
 
   if (batchCommands.length > 1) {
@@ -263,13 +290,13 @@ function findCandidateSourcesForEvent(
       return eventWords.some((w) => cWords.includes(w));
     });
     if (matchedCmds.length > 0 || matchedConstraints.length > 0) {
-      return [...matchedCmds, ...matchedConstraints];
+      return resolveLinkedStates([...matchedCmds, ...matchedConstraints]);
     }
-    return [...batchCommands, ...batchConstraints];
+    return resolveLinkedStates([...batchCommands, ...batchConstraints]);
   }
 
   if (batchConstraints.length > 0) {
-    return batchConstraints;
+    return resolveLinkedStates(batchConstraints);
   }
 
   const existingCommands = input.existing.filter(
@@ -332,6 +359,7 @@ function findEventCard(
 }
 
 export interface StormValidationCard {
+  id?: string;
   kind: StormKind;
   name: string;
   /** Primary fields (Command/Event/BDD payload; Query params). */
@@ -366,6 +394,9 @@ export interface StormValidationCard {
   action?: string;
   permissions?: string[];
   writtenPermissions?: string[];
+  stateId?: string;
+  stateName?: string;
+  stateIds?: string[];
 }
 
 export interface StormValidationInput {
@@ -499,12 +530,12 @@ export function validateStormWrite(input: StormValidationInput): string[] {
       for (const field of writtenFields) {
         if ((field.tag ?? "").trim()) {
           issues.push(
-            `${label} field "${field.name}" carries a tag, but tags are only valid on Event, Given/When/Then, State, and Constraint cards.`,
+            `${label} field "${field.name}" carries a tag, but tags are only valid on Event, Given/When/Then, and State cards.`,
           );
         }
       }
-    } else if (card.kind === "state" || card.kind === "constraint") {
-      // On State/Constraint cards tags live ONLY on the INPUT params. The
+    } else if (card.kind === "state") {
+      // On State cards tags live ONLY on the INPUT params. The
       // projected OUTPUT fields never carry tags.
       for (const field of card.inputFields ?? []) {
         const tag = (field.tag ?? "").trim();
@@ -548,14 +579,58 @@ export function validateStormWrite(input: StormValidationInput): string[] {
     if (card.kind === "constraint" && card.constraints) {
       const COMMAND_VALIDATION_REGEX =
         /\b(cannot be (empty|blank|null)|must not be (empty|blank|null)|is required|valid email format|characters long)\b/i;
-      const constraintOutputFields = [
-        ...(card.outputFields ?? []),
-        ...(card.rawOutputFields?.map((f) => ({ name: f.name, fieldType: f.fieldType })) ?? []),
-      ];
-      const constraintInputFields = [
-        ...(card.inputFields ?? []),
-        ...(card.rawInputFields?.map((f) => ({ name: f.name, fieldType: f.fieldType })) ?? []),
-      ];
+
+      // Find referenced State card
+      let linkedState: StormValidationCard | CanvasObject | undefined;
+      if (card.stateId) {
+        linkedState =
+          input.existing.find((o) => o.id === card.stateId) ??
+          input.cards.find((c) => c.id === card.stateId);
+        if (!linkedState && !card.stateName) {
+          issues.push(
+            `${label} references stateId "${card.stateId}", but no matching State card was found.`,
+          );
+        }
+      }
+      if (!linkedState && card.stateName) {
+        linkedState =
+          input.cards.find((c) => c.kind === "state" && fieldNameMatches(c.name, card.stateName!)) ??
+          input.existing.find((o) => o.type === "storm" && o.stormData?.kind === "state" && fieldNameMatches(o.stormData.name, card.stateName!));
+        if (!linkedState) {
+          issues.push(
+            `${label} references State "${card.stateName}", but no matching State card was found.`,
+          );
+        }
+      }
+
+      const constraintOutputFields = linkedState
+        ? (isCanvasObject(linkedState)
+            ? [...(linkedState.stormData?.outputFields ?? [])]
+            : [
+                ...(linkedState.outputFields ?? []),
+                ...(linkedState.rawOutputFields?.map((f: { name: string; fieldType?: string }) => ({
+                  name: f.name,
+                  fieldType: f.fieldType,
+                })) ?? []),
+              ])
+        : [
+            ...(card.outputFields ?? []),
+            ...(card.rawOutputFields?.map((f) => ({ name: f.name, fieldType: f.fieldType })) ?? []),
+          ];
+      const constraintInputFields = linkedState
+        ? (isCanvasObject(linkedState)
+            ? [...(linkedState.stormData?.inputFields ?? [])]
+            : [
+                ...(linkedState.inputFields ?? []),
+                ...(linkedState.rawInputFields?.map((f: { name: string; fieldType?: string }) => ({
+                  name: f.name,
+                  fieldType: f.fieldType,
+                })) ?? []),
+              ])
+        : [
+            ...(card.inputFields ?? []),
+            ...(card.rawInputFields?.map((f) => ({ name: f.name, fieldType: f.fieldType })) ?? []),
+          ];
 
       for (const rule of card.constraints) {
         const text = typeof rule === "string" ? rule : rule.text;

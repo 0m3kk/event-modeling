@@ -700,6 +700,163 @@ export class StormCardRenderer {
 
         renderY += rowHeight;
       }
+    } else if (isConstraint) {
+      const findObjectById = (id?: string): CanvasObject | undefined => {
+        if (!id || !allObjects) return undefined;
+        if (allObjects instanceof Map) return allObjects.get(id);
+        if (Array.isArray(allObjects)) return allObjects.find((o) => o.id === id);
+        return undefined;
+      };
+
+      const stateObj = findObjectById(data.stateId);
+      const stateName = stateObj?.stormData?.name;
+
+      if (stateName) {
+        const stateDisplayText = `⟡ ${stateName}`;
+        const statePillY = renderY + 4;
+        const statePillHeight = 22;
+        const statePillWidth = w - 16;
+
+        g.roundRect(8, statePillY, statePillWidth, statePillHeight, 4)
+          .fill({
+            color: isDark ? 0x134e4a : 0xf0fdfa,
+          })
+          .stroke({
+            color: isDark ? 0x14b8a6 : 0x99f6e4,
+            width: 1,
+          });
+
+        const stateText = new Text({
+          text: stateDisplayText,
+          style: {
+            fontSize: 10,
+            fontWeight: "bold",
+            fontFamily: APP_FONT_FAMILY,
+            fill: isDark ? 0x2dd4bf : 0x0f766e,
+          },
+          resolution: textResolution,
+        });
+        stateText.x = 16;
+        stateText.y = statePillY + 4;
+        container.addChild(stateText);
+
+        hitZones.push({
+          type: "constraintState",
+          bounds: {
+            x: 8,
+            y: statePillY,
+            width: statePillWidth,
+            height: statePillHeight,
+          },
+          currentText: stateName,
+        });
+
+        renderY += statePillHeight + 8;
+      }
+
+      if (constraints.length > 0) {
+        const cLabel = new Text({
+          text: "RULES",
+          style: {
+            fontSize: 9,
+            fontWeight: "bold",
+            fontFamily: APP_FONT_FAMILY,
+            fill: isDark ? 0x14b8a6 : 0x0f766e,
+            letterSpacing: 0.5,
+          },
+          resolution: textResolution,
+        });
+        cLabel.x = 10;
+        cLabel.y = renderY + 2;
+        container.addChild(cLabel);
+        renderY += sectionLabelHeight;
+
+        const textX = 22;
+        const wrapWidth = Math.max(40, w - textX - 10);
+        for (const c of constraints) {
+          const rowY = renderY;
+          const rawText = c.text || c.code || c.assert || "";
+          const displayText = rawText.startsWith("•")
+            ? rawText.replace(/^•\s*/, "")
+            : rawText;
+          const hasStructured = Boolean(c.assert);
+          const itemWrapWidth = hasStructured
+            ? Math.max(30, wrapWidth - 14)
+            : wrapWidth;
+
+          const bullet = new Text({
+            text: "•",
+            style: {
+              fontSize: 10,
+              fontFamily: APP_FONT_FAMILY,
+              fill: isDark ? 0x14b8a6 : 0x134e4a,
+            },
+            resolution: textResolution,
+          });
+          bullet.x = 10;
+          bullet.y = rowY + 5;
+
+          const cText = new Text({
+            text: displayText,
+            style: {
+              fontSize: 10,
+              fontFamily: APP_FONT_FAMILY,
+              fill: isDark ? 0xd4d4d8 : 0x134e4a,
+              wordWrap: true,
+              wordWrapWidth: itemWrapWidth,
+              lineHeight: 14,
+              breakWords: true,
+            },
+            resolution: textResolution,
+          });
+
+          const textHeight =
+            typeof document !== "undefined"
+              ? (() => {
+                  try {
+                    return cText.height || 14;
+                  } catch {
+                    return computeStormConstraintItemLines(displayText, w) * 14;
+                  }
+                })()
+              : computeStormConstraintItemLines(displayText, w) * 14;
+
+          const itemHeight = Math.max(rowHeight, Math.ceil(textHeight) + 12);
+
+          // Draw selection highlight for this row
+          if (selectedFieldId && c.id === selectedFieldId) {
+            g.roundRect(4, rowY + 1, w - 8, itemHeight - 2, 4).fill({
+              color: isDark ? 0x1e3a8a : 0xdbeafe,
+            });
+          }
+
+          cText.x = textX;
+          cText.y = rowY + 5;
+          container.addChild(bullet);
+          container.addChild(cText);
+
+          if (hasStructured) {
+            drawInfoBadge(g, container, w - 14, rowY + 12, {
+              radius: 6,
+              stroke: isDark ? 0x14b8a6 : 0x0f766e,
+              fill: isDark ? 0x2dd4bf : 0x0f766e,
+              fontSize: 8,
+              glyph: "ƒ",
+              bold: true,
+              textResolution,
+            });
+          }
+
+          hitZones.push({
+            type: "constraint",
+            bounds: { x: 0, y: rowY, width: w, height: itemHeight },
+            constraintId: c.id,
+            currentText: c.text,
+          });
+
+          renderY += itemHeight;
+        }
+      }
     } else if (hasInputOutput) {
       // State/Constraint INPUT params. Their tags are the only tags a Query
       // Item can filter on. Output fields render later, after Query Items.
@@ -894,111 +1051,6 @@ export class StormCardRenderer {
       renderY += sectionLabelHeight;
 
       renderFieldList(outputFields, "response", false);
-    }
-
-    // Render Constraints
-    if (isConstraint && constraints.length > 0) {
-      const cLabel = new Text({
-        text: "CONSTRAINTS",
-        style: {
-          fontSize: 9,
-          fontWeight: "bold",
-          fontFamily: APP_FONT_FAMILY,
-          fill: isDark ? 0x14b8a6 : 0x0f766e,
-          letterSpacing: 0.5,
-        },
-        resolution: textResolution,
-      });
-      cLabel.x = 10;
-      cLabel.y = renderY + 4;
-      container.addChild(cLabel);
-      renderY += sectionLabelHeight;
-
-      const textX = 22;
-      const wrapWidth = Math.max(40, w - textX - 10);
-      for (const c of constraints) {
-        const rowY = renderY;
-        const rawText = c.text || c.code || c.assert || "";
-        const displayText = rawText.startsWith("•")
-          ? rawText.replace(/^•\s*/, "")
-          : rawText;
-        const hasStructured = Boolean(c.assert);
-        const itemWrapWidth = hasStructured
-          ? Math.max(30, wrapWidth - 14)
-          : wrapWidth;
-
-        const bullet = new Text({
-          text: "•",
-          style: {
-            fontSize: 10,
-            fontFamily: APP_FONT_FAMILY,
-            fill: isDark ? 0x14b8a6 : 0x134e4a,
-          },
-          resolution: textResolution,
-        });
-        bullet.x = 10;
-        bullet.y = rowY + 5;
-
-        const cText = new Text({
-          text: displayText,
-          style: {
-            fontSize: 10,
-            fontFamily: APP_FONT_FAMILY,
-            fill: isDark ? 0xd4d4d8 : 0x134e4a,
-            wordWrap: true,
-            wordWrapWidth: itemWrapWidth,
-            lineHeight: 14,
-            breakWords: true,
-          },
-          resolution: textResolution,
-        });
-
-        const textHeight =
-          typeof document !== "undefined"
-            ? (() => {
-                try {
-                  return cText.height || 14;
-                } catch {
-                  return computeStormConstraintItemLines(displayText, w) * 14;
-                }
-              })()
-            : computeStormConstraintItemLines(displayText, w) * 14;
-
-        const itemHeight = Math.max(rowHeight, Math.ceil(textHeight) + 12);
-
-        // Draw selection highlight for this row
-        if (selectedFieldId && c.id === selectedFieldId) {
-          g.roundRect(4, rowY + 1, w - 8, itemHeight - 2, 4).fill({
-            color: isDark ? 0x1e3a8a : 0xdbeafe,
-          });
-        }
-
-        cText.x = textX;
-        cText.y = rowY + 5;
-        container.addChild(bullet);
-        container.addChild(cText);
-
-        if (hasStructured) {
-          drawInfoBadge(g, container, w - 14, rowY + 12, {
-            radius: 6,
-            stroke: isDark ? 0x14b8a6 : 0x0f766e,
-            fill: isDark ? 0x2dd4bf : 0x0f766e,
-            fontSize: 8,
-            glyph: "ƒ",
-            bold: true,
-            textResolution,
-          });
-        }
-
-        hitZones.push({
-          type: "constraint",
-          bounds: { x: 0, y: rowY, width: w, height: itemHeight },
-          constraintId: c.id,
-          currentText: c.text,
-        });
-
-        renderY += itemHeight;
-      }
     }
 
     const finalHeight = Math.max(renderY + 10, 80);

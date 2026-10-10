@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CanvasObject, StormField, StormKind } from "@/types";
+import type { CanvasObject, StormData, StormField, StormKind } from "@/types";
 import {
   collectStormWarnings,
   describeStormOptions,
@@ -21,6 +21,7 @@ function stormObject(
   kind: StormKind,
   name: string,
   fields: StormField[],
+  extra: Partial<StormData> = {},
 ): CanvasObject {
   return {
     id: `${kind}-${name}`,
@@ -29,7 +30,7 @@ function stormObject(
     y: 0,
     width: 260,
     height: 150,
-    stormData: { kind, name, fields },
+    stormData: { kind, name, fields, ...extra },
   };
 }
 
@@ -108,7 +109,7 @@ describe("validateStormWrite", () => {
       ],
     };
     expect(validateStormWrite(input)).toEqual([
-      '"Place Order" (command) field "Order ID" carries a tag, but tags are only valid on Event, Given/When/Then, State, and Constraint cards.',
+      '"Place Order" (command) field "Order ID" carries a tag, but tags are only valid on Event, Given/When/Then, and State cards.',
     ]);
   });
 
@@ -707,6 +708,93 @@ describe("describeStormOptions", () => {
         ],
       };
       expect(validateStormWrite(validEnumInput)).toEqual([]);
+    });
+  });
+
+  describe("Constraint State Reusability & Field Validation", () => {
+    it("validates constraint assert rules against fields of a linked State card", () => {
+      const userStatusState = stormObject("state", "User Status", [], {
+        inputFields: [field("User ID", "UUID", "User")],
+        outputFields: [field("Status", "String"), field("Is Active", "Boolean")],
+      });
+
+      // Valid: references existing output field "Is Active"
+      const validConstraint: StormValidationInput = {
+        existing: [userStatusState],
+        cards: [
+          card("constraint", "User Must Be Active", [], {
+            stateId: userStatusState.id,
+            constraints: [
+              {
+                code: "USER_INACTIVE",
+                assert: '"Fields"."Is Active" == true',
+              },
+            ],
+          }),
+        ],
+      };
+      expect(validateStormWrite(validConstraint)).toEqual([]);
+
+      // Invalid: references non-existent field "Deleted At"
+      const invalidConstraint: StormValidationInput = {
+        existing: [userStatusState],
+        cards: [
+          card("constraint", "User Not Deleted", [], {
+            stateId: userStatusState.id,
+            constraints: [
+              {
+                code: "USER_DELETED",
+                assert: '"Fields"."Deleted At" == null',
+              },
+            ],
+          }),
+        ],
+      };
+      const issues = validateStormWrite(invalidConstraint);
+      expect(issues.length).toBe(1);
+      expect(issues[0]).toContain('references "Fields"."Deleted At" which does not exist in output fields');
+    });
+
+    it("allows multiple constraints to reuse the same State card", () => {
+      const userStatusState = stormObject("state", "User Status", [], {
+        inputFields: [field("User ID", "UUID", "User")],
+        outputFields: [field("Status", "String")],
+      });
+
+      const multiConstraintsInput: StormValidationInput = {
+        existing: [userStatusState],
+        cards: [
+          card("constraint", "User Must Be Active", [], {
+            stateId: userStatusState.id,
+            constraints: [
+              { code: "MUST_BE_ACTIVE", assert: '"Fields"."Status" == \'ACTIVE\'' },
+            ],
+          }),
+          card("constraint", "User Must Be Pending", [], {
+            stateId: userStatusState.id,
+            constraints: [
+              { code: "MUST_BE_PENDING", assert: '"Fields"."Status" == \'PENDING\'' },
+            ],
+          }),
+        ],
+      };
+      expect(validateStormWrite(multiConstraintsInput)).toEqual([]);
+    });
+
+    it("flags error when constraint references a non-existent State name", () => {
+      const missingStateInput: StormValidationInput = {
+        existing: [],
+        cards: [
+          card("constraint", "User Must Be Active", [], {
+            stateName: "Non Existent State",
+            constraints: ["User must be active"],
+          }),
+        ],
+      };
+      const issues = validateStormWrite(missingStateInput);
+      expect(issues).toEqual([
+        '"User Must Be Active" (constraint) references State "Non Existent State", but no matching State card was found.',
+      ]);
     });
   });
 });

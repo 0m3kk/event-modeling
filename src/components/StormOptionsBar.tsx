@@ -25,6 +25,7 @@ import { TagPopover } from "./TagPopover";
 import { QueryItemPopover } from "./QueryItemPopover";
 import { ValidationPopover } from "./ValidationPopover";
 import { ConstraintRulePopover } from "./ConstraintRulePopover";
+import { ConstraintStatePopover } from "./ConstraintStatePopover";
 import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 import { findDescriptionText } from "@/utils/description";
 import { getActorPermissions } from "@/utils/stormAuth";
@@ -47,6 +48,7 @@ import {
   Pencil,
   PlusCircle,
   Code2,
+  Database,
 } from "lucide-react";
 
 export function StormOptionsBar() {
@@ -71,6 +73,8 @@ export function StormOptionsBar() {
   const setBddStepPopup = useCanvasStore((s) => s.setBddStepPopup);
   const queryItemPopup = useCanvasStore((s) => s.queryItemPopup);
   const setQueryItemPopup = useCanvasStore((s) => s.setQueryItemPopup);
+  const constraintStatePopup = useCanvasStore((s) => s.constraintStatePopup);
+  const setConstraintStatePopup = useCanvasStore((s) => s.setConstraintStatePopup);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [showActionPopover, setShowActionPopover] = useState(false);
@@ -82,6 +86,7 @@ export function StormOptionsBar() {
     "create" | "edit"
   >("create");
   const [showConstraintRulePopover, setShowConstraintRulePopover] = useState(false);
+  const [showConstraintStatePopover, setShowConstraintStatePopover] = useState(false);
 
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const permissionsButtonRef = useRef<HTMLButtonElement>(null);
@@ -235,10 +240,13 @@ export function StormOptionsBar() {
       (showQueryItemActive && queryItemEffectiveMode === "edit"),
   );
 
+  const showConstraintStateActive = Boolean(
+    showConstraintStatePopover ||
+      (constraintStatePopup && constraintStatePopup.objectId === selectedStorm.id),
+  );
+
   const tagButtonTitle = selectedField
     ? selectedField.tag
-      ? `Tag: "${selectedField.tag}" (${selectedField.name})`
-      : `Set Tag for "${selectedField.name}"`
     : "Set Field Tag";
 
   const closeAllPopovers = () => {
@@ -247,9 +255,12 @@ export function StormOptionsBar() {
     setShowPermissionsPopover(false);
     setShowTagPopover(false);
     setShowQueryItemPopover(false);
+    setShowConstraintStatePopover(false);
+    setShowConstraintRulePopover(false);
     setValidationTarget(null);
     setBddStepPopup(null);
     setQueryItemPopup(null);
+    setConstraintStatePopup(null);
   };
 
   const handleToggleActionPopover = () => {
@@ -568,11 +579,11 @@ export function StormOptionsBar() {
           </button>
         )}
 
-        {/* Add Field Button (hidden on the fieldless Actor chip and on BDD
-            scenario step cards, which add steps instead). On Query cards this
-            appends to the Params list; on State/Constraint it appends to the
-            INPUT params. A dedicated output/response button follows. */}
-        {kind !== "actor" && !isStepKind && (
+        {/* Add Field Button (hidden on the fieldless Actor chip, on Constraint
+            cards which reference a State, and on BDD scenario step cards, which add
+            steps instead). On Query cards this appends to the Params list; on State
+            it appends to the INPUT params. A dedicated output/response button follows. */}
+        {kind !== "actor" && kind !== "constraint" && !isStepKind && (
           <button
             onClick={handleAddRow}
             title={
@@ -659,6 +670,33 @@ export function StormOptionsBar() {
             }`}
           >
             <Layers size={16} />
+          </button>
+        )}
+
+        {/* Link State Button (Constraint cards only) */}
+        {kind === "constraint" && (
+          <button
+            onClick={() => {
+              if (showConstraintStateActive) {
+                setShowConstraintStatePopover(false);
+                setConstraintStatePopup(null);
+              } else {
+                closeAllPopovers();
+                setShowConstraintStatePopover(true);
+              }
+            }}
+            title={
+              selectedStorm.stormData?.stateId
+                ? `Linked State: ${objects.find((o) => o.id === selectedStorm.stormData?.stateId)?.stormData?.name || "Selected"}`
+                : "Link State Card"
+            }
+            className={`flex h-8 w-8 items-center justify-center rounded-lg cursor-pointer transition-colors ${
+              showConstraintStateActive || selectedStorm.stormData?.stateId
+                ? "bg-teal-100 text-teal-800 dark:bg-teal-950/80 dark:text-teal-300 font-semibold"
+                : "text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40"
+            }`}
+          >
+            <Database size={16} />
           </button>
         )}
 
@@ -803,6 +841,18 @@ export function StormOptionsBar() {
           card={selectedStorm}
           constraintId={selectedConstraint.id}
           onClose={() => setShowConstraintRulePopover(false)}
+          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
+        />
+      )}
+
+      {/* Constraint State Selector Popover */}
+      {showConstraintStateActive && (
+        <ConstraintStatePopover
+          card={selectedStorm}
+          onClose={() => {
+            setShowConstraintStatePopover(false);
+            setConstraintStatePopup(null);
+          }}
           anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
         />
       )}

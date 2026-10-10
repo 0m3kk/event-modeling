@@ -949,6 +949,15 @@ export class PixiEngine {
         return;
       }
 
+      // Click on constraint state selector opens the state picker popover
+      if (accurateZone?.type === "constraintState") {
+        state.clearModelPopups();
+        state.selectObject(id, e.shiftKey || e.metaKey || e.ctrlKey);
+        state.setStormSelectedField(null);
+        state.setConstraintStatePopup({ objectId: id });
+        return;
+      }
+
       // Single-click row selection: clicking anywhere on a field row (name, tag, type,
       // enum value, query item, constraint, BDD scenario step) selects and
       // highlights that row.
@@ -2491,7 +2500,13 @@ export class PixiEngine {
         (o) =>
           selectedIds.includes(o.id) &&
           o.type === "storm" &&
-          (o.stormData?.kind === "state" || o.stormData?.kind === "constraint"),
+          o.stormData?.kind === "state",
+      );
+      const selectedConstraintCard = objects.find(
+        (o) =>
+          selectedIds.includes(o.id) &&
+          o.type === "storm" &&
+          o.stormData?.kind === "constraint",
       );
 
       if (stormActionHover) {
@@ -2508,7 +2523,22 @@ export class PixiEngine {
         const matchingEvents = objects.filter((o) =>
           matchingIds.includes(o.id),
         );
-        this.visualLinkLayer.renderHighlights(matchingEvents);
+        const referencingConstraints = objects.filter(
+          (o) =>
+            o.type === "storm" &&
+            o.stormData?.kind === "constraint" &&
+            o.stormData?.stateId === selectedStateCard.id,
+        );
+        this.visualLinkLayer.renderHighlights([...matchingEvents, ...referencingConstraints]);
+      } else if (selectedConstraintCard && selectedConstraintCard.stormData?.stateId) {
+        const linkedState = objects.find(
+          (o) => o.id === selectedConstraintCard.stormData?.stateId,
+        );
+        if (linkedState) {
+          this.visualLinkLayer.renderHighlights([linkedState]);
+        } else {
+          this.visualLinkLayer.clearHighlights();
+        }
       } else {
         this.visualLinkLayer.clearHighlights();
       }

@@ -157,16 +157,20 @@ export interface StormData {
    */
   phase?: BddPhase;
   description?: string;
-  /** Primary fields (payload on Command/Event/BDD; Query params). Empty on State/Constraint — use inputFields/outputFields. */
+  /** Primary fields (payload on Command/Event/BDD; Query params). Empty on State/Constraint. */
   fields: StormField[];
-  /** State & Constraint cards only: INPUT params; their tags feed Query Items. */
+  /** State cards only: INPUT params; their tags feed Query Items. */
   inputFields?: StormField[];
-  /** State & Constraint cards only: OUTPUT fields produced by projecting matching events. */
+  /** State cards only: OUTPUT fields produced by projecting matching events. */
   outputFields?: StormField[];
   /** Query & Command cards (Response fields) */
   responseFields?: StormField[]; // Query & Command cards (Response fields)
-  queryItems?: StormQueryItem[]; // State & Constraint cards (DCB Query)
-  constraints?: StormConstraint[]; // Constraint cards only
+  queryItems?: StormQueryItem[]; // State cards only (DCB Query)
+  constraints?: StormConstraint[]; // Constraint cards only (decision rules)
+  /** Constraint cards: ID of the referenced reusable State card */
+  stateId?: string;
+  /** Constraint cards: Optional list of referenced State IDs */
+  stateIds?: string[];
   /**
    * BDD (Given/When/Then) cards only: the scenario steps of this phase card.
    * Each step is a named Event/Command/Query/State/Error plus the concrete

@@ -92,9 +92,10 @@ export interface CodegenConstraint {
   description?: string;
   slice?: string;
   domain?: string;
-  params: CodegenField[];
-  queryItems: CodegenQueryItem[];
-  outputFields: CodegenField[];
+  state?: string;
+  params?: CodegenField[];
+  queryItems?: CodegenQueryItem[];
+  outputFields?: CodegenField[];
   rules: CodegenConstraintRuleItem[];
 }
 
@@ -567,19 +568,20 @@ export function buildCodegenSpec(
         }
 
         case "constraint": {
-          const inputFields = storm.inputFields ?? [];
-          spec.constraints.push({
+          let stateName: string | undefined;
+          if (storm.stateId) {
+            const stateObj = objects.find((o) => o.id === storm.stateId);
+            if (stateObj?.stormData?.name) {
+              stateName = stateObj.stormData.name.trim();
+            }
+          }
+
+          const constraintObj: CodegenConstraint = {
             name,
             ...(desc ? { description: desc } : {}),
             ...(slice ? { slice } : {}),
             ...(domain ? { domain } : {}),
-            params: inputFields.map(cleanField),
-            queryItems: resolveQueryItems(
-              storm.queryItems,
-              inputFields,
-              storm.outputFields ?? [],
-            ),
-            outputFields: (storm.outputFields ?? []).map(cleanOutputField),
+            ...(stateName ? { state: stateName } : {}),
             rules: (storm.constraints ?? [])
               .map((c) => {
                 const hasStructured = Boolean(
@@ -609,7 +611,23 @@ export function buildCodegenSpec(
                   r && (r.assert || r.code || r.description || r.message),
                 );
               }),
-          });
+          };
+
+          if (storm.inputFields && storm.inputFields.length > 0) {
+            constraintObj.params = storm.inputFields.map(cleanField);
+          }
+          if (storm.queryItems && storm.queryItems.length > 0) {
+            constraintObj.queryItems = resolveQueryItems(
+              storm.queryItems,
+              storm.inputFields ?? [],
+              storm.outputFields ?? [],
+            );
+          }
+          if (storm.outputFields && storm.outputFields.length > 0) {
+            constraintObj.outputFields = storm.outputFields.map(cleanOutputField);
+          }
+
+          spec.constraints.push(constraintObj);
           break;
         }
 

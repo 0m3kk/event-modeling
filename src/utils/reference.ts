@@ -80,6 +80,7 @@ function cloneStormData(data: StormData): StormData {
       set: item.set ? { ...item.set } : undefined,
     })),
     constraints: data.constraints?.map((c) => ({ ...c })),
+    stateIds: data.stateIds ? [...data.stateIds] : undefined,
     permissions: data.permissions ? [...data.permissions] : undefined,
   };
 }

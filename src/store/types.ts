@@ -54,6 +54,13 @@ export interface QueryItemPopupTarget {
 }
 
 /**
+ * Target of the Constraint State selector popover.
+ */
+export interface ConstraintStatePopupTarget {
+  objectId: string;
+}
+
+/**
  * Target of the description (ⓘ) hover tooltip / edit popover.
  * `fieldId` omitted means the card's own description. `iconBounds` is the ⓘ
  * hit box in card-local coordinates, used to anchor the tooltip/editor.
@@ -128,6 +135,8 @@ export interface CanvasStoreState {
   bddStepPopup: BddStepPopupTarget | null;
   /** Open DCB query item popover target (create when queryItemId is omitted). */
   queryItemPopup: QueryItemPopupTarget | null;
+  /** Open Constraint State selector popover target. */
+  constraintStatePopup: ConstraintStatePopupTarget | null;
   /** Open Service Method Visibility popover target. */
   serviceMethodVisibilityPopup: { objectId: string } | null;
   /** Hovered validation ✓ badge, used to anchor its tooltip. */
@@ -223,6 +232,10 @@ export interface CanvasStoreActions {
   setBddStepPopup: (target: BddStepPopupTarget | null) => void;
   /** Open / close the DCB query item popover. */
   setQueryItemPopup: (target: QueryItemPopupTarget | null) => void;
+  /** Open / close the Constraint State selector popover. */
+  setConstraintStatePopup: (target: ConstraintStatePopupTarget | null) => void;
+  /** Set the referenced State card for a Constraint card. */
+  setStormConstraintState: (objectId: string, stateId: string | undefined) => void;
   addModelField: (objectId: string) => string | undefined;
   addModelEnumValue: (objectId: string) => string | undefined;
   addServiceModelMethod: (objectId: string) => string | undefined;

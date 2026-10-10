@@ -133,6 +133,7 @@ export const initialCanvasState: CanvasStoreState = {
   validationTarget: null,
   bddStepPopup: null,
   queryItemPopup: null,
+  constraintStatePopup: null,
   serviceMethodVisibilityPopup: null,
   validationHover: null,
   fieldClipboard: null,
@@ -200,8 +201,13 @@ export const useCanvasStore = create<CanvasStore>()(
             set({ selectedIds: [...selectedIds, id] });
           }
         } else {
-          // Selecting a different card drops any step/query popover from the old one.
-          set({ selectedIds: [id], bddStepPopup: null, queryItemPopup: null });
+          // Selecting a different card drops any step/query/state popover from the old one.
+          set({
+            selectedIds: [id],
+            bddStepPopup: null,
+            queryItemPopup: null,
+            constraintStatePopup: null,
+          });
         }
       },
 
@@ -218,13 +224,15 @@ export const useCanvasStore = create<CanvasStore>()(
           modelPopupChain,
           bddStepPopup,
           queryItemPopup,
+          constraintStatePopup,
         } = get();
         if (
           selectedIds.length > 0 ||
           stormSelectedField ||
           modelPopupChain.length > 0 ||
           bddStepPopup ||
-          queryItemPopup
+          queryItemPopup ||
+          constraintStatePopup
         ) {
           // A storm field selection only makes sense while its card is
           // selected, so clear both together. Also clear active model popups.
@@ -234,6 +242,7 @@ export const useCanvasStore = create<CanvasStore>()(
             modelPopupChain: [],
             bddStepPopup: null,
             queryItemPopup: null,
+            constraintStatePopup: null,
           });
         }
       },
@@ -1593,6 +1602,9 @@ export const useCanvasStore = create<CanvasStore>()(
 
       setQueryItemPopup: (queryItemPopup) => set({ queryItemPopup }),
 
+      setConstraintStatePopup: (constraintStatePopup) =>
+        set({ constraintStatePopup }),
+
       setValidationHover: (validationHover) => set({ validationHover }),
 
       setStormActionHover: (stormActionHover) => set({ stormActionHover }),
@@ -2001,11 +2013,7 @@ export const useCanvasStore = create<CanvasStore>()(
         const obj = objects.find((o) => o.id === objectId);
         if (!obj || obj.type !== "storm" || !obj.stormData || obj.locked)
           return;
-        if (
-          obj.stormData.kind !== "state" &&
-          obj.stormData.kind !== "constraint"
-        )
-          return;
+        if (obj.stormData.kind !== "state") return;
         const newId = nanoid();
         const newItem = { id: newId, types: [], tagFieldIds: [] };
         const nextQueryItems = [...(obj.stormData.queryItems ?? []), newItem];
@@ -2058,6 +2066,31 @@ export const useCanvasStore = create<CanvasStore>()(
         return newId;
       },
 
+      setStormConstraintState: (objectId, stateId) => {
+        const { objects } = get();
+        const obj = objects.find((o) => o.id === objectId);
+        if (!obj || obj.type !== "storm" || !obj.stormData || obj.locked)
+          return;
+        if (obj.stormData.kind !== "constraint") return;
+
+        const nextData = {
+          ...obj.stormData,
+          stateId: stateId || undefined,
+          stateIds: stateId ? [stateId] : undefined,
+        };
+        const newHeight = computeStormCardHeight(nextData, obj.width);
+        set({
+          objects: syncReferenceAfterChange(
+            objects.map((o) =>
+              o.id === obj.id
+                ? { ...o, height: newHeight, stormData: nextData }
+                : o,
+            ),
+            obj.id,
+          ),
+        });
+      },
+
       updateStormConstraint: (objectId, constraintId, patch) => {
         const { objects } = get();
         const obj = objects.find((o) => o.id === objectId);
@@ -2086,7 +2119,7 @@ export const useCanvasStore = create<CanvasStore>()(
         const { objects } = get();
         const obj = objects.find((o) => o.id === objectId);
         if (!obj || obj.type !== "storm" || !obj.stormData || obj.locked) return;
-        if (obj.stormData.kind !== "state" && obj.stormData.kind !== "constraint") return;
+        if (obj.stormData.kind !== "state") return;
 
         const nextQueryItems = (obj.stormData.queryItems ?? []).map((q) =>
           q.id === queryItemId ? { ...q, set: setRecord && Object.keys(setRecord).length > 0 ? setRecord : undefined } : q,

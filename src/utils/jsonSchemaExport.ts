@@ -334,17 +334,51 @@ function generateProjectionCardJsonSchema(
     ),
   };
 
-  if (storm.kind === "constraint") {
-    properties.constraints = {
-      type: "array",
-      description:
-        "Business invariant rules evaluated against the queried events.",
-      items: { type: "string" },
+  return {
+    "x-kind": "state",
+    title,
+    description: storm.description,
+    type: "object",
+    properties,
+  };
+}
+
+/**
+ * JSON schema for a Constraint card. References a State card and defines invariant rules.
+ */
+function generateConstraintCardJsonSchema(
+  storm: StormData,
+  _allModelNames = new Set<string>(),
+  _defsKey: "definitions" | "$defs" = "definitions",
+): JsonSchemaDefinition {
+  const title = toCamelCaseIdentifier(storm.name);
+  const properties: Record<string, JsonSchemaProperty> = {};
+
+  if (storm.stateId) {
+    properties.state = {
+      type: "string",
+      description: "ID of the referenced State card.",
     };
   }
 
+  properties.constraints = {
+    type: "array",
+    description:
+      "Business invariant rules evaluated against the referenced state.",
+    items: {
+      type: "object",
+      properties: {
+        code: { type: "string" },
+        text: { type: "string" },
+        assert: { type: "string" },
+        message: { type: "string" },
+        status: { type: "number" },
+      },
+    },
+  };
+
   return {
-    "x-kind": storm.kind,
+    "x-kind": "constraint",
     title,
     description: storm.description,
     type: "object",
@@ -430,8 +464,11 @@ export function generateStormCardJsonSchema(
   allModelNames = new Set<string>(),
   defsKey: "definitions" | "$defs" = "definitions",
 ): JsonSchemaDefinition {
-  if (storm.kind === "state" || storm.kind === "constraint") {
+  if (storm.kind === "state") {
     return generateProjectionCardJsonSchema(storm, allModelNames, defsKey);
+  }
+  if (storm.kind === "constraint") {
+    return generateConstraintCardJsonSchema(storm, allModelNames, defsKey);
   }
   if (storm.kind === "bdd") {
     return generateBddCardJsonSchema(storm);

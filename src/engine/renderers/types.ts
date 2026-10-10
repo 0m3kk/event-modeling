@@ -9,6 +9,7 @@ export type CardHitZoneType =
   | "innerType"
   | "queryItem"
   | "constraint"
+  | "constraintState"
   | "bddStep"
   | "bddStepName"
   | "bddPayloadKey"

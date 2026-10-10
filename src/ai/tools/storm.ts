@@ -240,18 +240,23 @@ function buildStormData(input: {
   responseFields?: StormField[];
   queryItems?: QueryItemSpec[];
   constraints?: (string | ConstraintRuleSpec)[];
+  stateId?: string;
   action?: string;
   permissions?: string[];
 }): StormData {
-  const isProjection = input.kind === "state" || input.kind === "constraint";
+  const isProjection = input.kind === "state";
   const data: StormData = {
     kind: input.kind,
     name: toDisplayName(input.name),
-    fields: isProjection ? [] : input.fields,
+    fields: isProjection || input.kind === "constraint" ? [] : input.fields,
   };
   if (isProjection) {
     data.inputFields = input.inputFields ?? [];
     data.outputFields = input.outputFields ?? [];
+  }
+  if (input.stateId) {
+    data.stateId = input.stateId;
+    data.stateIds = [input.stateId];
   }
   if (input.description) data.description = input.description;
   if (input.isArray !== undefined) data.isArray = input.isArray;
@@ -356,6 +361,14 @@ export const createStormCardsTool = defineTool({
             .describe(
               "Constraint cards: domain invariants (strings or { code, assert, message, status }).",
             ),
+          stateId: z
+            .string()
+            .optional()
+            .describe("Constraint cards only: ID of the referenced State card."),
+          stateName: z
+            .string()
+            .optional()
+            .describe("Constraint cards only: Name of the referenced State card (e.g. 'User Status')."),
           action: z
             .string()
             .optional()
@@ -416,9 +429,36 @@ export const createStormCardsTool = defineTool({
     const typeEnv = buildFieldTypeEnvironment(state.objects);
     const typeErrors: string[] = [];
 
-    const built = args.cards.map((spec) => {
+    const cardIds = args.cards.map(() => `storm-${nanoid()}`);
+
+    const findStateId = (nameOrId?: string): string | undefined => {
+      if (!nameOrId) return undefined;
+      const needle = nameOrId.trim().toLowerCase();
+      const existingMatch = state.objects.find(
+        (o) =>
+          o.type === "storm" &&
+          o.stormData?.kind === "state" &&
+          (o.id === nameOrId || o.stormData.name.toLowerCase() === needle),
+      );
+      if (existingMatch) return existingMatch.id;
+      const batchIdx = args.cards.findIndex(
+        (c) =>
+          c.kind === "state" &&
+          (toDisplayName(c.name).toLowerCase() === needle || c.name.toLowerCase() === needle),
+      );
+      if (batchIdx >= 0) return cardIds[batchIdx];
+      return undefined;
+    };
+
+    const built = args.cards.map((spec, idx) => {
+      const cardId = cardIds[idx];
       const label = `"${toDisplayName(spec.name)}" (${spec.kind})`;
       const fieldOptions = { env: typeEnv, errors: typeErrors, label };
+      const resolvedStateId =
+        spec.kind === "constraint"
+          ? (spec.stateId ?? findStateId(spec.stateName))
+          : undefined;
+
       const data = buildStormData({
         kind: spec.kind,
         name: spec.name,
@@ -444,6 +484,7 @@ export const createStormCardsTool = defineTool({
             : undefined,
         queryItems: spec.queryItems,
         constraints: spec.constraints,
+        stateId: resolvedStateId,
       });
 
       const width = computeOptimalStormCardWidth(data);
@@ -452,7 +493,7 @@ export const createStormCardsTool = defineTool({
         spec.sliceId ?? spec.slice ?? spec.groupId,
       );
       const obj: CanvasObject = {
-        id: `storm-${nanoid()}`,
+        id: cardId,
         type: "storm",
         x: 0,
         y: 0,
@@ -471,6 +512,7 @@ export const createStormCardsTool = defineTool({
     const validationInput: StormValidationInput = {
       existing: state.objects,
       cards: built.map(({ spec, obj }): StormValidationCard => ({
+        id: obj.id,
         kind: spec.kind,
         name: spec.name,
         fields: obj.stormData?.fields ?? [],
@@ -488,6 +530,9 @@ export const createStormCardsTool = defineTool({
           obj.stormData?.kind === "actor"
             ? getActorPermissions(obj.stormData)
             : undefined,
+        stateId: obj.stormData?.stateId,
+        stateName: spec.stateName,
+        stateIds: obj.stormData?.stateIds,
       })),
     };
     assertValidStormWrite(validationInput);
@@ -678,11 +723,11 @@ export const updateStormCardTool = defineTool({
     inputFields: z
       .array(fieldSpec)
       .optional()
-      .describe("State & Constraint: replace INPUT params (tags allowed here)."),
+      .describe("State cards only: replace INPUT params (tags allowed here)."),
     outputFields: z
       .array(fieldSpec)
       .optional()
-      .describe("State & Constraint: replace OUTPUT fields (no tags)."),
+      .describe("State cards only: replace OUTPUT fields (no tags)."),
     responseFields: z
       .array(fieldSpec)
       .optional()
@@ -690,11 +735,19 @@ export const updateStormCardTool = defineTool({
     queryItems: z
       .array(queryItemSpec)
       .optional()
-      .describe("Updated queryItems for State/Constraint."),
+      .describe("Updated queryItems for State cards."),
     constraints: z
       .array(constraintRuleSpec)
       .optional()
       .describe("Updated constraints (strings or { code, assert, message, status })."),
+    stateId: z
+      .string()
+      .optional()
+      .describe("Constraint cards only: ID of the referenced State card."),
+    stateName: z
+      .string()
+      .optional()
+      .describe("Constraint cards only: Name of the referenced State card (e.g. 'User Status')."),
     action: z
       .string()
       .optional()
@@ -713,8 +766,21 @@ export const updateStormCardTool = defineTool({
     }
 
     const existing = object.stormData;
-    const isProjection =
-      existing.kind === "state" || existing.kind === "constraint";
+    const isProjection = existing.kind === "state";
+    let resolvedStateId = args.stateId;
+    if (!resolvedStateId && args.stateName) {
+      const needle = args.stateName.trim().toLowerCase();
+      const match = state.objects.find(
+        (o) =>
+          o.type === "storm" &&
+          o.stormData?.kind === "state" &&
+          (o.id === args.stateName || o.stormData.name.toLowerCase() === needle),
+      );
+      if (match) resolvedStateId = match.id;
+    }
+    if (resolvedStateId === undefined && existing.kind === "constraint") {
+      resolvedStateId = existing.stateId;
+    }
     const typeEnv = buildFieldTypeEnvironment(state.objects);
     const typeErrors: string[] = [];
     const fieldOptions = {
@@ -753,9 +819,10 @@ export const updateStormCardTool = defineTool({
       existing: state.objects.filter((o) => o.id !== args.id),
       cards: [
         {
+          id: args.id,
           kind: existing.kind,
           name: args.name !== undefined ? args.name : existing.name,
-          fields: isProjection ? [] : fields,
+          fields: isProjection || existing.kind === "constraint" ? [] : fields,
           inputFields: isProjection ? inputFields : undefined,
           outputFields: isProjection ? outputFields : undefined,
           responseFields: responseFields ?? existing.responseFields,
@@ -764,7 +831,7 @@ export const updateStormCardTool = defineTool({
           rawInputFields: args.inputFields,
           rawOutputFields: args.outputFields,
           rawResponseFields: args.responseFields,
-          queryItems: args.queryItems ?? existing.queryItems,
+          queryItems: isProjection ? (args.queryItems ?? existing.queryItems) : undefined,
           constraints: args.constraints ?? existing.constraints,
           action: args.action ?? existing.action,
           permissions:
@@ -779,6 +846,9 @@ export const updateStormCardTool = defineTool({
             existing.kind === "actor"
               ? (writtenPermissions ?? [])
               : undefined,
+          stateId: resolvedStateId,
+          stateName: args.stateName,
+          stateIds: resolvedStateId ? [resolvedStateId] : existing.stateIds,
         },
       ],
     };
@@ -794,22 +864,29 @@ export const updateStormCardTool = defineTool({
       description: args.description ?? existing.description,
       isArray: args.isArray ?? existing.isArray,
       fields,
-      inputFields,
-      outputFields,
+      inputFields: isProjection ? inputFields : undefined,
+      outputFields: isProjection ? outputFields : undefined,
       responseFields,
-      queryItems: args.queryItems,
+      queryItems: isProjection ? args.queryItems : undefined,
       constraints: args.constraints,
+      stateId: resolvedStateId,
       action: args.action ?? existing.action,
       permissions: args.permissions ?? existing.permissions,
     });
     if (args.responseFields === undefined) {
       data.responseFields = existing.responseFields;
     }
-    if (args.inputFields === undefined) data.inputFields = existing.inputFields;
-    if (args.outputFields === undefined)
-      data.outputFields = existing.outputFields;
-    if (args.queryItems === undefined) data.queryItems = existing.queryItems;
+    if (isProjection) {
+      if (args.inputFields === undefined) data.inputFields = existing.inputFields;
+      if (args.outputFields === undefined)
+        data.outputFields = existing.outputFields;
+      if (args.queryItems === undefined) data.queryItems = existing.queryItems;
+    }
     if (args.constraints === undefined) data.constraints = existing.constraints;
+    if (existing.kind === "constraint" && resolvedStateId) {
+      data.stateId = resolvedStateId;
+      data.stateIds = [resolvedStateId];
+    }
 
     // A width the user resized by hand is preserved (height still reflows to
     // the new content); otherwise the card refits to its content width.

@@ -96,15 +96,14 @@ describe("cardDimensions", () => {
     );
   });
 
-  it("grows a constraint card for fields, query items and constraint lines", () => {
+  it("grows a state card for input fields, query items and output fields", () => {
     const base: StormData = {
-      kind: "constraint",
-      name: "OrderConstraints",
-      // Two input params keep the base above the 80px minimum so each delta is exact.
+      kind: "state",
+      name: "OrderState",
       fields: [],
       inputFields: [
-        { id: "cf1", name: "total", fieldType: "number" },
-        { id: "cf2", name: "status", fieldType: "string" },
+        { id: "sf1", name: "total", fieldType: "number" },
+        { id: "sf2", name: "status", fieldType: "string" },
       ],
     };
 
@@ -115,7 +114,7 @@ describe("cardDimensions", () => {
       ...base,
       inputFields: [
         ...(base.inputFields ?? []),
-        { id: "cf3", name: "currency", fieldType: "string" },
+        { id: "sf3", name: "currency", fieldType: "string" },
       ],
     };
     expect(computeStormCardHeight(withField)).toBe(hBase + 26);
@@ -127,12 +126,38 @@ describe("cardDimensions", () => {
     };
     expect(computeStormCardHeight(withQuery)).toBe(hBase + 22 + 26);
 
-    // +1 free-text constraint row (section label + row)
-    const withConstraint: StormData = {
+    // +1 output field row (section label + row)
+    const withOutput: StormData = {
       ...base,
-      constraints: [{ id: "c1", text: "total > 0" }],
+      outputFields: [{ id: "of1", name: "balance", fieldType: "number" }],
     };
-    expect(computeStormCardHeight(withConstraint)).toBe(hBase + 22 + 26);
+    expect(computeStormCardHeight(withOutput)).toBe(hBase + 22 + 26);
+  });
+
+  it("computes constraint card height with state reference and rules", () => {
+    const base: StormData = {
+      kind: "constraint",
+      name: "UserMustBeActive",
+      fields: [],
+    };
+    const hBase = computeStormCardHeight(base);
+    // Header (42) + Bottom pad (10) -> clamped to MIN_CARD_HEIGHT (80)
+    expect(hBase).toBe(80);
+
+    // With linked state
+    const withState: StormData = {
+      ...base,
+      stateId: "st-1",
+    };
+    // Header (42) + State link (28) + Bottom pad (10) = 80
+    expect(computeStormCardHeight(withState)).toBe(80);
+
+    // Adding a rule grows the card: 42 + 28 + section label (22) + rule row (26) + 10 = 128
+    const withRule: StormData = {
+      ...withState,
+      constraints: [{ id: "c1", text: "status == 'ACTIVE'" }],
+    };
+    expect(computeStormCardHeight(withRule)).toBe(80 + 22 + 26);
   });
 
   it("expands query item height vertically when multiple events are present", () => {

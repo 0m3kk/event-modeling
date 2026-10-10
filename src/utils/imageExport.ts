@@ -372,6 +372,20 @@ function svgStormBody(
     }
   }
 
+  if (kind === "constraint" && storm.stateId) {
+    const stateObj = objects.find((o) => o.id === storm.stateId);
+    const stateName = stateObj?.stormData?.name;
+    if (stateName) {
+      const stateDisplayText = `⟡ ${stateName}`;
+      const pillY = rowY + 4;
+      parts.push(
+        `<rect x="${x + 8}" y="${pillY}" width="${w - 16}" height="22" rx="4" fill="#f0fdfa" stroke="#99f6e4" stroke-width="1"/>`,
+        `<text x="${x + 16}" y="${pillY + 15}" font-size="10" font-family="${SVG_FONT}" font-weight="700" fill="#0f766e">${escapeXml(stateDisplayText)}</text>`,
+      );
+      rowY += 30;
+    }
+  }
+
   // DCB Query Items ("Related Events") on State / Constraint cards.
   if (stormHasQueryItems(kind) && queryItems.length > 0) {
     parts.push(svgSectionLabel(x + 14, rowY + 4, "QUERY ITEMS", "#7c3aed"));

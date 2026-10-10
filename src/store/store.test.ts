@@ -2231,5 +2231,63 @@ describe("useCanvasStore", () => {
     const clone = state.objects.find((o) => o.id !== "srv-vis-1")!;
     expect(state.serviceMethodVisibilityPopup?.objectId).toBe(clone.id);
   });
+
+  it("links and unlinks state for a storm constraint card with undo/redo", () => {
+    const constraintCard: CanvasObject = {
+      id: "cn-1",
+      type: "storm",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 80,
+      stormData: {
+        kind: "constraint",
+        name: "User Must Be Active",
+        fields: [],
+      },
+    };
+    const stateCard: CanvasObject = {
+      id: "st-1",
+      type: "storm",
+      x: 300,
+      y: 0,
+      width: 200,
+      height: 120,
+      stormData: {
+        kind: "state",
+        name: "User Status",
+        fields: [],
+      },
+    };
+
+    useCanvasStore.getState().addObjects([constraintCard, stateCard]);
+    clearHistory();
+
+    // 1. Set popup target
+    useCanvasStore.getState().setConstraintStatePopup({ objectId: "cn-1" });
+    expect(useCanvasStore.getState().constraintStatePopup?.objectId).toBe("cn-1");
+
+    // 2. Link state
+    useCanvasStore.getState().setStormConstraintState("cn-1", "st-1");
+    let cn = useCanvasStore.getState().objects.find((o) => o.id === "cn-1")!;
+    expect(cn.stormData?.stateId).toBe("st-1");
+    expect(cn.stormData?.stateIds).toEqual(["st-1"]);
+
+    // 3. Undo linking
+    undo();
+    cn = useCanvasStore.getState().objects.find((o) => o.id === "cn-1")!;
+    expect(cn.stormData?.stateId).toBeUndefined();
+
+    // 4. Redo linking
+    redo();
+    cn = useCanvasStore.getState().objects.find((o) => o.id === "cn-1")!;
+    expect(cn.stormData?.stateId).toBe("st-1");
+
+    // 5. Unlink state
+    useCanvasStore.getState().setStormConstraintState("cn-1", undefined);
+    cn = useCanvasStore.getState().objects.find((o) => o.id === "cn-1")!;
+    expect(cn.stormData?.stateId).toBeUndefined();
+    expect(cn.stormData?.stateIds).toBeUndefined();
+  });
 });
 

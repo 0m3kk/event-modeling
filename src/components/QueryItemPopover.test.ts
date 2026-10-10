@@ -3,15 +3,15 @@ import { useCanvasStore, clearHistory } from "@/store";
 import type { CanvasObject, StormKind, StormQueryItem } from "@/types";
 import { stormHasQueryItems } from "@/constants/storm";
 
-describe("State/Constraint Query Item Tool", () => {
+describe("State Query Item Tool", () => {
   beforeEach(() => {
     useCanvasStore.getState().resetBoard();
     clearHistory();
   });
 
-  it("identifies state and constraint cards as query-item-capable cards", () => {
+  it("identifies state cards as query-item-capable cards", () => {
     expect(stormHasQueryItems("state")).toBe(true);
-    expect(stormHasQueryItems("constraint")).toBe(true);
+    expect(stormHasQueryItems("constraint")).toBe(false);
     expect(stormHasQueryItems("event")).toBe(false);
     expect(stormHasQueryItems("command")).toBe(false);
     expect(stormHasQueryItems("actor")).toBe(false);
@@ -148,9 +148,9 @@ describe("State/Constraint Query Item Tool", () => {
     // Selecting a query item on state card
     expect(isEditButtonVisible("state", { id: "qi-1", types: [] })).toBe(true);
 
-    // Selecting a query item on constraint card
+    // Selecting a query item on constraint card (constraint has no query items)
     expect(isEditButtonVisible("constraint", { id: "qi-1", types: [] })).toBe(
-      true,
+      false,
     );
 
     // Event card does not have query items

@@ -70,20 +70,18 @@ describe("storm kind helpers", () => {
     expect(BDD_STEP_REF_COLORS.error).toBeTruthy();
   });
 
-  it("treats only the actor chip as fieldless (constraint carries fields)", () => {
+  it("treats actor and constraint cards as fieldless", () => {
     expect(stormHasFields("actor")).toBe(false);
-    expect(stormHasFields("constraint")).toBe(true);
+    expect(stormHasFields("constraint")).toBe(false);
     expect(stormHasFields("state")).toBe(true);
     expect(stormHasFields("command")).toBe(true);
-    // Constraint fields are typed, Actor is typeless
-    expect(stormHasFieldTypes("constraint")).toBe(true);
     expect(stormHasFieldTypes("actor")).toBe(false);
-    expect(stormHasTags("constraint")).toBe(true);
+    expect(stormHasTags("constraint")).toBe(false);
   });
 
-  it("gives State and Constraint cards a DCB Query Items section", () => {
+  it("gives State cards a DCB Query Items section", () => {
     expect(stormHasQueryItems("state")).toBe(true);
-    expect(stormHasQueryItems("constraint")).toBe(true);
+    expect(stormHasQueryItems("constraint")).toBe(false);
     expect(stormHasQueryItems("command")).toBe(false);
     expect(stormHasQueryItems("event")).toBe(false);
   });

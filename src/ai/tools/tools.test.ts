@@ -1913,7 +1913,7 @@ describe("AI Model & Write Tools", () => {
     const fake = createFakeStore();
     const { ctx } = createContext(fake);
 
-    // 1. Create constraint card with structured rules
+    // 1. Create state card and constraint card with structured rules
     const createRes = await executeToolCall(
       {
         id: "1",
@@ -1921,10 +1921,15 @@ describe("AI Model & Write Tools", () => {
         arguments: JSON.stringify({
           cards: [
             {
-              kind: "constraint",
-              name: "User Must Exist",
+              kind: "state",
+              name: "User Status",
               inputFields: [{ name: "User ID", fieldType: "UUID" }],
               outputFields: [{ name: "Is Deleted", fieldType: "Boolean" }],
+            },
+            {
+              kind: "constraint",
+              name: "User Must Exist",
+              stateName: "User Status",
               constraints: [
                 // Plain string rule
                 "Legacy string rule",

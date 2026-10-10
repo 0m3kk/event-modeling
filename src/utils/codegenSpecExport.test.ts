@@ -772,8 +772,8 @@ describe("codegenSpecExport", () => {
         width: 200,
         height: 100,
         stormData: {
-          kind: "constraint",
-          name: "EmailMustBeUnique",
+          kind: "state",
+          name: "EmailProjection",
           fields: [],
           inputFields: [],
           outputFields: [
@@ -789,16 +789,15 @@ describe("codegenSpecExport", () => {
               },
             },
           ],
-          constraints: [],
         },
       },
     ];
 
     const spec = buildCodegenSpec(objects, []);
-    const constraint = spec.constraints.find((c) => c.name === "EmailMustBeUnique")!;
-    expect(constraint).toBeDefined();
+    const readModel = spec.readModels.find((rm) => rm.name === "EmailProjection")!;
+    expect(readModel).toBeDefined();
     // In output spec, queryItem.set keys and expressions are normalized
-    expect(constraint.queryItems[0].set).toEqual({
+    expect(readModel.queryItems[0].set).toEqual({
       registeredEmail: "command.email",
     });
   });

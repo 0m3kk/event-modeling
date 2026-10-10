@@ -146,6 +146,29 @@ export function computeStormCardHeight(
     return Math.max(80, h);
   }
 
+  if (kind === "constraint") {
+    // If a state is linked, reserve space for the linked state pill
+    if (data.stateId) {
+      const stateLinkHeight = 28;
+      h += stateLinkHeight;
+    }
+
+    // Constraint cards stack business invariant rules
+    if (constraints.length > 0) {
+      let constraintsTotalHeight = 0;
+      for (const c of constraints) {
+        constraintsTotalHeight += computeStormConstraintItemHeight(
+          c.text,
+          cardWidth,
+        );
+      }
+      h += sectionLabelHeight + constraintsTotalHeight;
+    }
+
+    h += 10; // bottom padding
+    return Math.max(80, h);
+  }
+
   if (hasInputOutput) {
     // Order mirrors the canvas: INPUT params -> Query Items -> OUTPUT fields.
     if (inputFields.length > 0) {
@@ -162,17 +185,6 @@ export function computeStormCardHeight(
 
     if (outputFields.length > 0) {
       h += sectionLabelHeight + outputFields.length * rowHeight;
-    }
-
-    if (kind === "constraint" && constraints.length > 0) {
-      let constraintsTotalHeight = 0;
-      for (const c of constraints) {
-        constraintsTotalHeight += computeStormConstraintItemHeight(
-          c.text,
-          cardWidth,
-        );
-      }
-      h += sectionLabelHeight + constraintsTotalHeight;
     }
 
     h += 10; // bottom padding
@@ -194,14 +206,6 @@ export function computeStormCardHeight(
       queryItemsTotalHeight += computeStormQueryItemHeight(item, fields);
     }
     h += sectionLabelHeight + queryItemsTotalHeight;
-  }
-
-  if (kind === "constraint" && constraints.length > 0) {
-    let constraintsTotalHeight = 0;
-    for (const c of constraints) {
-      constraintsTotalHeight += computeStormConstraintItemHeight(c.text, cardWidth);
-    }
-    h += sectionLabelHeight + constraintsTotalHeight;
   }
 
   h += 10; // bottom padding

@@ -170,14 +170,12 @@ export function bddDefaultRefForPhase(phase?: BddPhase): BddStepRef {
 }
 
 /**
- * Kinds whose field rows render a tag pill. Event, State and Constraint tags
- * feed DCB matching. BDD cards no longer carry fields, so they are not
- * taggable.
+ * Kinds whose field rows render a tag pill. Event and State tags
+ * feed DCB matching.
  */
 export const STORM_TAGGABLE_KINDS: readonly StormKind[] = [
   "event",
   "state",
-  "constraint",
 ];
 
 /** Whether a kind renders a tag pill on its field rows */
@@ -193,44 +191,39 @@ export function stormHasFieldTypes(kind: StormKind): boolean {
 }
 
 /**
- * Kinds that render a field list. Only the Actor chip is fieldless (its rows
- * are role permissions rendered by a dedicated path). Constraint carries
- * fields too: it shares the State card body and stacks a free-text Constraints
- * section below it.
+ * Kinds that render a field list. Actor is fieldless (role permissions);
+ * Constraint references a State and lists business rules rather than field rows.
  */
 export function stormHasFields(kind: StormKind): boolean {
-  return kind !== "actor";
+  return kind !== "actor" && kind !== "constraint";
 }
 
 /**
- * State & Constraint cards split their fields into two distinct bands:
+ * State cards split their fields into two distinct bands:
  * - INPUT params (`inputFields`): the tags a Query Item can filter on
  * - OUTPUT fields (`outputFields`): what rehydrating the matching events yields
  * The split keeps a card's input and output from blurring together.
  */
 export const STORM_INPUT_OUTPUT_KINDS: readonly StormKind[] = [
   "state",
-  "constraint",
 ];
 
-/** Whether a kind carries the INPUT param list (State & Constraint) */
+/** Whether a kind carries the INPUT param list (State) */
 export function stormHasInputFields(kind: StormKind): boolean {
   return STORM_INPUT_OUTPUT_KINDS.includes(kind);
 }
 
-/** Whether a kind carries the OUTPUT (rehydrated) field list (State & Constraint) */
+/** Whether a kind carries the OUTPUT (rehydrated) field list (State) */
 export function stormHasOutputFields(kind: StormKind): boolean {
   return STORM_INPUT_OUTPUT_KINDS.includes(kind);
 }
 
 /**
  * Kinds with DCB Query Items ("Related Events"): a State card builds its
- * consistency boundary from events, and a Constraint card shares that body
- * (field rows → Query Items → free-text Constraints).
+ * consistency boundary from events.
  */
 export const STORM_QUERY_ITEM_KINDS: readonly StormKind[] = [
   "state",
-  "constraint",
 ];
 
 /** Whether a kind renders the DCB Query Items section */

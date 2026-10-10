@@ -70,18 +70,32 @@ export function ConstraintRulePopover({
     };
   }, [onClose]);
 
-  // Available input params and output fields for quick tokens
+  const objects = useCanvasStore((s) => s.objects);
+  const linkedState = useMemo(() => {
+    const stateId = card.stormData?.stateId;
+    if (!stateId) return null;
+    return (
+      objects.find(
+        (o) =>
+          o.id === stateId &&
+          o.type === "storm" &&
+          o.stormData?.kind === "state",
+      ) ?? null
+    );
+  }, [objects, card.stormData?.stateId]);
+
+  // Available input params and output fields from the linked State card
   const inputParamNames = useMemo(() => {
-    return (card.stormData?.inputFields ?? [])
+    return (linkedState?.stormData?.inputFields ?? [])
       .map((f) => f.name.trim())
       .filter(Boolean);
-  }, [card.stormData?.inputFields]);
+  }, [linkedState?.stormData?.inputFields]);
 
   const outputFieldNames = useMemo(() => {
-    return (card.stormData?.outputFields ?? [])
+    return (linkedState?.stormData?.outputFields ?? [])
       .map((f) => f.name.trim())
       .filter(Boolean);
-  }, [card.stormData?.outputFields]);
+  }, [linkedState?.stormData?.outputFields]);
 
 
   const insertToken = (token: string) => {
@@ -166,8 +180,15 @@ export function ConstraintRulePopover({
             <h3 className="text-sm font-semibold text-gray-800 dark:text-zinc-100">
               Constraint Rule (Codegen)
             </h3>
-            <p className="text-xs text-gray-400 dark:text-zinc-500">
-              Executable invariant assertion & error spec
+            <p className="text-xs text-gray-400 dark:text-zinc-500 flex items-center gap-1">
+              {linkedState ? (
+                <>
+                  <span>State:</span>
+                  <span className="text-violet-600 dark:text-violet-400 font-medium">⟡ {linkedState.stormData?.name}</span>
+                </>
+              ) : (
+                <span className="text-amber-500 font-medium">No State linked</span>
+              )}
             </p>
           </div>
         </div>
