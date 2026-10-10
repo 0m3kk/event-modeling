@@ -767,6 +767,63 @@ describe("useCanvasStore", () => {
     expect(state.selectedIds).toEqual([`__group:${sliceId}`]);
   });
 
+  it("pressing Slice repeatedly creates fresh slices with numbered names", () => {
+    useCanvasStore.getState().resetBoard();
+
+    const firstId = useCanvasStore.getState().createSlice()!;
+    // The first slice is auto-selected; pressing Slice again must still spawn a
+    // new slice (like the card buttons) instead of silently reusing the first.
+    const secondId = useCanvasStore.getState().createSlice()!;
+    const thirdId = useCanvasStore.getState().createSlice()!;
+
+    expect(firstId).not.toBe(secondId);
+    expect(secondId).not.toBe(thirdId);
+
+    const state = useCanvasStore.getState();
+    expect(state.groups).toHaveLength(3);
+    expect(state.groups.map((g) => g.name)).toEqual([
+      "Slice",
+      "Slice 2",
+      "Slice 3",
+    ]);
+    expect(state.selectedIds).toEqual([`__group:${thirdId}`]);
+  });
+
+  it("does not reuse a slice, and numbers the name, when the slice is already selected", () => {
+    useCanvasStore.getState().resetBoard();
+    const cmd: CanvasObject = {
+      id: "cmd-slice-name",
+      type: "storm",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 120,
+      stormData: { kind: "command", name: "Place Order", fields: [] },
+    };
+    useCanvasStore.getState().addObject(cmd);
+
+    const firstId = useCanvasStore
+      .getState()
+      .createSlice({ objectIds: ["cmd-slice-name"] })!;
+    // The card now lives in the first slice; slicing it again must spawn a new
+    // slice with a numbered name instead of collapsing onto the first one.
+    const secondId = useCanvasStore
+      .getState()
+      .createSlice({ objectIds: ["cmd-slice-name"] })!;
+
+    expect(secondId).not.toBe(firstId);
+    const state = useCanvasStore.getState();
+    expect(state.groups.find((g) => g.id === firstId)?.name).toBe(
+      "Place Order Slice",
+    );
+    expect(state.groups.find((g) => g.id === secondId)?.name).toBe(
+      "Place Order Slice 2",
+    );
+    expect(state.objects.find((o) => o.id === "cmd-slice-name")?.groupId).toBe(
+      secondId,
+    );
+  });
+
   it("a slice remains intact when its member objects are removed or deleted, unlike standard groups", () => {
     useCanvasStore.getState().resetBoard();
     const cmd: CanvasObject = {

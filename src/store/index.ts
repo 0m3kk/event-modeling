@@ -21,7 +21,11 @@ import {
   buildPastedObjects,
 } from "@/utils/objectClipboard";
 import { alignObjects, distributeObjects } from "@/utils/align";
-import { componentNameOf, ensureUniqueComponentName } from "@/utils/naming";
+import {
+  componentNameOf,
+  ensureUniqueComponentName,
+  makeUniqueName,
+} from "@/utils/naming";
 import {
   arrangeStormLanes,
   arrangeVerticalSlice,
@@ -1256,6 +1260,16 @@ export const useCanvasStore = create<CanvasStore>()(
         const domain =
           options?.domain?.trim() || options?.tag?.trim() || undefined;
 
+        // Default slice names get the same board-unique treatment as storm and
+        // model cards, so repeated "Slice" clicks produce "Slice 2", "Slice 3",
+        // … instead of identical names. An explicit name still wins unless it
+        // matches an existing slice, in which case the branch below merges.
+        const uniqueSliceName = (base: string) =>
+          makeUniqueName(
+            base,
+            state.groups.map((g) => g.name),
+          );
+
         // Check if adding to an existing slice by name
         if (options?.name) {
           const existingSlice = state.groups.find(
@@ -1291,8 +1305,9 @@ export const useCanvasStore = create<CanvasStore>()(
         // The Slice button adds components to the slice they already relate to
         // — a selected slice, or cards already living in one — instead of
         // spawning a duplicate. An explicit new name still wins, so callers can
-        // force a fresh slice.
-        if (!options?.name) {
+        // force a fresh slice. With no pickable objects there is nothing to
+        // absorb, so fall through and spawn a fresh slice like the card buttons.
+        if (!options?.name && candidateObjectIds.length > 0) {
           const targetSliceIds = new Set(explicitSliceIds);
           for (const id of candidateObjectIds) {
             const gid = state.objects.find((o) => o.id === id)?.groupId;
@@ -1306,17 +1321,23 @@ export const useCanvasStore = create<CanvasStore>()(
               (id) =>
                 state.objects.find((o) => o.id === id)?.groupId !== sliceId,
             );
-            if (incoming.length > 0) get().addToGroup(sliceId, incoming);
-            if (domain) {
-              get().updateGroup(sliceId, { domain, tag: domain });
+            // Only absorb into the related slice when there is something new to
+            // add. Otherwise fall through and spawn a fresh slice, so pressing
+            // Slice again after it auto-selected the first one keeps creating
+            // new slices with numbered names instead of silently doing nothing.
+            if (incoming.length > 0) {
+              get().addToGroup(sliceId, incoming);
+              if (domain) {
+                get().updateGroup(sliceId, { domain, tag: domain });
+              }
+              if (options?.commandOrQueryId) {
+                get().updateGroup(sliceId, {
+                  commandOrQueryId: options.commandOrQueryId,
+                });
+              }
+              set({ selectedIds: [`__group:${sliceId}`] });
+              return sliceId;
             }
-            if (options?.commandOrQueryId) {
-              get().updateGroup(sliceId, {
-                commandOrQueryId: options.commandOrQueryId,
-              });
-            }
-            set({ selectedIds: [`__group:${sliceId}`] });
-            return sliceId;
           }
         }
 
@@ -1350,7 +1371,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
           const sliceName =
             options?.name?.trim() ||
-            (rootCardName ? `${rootCardName} Slice` : "Slice");
+            uniqueSliceName(rootCardName ? `${rootCardName} Slice` : "Slice");
           const sliceId = `slice-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
           const newSlice: import("@/types").GroupInfo = {
@@ -1410,7 +1431,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
         const sliceName =
           options?.name?.trim() ||
-          (rootCardName ? `${rootCardName} Slice` : "Slice");
+          uniqueSliceName(rootCardName ? `${rootCardName} Slice` : "Slice");
 
         const sliceId = `slice-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
         const nextObjects = state.objects.map((obj) =>
