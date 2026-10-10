@@ -129,8 +129,6 @@ export interface StormField {
   tag?: string; // tag name (e.g. 'order') forming '{tag}:{name}'
   /** Command payload / Query param validation. Only set on those kinds. */
   validation?: FieldValidation;
-  /** Explicit derivation / mapping expression for codegen (e.g. 'command.email', 'uuid()', 'now()') */
-  mapping?: string;
 }
 
 /**

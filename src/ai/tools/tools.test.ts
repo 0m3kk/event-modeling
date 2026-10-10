@@ -1753,11 +1753,11 @@ describe("AI Model & Write Tools", () => {
     expect(updatedConstraints?.[0]?.status).toBe(410);
   });
 
-  it("supports explicit field mapping and projection set dictionaries in create_storm_cards and update_storm_card", async () => {
+  it("supports projection set dictionaries in create_storm_cards and update_storm_card", async () => {
     const fake = createFakeStore();
     const { ctx } = createContext(fake);
 
-    // 1. Create Event with explicit mapping and State with queryItem set using Title Case
+    // 1. Create Event and State with queryItem set using Title Case
     const createRes = await executeToolCall(
       {
         id: "1",
@@ -1772,17 +1772,14 @@ describe("AI Model & Write Tools", () => {
                   name: "Cart ID",
                   fieldType: "UUID",
                   tag: "Cart",
-                  mapping: '"Command"."Cart ID"',
                 },
                 {
                   name: "Item ID",
                   fieldType: "UUID",
-                  mapping: '"Command"."Item ID"',
                 },
                 {
                   name: "Added At",
                   fieldType: "DateTime",
-                  mapping: "now()",
                 },
               ],
             },
@@ -1816,9 +1813,6 @@ describe("AI Model & Write Tools", () => {
       (o) => o.stormData?.name === "Item Added To Cart",
     );
     expect(eventCard).toBeDefined();
-    expect(eventCard?.stormData?.fields[0].mapping).toBe('"Command"."Cart ID"');
-    expect(eventCard?.stormData?.fields[1].mapping).toBe('"Command"."Item ID"');
-    expect(eventCard?.stormData?.fields[2].mapping).toBe("now()");
 
     const stateCard = fake.objects.find(
       (o) => o.stormData?.name === "Cart Summary",
@@ -1828,7 +1822,7 @@ describe("AI Model & Write Tools", () => {
       "Total Items": "count + 1",
     });
 
-    // 2. Update Event card to change mapping
+    // 2. Update Event card
     const updateRes = await executeToolCall(
       {
         id: "2",
@@ -1840,7 +1834,6 @@ describe("AI Model & Write Tools", () => {
               name: "Cart ID",
               fieldType: "UUID",
               tag: "Cart",
-              mapping: "uuid()",
             },
           ],
         }),
@@ -1850,10 +1843,10 @@ describe("AI Model & Write Tools", () => {
 
     expect(updateRes.isError).toBeFalsy();
     const updatedEvent = fake.objects.find((o) => o.id === eventCard!.id);
-    expect(updatedEvent?.stormData?.fields[0].mapping).toBe("uuid()");
+    expect(updatedEvent?.stormData?.fields[0].name).toBe("Cart ID");
   });
 
-  it("strictly rejects camelCase card names, field names, mappings, and queryItems set keys with immediate error feedback", async () => {
+  it("strictly rejects camelCase card names, field names, and queryItems set keys with immediate error feedback", async () => {
     const fake = createFakeStore();
     const { ctx } = createContext(fake);
 
@@ -1901,20 +1894,14 @@ describe("AI Model & Write Tools", () => {
     expect(resBadField.content).toContain('userEmail');
     expect(resBadField.content).toContain('is in camelCase');
 
-    // 3. Reject lowercase/camelCase mapping (e.g. command.email)
-    const resBadMapping = await executeToolCall(
+    // 3. Reject camelCase set key and expression
+    const resBadSet = await executeToolCall(
       {
         id: "3",
         name: "create_storm_cards",
         arguments: JSON.stringify({
           cards: [
             {
-              kind: "command",
-              name: "Register User",
-              fields: [{ name: "Email", fieldType: "Email" }],
-              action: "user:create:*",
-            },
-            {
               kind: "event",
               name: "User Registered",
               fields: [
@@ -1922,35 +1909,6 @@ describe("AI Model & Write Tools", () => {
                   name: "Email",
                   fieldType: "Email",
                   tag: "User",
-                  mapping: "command.email",
-                },
-              ],
-            },
-          ],
-        }),
-      },
-      ctx,
-    );
-    expect(resBadMapping.isError).toBe(true);
-    expect(resBadMapping.content).toContain('command.email');
-    expect(resBadMapping.content).toContain('uses lowercase/camelCase prefix');
-
-    // 4. Reject camelCase set key and expression
-    const resBadSet = await executeToolCall(
-      {
-        id: "4",
-        name: "create_storm_cards",
-        arguments: JSON.stringify({
-          cards: [
-            {
-              kind: "event",
-              name: "User Registered",
-              fields: [
-                {
-                  name: "Email",
-                  fieldType: "Email",
-                  tag: "User",
-                  mapping: "uuid()",
                 },
               ],
             },

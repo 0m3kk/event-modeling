@@ -48,15 +48,14 @@ All systems are organized into cohesive vertical slices arranged vertically from
   - \`assert\` expressions (CEL / JS): Wrap cards/fields in double quotes: \`"Fields"."User ID" != null\`, \`"Params"."Amount" <= "Fields"."Balance"\`. Enum comparisons: \`"Fields"."Status" == "User Status"."ACTIVE"\`. String literals only for \`String\` type.
 - **Constraint Evolution**: When introducing new events (e.g. \`User Deleted\`), update existing constraints (e.g. \`User Exists\`) via \`update_storm_card\` to evaluate the new event.
 
-## 4. Authorization & Field Mapping
+## 4. Authorization
 - **Authorization**:
   - RBAC format: \`resource:verb:scope\` (e.g., \`order:create:own\`, \`user:read:*\`).
   - Every Command and Query MUST declare an \`action\`.
   - Actors declare wildcard \`permissions\` (e.g., \`order:*\`). Permissions MUST match existing Command/Query actions on canvas. Do NOT invent unmatched permissions.
   - NEVER connect Actor to Command/Query with connector lines.
-- **Explicit Field Mapping (STRICT Title Case)**:
-  - Event & External fields, Command/Query responseFields, and State/Constraint inputFields MUST have an explicit \`mapping\` expression: \`"Command"."Field"\`, \`"Query"."Field"\`, \`"Event Name"."Field"\`.
-  - \`queryItems[].set\` on State/Constraint: Keys MUST match exact Title Case \`outputFields\` names. Values MUST be \`"Event Name"."Field"\` or \`"Enum Name"."VALUE"\`. NEVER use camelCase or generic \`event.<field>\`.
+- **State Projection Updates (\`queryItems[].set\`)**:
+  - On State/Constraint: Keys MUST match exact Title Case \`outputFields\` names. Values MUST be \`"Event Name"."Field"\` or \`"Enum Name"."VALUE"\`. NEVER use camelCase or generic \`event.<field>\`.
 
 ## 5. Naming, Types & Language
 - **Language**: Canvas content is ALWAYS English. Conversational replies MUST match the user's language (e.g., Vietnamese in, Vietnamese out).

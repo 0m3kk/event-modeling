@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
-import type { BddPhase, StormQueryItem } from "@/types";
+import type { BddPhase } from "@/types";
 import {
   STORM_PHASE_COLORS,
   STORM_PHASE_LABELS,
@@ -25,7 +25,6 @@ import { TagPopover } from "./TagPopover";
 import { QueryItemPopover } from "./QueryItemPopover";
 import { ValidationPopover } from "./ValidationPopover";
 import { ConstraintRulePopover } from "./ConstraintRulePopover";
-import { FieldMappingPopover } from "./FieldMappingPopover";
 import { RemoveFromGroupButton } from "./RemoveFromGroupButton";
 import { findDescriptionText } from "@/utils/description";
 import { getActorPermissions } from "@/utils/stormAuth";
@@ -33,7 +32,6 @@ import {
   describeValidationRules,
   hasValidationRules,
 } from "@/utils/fieldValidation";
-import { fieldNameMatches } from "@/utils/naming";
 import {
   Shield,
   Trash2,
@@ -49,7 +47,6 @@ import {
   Pencil,
   PlusCircle,
   Code2,
-  ArrowLeftRight,
 } from "lucide-react";
 
 export function StormOptionsBar() {
@@ -70,8 +67,6 @@ export function StormOptionsBar() {
   const stormSelectedField = useCanvasStore((s) => s.stormSelectedField);
   const validationTarget = useCanvasStore((s) => s.validationTarget);
   const setValidationTarget = useCanvasStore((s) => s.setValidationTarget);
-  const mappingTarget = useCanvasStore((s) => s.mappingTarget);
-  const setMappingTarget = useCanvasStore((s) => s.setMappingTarget);
   const bddStepPopup = useCanvasStore((s) => s.bddStepPopup);
   const setBddStepPopup = useCanvasStore((s) => s.setBddStepPopup);
   const queryItemPopup = useCanvasStore((s) => s.queryItemPopup);
@@ -158,70 +153,6 @@ export function StormOptionsBar() {
       ? `Validation: ${describeValidationRules(validationField.validation)}`
       : `Set Validation for "${validationField.name}"`
     : "Set Field Validation";
-
-  // Field mapping applies to Event fields and Command/Query response fields,
-  // plus State/Constraint outputFields (which configure projection via Query Items).
-  const isOutputField = Boolean(
-    (kind === "state" || kind === "constraint") &&
-      selectedField &&
-      (data.outputFields ?? []).some((f) => f.id === selectedField.id),
-  );
-
-  let outputFieldProjectedExpr: string | undefined;
-  let outputFieldMatchedQi: StormQueryItem | undefined;
-  if (isOutputField && selectedField) {
-    for (const q of data.queryItems ?? []) {
-      if (!q.set) continue;
-      for (const [key, expr] of Object.entries(q.set)) {
-        if (
-          fieldNameMatches(selectedField.name, key) ||
-          fieldNameMatches(selectedField.id, key)
-        ) {
-          outputFieldProjectedExpr = expr;
-          outputFieldMatchedQi = q;
-          break;
-        }
-      }
-      if (outputFieldProjectedExpr) break;
-    }
-  }
-
-  const isMappableField =
-    selectedField &&
-    (kind === "event" ||
-      kind === "external" ||
-      ((kind === "command" || kind === "query") &&
-        (data.responseFields ?? []).some((f) => f.id === selectedField.id)) ||
-      isOutputField);
-
-  const mappingSection: "params" | "response" | undefined =
-    selectedField &&
-    ((data.responseFields ?? []).some((f) => f.id === selectedField.id) ||
-      (data.outputFields ?? []).some((f) => f.id === selectedField.id))
-      ? "response"
-      : undefined;
-
-  const showMappingPopover = Boolean(
-    mappingTarget &&
-      mappingTarget.objectId === selectedStorm.id &&
-      mappingTarget.fieldId === selectedField?.id,
-  );
-
-  const hasMappingActive = Boolean(
-    showMappingPopover ||
-      (isOutputField && outputFieldProjectedExpr) ||
-      (!isOutputField && isMappableField && selectedField?.mapping?.trim()),
-  );
-
-  const mappingButtonTitle = isOutputField
-    ? outputFieldProjectedExpr
-      ? `Projection: ${outputFieldProjectedExpr} (Query Item: ${outputFieldMatchedQi?.types?.join(", ") || "item"})`
-      : `Set Projection for "${selectedField?.name}" (Configured in Query Item)`
-    : isMappableField
-      ? selectedField?.mapping?.trim()
-        ? `Mapping: ${selectedField.mapping}`
-        : `Set Field Mapping for "${selectedField?.name}" (Required for Codegen)`
-      : "Set Field Mapping";
 
   const selectedQueryItem =
     sf && sf.objectId === selectedStorm.id && sf.fieldId
@@ -317,22 +248,8 @@ export function StormOptionsBar() {
     setShowTagPopover(false);
     setShowQueryItemPopover(false);
     setValidationTarget(null);
-    setMappingTarget(null);
     setBddStepPopup(null);
     setQueryItemPopup(null);
-  };
-
-  const handleToggleMappingPopover = () => {
-    if (!selectedField) return;
-    const next = !showMappingPopover;
-    closeAllPopovers();
-    if (next) {
-      setMappingTarget({
-        objectId: selectedStorm.id,
-        fieldId: selectedField.id,
-        section: mappingSection,
-      });
-    }
   };
 
   const handleToggleActionPopover = () => {
@@ -608,26 +525,6 @@ export function StormOptionsBar() {
               size={16}
               className={
                 hasValidationActive ? "text-emerald-600 dark:text-emerald-400" : "text-gray-600 dark:text-zinc-400"
-              }
-            />
-          </button>
-        )}
-
-        {/* Set Field Mapping Button — only visible when an Event field or Response field is selected */}
-        {isMappableField && (
-          <button
-            onClick={handleToggleMappingPopover}
-            title={mappingButtonTitle}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer ${
-              hasMappingActive
-                ? "border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300"
-                : "text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100"
-            }`}
-          >
-            <ArrowLeftRight
-              size={16}
-              className={
-                hasMappingActive ? "text-cyan-600 dark:text-cyan-400" : "text-gray-600 dark:text-zinc-400"
               }
             />
           </button>
@@ -910,16 +807,6 @@ export function StormOptionsBar() {
         />
       )}
 
-      {/* Field Mapping Popover (Codegen) */}
-      {showMappingPopover && selectedField && (
-        <FieldMappingPopover
-          card={selectedStorm}
-          fieldId={selectedField.id}
-          section={mappingSection}
-          onClose={() => setMappingTarget(null)}
-          anchorPosition={{ x: barX, y: isAbove ? barY : barY + 44 * barScale }}
-        />
-      )}
     </>
   );
 }

@@ -133,8 +133,6 @@ export const initialCanvasState: CanvasStoreState = {
   bddStepPopup: null,
   queryItemPopup: null,
   validationHover: null,
-  mappingTarget: null,
-  mappingHover: null,
   fieldClipboard: null,
   objectClipboard: null,
   stormActionHover: null,
@@ -1384,10 +1382,6 @@ export const useCanvasStore = create<CanvasStore>()(
 
       setValidationHover: (validationHover) => set({ validationHover }),
 
-      setMappingTarget: (mappingTarget) => set({ mappingTarget }),
-
-      setMappingHover: (mappingHover) => set({ mappingHover }),
-
       setStormActionHover: (stormActionHover) => set({ stormActionHover }),
 
       setAIHighlight: (ids) => {
@@ -1852,43 +1846,6 @@ export const useCanvasStore = create<CanvasStore>()(
         });
       },
 
-      updateStormFieldMapping: (objectId, fieldId, mapping, section) => {
-        const { objects } = get();
-        const obj = objects.find((o) => o.id === objectId);
-        if (!obj || obj.type !== "storm" || !obj.stormData || obj.locked) return;
-
-        const updateList = (list?: typeof obj.stormData.fields) =>
-          (list ?? []).map((f) =>
-            f.id === fieldId ? { ...f, mapping: mapping?.trim() ? mapping.trim() : undefined } : f,
-          );
-
-        let nextData = obj.stormData;
-        if (section === "response" && nextData.responseFields) {
-          nextData = { ...nextData, responseFields: updateList(nextData.responseFields) };
-        } else if (section === "response" && nextData.outputFields) {
-          nextData = { ...nextData, outputFields: updateList(nextData.outputFields) };
-        } else if (section === "params" && nextData.inputFields) {
-          nextData = { ...nextData, inputFields: updateList(nextData.inputFields) };
-        } else if (nextData.fields.some((f) => f.id === fieldId)) {
-          nextData = { ...nextData, fields: updateList(nextData.fields) };
-        } else if (nextData.inputFields?.some((f) => f.id === fieldId)) {
-          nextData = { ...nextData, inputFields: updateList(nextData.inputFields) };
-        } else if (nextData.responseFields?.some((f) => f.id === fieldId)) {
-          nextData = { ...nextData, responseFields: updateList(nextData.responseFields) };
-        } else if (nextData.outputFields?.some((f) => f.id === fieldId)) {
-          nextData = { ...nextData, outputFields: updateList(nextData.outputFields) };
-        }
-
-        set({
-          objects: syncReferenceAfterChange(
-            objects.map((o) =>
-              o.id === obj.id ? { ...o, stormData: nextData } : o,
-            ),
-            obj.id,
-          ),
-        });
-      },
-
       updateStormQueryItemSet: (objectId, queryItemId, setRecord) => {
         const { objects } = get();
         const obj = objects.find((o) => o.id === objectId);
@@ -2250,8 +2207,6 @@ export const useCanvasStore = create<CanvasStore>()(
           modelPopupChain: [],
           isDragging: false,
           tool: "select",
-          mappingTarget: null,
-          mappingHover: null,
           viewport: {
             ...DEFAULT_VIEWPORT,
             // Keep the live canvas size — the engine owns it and only resyncs

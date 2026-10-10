@@ -50,8 +50,8 @@ export function QueryItemPopover({
   // Text input for typing a custom event name
   const [customTypeInput, setCustomTypeInput] = useState("");
 
-  // Set mappings (outputField.name/id -> source expression)
-  const [setMappings, setSetMappings] = useState<Record<string, string>>(
+  // Set expressions (outputField.name/id -> source expression)
+  const [setValues, setSetValues] = useState<Record<string, string>>(
     () => currentItem?.set ? { ...currentItem.set } : {},
   );
 
@@ -59,11 +59,11 @@ export function QueryItemPopover({
     if (currentItem) {
       setSelectedTypes(currentItem.types ?? []);
       setSelectedTagFieldIds(currentItem.tagFieldIds ?? []);
-      setSetMappings(currentItem.set ? { ...currentItem.set } : {});
+      setSetValues(currentItem.set ? { ...currentItem.set } : {});
     } else {
       setSelectedTypes([]);
       setSelectedTagFieldIds([]);
-      setSetMappings({});
+      setSetValues({});
     }
   }, [currentItem]);
 
@@ -171,9 +171,9 @@ export function QueryItemPopover({
       finalTypes = Array.from(new Set([...finalTypes, ...parts]));
     }
 
-    // Clean set mappings: only non-empty trimmed strings
+    // Clean set expressions: only non-empty trimmed strings
     const cleanSet: Record<string, string> = {};
-    for (const [key, val] of Object.entries(setMappings)) {
+    for (const [key, val] of Object.entries(setValues)) {
       if (val && val.trim()) {
         cleanSet[key] = val.trim();
       }
@@ -420,9 +420,9 @@ export function QueryItemPopover({
                   customTypeInput.trim() ||
                   "Event";
                 // Find matching expression across direct name, id, or camelCase
-                let currentVal = setMappings[of.name] ?? setMappings[of.id] ?? "";
+                let currentVal = setValues[of.name] ?? setValues[of.id] ?? "";
                 if (!currentVal) {
-                  for (const [key, expr] of Object.entries(setMappings)) {
+                  for (const [key, expr] of Object.entries(setValues)) {
                     if (fieldNameMatches(of.name, key) || fieldNameMatches(of.id, key)) {
                       currentVal = expr;
                       break;
@@ -443,7 +443,7 @@ export function QueryItemPopover({
                       value={currentVal}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setSetMappings((prev) => {
+                        setSetValues((prev) => {
                           const next = { ...prev };
                           // Clear any alternative casing keys for this field first
                           for (const key of Object.keys(next)) {

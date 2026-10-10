@@ -16,7 +16,6 @@ export type CardHitZoneType =
   | "bddAddStep"
   | "desc"
   | "validation"
-  | "mapping"
   | "stickyText"
   | "textBoxText"
   | "methodName"

@@ -75,12 +75,6 @@ const fieldSpec = z.object({
     .describe(
       "DCB tag name on Event field (e.g. 'Order'). Tag ONLY key/unique identifier fields.",
     ),
-  mapping: z
-    .string()
-    .optional()
-    .describe(
-      "Source expression in Title Case (e.g. 'Command.Email', 'now()').",
-    ),
   validation: validationSpec
     .optional()
     .describe("Input validation for Command payload or Query params only."),
@@ -99,7 +93,7 @@ const queryItemSpec = z.object({
     .record(z.string(), z.string())
     .optional()
     .describe(
-      "Projection mapping: outputFields in Title Case -> EventName.FieldName in Title Case (e.g. { 'Status': \"'ACTIVE'\", 'Email': 'User Registered.Email' }).",
+      "State projection updates: outputFields in Title Case -> EventName.FieldName in Title Case (e.g. { 'Status': \"'ACTIVE'\", 'Email': 'User Registered.Email' }).",
     ),
 });
 
@@ -127,7 +121,6 @@ function createStormField(
   description?: string,
   tag?: string,
   validation?: FieldValidation,
-  mapping?: string,
 ): StormField {
   return {
     id: nanoid(),
@@ -136,7 +129,6 @@ function createStormField(
     required,
     description,
     tag,
-    mapping: mapping?.trim() ? mapping.trim() : undefined,
     ...(validation ? { validation } : {}),
   };
 }
@@ -225,7 +217,6 @@ function buildFields(
       spec.description,
       spec.tag ? toDisplayName(spec.tag) : undefined,
       options.allowValidation ? normalizeValidation(spec.validation) : undefined,
-      spec.mapping,
     );
   });
 }

@@ -22,7 +22,6 @@ export interface CodegenField {
   tag?: string;
   description?: string;
   validation?: FieldValidation;
-  mapping?: string;
 }
 
 export interface CodegenQueryItem {
@@ -209,16 +208,11 @@ function cleanField(field: StormField): CodegenField {
   if (field.validation && Object.keys(field.validation).length > 0) {
     result.validation = field.validation;
   }
-  if ((field.mapping ?? "").trim()) {
-    result.mapping = normalizeExpressionForCodegen(field.mapping!.trim());
-  }
   return result;
 }
 
 function cleanOutputField(field: StormField): CodegenField {
-  const f = cleanField(field);
-  delete f.mapping;
-  return f;
+  return cleanField(field);
 }
 
 function resolveQueryItems(

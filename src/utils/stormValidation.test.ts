@@ -524,40 +524,6 @@ describe("describeStormOptions", () => {
       expect(issues.some((i) => i.includes('field "orderId" is in camelCase'))).toBe(true);
     });
 
-    it("rejects lowercase/camelCase mapping prefixes and field names", () => {
-      const input: StormValidationInput = {
-        existing: [],
-        cards: [
-          card("command", "Place Order", [field("Order ID", "uuid")]),
-          card("event", "Order Placed", [
-            {
-              ...field("Order ID", "uuid", "Order"),
-              mapping: "command.orderId",
-            },
-          ]),
-        ],
-      };
-      const issues = validateStormWrite(input);
-      expect(issues.some((i) => i.includes('mapping "command.orderId" uses lowercase/camelCase prefix "command."'))).toBe(true);
-    });
-
-    it("rejects mapping referencing non-existent field on Command", () => {
-      const input: StormValidationInput = {
-        existing: [],
-        cards: [
-          card("command", "Place Order", [field("Order ID", "uuid")]),
-          card("event", "Order Placed", [
-            {
-              ...field("Order ID", "uuid", "Order"),
-              mapping: "Command.NonExistent",
-            },
-          ]),
-        ],
-      };
-      const issues = validateStormWrite(input);
-      expect(issues.some((i) => i.includes('references field "NonExistent" which does not exist on source card "Place Order"'))).toBe(true);
-    });
-
     it("rejects camelCase set keys and generic event or camelCase expressions in queryItems", () => {
       const input: StormValidationInput = {
         existing: [],
@@ -586,19 +552,14 @@ describe("describeStormOptions", () => {
       expect(issues.some((i) => i.includes('uses camelCase prefix "orderPlaced."'))).toBe(true);
     });
 
-    it("passes valid Title Case cards, fields, mappings, and queryItems set", () => {
+    it("passes valid Title Case cards, fields, and queryItems set", () => {
       const input: StormValidationInput = {
         existing: [],
         cards: [
           card("command", "Place Order", [field("Order ID", "uuid")], {
             action: "order:create:*",
           }),
-          card("event", "Order Placed", [
-            {
-              ...field("Order ID", "uuid", "Order"),
-              mapping: '"Command"."Order ID"',
-            },
-          ]),
+          card("event", "Order Placed", [field("Order ID", "uuid", "Order")]),
           {
             kind: "state",
             name: "Order Summary",
@@ -677,26 +638,7 @@ describe("describeStormOptions", () => {
         },
       };
 
-      // 1. Rejects plain string literal 'PENDING' when field type is enum "User Status"
-      const invalidEnumMappingInput: StormValidationInput = {
-        existing: [userStatusEnum],
-        cards: [
-          card("event", "User Registered", [
-            {
-              ...field("Status", "User Status"),
-              mapping: "'PENDING'",
-            },
-          ]),
-        ],
-      };
-      const issues1 = validateStormWrite(invalidEnumMappingInput);
-      expect(
-        issues1.some((i) =>
-          i.includes('has enum type "User Status". Use enum reference "User Status"."<VALUE>"'),
-        ),
-      ).toBe(true);
-
-      // 2. Rejects plain string in queryItems set when target outputField is enum "User Status"
+      // 1. Rejects plain string in queryItems set when target outputField is enum "User Status"
       const invalidEnumSetInput: StormValidationInput = {
         existing: [userStatusEnum, stormObject("event", "User Registered", [field("User ID", "uuid", "User")])],
         cards: [
@@ -715,23 +657,18 @@ describe("describeStormOptions", () => {
           }),
         ],
       };
-      const issues2 = validateStormWrite(invalidEnumSetInput);
+      const issues = validateStormWrite(invalidEnumSetInput);
       expect(
-        issues2.some((i) =>
+        issues.some((i) =>
           i.includes('has enum type "User Status". Use enum reference "User Status"."<VALUE>"'),
         ),
       ).toBe(true);
 
-      // 3. Allows plain string 'PENDING' when field type is "String"
+      // 2. Allows plain string 'PENDING' when field type is "String"
       const validStringInput: StormValidationInput = {
         existing: [userStatusEnum, stormObject("event", "User Registered", [field("User ID", "uuid", "User")])],
         cards: [
-          card("event", "User Registered", [
-            {
-              ...field("Status", "String"),
-              mapping: "'PENDING'",
-            },
-          ]),
+          card("event", "User Registered", [field("Status", "String")]),
           card("state", "User State", [], {
             inputFields: [field("User ID", "uuid", "User")],
             outputFields: [field("Status", "String")],
@@ -749,16 +686,11 @@ describe("describeStormOptions", () => {
       };
       expect(validateStormWrite(validStringInput)).toEqual([]);
 
-      // 4. Passes when enum reference "User Status"."PENDING" is used
+      // 3. Passes when enum reference "User Status"."PENDING" is used
       const validEnumInput: StormValidationInput = {
         existing: [userStatusEnum, stormObject("event", "User Registered", [field("User ID", "uuid", "User")])],
         cards: [
-          card("event", "User Registered", [
-            {
-              ...field("Status", "User Status"),
-              mapping: '"User Status"."PENDING"',
-            },
-          ]),
+          card("event", "User Registered", [field("Status", "User Status")]),
           card("state", "User State", [], {
             inputFields: [field("User ID", "uuid", "User")],
             outputFields: [field("Status", "User Status")],

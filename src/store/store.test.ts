@@ -43,50 +43,7 @@ describe("useCanvasStore", () => {
     expect(useCanvasStore.getState().validationHover).toBeNull();
   });
 
-  it("tracks mappingTarget, mappingHover, and updates storm field mappings and query item sets", () => {
-    const store = useCanvasStore.getState();
-    expect(store.mappingTarget).toBeNull();
-    expect(store.mappingHover).toBeNull();
-
-    store.setMappingTarget({ objectId: "ev-1", fieldId: "f1" });
-    store.setMappingHover({
-      objectId: "ev-1",
-      fieldId: "f1",
-      text: "Mapping: command.id",
-      iconBounds: { x: 40, y: 50, width: 15, height: 26 },
-    });
-
-    expect(useCanvasStore.getState().mappingTarget).toEqual({
-      objectId: "ev-1",
-      fieldId: "f1",
-    });
-    expect(useCanvasStore.getState().mappingHover?.text).toBe("Mapping: command.id");
-
-    const eventObj: CanvasObject = {
-      id: "ev-1",
-      type: "storm",
-      x: 0,
-      y: 0,
-      width: 200,
-      height: 120,
-      stormData: {
-        kind: "event",
-        name: "OrderPlaced",
-        fields: [{ id: "f1", name: "orderId", fieldType: "UUID" }],
-      },
-    };
-    useCanvasStore.getState().addObject(eventObj);
-
-    // Update field mapping
-    useCanvasStore.getState().updateStormFieldMapping("ev-1", "f1", "uuid()");
-    const updatedEv = useCanvasStore.getState().objects.find((o) => o.id === "ev-1")!;
-    expect(updatedEv.stormData?.fields[0].mapping).toBe("uuid()");
-
-    // Clear mapping with empty string
-    useCanvasStore.getState().updateStormFieldMapping("ev-1", "f1", "");
-    const clearedEv = useCanvasStore.getState().objects.find((o) => o.id === "ev-1")!;
-    expect(clearedEv.stormData?.fields[0].mapping).toBeUndefined();
-
+  it("updates storm query item sets", () => {
     // Query item set update
     const stateObj: CanvasObject = {
       id: "st-1",
@@ -119,12 +76,9 @@ describe("useCanvasStore", () => {
     expect(useCanvasStore.getState().projectName).toBe("Loaded Project");
 
     useCanvasStore.getState().setTool("line");
-    // Resetting board without project name defaults to Untitled
     useCanvasStore.getState().resetBoard();
     expect(useCanvasStore.getState().projectName).toBe("Untitled");
     expect(useCanvasStore.getState().tool).toBe("select");
-    expect(useCanvasStore.getState().mappingTarget).toBeNull();
-    expect(useCanvasStore.getState().mappingHover).toBeNull();
   });
 
   it("adds objects and auto-selects them", () => {

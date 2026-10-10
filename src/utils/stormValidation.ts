@@ -241,15 +241,6 @@ function getCardOrObjectName(
   return (source as StormValidationCard).name;
 }
 
-function getCardOrObjectKind(
-  source: StormValidationCard | CanvasObject,
-): StormKind | undefined {
-  if ("stormData" in source) {
-    return source.stormData?.kind;
-  }
-  return (source as StormValidationCard).kind;
-}
-
 function findCandidateSourcesForEvent(
   eventCard: StormValidationCard,
   input: StormValidationInput,
@@ -313,46 +304,6 @@ function findCandidateSourcesForEvent(
   return [];
 }
 
-function findCandidateSourcesForDecisionOrReadModel(
-  card: StormValidationCard,
-  input: StormValidationInput,
-): (StormValidationCard | CanvasObject)[] {
-  const batchCommands = input.cards.filter(
-    (c) => c.kind === "command" || c.kind === "query",
-  );
-  if (batchCommands.length === 1) {
-    return batchCommands;
-  }
-  if (batchCommands.length > 1) {
-    const cWords = extractDomainWords(card.name);
-    const matched = batchCommands.filter((cmd) => {
-      const cmdWords = extractDomainWords(cmd.name);
-      return cWords.some((w) => cmdWords.includes(w));
-    });
-    if (matched.length > 0) return matched;
-    return batchCommands;
-  }
-  const existingCommands = input.existing.filter(
-    (o) =>
-      o.type === "storm" &&
-      (o.stormData?.kind === "command" || o.stormData?.kind === "query"),
-  );
-  if (existingCommands.length === 1) {
-    return existingCommands;
-  }
-  if (existingCommands.length > 1) {
-    const cWords = extractDomainWords(card.name);
-    const matched = existingCommands.filter((obj) => {
-      const name = obj.stormData?.name ?? "";
-      const objWords = extractDomainWords(name);
-      return cWords.some((w) => objWords.includes(w));
-    });
-    if (matched.length > 0) return matched;
-    return existingCommands;
-  }
-  return [];
-}
-
 function findEventCard(
   nameOrType: string,
   input: StormValidationInput,
@@ -391,10 +342,10 @@ export interface StormValidationCard {
   outputFields?: StormField[];
   responseFields?: StormField[];
   writtenFields?: StormField[];
-  rawFields?: { name: string; mapping?: string; tag?: string; fieldType?: string }[];
-  rawInputFields?: { name: string; mapping?: string; tag?: string; fieldType?: string }[];
-  rawOutputFields?: { name: string; mapping?: string; tag?: string; fieldType?: string }[];
-  rawResponseFields?: { name: string; mapping?: string; tag?: string; fieldType?: string }[];
+  rawFields?: { name: string; tag?: string; fieldType?: string }[];
+  rawInputFields?: { name: string; tag?: string; fieldType?: string }[];
+  rawOutputFields?: { name: string; tag?: string; fieldType?: string }[];
+  rawResponseFields?: { name: string; tag?: string; fieldType?: string }[];
   queryItems?: {
     types?: string[];
     tagFields?: string[];
@@ -517,130 +468,6 @@ export function validateStormWrite(input: StormValidationInput): string[] {
           issues.push(
             `${label} field "${f.name}" is in camelCase. Field names must use Title Case matching user definitions (e.g. "${toDisplayName(f.name)}").`,
           );
-        }
-      }
-    }
-
-    // Validate field mapping expressions
-    for (const f of allFieldSpecs) {
-      const mapping = (f.mapping ?? "").trim();
-      if (!mapping) continue;
-
-      if (/\bevent\./i.test(mapping)) {
-        issues.push(
-          `${label} field "${f.name}" mapping "${mapping}" uses generic "event.". Specify the source card name in Title Case (e.g. "Command.<FieldName>" or "<EventName>.<FieldName>").`,
-        );
-      }
-
-      // If field type is an enum, disallow plain string literal or bare identifier
-      if (f.fieldType) {
-        const enumInfo = enumModels.get(nameKey(f.fieldType));
-        if (enumInfo) {
-          if (
-            isPlainStringLiteral(mapping) ||
-            (/^[A-Z][A-Z0-9_]*$/.test(mapping) && !mapping.includes("."))
-          ) {
-            issues.push(
-              `${label} field "${f.name}" has enum type "${enumInfo.name}". Use enum reference "${enumInfo.name}"."<VALUE>" (e.g. "${enumInfo.name}"."${enumInfo.values[0] ?? "VALUE"}") instead of plain string literal ${mapping}.`,
-            );
-          }
-        }
-      }
-
-      const accesses = parseMemberAccesses(mapping);
-      for (const match of accesses) {
-        const prefix = match.prefix;
-        const accessedField = match.accessedField;
-
-        if (isCamelOrLower(prefix)) {
-          issues.push(
-            `${label} field "${f.name}" mapping "${mapping}" uses lowercase/camelCase prefix "${prefix}.". Use Title Case matching defined card (e.g. "${toDisplayName(prefix)}.${toDisplayName(accessedField)}").`,
-          );
-        } else if (isCamelOrLower(accessedField)) {
-          issues.push(
-            `${label} field "${f.name}" mapping "${mapping}" uses camelCase field "${accessedField}". Use Title Case matching defined field (e.g. "${prefix}.${toDisplayName(accessedField)}").`,
-          );
-        }
-
-        if (!match.isQuoted && (prefix.includes(" ") || accessedField.includes(" "))) {
-          issues.push(
-            `${label} field "${f.name}" mapping "${mapping}" uses unquoted name with spaces "${match.raw}". Wrap names in double quotes (e.g. "${prefix}"."${accessedField}").`,
-          );
-        }
-
-        const enumInfo = enumModels.get(nameKey(prefix));
-        if (enumInfo) {
-          if (!enumInfo.values.some((v) => v.toLowerCase() === accessedField.toLowerCase())) {
-            issues.push(
-              `${label} field "${f.name}" mapping "${mapping}" references unknown enum value "${accessedField}" in enum "${enumInfo.name}". Valid values: [${enumInfo.values.map((v) => `"${v}"`).join(", ")}].`,
-            );
-          }
-        } else if (card.kind === "event" || card.kind === "external") {
-          const candidateSources = findCandidateSourcesForEvent(card, input);
-          if (candidateSources.length > 0) {
-            if (
-              prefix.toLowerCase() === "command" ||
-              candidateSources.some(
-                (s) => nameKey(getCardOrObjectName(s)) === nameKey(prefix),
-              )
-            ) {
-              const src =
-                candidateSources.find(
-                  (s) =>
-                    (prefix.toLowerCase() === "command" &&
-                      getCardOrObjectKind(s) === "command") ||
-                    nameKey(getCardOrObjectName(s)) === nameKey(prefix),
-                ) || candidateSources[0];
-              const availableFields = getCardOrObjectFields(src);
-              const matchedField = availableFields.find((srcF) =>
-                fieldNameMatches(srcF.name, accessedField),
-              );
-              if (!matchedField) {
-                issues.push(
-                  `${label} field "${f.name}" mapping "${mapping}" references field "${accessedField}" which does not exist on source card "${getCardOrObjectName(src)}". Available fields: [${availableFields.map((srcF) => `"${srcF.name}"`).join(", ")}].`,
-                );
-              } else if (matchedField.name.trim() !== accessedField.trim()) {
-                issues.push(
-                  `${label} field "${f.name}" mapping "${mapping}" references field "${accessedField}" with incorrect casing. Use exact defined name "${matchedField.name}".`,
-                );
-              }
-            }
-          }
-        } else if (card.kind === "constraint" || card.kind === "state") {
-          const candidateSources = findCandidateSourcesForDecisionOrReadModel(card, input);
-          if (candidateSources.length > 0) {
-            const isGenericCommandOrQuery =
-              prefix.toLowerCase() === "command" || prefix.toLowerCase() === "query";
-            if (
-              isGenericCommandOrQuery ||
-              candidateSources.some(
-                (s) => nameKey(getCardOrObjectName(s)) === nameKey(prefix),
-              )
-            ) {
-              const src =
-                candidateSources.find(
-                  (s) =>
-                    (prefix.toLowerCase() === "command" &&
-                      getCardOrObjectKind(s) === "command") ||
-                    (prefix.toLowerCase() === "query" &&
-                      getCardOrObjectKind(s) === "query") ||
-                    nameKey(getCardOrObjectName(s)) === nameKey(prefix),
-                ) || candidateSources[0];
-              const availableFields = getCardOrObjectFields(src);
-              const matchedField = availableFields.find((srcF) =>
-                fieldNameMatches(srcF.name, accessedField),
-              );
-              if (!matchedField) {
-                issues.push(
-                  `${label} field "${f.name}" mapping "${mapping}" references field "${accessedField}" which does not exist on source card "${getCardOrObjectName(src)}". Available fields: [${availableFields.map((srcF) => `"${srcF.name}"`).join(", ")}].`,
-                );
-              } else if (matchedField.name.trim() !== accessedField.trim()) {
-                issues.push(
-                  `${label} field "${f.name}" mapping "${mapping}" references field "${accessedField}" with incorrect casing. Use exact defined name "${matchedField.name}".`,
-                );
-              }
-            }
-          }
         }
       }
     }
