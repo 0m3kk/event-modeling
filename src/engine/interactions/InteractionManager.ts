@@ -3,6 +3,8 @@ import { PanInteraction } from "./PanInteraction";
 import { MarqueeInteraction } from "./MarqueeInteraction";
 import { DragElementsInteraction } from "./DragElementsInteraction";
 import { CreateElementInteraction } from "./CreateElementInteraction";
+import { ResizeElementInteraction } from "./ResizeElementInteraction";
+import { hitResizeHandle } from "../layers/GizmoLayer";
 import type { Point } from "@/types";
 import { useCanvasStore } from "@/store";
 
@@ -10,6 +12,7 @@ export class InteractionManager {
   private pan = new PanInteraction();
   private marquee = new MarqueeInteraction();
   private dragElements = new DragElementsInteraction();
+  private resizeElement = new ResizeElementInteraction();
   private createElement = new CreateElementInteraction();
 
   private activeInteraction: CanvasInteraction | null = null;
@@ -42,14 +45,22 @@ export class InteractionManager {
       }
     }
 
-    // 3. Click/Drag on existing element
+    // 3. Grab a resize handle on the single selected element (before drag so the
+    // handle click does not get swallowed as a card drag).
+    if (this.resizeElement.onPointerDown(e, worldPoint, this.ctx)) {
+      this.ctx.previewLayer.hidePreview();
+      this.activeInteraction = this.resizeElement;
+      return true;
+    }
+
+    // 4. Click/Drag on existing element
     if (this.dragElements.onPointerDown(e, worldPoint, this.ctx)) {
       this.ctx.previewLayer.hidePreview();
       this.activeInteraction = this.dragElements;
       return true;
     }
 
-    // 4. Click/Drag on empty canvas:
+    // 5. Click/Drag on empty canvas:
     // If Command (Mac) or Ctrl (Windows) held -> Marquee selection box!
     if (e.metaKey || e.ctrlKey) {
       if (this.marquee.onPointerDown(e, worldPoint, this.ctx)) {
@@ -91,7 +102,17 @@ export class InteractionManager {
       this.ctx.setCursor("crosshair");
     } else {
       this.ctx.previewLayer.hidePreview();
+      this.ctx.setCursor(this.isOverResizeHandle(worldPoint) ? "ew-resize" : "default");
     }
+  }
+
+  /** True when the pointer hovers a resize handle of the single selected card. */
+  private isOverResizeHandle(worldPoint: Point): boolean {
+    const state = useCanvasStore.getState();
+    if (state.selectedIds.length !== 1) return false;
+    const element = state.elements.find((el) => el.id === state.selectedIds[0]);
+    if (!element || element.locked) return false;
+    return hitResizeHandle(element, worldPoint, state.viewport.zoom) !== null;
   }
 
   handlePointerUp(e: PointerEvent, worldPoint: Point): void {

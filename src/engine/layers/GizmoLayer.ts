@@ -1,14 +1,67 @@
 import { Container, Graphics } from "pixi.js";
-import type { Rect, CanvasElement } from "@/types";
+import type { Rect, CanvasElement, Point } from "@/types";
+
+/** On-screen size (px) of a resize handle, kept constant across zoom levels. */
+export const RESIZE_HANDLE_SIZE = 10;
+/** On-screen square hit target (px) around a resize handle. */
+export const RESIZE_HANDLE_HIT = 18;
+/** Smallest width a card may be resized to, in world units. */
+export const MIN_ELEMENT_WIDTH = 80;
+
+export type ResizeSide = "left" | "right";
+
+/** World-space centers of a card's left/right resize handles (mid-height). */
+export function getResizeHandleCenters(element: CanvasElement): {
+  left: Point;
+  right: Point;
+} {
+  const cy = element.y + element.height / 2;
+  return {
+    left: { x: element.x, y: cy },
+    right: { x: element.x + element.width, y: cy },
+  };
+}
+
+/**
+ * Returns which resize handle (if any) sits under a world-space point. The hit
+ * target is defined in screen space so it stays usable at any zoom level; the
+ * nearer handle wins when a card is narrow enough for the two to overlap.
+ */
+export function hitResizeHandle(
+  element: CanvasElement,
+  worldPoint: Point,
+  zoom = 1,
+): ResizeSide | null {
+  const scale = zoom || 1;
+  const half = RESIZE_HANDLE_HIT / scale / 2;
+  const centers = getResizeHandleCenters(element);
+
+  const near = (c: Point) =>
+    Math.abs(worldPoint.x - c.x) <= half && Math.abs(worldPoint.y - c.y) <= half;
+
+  const leftHit = near(centers.left);
+  const rightHit = near(centers.right);
+
+  if (leftHit && rightHit) {
+    const dl = Math.abs(worldPoint.x - centers.left.x);
+    const dr = Math.abs(worldPoint.x - centers.right.x);
+    return dl <= dr ? "left" : "right";
+  }
+  if (leftHit) return "left";
+  if (rightHit) return "right";
+  return null;
+}
 
 export class GizmoLayer extends Container {
   private marqueeGraphics = new Graphics();
   private boundsGraphics = new Graphics();
+  private handlesGraphics = new Graphics();
 
   constructor() {
     super();
     this.addChild(this.marqueeGraphics);
     this.addChild(this.boundsGraphics);
+    this.addChild(this.handlesGraphics);
   }
 
   drawMarquee(rect: Rect | null) {
@@ -25,9 +78,18 @@ export class GizmoLayer extends Container {
     this.marqueeGraphics.stroke({ color: 0x3b82f6, width: 1 });
   }
 
-  drawSelectionBounds(selectedElements: CanvasElement[]) {
+  drawSelectionBounds(selectedElements: CanvasElement[], zoom = 1) {
     this.boundsGraphics.clear();
-    if (selectedElements.length <= 1) return; // Single items draw their own selection stroke in ElementLayer
+    this.handlesGraphics.clear();
+
+    // Single selection: the card draws its own selection stroke, so the gizmo
+    // only contributes the left/right resize handles.
+    if (selectedElements.length === 1) {
+      this.drawResizeHandles(selectedElements[0], zoom);
+      return;
+    }
+
+    if (selectedElements.length <= 1) return; // 0 items: nothing to draw.
 
     let minX = Infinity;
     let minY = Infinity;
@@ -53,8 +115,26 @@ export class GizmoLayer extends Container {
     }
   }
 
+  /**
+   * Draws the two square handles used to resize a card's width. Sizes are
+   * divided by zoom so they keep a constant on-screen footprint.
+   */
+  private drawResizeHandles(element: CanvasElement, zoom: number) {
+    const scale = zoom || 1;
+    const size = RESIZE_HANDLE_SIZE / scale;
+    const r = size / 2;
+    const centers = getResizeHandleCenters(element);
+
+    for (const c of [centers.left, centers.right]) {
+      this.handlesGraphics.roundRect(c.x - r, c.y - r, size, size, 2 / scale);
+      this.handlesGraphics.fill({ color: 0xffffff });
+      this.handlesGraphics.stroke({ color: 0x3b82f6, width: 1.5 / scale });
+    }
+  }
+
   clear() {
     this.marqueeGraphics.clear();
     this.boundsGraphics.clear();
+    this.handlesGraphics.clear();
   }
 }

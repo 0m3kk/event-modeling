@@ -168,7 +168,7 @@ export class PixiEngine {
 
     // Gizmo
     const selectedElements = elements.filter((el) => selectedSet.has(el.id));
-    this.gizmoLayer.drawSelectionBounds(selectedElements);
+    this.gizmoLayer.drawSelectionBounds(selectedElements, viewport.zoom);
 
     // Hide preview if tool was reset to select
     if (state.tool === "select") {

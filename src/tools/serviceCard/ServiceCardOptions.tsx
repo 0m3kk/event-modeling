@@ -49,9 +49,9 @@ export function ServiceCardOptions({ element }: ServiceCardOptionsProps) {
   const commit = (nextMethods: ServiceCardData["methods"]) => {
     const nextData: ServiceCardData = { ...element.data, methods: nextMethods };
     const nextSize = computeServiceCardSize(nextData);
+    // Only the content-driven height changes; a user-resized width is preserved.
     useCanvasStore.getState().updateElement(element.id, {
       height: nextSize.height,
-      width: nextSize.width,
       data: nextData,
     });
   };

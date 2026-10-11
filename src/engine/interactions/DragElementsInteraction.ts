@@ -114,7 +114,7 @@ export class DragElementsInteraction implements CanvasInteraction {
     );
 
     const selected = nextElements.filter((el) => selectedSet.has(el.id));
-    ctx.gizmoLayer.drawSelectionBounds(selected);
+    ctx.gizmoLayer.drawSelectionBounds(selected, state.viewport.zoom);
   }
 
   onPointerUp(_e: PointerEvent, worldPoint: Point, _ctx: InteractionContext): void {
