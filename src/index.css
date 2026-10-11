@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "@fontsource/geist-mono";
 
+@theme {
+  --font-sans: "Geist Mono", monospace;
+  --font-mono: "Geist Mono", monospace;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
@@ -20,8 +25,12 @@ body,
   font-family: "Geist Mono", monospace;
 }
 
-* {
-  font-family: "Geist Mono", monospace;
+*,
+input,
+button,
+textarea,
+select {
+  font-family: "Geist Mono", monospace !important;
 }
 
 #canvas-container,

@@ -51,6 +51,10 @@ export class PixiEngine {
       const width = this.container.clientWidth || window.innerWidth;
       const height = this.container.clientHeight || window.innerHeight;
 
+      if (typeof document !== "undefined" && document.fonts) {
+        await document.fonts.ready;
+      }
+
       await this.app.init({
         width,
         height,
