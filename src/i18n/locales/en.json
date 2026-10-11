@@ -1,0 +1,53 @@
+{
+  "header": {
+    "untitled": "Untitled Board",
+    "undo": "Undo (Ctrl+Z)",
+    "redo": "Redo (Ctrl+Y)",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "resetZoom": "Reset Zoom",
+    "file": "File",
+    "newBoard": "New Board",
+    "openLocal": "Open File (JSON)",
+    "saveLocal": "Save to File (JSON)",
+    "drive": "Google Drive",
+    "saveToDrive": "Save to Drive",
+    "openFromDrive": "Open from Drive",
+    "search": "Search (Ctrl+K)",
+    "aiAssistant": "AI Assistant"
+  },
+  "toolbar": {
+    "select": "Select (V)",
+    "delete": "Delete Selected (Del)",
+    "clearCanvas": "Clear Canvas"
+  },
+  "ai": {
+    "title": "AI Copilot",
+    "placeholder": "Ask AI to model your domain...",
+    "send": "Send",
+    "settings": "Settings",
+    "apiKey": "OpenAI API Key",
+    "baseUrl": "Base URL",
+    "model": "Model",
+    "saveSettings": "Save Settings",
+    "toolsCalled": "Tools invoked"
+  },
+  "drive": {
+    "title": "Google Drive",
+    "signIn": "Sign In with Google",
+    "signOut": "Sign Out",
+    "saveTab": "Save to Drive",
+    "openTab": "Open from Drive",
+    "fileName": "File Name",
+    "saveBtn": "Save",
+    "loading": "Loading...",
+    "noFiles": "No event modeling files found on your Drive.",
+    "selectFile": "Open Selected"
+  },
+  "modal": {
+    "newBoardTitle": "Create New Board?",
+    "newBoardDesc": "All unsaved changes will be lost. Do you want to proceed?",
+    "confirm": "Yes, Clear Board",
+    "cancel": "Cancel"
+  }
+}

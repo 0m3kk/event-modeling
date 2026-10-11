@@ -1,0 +1,53 @@
+{
+  "header": {
+    "untitled": "Bảng thiết kế chưa đặt tên",
+    "undo": "Hoàn tác (Ctrl+Z)",
+    "redo": "Làm lại (Ctrl+Y)",
+    "zoomIn": "Phóng to",
+    "zoomOut": "Thu nhỏ",
+    "resetZoom": "Thu phóng chuẩn",
+    "file": "Tệp",
+    "newBoard": "Tạo bảng mới",
+    "openLocal": "Mở tệp từ máy (JSON)",
+    "saveLocal": "Lưu tệp về máy (JSON)",
+    "drive": "Google Drive",
+    "saveToDrive": "Lưu lên Google Drive",
+    "openFromDrive": "Mở từ Google Drive",
+    "search": "Tìm kiếm (Ctrl+K)",
+    "aiAssistant": "Trợ lý AI"
+  },
+  "toolbar": {
+    "select": "Chọn đối tượng (V)",
+    "delete": "Xóa đối tượng đang chọn (Del)",
+    "clearCanvas": "Xóa toàn bộ bảng"
+  },
+  "ai": {
+    "title": "Trợ lý AI",
+    "placeholder": "Yêu cầu AI mô hình hóa domain của bạn...",
+    "send": "Gửi",
+    "settings": "Cài đặt",
+    "apiKey": "OpenAI API Key",
+    "baseUrl": "Base URL",
+    "model": "Tên Model",
+    "saveSettings": "Lưu cài đặt",
+    "toolsCalled": "Công cụ đã kích hoạt"
+  },
+  "drive": {
+    "title": "Google Drive",
+    "signIn": "Đăng nhập Google",
+    "signOut": "Đăng xuất",
+    "saveTab": "Lưu lên Drive",
+    "openTab": "Mở từ Drive",
+    "fileName": "Tên tệp",
+    "saveBtn": "Lưu",
+    "loading": "Đang tải...",
+    "noFiles": "Không tìm thấy tệp event-modeling nào trên Drive.",
+    "selectFile": "Mở tệp đã chọn"
+  },
+  "modal": {
+    "newBoardTitle": "Tạo bảng vẽ mới?",
+    "newBoardDesc": "Mọi thay đổi chưa lưu sẽ bị xóa. Bạn có chắc chắn muốn tiếp tục?",
+    "confirm": "Đồng ý tạo mới",
+    "cancel": "Hủy bỏ"
+  }
+}
