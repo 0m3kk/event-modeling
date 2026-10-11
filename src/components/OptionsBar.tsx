@@ -171,12 +171,16 @@ export function OptionsBar() {
 
   return (
     <div
-      className={`pointer-events-none absolute z-40 -translate-x-1/2 ${
-        isAbove ? "-translate-y-full" : ""
-      }`}
+      className="pointer-events-none absolute z-40"
       style={{
         left: `${barX}px`,
         top: `${barY}px`,
+        // Scale the bar together with the canvas so it zooms in/out with the
+        // selected element. The transform-origin is set to the anchor edge
+        // (bottom-center when above, top-center when below) so the bar stays
+        // pinned to the element while growing/shrinking from that point.
+        transform: `translate(-50%, ${isAbove ? "-100%" : "0"}) scale(${zoom})`,
+        transformOrigin: isAbove ? "50% 100%" : "50% 0%",
       }}
     >
       <div
