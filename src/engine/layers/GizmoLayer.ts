@@ -1,5 +1,7 @@
 import { Container, Graphics } from "pixi.js";
 import type { Rect, CanvasElement, Point } from "@/types";
+import { toolRegistry } from "@/tools";
+import { SLICE_TYPE } from "@/tools/sliceCard/layout";
 
 /** On-screen size (px) of a resize handle, kept constant across zoom levels. */
 export const RESIZE_HANDLE_SIZE = 10;
@@ -9,6 +11,12 @@ export const RESIZE_HANDLE_HIT = 18;
 export const MIN_ELEMENT_WIDTH = 80;
 
 export type ResizeSide = "left" | "right";
+
+/** Whether a card exposes resize handles (auto-sized containers do not). */
+export function isResizableElement(element: CanvasElement): boolean {
+  if (element.type === SLICE_TYPE) return false;
+  return toolRegistry.get(element.type)?.resizable !== false;
+}
 
 /** World-space centers of a card's left/right resize handles (mid-height). */
 export function getResizeHandleCenters(element: CanvasElement): {
@@ -55,12 +63,14 @@ export function hitResizeHandle(
 export class GizmoLayer extends Container {
   private marqueeGraphics = new Graphics();
   private boundsGraphics = new Graphics();
+  private dropGraphics = new Graphics();
   private handlesGraphics = new Graphics();
 
   constructor() {
     super();
     this.addChild(this.marqueeGraphics);
     this.addChild(this.boundsGraphics);
+    this.addChild(this.dropGraphics);
     this.addChild(this.handlesGraphics);
   }
 
@@ -85,7 +95,9 @@ export class GizmoLayer extends Container {
     // Single selection: the card draws its own selection stroke, so the gizmo
     // only contributes the left/right resize handles.
     if (selectedElements.length === 1) {
-      this.drawResizeHandles(selectedElements[0], zoom);
+      if (isResizableElement(selectedElements[0])) {
+        this.drawResizeHandles(selectedElements[0], zoom);
+      }
       return;
     }
 
@@ -135,6 +147,17 @@ export class GizmoLayer extends Container {
   clear() {
     this.marqueeGraphics.clear();
     this.boundsGraphics.clear();
+    this.dropGraphics.clear();
     this.handlesGraphics.clear();
+  }
+
+  /** Highlights the lane a dragged card would drop into (null clears it). */
+  drawDropTarget(rect: Rect | null) {
+    this.dropGraphics.clear();
+    if (!rect) return;
+
+    this.dropGraphics.roundRect(rect.x, rect.y, rect.width, rect.height, 8);
+    this.dropGraphics.fill({ color: 0x3b82f6, alpha: 0.1 });
+    this.dropGraphics.stroke({ color: 0x3b82f6, width: 2, alpha: 0.75 });
   }
 }

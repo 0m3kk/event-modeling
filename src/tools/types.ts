@@ -77,6 +77,11 @@ export interface ToolDefinition<TData = any> {
   createDefaultData: () => TData;
   defaultSize: { width: number; height: number };
   computeSize?: (data: TData) => { width: number; height: number };
+  /**
+   * Whether the card exposes left/right resize handles. Defaults to true.
+   * Auto-sized containers (e.g. a Slice) set this to false.
+   */
+  resizable?: boolean;
 
   render: (container: Container, element: CanvasElement<TData>, context: RenderContext) => void;
   destroy?: (container: Container) => void;

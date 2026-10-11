@@ -10,6 +10,7 @@ import { viewCardTool } from "./viewCard";
 import { enumCardTool } from "./enumCard";
 import { aliasCardTool } from "./aliasCard";
 import { serviceCardTool } from "./serviceCard";
+import { sliceCardTool } from "./sliceCard";
 
 describe("toolRegistry", () => {
   it("registers and retrieves tools", () => {
@@ -23,6 +24,7 @@ describe("toolRegistry", () => {
     expect(toolRegistry.get("enumCard")).toBe(enumCardTool);
     expect(toolRegistry.get("aliasCard")).toBe(aliasCardTool);
     expect(toolRegistry.get("serviceCard")).toBe(serviceCardTool);
+    expect(toolRegistry.get("sliceCard")).toBe(sliceCardTool);
     expect(toolRegistry.get("nonexistent")).toBeUndefined();
   });
 
@@ -36,6 +38,7 @@ describe("toolRegistry", () => {
     expect(all.some((t) => t.type === "constraintCard")).toBe(true);
     expect(all.some((t) => t.type === "eventCard")).toBe(true);
     expect(all.some((t) => t.type === "serviceCard")).toBe(true);
+    expect(all.some((t) => t.type === "sliceCard")).toBe(true);
   });
 
   it("extracts AI tools from registered tools", () => {
@@ -49,5 +52,6 @@ describe("toolRegistry", () => {
     expect(aiTools.some((t) => t.toolName === "create_event_card")).toBe(true);
     expect(aiTools.some((t) => t.toolName === "create_sticky_note")).toBe(true);
     expect(aiTools.some((t) => t.toolName === "create_service_card")).toBe(true);
+    expect(aiTools.some((t) => t.toolName === "create_slice")).toBe(true);
   });
 });

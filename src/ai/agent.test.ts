@@ -327,4 +327,51 @@ describe("AIAgent", () => {
     expect(res.status).toBe("error");
     expect(res.error).toBe("element_not_found");
   });
+
+  it("exposes create_slice and update_slice tools", () => {
+    const names = buildOpenAITools().map((t) => t.function.name);
+    expect(names).toContain("create_slice");
+    expect(names).toContain("update_slice");
+  });
+
+  it("creates a slice with typed lanes via AI", async () => {
+    const res = JSON.parse(
+      await executeAITool("create_slice", {
+        name: "PlaceOrderSlice",
+        lanes: [{ type: "commandCard" }, { type: "eventCard" }, { type: "queryCard" }],
+      }),
+    );
+    expect(res.status).toBe("success");
+    expect(res.type).toBe("sliceCard");
+
+    const slice = useCanvasStore.getState().elements.find((e) => e.type === "sliceCard");
+    expect((slice?.data as any).lanes).toHaveLength(3);
+    expect((slice?.data as any).lanes[0].childType).toBe("commandCard");
+  });
+
+  it("rejects an AI slice with a disallowed lane type or no lanes", async () => {
+    const bad = JSON.parse(
+      await executeAITool("create_slice", { name: "Bad", lanes: [{ type: "enumCard" }] }),
+    );
+    expect(bad.status).toBe("error");
+    expect(bad.issues.map((i: any) => i.code)).toContain("lane_type_not_allowed");
+
+    const empty = JSON.parse(await executeAITool("create_slice", { name: "Empty", lanes: [] }));
+    expect(empty.status).toBe("error");
+    expect(empty.issues.map((i: any) => i.code)).toContain("lanes_empty");
+
+    expect(useCanvasStore.getState().elements).toHaveLength(0);
+  });
+
+  it("rejects an AI slice that repeats a lane type", async () => {
+    const res = JSON.parse(
+      await executeAITool("create_slice", {
+        name: "Dup",
+        lanes: [{ type: "commandCard" }, { type: "commandCard" }],
+      }),
+    );
+    expect(res.status).toBe("error");
+    expect(res.issues.map((i: any) => i.code)).toContain("duplicate_lane_type");
+    expect(useCanvasStore.getState().elements).toHaveLength(0);
+  });
 });

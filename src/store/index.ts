@@ -15,6 +15,7 @@ import {
   pruneDanglingReferences,
 } from "@/utils/reference";
 import { toolRegistry } from "@/tools/registry";
+import { reflowSlices } from "@/tools/sliceCard/layout";
 import {
   navigateSubSelect,
   getAdjacentSubSelectAfterDeletion,
@@ -176,7 +177,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: [...state.elements, uniqueElement],
+      elements: reflowSlices([...state.elements, uniqueElement]),
       selectedIds: [uniqueElement.id],
       selectedField: null,
       inlineEdit: null,
@@ -195,7 +196,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: [...state.elements, ...processed],
+      elements: reflowSlices([...state.elements, ...processed]),
       selectedIds: processed.map((e) => e.id),
       selectedField: null,
       inlineEdit: null,
@@ -277,7 +278,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: updatedElements,
+      elements: reflowSlices(updatedElements),
     }));
   },
 
@@ -297,7 +298,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: updatedElements,
+      elements: reflowSlices(updatedElements),
     }));
   },
 
@@ -311,7 +312,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: cleaned,
+      elements: reflowSlices(cleaned),
       selectedIds: state.selectedIds.filter((id) => !idSet.has(id)),
       selectedField:
         state.selectedField && idSet.has(state.selectedField.elementId)
@@ -554,7 +555,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     const normalized = project.elements.map((el) => normalizeElementData(el, project.elements));
     set({
       projectName: project.name,
-      elements: normalized,
+      elements: reflowSlices(normalized),
       selectedIds: [],
       viewport: {
         x: project.viewport.x,

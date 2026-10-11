@@ -9,6 +9,7 @@ import { enumCardTool } from "./enumCard";
 import { eventCardTool } from "./eventCard";
 import { objectCardTool } from "./objectCard";
 import { serviceCardTool } from "./serviceCard";
+import { sliceCardTool } from "./sliceCard";
 import { stickyNoteTool } from "./stickyNote";
 
 // Register default decoupled tools (order here drives the toolbar order)
@@ -19,6 +20,7 @@ toolRegistry.register(stateCardTool);
 toolRegistry.register(viewCardTool);
 toolRegistry.register(constraintCardTool);
 toolRegistry.register(serviceCardTool);
+toolRegistry.register(sliceCardTool);
 toolRegistry.register(objectCardTool);
 toolRegistry.register(enumCardTool);
 toolRegistry.register(aliasCardTool);
@@ -37,5 +39,6 @@ export {
   eventCardTool,
   objectCardTool,
   serviceCardTool,
+  sliceCardTool,
   stickyNoteTool,
 };

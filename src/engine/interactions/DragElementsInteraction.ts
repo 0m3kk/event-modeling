@@ -2,6 +2,7 @@ import type { CanvasInteraction, InteractionContext } from "./types";
 import type { Point, CanvasElement } from "@/types";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
+import { findSliceDropTarget, SLICE_TYPE } from "@/tools/sliceCard/layout";
 
 export class DragElementsInteraction implements CanvasInteraction {
   readonly id = "dragElements";
@@ -10,6 +11,8 @@ export class DragElementsInteraction implements CanvasInteraction {
   private dragStartWorld: Point = { x: 0, y: 0 };
   private initialPositions = new Map<string, Point>();
   private hitElementId: string | null = null;
+  /** The single element being dragged, when exactly one is selected. */
+  private singleDragged: { id: string; type: string } | null = null;
 
   isActive(): boolean {
     return this.active;
@@ -26,6 +29,7 @@ export class DragElementsInteraction implements CanvasInteraction {
     this.active = true;
     this.hasMoved = false;
     this.hitElementId = hitId;
+    this.singleDragged = null;
     this.dragStartWorld = worldPoint;
     this.initialPositions.clear();
 
@@ -42,7 +46,7 @@ export class DragElementsInteraction implements CanvasInteraction {
       useCanvasStore.getState().setSelectedIds([hitId]);
     }
 
-    // Sub-element selection (e.g. fields)
+    // Sub-element selection (e.g. fields, slice lanes)
     const hitElement = elements.find((item) => item.id === hitId);
     if (hitElement) {
       const tool = toolRegistry.get(hitElement.type);
@@ -69,13 +73,28 @@ export class DragElementsInteraction implements CanvasInteraction {
       }
     }
 
-    // Capture initial positions of all items to drag
+    // Capture initial positions of all items to drag. Dragging a Slice also
+    // carries every card it contains.
     const finalSelected = useCanvasStore.getState().selectedIds;
+    const dragIds = new Set<string>(finalSelected);
     for (const id of finalSelected) {
+      const el = elements.find((item) => item.id === id);
+      if (el?.type === SLICE_TYPE) {
+        for (const child of elements) {
+          if (child.sliceId === id) dragIds.add(child.id);
+        }
+      }
+    }
+    for (const id of dragIds) {
       const el = elements.find((item) => item.id === id);
       if (el) {
         this.initialPositions.set(id, { x: el.x, y: el.y });
       }
+    }
+
+    if (finalSelected.length === 1) {
+      const el = elements.find((item) => item.id === finalSelected[0]);
+      if (el) this.singleDragged = { id: el.id, type: el.type };
     }
 
     return true;
@@ -106,6 +125,9 @@ export class DragElementsInteraction implements CanvasInteraction {
     });
 
     const selectedSet = new Set(state.selectedIds);
+    // Slices carry their cards, so keep the cards visible while dragging.
+    for (const id of this.initialPositions.keys()) selectedSet.add(id);
+
     ctx.elementLayer.renderElements(
       nextElements,
       selectedSet,
@@ -115,11 +137,30 @@ export class DragElementsInteraction implements CanvasInteraction {
 
     const selected = nextElements.filter((el) => selectedSet.has(el.id));
     ctx.gizmoLayer.drawSelectionBounds(selected, state.viewport.zoom);
+    this.updateDropTarget(worldPoint, ctx);
   }
 
-  onPointerUp(_e: PointerEvent, worldPoint: Point, _ctx: InteractionContext): void {
+  /** Shows/clears the lane highlight for a single non-slice card drag. */
+  private updateDropTarget(worldPoint: Point, ctx: InteractionContext): void {
+    if (!this.hasMoved || !this.singleDragged || this.singleDragged.type === SLICE_TYPE) {
+      ctx.gizmoLayer.drawDropTarget(null);
+      return;
+    }
+
+    const elements = useCanvasStore.getState().elements;
+    const target = findSliceDropTarget(
+      elements,
+      worldPoint,
+      this.singleDragged.id,
+      this.singleDragged.type,
+    );
+    ctx.gizmoLayer.drawDropTarget(target ? target.rect : null);
+  }
+
+  onPointerUp(_e: PointerEvent, worldPoint: Point, ctx: InteractionContext): void {
     if (!this.active) return;
     this.active = false;
+    ctx.gizmoLayer.drawDropTarget(null);
 
     if (this.hasMoved) {
       this.hasMoved = false;
@@ -138,20 +179,61 @@ export class DragElementsInteraction implements CanvasInteraction {
           y: Math.round(initial.y + dy),
         });
       }
-      useCanvasStore.getState().updateElements(updates);
+
+      const single = this.singleDragged;
+      if (single && single.type !== SLICE_TYPE) {
+        const elements = useCanvasStore.getState().elements;
+        const dragged = elements.find((el) => el.id === single.id);
+        const index = updates.findIndex((u) => u.id === single.id);
+
+        if (dragged && index >= 0) {
+          const target = findSliceDropTarget(
+            elements,
+            worldPoint,
+            single.id,
+            single.type,
+          );
+
+          if (target && target.allowed) {
+            // Join (or move within) the lane; the store reflows the position.
+            updates[index] = {
+              ...updates[index],
+              sliceId: target.sliceId,
+              laneId: target.laneId,
+            };
+          } else if (target && !target.allowed) {
+            // Invalid lane type: snap back to where it was.
+            updates.splice(index, 1);
+          } else {
+            // Dropped outside any slice: detach from its lane.
+            updates[index] = {
+              ...updates[index],
+              sliceId: undefined,
+              laneId: undefined,
+            };
+          }
+        }
+      }
+
+      if (updates.length > 0) {
+        useCanvasStore.getState().updateElements(updates);
+      }
     }
 
     this.initialPositions.clear();
+    this.singleDragged = null;
     this.hitElementId = null;
   }
 
-  onCancel(_ctx: InteractionContext): void {
+  onCancel(ctx: InteractionContext): void {
     if (this.hasMoved) {
       this.hasMoved = false;
       useCanvasStore.getState().setIsDragging(false);
     }
+    ctx.gizmoLayer.drawDropTarget(null);
     this.active = false;
     this.initialPositions.clear();
+    this.singleDragged = null;
     this.hitElementId = null;
   }
 }

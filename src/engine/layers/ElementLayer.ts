@@ -6,6 +6,7 @@ import { computeTextResolution } from "../textResolution";
 import { useCanvasStore } from "@/store";
 import { drawReferenceIndicator, drawMethodCopyBadge } from "./linkBadge";
 import { clearDescZones } from "@/tools/common/descZones";
+import { orderForRender } from "@/tools/sliceCard/layout";
 
 interface CacheableContainer extends Container {
   /** Element object last rendered into this container (store updates are immutable). */
@@ -15,10 +16,19 @@ interface CacheableContainer extends Container {
   _theme?: ResolvedTheme;
   _textResolution?: number;
   _isOriginal?: boolean;
+  /** Signature of a slice's lane contents, so lane labels refresh. */
+  _sliceSig?: string;
 }
 
 export class ElementLayer extends Container {
   private elementContainers = new Map<string, CacheableContainer>();
+
+  constructor() {
+    super();
+    // Children carry explicit zIndex values (see renderElements) so slices can
+    // be pushed behind their cards regardless of insertion order.
+    this.sortableChildren = true;
+  }
 
   renderElements(
     elements: CanvasElement[],
@@ -39,7 +49,20 @@ export class ElementLayer extends Container {
       }
     }
 
-    for (const element of elements) {
+    let renderIndex = 0;
+
+    // A slice's visuals depend on its cards (lane type + count). Hash that
+    // membership so the slice redraws when a lane's contents change even if the
+    // slice's own size happens to stay the same.
+    const childSigs = new Map<string, string[]>();
+    for (const el of elements) {
+      if (!el.sliceId) continue;
+      const list = childSigs.get(el.sliceId) ?? [];
+      list.push(`${el.laneId ?? ""}:${el.type}`);
+      childSigs.set(el.sliceId, list);
+    }
+
+    for (const element of orderForRender(elements)) {
       activeIds.add(element.id);
       let container = this.elementContainers.get(element.id);
       if (!container) {
@@ -48,8 +71,11 @@ export class ElementLayer extends Container {
         this.elementContainers.set(element.id, container);
       }
 
+      container.zIndex = renderIndex++;
       container.x = element.x;
       container.y = element.y;
+
+      const sliceSig = childSigs.get(element.id)?.sort().join(",") ?? "";
 
       const isSelected = selectedIds.has(element.id);
       const fieldKey =
@@ -73,7 +99,8 @@ export class ElementLayer extends Container {
         container._fieldKey !== fieldKey ||
         container._theme !== theme ||
         container._textResolution !== textResolution ||
-        container._isOriginal !== isOriginal;
+        container._isOriginal !== isOriginal ||
+        container._sliceSig !== sliceSig;
 
       if (needsRender) {
         container._src = element;
@@ -82,6 +109,7 @@ export class ElementLayer extends Container {
         container._theme = theme;
         container._textResolution = textResolution;
         container._isOriginal = isOriginal;
+        container._sliceSig = sliceSig;
 
         const context: RenderContext = {
           theme,

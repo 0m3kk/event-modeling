@@ -1,5 +1,6 @@
 import RBush from "rbush";
 import type { CanvasElement, Point, Rect } from "@/types";
+import { orderForRender } from "@/tools/sliceCard/layout";
 
 interface SpatialItem {
   minX: number;
@@ -7,6 +8,8 @@ interface SpatialItem {
   maxX: number;
   maxY: number;
   id: string;
+  /** Render order; a higher value is drawn on top. */
+  order: number;
 }
 
 export class SpatialIndex {
@@ -20,12 +23,16 @@ export class SpatialIndex {
 
   rebuild(elements: CanvasElement[]) {
     this.clear();
-    const items: SpatialItem[] = elements.map((el) => ({
+    // Index in render order (slices before their cards) so hit-testing can pick
+    // the top-most element without relying on rbush's internal ordering.
+    const ordered = orderForRender(elements);
+    const items: SpatialItem[] = ordered.map((el, index) => ({
       minX: el.x,
       minY: el.y,
       maxX: el.x + el.width,
       maxY: el.y + el.height,
       id: el.id,
+      order: index,
     }));
 
     for (const item of items) {
@@ -53,7 +60,12 @@ export class SpatialIndex {
     });
 
     if (results.length === 0) return null;
-    // Return the last one (drawn on top)
-    return results[results.length - 1].id;
+
+    // Return the top-most item (highest render order).
+    let top = results[0];
+    for (const item of results) {
+      if (item.order > top.order) top = item;
+    }
+    return top.id;
   }
 }

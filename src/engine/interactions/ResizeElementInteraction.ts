@@ -3,6 +3,7 @@ import type { Point } from "@/types";
 import { useCanvasStore } from "@/store";
 import {
   hitResizeHandle,
+  isResizableElement,
   MIN_ELEMENT_WIDTH,
   type ResizeSide,
 } from "../layers/GizmoLayer";
@@ -71,6 +72,7 @@ export class ResizeElementInteraction implements CanvasInteraction {
 
     const element = state.elements.find((el) => el.id === state.selectedIds[0]);
     if (!element || element.locked) return false;
+    if (!isResizableElement(element)) return false;
 
     const side = hitResizeHandle(element, worldPoint, state.viewport.zoom);
     if (!side) return false;

@@ -24,6 +24,10 @@ export interface CanvasElement<TData = any> {
   zIndex?: number;
   locked?: boolean;
   groupId?: string;
+  /** Id of the Slice this card belongs to (when it lives inside a lane). */
+  sliceId?: string;
+  /** Id of the lane within {@link sliceId} that holds this card. */
+  laneId?: string;
   data: TData;
 }
 
@@ -53,6 +57,8 @@ export const CanvasElementSchema = z.object({
   zIndex: z.number().optional(),
   locked: z.boolean().optional(),
   groupId: z.string().optional(),
+  sliceId: z.string().optional(),
+  laneId: z.string().optional(),
   data: z.record(z.unknown()).default({}),
 });
 

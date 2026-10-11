@@ -4,7 +4,7 @@ import { MarqueeInteraction } from "./MarqueeInteraction";
 import { DragElementsInteraction } from "./DragElementsInteraction";
 import { CreateElementInteraction } from "./CreateElementInteraction";
 import { ResizeElementInteraction } from "./ResizeElementInteraction";
-import { hitResizeHandle } from "../layers/GizmoLayer";
+import { hitResizeHandle, isResizableElement } from "../layers/GizmoLayer";
 import type { Point } from "@/types";
 import { useCanvasStore } from "@/store";
 
@@ -112,6 +112,7 @@ export class InteractionManager {
     if (state.selectedIds.length !== 1) return false;
     const element = state.elements.find((el) => el.id === state.selectedIds[0]);
     if (!element || element.locked) return false;
+    if (!isResizableElement(element)) return false;
     return hitResizeHandle(element, worldPoint, state.viewport.zoom) !== null;
   }
 
