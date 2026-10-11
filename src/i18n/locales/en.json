@@ -32,6 +32,8 @@
     "saveSettings": "Save Settings",
     "retry": "Retry with last prompt",
     "newChat": "New chat (⌘/Ctrl+Alt+N)",
+    "increaseFont": "Increase font size",
+    "decreaseFont": "Decrease font size",
     "maxTokens": "Max tokens",
     "maxTurns": "Max tool turns",
     "limitsHelp": "Maximum tokens per response and maximum tool-call turns per request.",

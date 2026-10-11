@@ -32,6 +32,8 @@
     "saveSettings": "Lưu cài đặt",
     "retry": "Thử lại với prompt cuối",
     "newChat": "Phiên chat mới (⌘/Ctrl+Alt+N)",
+    "increaseFont": "Tăng cỡ chữ",
+    "decreaseFont": "Giảm cỡ chữ",
     "maxTokens": "Giới hạn token",
     "maxTurns": "Số vòng gọi công cụ tối đa",
     "limitsHelp": "Số token tối đa cho mỗi phản hồi và số vòng gọi công cụ tối đa cho một yêu cầu.",

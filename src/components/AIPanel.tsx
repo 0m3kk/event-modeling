@@ -8,6 +8,8 @@ import {
   Wrench,
   RotateCcw,
   MessageSquarePlus,
+  AArrowDown,
+  AArrowUp,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
@@ -25,6 +27,32 @@ const AI_PANEL_WIDTH_STORAGE_KEY = "event_modeling_ai_panel_width";
 const MIN_PANEL_WIDTH = 300;
 const MAX_PANEL_WIDTH = 700;
 const DEFAULT_PANEL_WIDTH = 380;
+
+const AI_PANEL_FONT_SCALE_STORAGE_KEY = "event_modeling_ai_panel_font_scale";
+// Discrete multipliers applied to the panel's base text sizes. The 1.0 entry is
+// the default/neutral step.
+const FONT_SCALE_LEVELS = [0.85, 1, 1.15, 1.3, 1.5];
+const DEFAULT_FONT_SCALE = 1;
+
+// Max height (px) the prompt textarea grows to before it starts scrolling.
+const MAX_INPUT_HEIGHT = 160;
+
+/** Restores the panel font scale from the last session, snapped to a known level. */
+function getStoredFontScale(): number {
+  try {
+    const raw = localStorage.getItem(AI_PANEL_FONT_SCALE_STORAGE_KEY);
+    const parsed = raw ? Number.parseFloat(raw) : Number.NaN;
+    if (Number.isFinite(parsed)) {
+      // Snap to the closest level so stale/free-form values stay in-sync.
+      return FONT_SCALE_LEVELS.reduce((best, level) =>
+        Math.abs(level - parsed) < Math.abs(best - parsed) ? level : best,
+      );
+    }
+  } catch {
+    // Ignore storage errors (private mode, quota, etc.)
+  }
+  return DEFAULT_FONT_SCALE;
+}
 
 /** Restores the panel width from the last session, clamped to sane bounds. */
 function getStoredPanelWidth(): number {
@@ -71,6 +99,9 @@ export function AIPanel() {
   const isResizingRef = useRef(false);
   const panelWidthRef = useRef(panelWidth);
 
+  // Panel font scale (persisted across sessions)
+  const [fontScale, setFontScale] = useState(getStoredFontScale);
+
   // The history snapshot for the most recent turn, used by retry.
   const lastTurnRef = useRef<ChatMessage[] | null>(null);
 
@@ -83,10 +114,19 @@ export function AIPanel() {
   const opencodeSessionRef = useRef<string>(createSessionId());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  // Grow the prompt box with its content, up to a cap where it starts scrolling.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`;
+  }, [input, isSettingsOpen]);
 
   // Start a fresh chat session, dropping any pending reply from the old one.
   const handleNewSession = () => {
@@ -146,6 +186,29 @@ export function AIPanel() {
       // Ignore storage errors
     }
   };
+
+  // Step the panel font scale up or down within the predefined levels and persist it.
+  const changeFontScale = (direction: 1 | -1) => {
+    setFontScale((prev) => {
+      const currentIndex = FONT_SCALE_LEVELS.indexOf(prev);
+      const nextIndex = Math.min(
+        FONT_SCALE_LEVELS.length - 1,
+        Math.max(0, currentIndex + direction),
+      );
+      const next = FONT_SCALE_LEVELS[nextIndex];
+      if (next !== prev) {
+        try {
+          localStorage.setItem(AI_PANEL_FONT_SCALE_STORAGE_KEY, String(next));
+        } catch {
+          // Ignore storage errors
+        }
+      }
+      return next;
+    });
+  };
+
+  const canDecreaseFont = fontScale > FONT_SCALE_LEVELS[0];
+  const canIncreaseFont = fontScale < FONT_SCALE_LEVELS[FONT_SCALE_LEVELS.length - 1];
 
   const handleSaveSettings = () => {
     const updated: AISettings = {
@@ -251,8 +314,13 @@ export function AIPanel() {
 
   return (
     <aside
-      style={{ width: `${panelWidth}px` }}
-      className="absolute right-0 top-14 bottom-6 z-20 flex flex-col border-l border-gray-200/80 bg-white/95 backdrop-blur-md shadow-2xl select-text dark:border-zinc-800/80 dark:bg-zinc-900/95"
+      style={
+        {
+          width: `${panelWidth}px`,
+          "--ai-font-scale": String(fontScale),
+        } as React.CSSProperties
+      }
+      className="ai-panel absolute right-0 top-14 bottom-6 z-20 flex flex-col border-l border-gray-200/80 bg-white/95 backdrop-blur-md shadow-2xl select-text dark:border-zinc-800/80 dark:bg-zinc-900/95"
     >
       {/* Drag handle to resize panel */}
       <div
@@ -267,6 +335,24 @@ export function AIPanel() {
           <span>{t("ai.title")}</span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => changeFontScale(-1)}
+            disabled={!canDecreaseFont}
+            title={t("ai.decreaseFont")}
+            aria-label={t("ai.decreaseFont")}
+            className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer dark:text-zinc-400 dark:hover:bg-zinc-800 dark:disabled:hover:bg-transparent"
+          >
+            <AArrowDown size={16} />
+          </button>
+          <button
+            onClick={() => changeFontScale(1)}
+            disabled={!canIncreaseFont}
+            title={t("ai.increaseFont")}
+            aria-label={t("ai.increaseFont")}
+            className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer dark:text-zinc-400 dark:hover:bg-zinc-800 dark:disabled:hover:bg-transparent"
+          >
+            <AArrowUp size={16} />
+          </button>
           <button
             onClick={handleNewSession}
             title={t("ai.newChat")}
@@ -412,14 +498,23 @@ export function AIPanel() {
               e.preventDefault();
               handleSend();
             }}
-            className="flex items-center gap-2"
+            className="flex items-end gap-2"
           >
-            <input
-              type="text"
+            <textarea
+              ref={inputRef}
+              rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter sends; Shift+Enter inserts a newline. Skip while an IME
+                // (e.g. Vietnamese) is composing so candidates don't submit.
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
               placeholder={t("ai.placeholder")}
-              className="flex-1 rounded-xl border border-gray-200 bg-transparent px-3 py-2 text-xs outline-none focus:border-purple-500 dark:border-zinc-700 dark:text-zinc-100"
+              className="flex-1 resize-none overflow-y-auto rounded-xl border border-gray-200 bg-transparent px-3 py-2 text-xs leading-relaxed outline-none focus:border-purple-500 dark:border-zinc-700 dark:text-zinc-100"
             />
             <button
               type="button"

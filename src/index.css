@@ -39,3 +39,25 @@ select {
   outline: none;
   -webkit-tap-highlight-color: transparent;
 }
+
+/*
+ * AI panel font scaling.
+ * The panel sets --ai-font-scale (see AIPanel.tsx). These unlayered rules
+ * override Tailwind's fixed text utilities (which live in @layer utilities)
+ * so every text size in the panel scales from that single variable.
+ */
+.ai-panel {
+  --ai-font-scale: 1;
+}
+
+.ai-panel .text-\[11px\] {
+  font-size: calc(11px * var(--ai-font-scale));
+}
+
+.ai-panel .text-xs {
+  font-size: calc(0.75rem * var(--ai-font-scale));
+}
+
+.ai-panel .text-sm {
+  font-size: calc(0.875rem * var(--ai-font-scale));
+}
