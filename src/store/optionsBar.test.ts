@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useCanvasStore } from "./index";
-import { eventCardTool } from "@/tools/eventCard";
+import { eventCardTool, type EventCardData } from "@/tools/eventCard";
 import { stickyNoteTool } from "@/tools/stickyNote";
 import type { CanvasElement } from "@/types";
 
@@ -10,7 +10,7 @@ describe("OptionsBar data workflows & undo/redo", () => {
   });
 
   it("updates element color and tracks in undo stack", () => {
-    const card: CanvasElement = {
+    const card: CanvasElement<EventCardData> = {
       id: "card-1",
       type: "eventCard",
       x: 100,
@@ -80,7 +80,7 @@ describe("OptionsBar data workflows & undo/redo", () => {
   });
 
   it("supports adding field to EventCard and recalculating height", () => {
-    const card: CanvasElement = {
+    const card: CanvasElement<EventCardData> = {
       id: "card-1",
       type: "eventCard",
       x: 100,
@@ -95,7 +95,7 @@ describe("OptionsBar data workflows & undo/redo", () => {
     const initialHeight = card.height;
     const newField = { name: "customerEmail", type: "string" };
     const nextFields = [...card.data.fields, newField];
-    const nextData = { ...card.data, fields: nextFields };
+    const nextData: EventCardData = { ...card.data, fields: nextFields };
     const nextSize = eventCardTool.computeSize!(nextData);
 
     useCanvasStore.getState().updateElement("card-1", {

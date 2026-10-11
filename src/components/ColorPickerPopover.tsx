@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Palette, Check } from "lucide-react";
+import { getContrastTextColor } from "@/utils/color";
 
 export const PRESET_COLORS = [
   { name: "Orange", hex: "#f97316" },
@@ -19,6 +20,7 @@ interface ColorPickerPopoverProps {
   onSelectColor: (hex: string) => void;
   isOpen: boolean;
   onClose: () => void;
+  placement?: "top" | "bottom";
 }
 
 export function ColorPickerPopover({
@@ -26,6 +28,7 @@ export function ColorPickerPopover({
   onSelectColor,
   isOpen,
   onClose,
+  placement = "top",
 }: ColorPickerPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -42,37 +45,75 @@ export function ColorPickerPopover({
 
   if (!isOpen) return null;
 
+  const positionClasses =
+    placement === "bottom"
+      ? "top-full mt-2"
+      : "bottom-full mb-2";
+
   return (
     <div
       ref={popoverRef}
-      className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-2xl border border-gray-200 bg-white p-2.5 shadow-2xl backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900 z-50 select-none animate-in fade-in zoom-in-95 duration-100"
+      className={`absolute left-0 ${positionClasses} w-[184px] rounded-2xl border border-gray-200/90 bg-white/95 p-2.5 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
     >
-      <div className="mb-2 flex items-center justify-between gap-3 px-1 text-[11px] font-medium text-gray-500 dark:text-zinc-400">
+      <div className="mb-2 flex items-center justify-between px-0.5 text-[11px] font-semibold text-gray-500 dark:text-zinc-400">
         <span className="flex items-center gap-1.5">
           <Palette size={13} />
           <span>Color</span>
         </span>
+        {currentColor && (
+          <span className="font-mono text-[10px] uppercase text-gray-400 dark:text-zinc-500">
+            {currentColor}
+          </span>
+        )}
       </div>
 
-      <div className="grid grid-cols-5 gap-1.5">
+      {/* Preset Swatches Grid */}
+      <div className="grid grid-cols-5 gap-2 justify-items-center">
         {PRESET_COLORS.map((c) => {
           const isSelected =
             currentColor?.toLowerCase() === c.hex.toLowerCase();
+          const checkColor = getContrastTextColor(c.hex);
+
           return (
             <button
               key={c.hex}
+              type="button"
               onClick={() => {
                 onSelectColor(c.hex);
                 onClose();
               }}
               title={c.name}
-              className="relative flex h-6 w-6 items-center justify-center rounded-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+              className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-black/10 shadow-xs transition-transform hover:scale-110 active:scale-95 cursor-pointer dark:border-white/10"
               style={{ backgroundColor: c.hex }}
             >
-              {isSelected && <Check size={13} className="text-white drop-shadow-sm font-bold" />}
+              {isSelected && (
+                <Check
+                  size={13}
+                  style={{ color: checkColor }}
+                  className="stroke-[3]"
+                />
+              )}
             </button>
           );
         })}
+      </div>
+
+      {/* Custom Color Native Picker */}
+      <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800 flex items-center justify-between px-0.5">
+        <span className="text-[10px] text-gray-400 dark:text-zinc-500 font-mono">Custom</span>
+        <label className="relative flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+          <span
+            className="h-4 w-4 rounded-md border border-black/15 shadow-xs"
+            style={{ backgroundColor: currentColor || "#f97316" }}
+          />
+          <input
+            type="color"
+            value={currentColor || "#f97316"}
+            onChange={(e) => onSelectColor(e.target.value)}
+            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+          />
+          <span className="text-[10px] font-mono text-gray-500 dark:text-zinc-400">Pick</span>
+        </label>
       </div>
     </div>
   );

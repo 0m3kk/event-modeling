@@ -12,7 +12,7 @@ export interface Rect {
   height: number;
 }
 
-export interface CanvasElement<TData = Record<string, unknown>> {
+export interface CanvasElement<TData = any> {
   id: string;
   type: string;
   x: number;

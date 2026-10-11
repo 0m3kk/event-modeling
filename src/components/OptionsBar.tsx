@@ -69,6 +69,7 @@ export function OptionsBar() {
   const barX = screenX + screenW / 2;
   const isAbove = screenY >= 56;
   const barY = isAbove ? screenY - 12 : screenY + screenH + 12;
+  const popoverPlacement: "top" | "bottom" = isAbove && barY >= 140 ? "top" : "bottom";
 
   // Active color
   const currentColor =
@@ -140,6 +141,7 @@ export function OptionsBar() {
             isOpen={isColorPickerOpen}
             onClose={() => setIsColorPickerOpen(false)}
             onSelectColor={handleColorChange}
+            placement={popoverPlacement}
           />
         </div>
 
