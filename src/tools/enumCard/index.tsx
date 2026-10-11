@@ -16,6 +16,7 @@ import {
   getStandardCardInlineEditTarget,
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
+import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 
 /**
@@ -54,14 +55,14 @@ export const enumCardTool: ToolDefinition<EnumCardData> = {
   name: "Enum",
   description: "An Enum definition: a named set of values, reusable as a field type",
   icon: List,
-  color: "#0d9488",
+  color: "#65a30d",
   category: "modeling",
 
   schema: EnumCardSchema,
   createDefaultData: () => ({
     name: "NewEnum",
     fields: [],
-    color: "#0d9488",
+    color: "#65a30d",
   }),
 
   defaultSize: { width: CARD_DEFAULT_WIDTH, height: 60 },
@@ -76,7 +77,7 @@ export const enumCardTool: ToolDefinition<EnumCardData> = {
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
-    const headerColor = element.data.color || enumCardTool.color;
+    const headerColor = resolveHeaderColor(element.data.color || enumCardTool.color, isDark);
 
     const selectedFieldIndex =
       context.selectedField?.elementId === element.id

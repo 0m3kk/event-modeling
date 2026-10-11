@@ -14,6 +14,7 @@ import {
   DESC_HIT_HALF,
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
+import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { validateFieldTypes } from "../common/typeValidation";
 import {
@@ -286,7 +287,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
     const w = element.width;
     const h = element.height;
     const r = CARD_CORNER_RADIUS;
-    const headerColor = element.data.color || serviceCardTool.color;
+    const headerColor = resolveHeaderColor(element.data.color || serviceCardTool.color, isDark);
     const methods = element.data.methods ?? [];
     const layouts = getMethodLayouts(element.data);
 

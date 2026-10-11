@@ -12,6 +12,7 @@ import {
   renderHeaderDescBadge,
   CARD_CORNER_RADIUS,
 } from "../common/cardLayout";
+import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 import {
   collectBoardStateCards,
@@ -205,7 +206,7 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
-    const headerColor = element.data.color || constraintCardTool.color;
+    const headerColor = resolveHeaderColor(element.data.color || constraintCardTool.color, isDark);
     const w = element.width;
     const h = element.height;
     const r = CARD_CORNER_RADIUS;

@@ -21,7 +21,7 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
         { name: "street", type: "string" },
         { name: "zip", type: "string" },
       ],
-      color: "#8b5cf6",
+      color: "#c026d3",
     },
   };
 

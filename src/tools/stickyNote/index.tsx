@@ -32,7 +32,7 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
   name: "Sticky Note",
   description: "A quick note or annotation on the canvas",
   icon: StickyIcon,
-  color: "#f59e0b",
+  color: "#eab308",
   category: "annotation",
 
   schema: StickyNoteSchema,

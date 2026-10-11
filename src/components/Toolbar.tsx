@@ -1,7 +1,52 @@
+import { Fragment } from "react";
 import { MousePointer, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
+import type { ToolDefinition } from "@/tools";
+
+/**
+ * Toolbar layout. Each inner array is rendered as a group, separated from the
+ * next one by a vertical divider. Any registered tool not listed here is
+ * appended as a final group, so new tools never silently disappear.
+ */
+const TOOL_GROUPS: string[][] = [
+  ["domainCard", "sliceCard"],
+  ["eventCard", "commandCard", "queryCard", "stateCard", "constraintCard", "viewCard"],
+  ["serviceCard", "objectCard", "enumCard", "aliasCard"],
+  ["stickyNote"],
+];
+
+function ToolButton({
+  tool,
+  isActive,
+  onSelect,
+}: {
+  tool: ToolDefinition;
+  isActive: boolean;
+  onSelect: () => void;
+}) {
+  const Icon = tool.icon;
+  return (
+    <div className="group relative flex items-center justify-center">
+      <button
+        onClick={onSelect}
+        title={tool.name}
+        className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
+          isActive
+            ? "bg-blue-600 text-white shadow-sm"
+            : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        }`}
+        style={!isActive ? { color: tool.color } : undefined}
+      >
+        <Icon size={20} />
+      </button>
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-zinc-800 whitespace-nowrap">
+        {tool.name}
+      </div>
+    </div>
+  );
+}
 
 export function Toolbar() {
   const { t } = useTranslation();
@@ -14,6 +59,15 @@ export function Toolbar() {
   const selectedField = useCanvasStore((s) => s.selectedField);
 
   const registeredTools = toolRegistry.getAll();
+  const toolByType = new Map(registeredTools.map((tool) => [tool.type, tool]));
+  const listedTypes = new Set(TOOL_GROUPS.flat());
+  const groups: ToolDefinition[][] = TOOL_GROUPS.map((types) =>
+    types
+      .map((type) => toolByType.get(type))
+      .filter((tool): tool is ToolDefinition => Boolean(tool)),
+  );
+  const unlistedTools = registeredTools.filter((tool) => !listedTypes.has(tool.type));
+  if (unlistedTools.length > 0) groups.push(unlistedTools);
   const isFieldSelected = Boolean(selectedField && selectedIds.includes(selectedField.elementId));
 
   const handleDelete = () => {
@@ -46,32 +100,22 @@ export function Toolbar() {
 
       <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />
 
-      {/* 2. Dynamic Plugin Tools from Registry */}
-      <div className="flex items-center gap-1">
-        {registeredTools.map((tool) => {
-          const Icon = tool.icon;
-          const isActive = currentTool === tool.type;
-          return (
-            <div key={tool.type} className="group relative flex items-center justify-center">
-              <button
-                onClick={() => setTool(tool.type)}
-                title={tool.name}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                }`}
-                style={!isActive ? { color: tool.color } : undefined}
-              >
-                <Icon size={20} />
-              </button>
-              <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-zinc-800 whitespace-nowrap">
-                {tool.name}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* 2. Dynamic Plugin Tools from Registry, grouped with separators */}
+      {groups.map((group, index) => (
+        <Fragment key={index}>
+          {index > 0 && <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />}
+          <div className="flex items-center gap-1">
+            {group.map((tool) => (
+              <ToolButton
+                key={tool.type}
+                tool={tool}
+                isActive={currentTool === tool.type}
+                onSelect={() => setTool(tool.type)}
+              />
+            ))}
+          </div>
+        </Fragment>
+      ))}
 
       <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />
 

@@ -14,15 +14,15 @@ import { sliceCardTool } from "./sliceCard";
 import { stickyNoteTool } from "./stickyNote";
 
 // Register default decoupled tools (order here drives the toolbar order)
+toolRegistry.register(domainCardTool);
+toolRegistry.register(sliceCardTool);
+toolRegistry.register(eventCardTool);
 toolRegistry.register(commandCardTool);
 toolRegistry.register(queryCardTool);
-toolRegistry.register(eventCardTool);
 toolRegistry.register(stateCardTool);
-toolRegistry.register(viewCardTool);
 toolRegistry.register(constraintCardTool);
+toolRegistry.register(viewCardTool);
 toolRegistry.register(serviceCardTool);
-toolRegistry.register(sliceCardTool);
-toolRegistry.register(domainCardTool);
 toolRegistry.register(objectCardTool);
 toolRegistry.register(enumCardTool);
 toolRegistry.register(aliasCardTool);

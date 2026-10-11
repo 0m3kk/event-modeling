@@ -16,6 +16,7 @@ import {
   getStandardCardInlineEditTarget,
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
+import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 import { validateEventCardData } from "./rules";
 
@@ -84,7 +85,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
-    const headerColor = element.data.color || eventCardTool.color;
+    const headerColor = resolveHeaderColor(element.data.color || eventCardTool.color, isDark);
 
     const isSectionActive =
       !context.selectedField?.sectionIndex ||

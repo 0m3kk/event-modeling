@@ -3,16 +3,19 @@ import { Palette, Check } from "lucide-react";
 import { getContrastTextColor } from "@/utils/color";
 
 export const PRESET_COLORS = [
+  { name: "Rose", hex: "#e11d48" },
   { name: "Orange", hex: "#f97316" },
-  { name: "Blue", hex: "#3b82f6" },
-  { name: "Green", hex: "#10b981" },
   { name: "Yellow", hex: "#eab308" },
-  { name: "Purple", hex: "#8b5cf6" },
-  { name: "Pink", hex: "#ec4899" },
-  { name: "Cyan", hex: "#06b6d4" },
-  { name: "Red", hex: "#ef4444" },
-  { name: "Slate", hex: "#64748b" },
-  { name: "Zinc", hex: "#71717a" },
+  { name: "Lime", hex: "#65a30d" },
+  { name: "Green", hex: "#16a34a" },
+  { name: "Teal", hex: "#0d9488" },
+  { name: "Cyan", hex: "#0891b2" },
+  { name: "Sky", hex: "#0ea5e9" },
+  { name: "Blue", hex: "#2563eb" },
+  { name: "Indigo", hex: "#4338ca" },
+  { name: "Violet", hex: "#7c3aed" },
+  { name: "Fuchsia", hex: "#c026d3" },
+  { name: "Pink", hex: "#db2777" },
 ];
 
 interface ColorPickerPopoverProps {

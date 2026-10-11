@@ -57,13 +57,13 @@ export const domainCardTool: ToolDefinition<DomainData> = {
   name: "Domain",
   description: "A Domain is a dashed boundary that groups any cards (slices, commands, queries, objects, …)",
   icon: BoxSelect,
-  color: "#8b5cf6",
+  color: "#7c3aed",
   category: "modeling",
   // Auto-fits its children, so edge-resize is disabled.
   resizable: false,
 
   schema: DomainCardSchema,
-  createDefaultData: () => ({ name: "Domain", color: "#8b5cf6" }),
+  createDefaultData: () => ({ name: "Domain", color: "#7c3aed" }),
 
   defaultSize: { width: DOMAIN_DEFAULT_WIDTH, height: DOMAIN_DEFAULT_HEIGHT },
 

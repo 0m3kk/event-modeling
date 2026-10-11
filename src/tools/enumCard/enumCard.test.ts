@@ -19,14 +19,14 @@ describe("enumCardTool", () => {
     data: {
       name: "OrderStatus",
       fields: [{ name: "Draft" }, { name: "Active" }],
-      color: "#0d9488",
+      color: "#65a30d",
     },
   };
 
   it("exposes modeling metadata", () => {
     expect(enumCardTool.type).toBe("enumCard");
     expect(enumCardTool.name).toBe("Enum");
-    expect(enumCardTool.color).toBe("#0d9488");
+    expect(enumCardTool.color).toBe("#65a30d");
     expect(enumCardTool.category).toBe("modeling");
     expect(enumCardTool.defaultSize).toEqual({ width: 220, height: 60 });
   });

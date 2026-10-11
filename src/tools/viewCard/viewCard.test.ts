@@ -25,14 +25,14 @@ describe("viewCardTool multi-section (params, query, states)", () => {
       ],
       queryItems: [{ types: ["CourseDefined"], tags: [{ tag: "course", field: "courseId" }] }],
       states: [{ name: "exists", type: "boolean" }],
-      color: "#4f46e5",
+      color: "#0891b2",
     },
   };
 
   it("has correct metadata and default styling", () => {
     expect(viewCardTool.type).toBe("viewCard");
     expect(viewCardTool.name).toBe("View");
-    expect(viewCardTool.color).toBe("#4f46e5");
+    expect(viewCardTool.color).toBe("#0891b2");
     expect(viewCardTool.category).toBe("modeling");
     expect(viewCardTool.defaultSize).toEqual({ width: 220, height: 182 });
   });

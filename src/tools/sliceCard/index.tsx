@@ -11,6 +11,7 @@ import {
   CARD_CORNER_RADIUS,
   renderStandardCardTitle,
 } from "../common/cardLayout";
+import { resolveHeaderColor } from "@/utils/color";
 import {
   SLICE_HEADER_HEIGHT,
   SLICE_LANE_LABEL_HEIGHT,
@@ -51,7 +52,7 @@ export const sliceCardTool: ToolDefinition<SliceData> = {
   description:
     "A Slice groups cards into stacked lanes; each lane holds a single card type (Command, Constraint, Query, …)",
   icon: Rows3,
-  color: "#6366f1",
+  color: "#4338ca",
   category: "modeling",
   // The slice auto-sizes to its lanes/cards, so edge-resize is disabled.
   resizable: false,
@@ -59,7 +60,7 @@ export const sliceCardTool: ToolDefinition<SliceData> = {
   schema: SliceCardSchema,
   createDefaultData: () => ({
     name: "Slice",
-    color: "#6366f1",
+    color: "#4338ca",
     lanes: [createSliceLane()],
   }),
 
@@ -139,7 +140,7 @@ export const sliceCardTool: ToolDefinition<SliceData> = {
     const w = element.width;
     const h = element.height;
     const r = CARD_CORNER_RADIUS;
-    const headerColor = element.data.color || sliceCardTool.color;
+    const headerColor = resolveHeaderColor(element.data.color || sliceCardTool.color, isDark);
 
     const all = useCanvasStore.getState().elements;
     const children = getSliceChildren(all, element.id);

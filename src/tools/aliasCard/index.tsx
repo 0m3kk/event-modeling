@@ -1,4 +1,4 @@
-import { Type } from "lucide-react";
+import { Code } from "lucide-react";
 import { z } from "zod";
 import { Graphics, Text } from "pixi.js";
 import { nanoid } from "nanoid";
@@ -14,6 +14,7 @@ import {
   CARD_HEADER_HEIGHT,
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
+import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 import { validateTypeValue } from "../common/typeValidation";
 import { collectDefinedTypeNames } from "@/utils/typeCatalog";
@@ -43,7 +44,7 @@ export const aliasCardTool: ToolDefinition<AliasCardData> = {
   type: "aliasCard",
   name: "Alias",
   description: "A named domain type that wraps an existing type, reusable as a field type",
-  icon: Type,
+  icon: Code,
   color: "#db2777",
   category: "modeling",
 
@@ -76,7 +77,7 @@ export const aliasCardTool: ToolDefinition<AliasCardData> = {
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
-    const headerColor = element.data.color || aliasCardTool.color;
+    const headerColor = resolveHeaderColor(element.data.color || aliasCardTool.color, isDark);
 
     // 1. Draw card frame (header banner + body + border); no selectable rows.
     const g = new Graphics();

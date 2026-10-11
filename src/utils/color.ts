@@ -35,6 +35,26 @@ export function getContrastTextColor(hex: string): string {
 }
 
 /**
+ * Softens a card header color for dark mode.
+ *
+ * Card headers are large filled areas, so a vivid light-mode color is harsh
+ * against the dark canvas. In dark mode we blend the color toward the dark
+ * card background, which keeps the hue recognizable while lowering brightness
+ * and saturation. Light mode returns the color unchanged.
+ */
+const DARK_HEADER_BLEND = 0.34;
+const DARK_CARD_BG = { r: 0x18, g: 0x18, b: 0x1b };
+
+export function resolveHeaderColor(hex: string, isDark: boolean): string {
+  if (!isDark) return hex;
+  const { r, g, b } = parseHexColor(hex);
+  const blend = (channel: number, target: number) =>
+    Math.round(channel * (1 - DARK_HEADER_BLEND) + target * DARK_HEADER_BLEND);
+  const toHexPart = (value: number) => value.toString(16).padStart(2, "0");
+  return `#${toHexPart(blend(r, DARK_CARD_BG.r))}${toHexPart(blend(g, DARK_CARD_BG.g))}${toHexPart(blend(b, DARK_CARD_BG.b))}`;
+}
+
+/**
  * Converts a hex string ('#f97316' or 'f97316') to a numeric color (0xf97316)
  */
 export function hexToNumber(hex: string): number {

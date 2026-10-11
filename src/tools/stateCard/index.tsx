@@ -25,6 +25,7 @@ import {
   DESC_HIT_HALF,
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
+import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 
 export const STATE_HEADER_HEIGHT = 32;
@@ -529,7 +530,7 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
-    const headerColor = element.data.color || stateCardTool.color;
+    const headerColor = resolveHeaderColor(element.data.color || stateCardTool.color, isDark);
     const w = element.width;
     const h = element.height;
     const r = CARD_CORNER_RADIUS;

@@ -25,6 +25,7 @@ import {
   DESC_HIT_HALF,
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
+import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 
 export const VIEW_HEADER_HEIGHT = 32;
@@ -500,7 +501,7 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
   description:
     "A View/Read Model: projects events matching a DCB query into a persisted read model for sorting, searching and filtering",
   icon: Table2,
-  color: "#4f46e5",
+  color: "#0891b2",
   category: "modeling",
 
   schema: ViewCardSchema,
@@ -509,7 +510,7 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
     params: [],
     queryItems: [],
     states: [],
-    color: "#4f46e5",
+    color: "#0891b2",
   }),
 
   // Minimum height with empty sections: 32 + 3 * (22 + 28) = 182
@@ -529,7 +530,7 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
-    const headerColor = element.data.color || viewCardTool.color;
+    const headerColor = resolveHeaderColor(element.data.color || viewCardTool.color, isDark);
     const w = element.width;
     const h = element.height;
     const r = CARD_CORNER_RADIUS;

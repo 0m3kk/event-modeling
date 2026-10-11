@@ -16,6 +16,7 @@ import {
   getStandardCardInlineEditTarget,
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
+import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 import { validateFieldTypes } from "../common/typeValidation";
 
@@ -57,14 +58,14 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
   description:
     "A shared Object (value/struct) definition with fields, reusable as a field type",
   icon: Box,
-  color: "#8b5cf6",
+  color: "#c026d3",
   category: "modeling",
 
   schema: ObjectCardSchema,
   createDefaultData: () => ({
     name: "NewObject",
     fields: [],
-    color: "#8b5cf6",
+    color: "#c026d3",
   }),
 
   defaultSize: { width: CARD_DEFAULT_WIDTH, height: 60 },
@@ -84,7 +85,7 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
-    const headerColor = element.data.color || objectCardTool.color;
+    const headerColor = resolveHeaderColor(element.data.color || objectCardTool.color, isDark);
 
     const selectedFieldIndex =
       context.selectedField?.elementId === element.id
