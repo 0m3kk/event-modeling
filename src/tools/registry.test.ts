@@ -4,6 +4,7 @@ import { stickyNoteTool } from "./stickyNote";
 import { eventCardTool } from "./eventCard";
 import { commandCardTool } from "./commandCard";
 import { enumCardTool } from "./enumCard";
+import { aliasCardTool } from "./aliasCard";
 
 describe("toolRegistry", () => {
   it("registers and retrieves tools", () => {
@@ -11,6 +12,7 @@ describe("toolRegistry", () => {
     expect(toolRegistry.get("stickyNote")).toBe(stickyNoteTool);
     expect(toolRegistry.get("eventCard")).toBe(eventCardTool);
     expect(toolRegistry.get("enumCard")).toBe(enumCardTool);
+    expect(toolRegistry.get("aliasCard")).toBe(aliasCardTool);
     expect(toolRegistry.get("nonexistent")).toBeUndefined();
   });
 

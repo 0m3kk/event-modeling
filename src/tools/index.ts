@@ -1,4 +1,5 @@
 import { toolRegistry } from "./registry";
+import { aliasCardTool } from "./aliasCard";
 import { commandCardTool } from "./commandCard";
 import { enumCardTool } from "./enumCard";
 import { eventCardTool } from "./eventCard";
@@ -10,8 +11,16 @@ toolRegistry.register(commandCardTool);
 toolRegistry.register(eventCardTool);
 toolRegistry.register(objectCardTool);
 toolRegistry.register(enumCardTool);
+toolRegistry.register(aliasCardTool);
 toolRegistry.register(stickyNoteTool);
 
 export * from "./types";
 export * from "./registry";
-export { commandCardTool, enumCardTool, eventCardTool, objectCardTool, stickyNoteTool };
+export {
+  aliasCardTool,
+  commandCardTool,
+  enumCardTool,
+  eventCardTool,
+  objectCardTool,
+  stickyNoteTool,
+};

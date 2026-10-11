@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Box, Check, Code2, List, Shapes } from "lucide-react";
+import { Box, Check, Code2, List, Shapes, Type } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { getElementName } from "@/utils/naming";
 
@@ -18,6 +18,39 @@ export const COMMON_FIELD_TYPES: FieldTypePreset[] = [
   { type: "uuid", label: "uuid", description: "ID" },
 ];
 
+type ReusableKind = "object" | "enum" | "alias";
+
+/**
+ * Per-kind styling for the section of board-defined types (Objects, Enums,
+ * Aliases). Each row shows its kind icon so they can be told apart at a glance.
+ */
+const REUSABLE_KIND_META: Record<
+  ReusableKind,
+  { label: string; Icon: typeof Box; selectedClass: string; iconClass: string }
+> = {
+  object: {
+    label: "Object",
+    Icon: Box,
+    selectedClass:
+      "bg-violet-50 text-violet-600 font-semibold dark:bg-violet-950/60 dark:text-violet-400",
+    iconClass: "text-violet-500 dark:text-violet-400",
+  },
+  enum: {
+    label: "Enum",
+    Icon: List,
+    selectedClass:
+      "bg-teal-50 text-teal-600 font-semibold dark:bg-teal-950/60 dark:text-teal-400",
+    iconClass: "text-teal-500 dark:text-teal-400",
+  },
+  alias: {
+    label: "Alias",
+    Icon: Type,
+    selectedClass:
+      "bg-pink-50 text-pink-600 font-semibold dark:bg-pink-950/60 dark:text-pink-400",
+    iconClass: "text-pink-500 dark:text-pink-400",
+  },
+};
+
 interface FieldTypePopoverProps {
   currentType?: string;
   onSelectType: (type: string) => void;
@@ -35,14 +68,20 @@ export function FieldTypePopover({
 }: FieldTypePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Objects and Enums defined on the board can be reused as a field type.
-  // They share a single section; each row shows its kind icon (Box vs List).
+  // Objects, Enums and Aliases defined on the board can be reused as a field
+  // type. They share one section; each row shows its kind icon.
   const elements = useCanvasStore((s) => s.elements);
   const reusableTypes = useMemo(() => {
-    const entries = new Map<string, { name: string; kind: "object" | "enum" }>();
+    const entries = new Map<string, { name: string; kind: ReusableKind }>();
     for (const el of elements) {
       const kind =
-        el.type === "objectCard" ? "object" : el.type === "enumCard" ? "enum" : null;
+        el.type === "objectCard"
+          ? "object"
+          : el.type === "enumCard"
+            ? "enum"
+            : el.type === "aliasCard"
+              ? "alias"
+              : null;
       if (!kind) continue;
       const name = getElementName(el);
       if (name) entries.set(`${kind}:${name}`, { name, kind });
@@ -116,25 +155,18 @@ export function FieldTypePopover({
         })}
       </div>
 
-      {/* Defined Objects & Enums — reusable as field types */}
+      {/* Defined Objects, Enums & Aliases — reusable as field types */}
       {reusableTypes.length > 0 && (
         <div className="mt-2.5 border-t border-gray-100 pt-2 dark:border-zinc-800">
           <div className="mb-1 flex items-center gap-1.5 px-1.5 text-xs font-semibold text-gray-500 dark:text-zinc-400">
             <Shapes size={13} />
-            <span>Objects &amp; Enums</span>
+            <span>Defined Types</span>
           </div>
           <div className="flex flex-col gap-0.5">
             {reusableTypes.map(({ name, kind }) => {
               const isSelected = currentType.toLowerCase() === name.toLowerCase();
-              const Icon = kind === "object" ? Box : List;
-              const selectedClass =
-                kind === "object"
-                  ? "bg-violet-50 text-violet-600 font-semibold dark:bg-violet-950/60 dark:text-violet-400"
-                  : "bg-teal-50 text-teal-600 font-semibold dark:bg-teal-950/60 dark:text-teal-400";
-              const iconClass =
-                kind === "object"
-                  ? "text-violet-500 dark:text-violet-400"
-                  : "text-teal-500 dark:text-teal-400";
+              const meta = REUSABLE_KIND_META[kind];
+              const Icon = meta.Icon;
 
               return (
                 <button
@@ -144,15 +176,15 @@ export function FieldTypePopover({
                     onSelectType(name);
                     onClose();
                   }}
-                  title={kind === "object" ? "Object" : "Enum"}
+                  title={meta.label}
                   className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-left transition-colors cursor-pointer ${
                     isSelected
-                      ? selectedClass
+                      ? meta.selectedClass
                       : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                   }`}
                 >
                   <span className="flex items-center gap-2">
-                    <Icon size={13} className={isSelected ? undefined : iconClass} />
+                    <Icon size={13} className={isSelected ? undefined : meta.iconClass} />
                     <span className="font-mono text-[13px] font-medium">{name}</span>
                   </span>
                   {isSelected && <Check size={14} className="stroke-[2.5]" />}
