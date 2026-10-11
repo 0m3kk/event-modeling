@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Header } from "@/components/Header";
 import { PixiCanvas } from "@/components/PixiCanvas";
 import { Toolbar } from "@/components/Toolbar";
+import { OptionsBar } from "@/components/OptionsBar";
 import { AIPanel } from "@/components/AIPanel";
 import { GoogleDriveModal } from "@/components/GoogleDriveModal";
 import { SearchModal } from "@/components/SearchModal";
@@ -38,6 +39,7 @@ export function App() {
       <main id="canvas-container" className="relative flex-1 overflow-hidden outline-none">
         <PixiCanvas />
         <Toolbar />
+        <OptionsBar />
         <AIPanel />
         <GoogleDriveModal />
         <SearchModal />

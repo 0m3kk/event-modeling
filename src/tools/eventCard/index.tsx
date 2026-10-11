@@ -4,6 +4,8 @@ import { Graphics, Text } from "pixi.js";
 import { nanoid } from "nanoid";
 import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point } from "@/types";
+import { getContrastTextColor } from "@/utils/color";
+import { EventCardOptions } from "./EventCardOptions";
 
 export interface EventField {
   name: string;
@@ -13,6 +15,7 @@ export interface EventField {
 export interface EventCardData {
   name: string;
   fields: EventField[];
+  color?: string;
 }
 
 export const EventCardSchema = z.object({
@@ -25,6 +28,7 @@ export const EventCardSchema = z.object({
       }),
     )
     .default([]),
+  color: z.string().optional(),
 });
 
 export const eventCardTool: ToolDefinition<EventCardData> = {
@@ -42,6 +46,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
       { name: "id", type: "string" },
       { name: "timestamp", type: "datetime" },
     ],
+    color: "#f97316",
   }),
 
   defaultSize: { width: 220, height: 120 },
@@ -52,6 +57,8 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     return { width: 220, height };
   },
 
+  optionsBar: EventCardOptions,
+
   render: (container, element, context) => {
     container.removeChildren();
 
@@ -59,6 +66,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     const isDark = context.theme === "dark";
     const cardBg = isDark ? 0x18181b : 0xffffff;
     const borderCol = isSelected ? 0x3b82f6 : isDark ? 0x3f3f46 : 0xe4e4e7;
+    const headerColor = element.data.color || eventCardTool.color;
 
     const g = new Graphics();
     // Background
@@ -66,24 +74,24 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     g.fill({ color: cardBg });
     g.stroke({ color: borderCol, width: isSelected ? 2 : 1 });
 
-    // Top Orange Header Bar
+    // Dynamic Top Header Bar
     g.roundRect(0, 0, element.width, 36, 8);
-    g.fill({ color: 0xf97316 });
+    g.fill({ color: headerColor });
 
     // Cut off bottom round corners of header
     g.rect(0, 24, element.width, 12);
-    g.fill({ color: 0xf97316 });
+    g.fill({ color: headerColor });
 
     container.addChild(g);
 
-    // Header Title
+    // Header Title (contrast-aware text)
     const title = new Text({
       text: element.data.name || "Event",
       style: {
         fontSize: 13,
         fontWeight: "bold",
         fontFamily: '"Geist Mono", monospace',
-        fill: 0xffffff,
+        fill: getContrastTextColor(headerColor),
       },
       resolution: context.textResolution,
     });
@@ -153,6 +161,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
         )
         .optional()
         .describe("Payload fields carried by the event"),
+      color: z.string().optional().describe("Optional header color hex code"),
     }),
     onCreate: (params, center: Point): CanvasElement<EventCardData> => {
       const fields = params.fields || [
@@ -162,6 +171,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
       const data: EventCardData = {
         name: params.name || "Event",
         fields,
+        color: params.color || eventCardTool.color,
       };
       const size = eventCardTool.computeSize!(data);
       return {

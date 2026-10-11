@@ -4,6 +4,8 @@ import { Graphics, Text } from "pixi.js";
 import { nanoid } from "nanoid";
 import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point } from "@/types";
+import { getContrastTextColor } from "@/utils/color";
+import { StickyNoteOptions } from "./StickyNoteOptions";
 
 export interface StickyNoteData {
   text: string;
@@ -31,22 +33,24 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
 
   defaultSize: { width: 180, height: 140 },
 
+  optionsBar: StickyNoteOptions,
+
   render: (container, element, context) => {
     container.removeChildren();
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
-    const bgHex = isDark ? 0x78350f : 0xfef08a; // Dark amber vs pastel yellow
-    const textHex = isDark ? 0xfef3c7 : 0x713f12;
+    const noteColor = element.data.color || "#fef08a";
+    const textColor = getContrastTextColor(noteColor);
 
     const g = new Graphics();
     g.roundRect(0, 0, element.width, element.height, 8);
-    g.fill({ color: bgHex, alpha: 0.95 });
+    g.fill({ color: noteColor, alpha: isDark ? 0.9 : 0.95 });
 
     if (isSelected) {
       g.stroke({ color: 0x3b82f6, width: 2 });
     } else {
-      g.stroke({ color: isDark ? 0x92400e : 0xfde047, width: 1 });
+      g.stroke({ color: isDark ? 0x3f3f46 : 0x000000, alpha: 0.15, width: 1 });
     }
     container.addChild(g);
 
@@ -55,7 +59,7 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
       style: {
         fontSize: 13,
         fontFamily: '"Geist Mono", monospace',
-        fill: textHex,
+        fill: textColor,
         wordWrap: true,
         wordWrapWidth: Math.max(element.width - 24, 40),
       },
