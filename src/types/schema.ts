@@ -15,6 +15,7 @@ export interface Rect {
 export interface CanvasElement<TData = any> {
   id: string;
   type: string;
+  referenceId?: string;
   x: number;
   y: number;
   width: number;
@@ -42,6 +43,7 @@ export interface Viewport {
 export const CanvasElementSchema = z.object({
   id: z.string(),
   type: z.string(),
+  referenceId: z.string().optional(),
   x: z.number(),
   y: z.number(),
   width: z.number(),

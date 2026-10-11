@@ -60,6 +60,16 @@ export function PixiCanvas() {
         return;
       }
 
+      // Duplicate / Copy reference
+      if (isCmdOrCtrl && e.code === "KeyD") {
+        e.preventDefault();
+        const selectedIds = useCanvasStore.getState().selectedIds;
+        if (selectedIds.length === 1) {
+          useCanvasStore.getState().createReferenceCopy(selectedIds[0]);
+        }
+        return;
+      }
+
       // Select tool
       if (e.code === "KeyV" && !isCmdOrCtrl) {
         useCanvasStore.getState().setTool("select");

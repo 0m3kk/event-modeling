@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { Trash2, Copy, Palette } from "lucide-react";
-import { nanoid } from "nanoid";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
@@ -12,7 +11,7 @@ export function OptionsBar() {
   const viewport = useCanvasStore((s) => s.viewport);
   const updateElement = useCanvasStore((s) => s.updateElement);
   const updateElements = useCanvasStore((s) => s.updateElements);
-  const addElement = useCanvasStore((s) => s.addElement);
+  const createReferenceCopy = useCanvasStore((s) => s.createReferenceCopy);
   const deleteElements = useCanvasStore((s) => s.deleteElements);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -91,16 +90,9 @@ export function OptionsBar() {
     }
   };
 
-  const handleDuplicate = () => {
+  const handleCopyReference = () => {
     if (isSingle && singleElement) {
-      const duplicate: CanvasElement = {
-        ...singleElement,
-        id: `${singleElement.type}-${nanoid(6)}`,
-        x: singleElement.x + 30,
-        y: singleElement.y + 30,
-        data: JSON.parse(JSON.stringify(singleElement.data)),
-      };
-      addElement(duplicate);
+      createReferenceCopy(singleElement.id);
     }
   };
 
@@ -164,11 +156,11 @@ export function OptionsBar() {
 
         <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
 
-        {/* 3. COMMON ACTIONS: DUPLICATE & DELETE */}
+        {/* 3. COMMON ACTIONS: COPY REFERENCE & DELETE */}
         {isSingle && (
           <button
-            onClick={handleDuplicate}
-            title="Duplicate"
+            onClick={handleCopyReference}
+            title="Copy Reference"
             className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
           >
             <Copy size={15} />

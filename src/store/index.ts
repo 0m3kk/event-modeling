@@ -1,5 +1,17 @@
 import { create } from "zustand";
 import type { CanvasElement, Viewport, ProjectFileV2, ThemeMode, SelectedField, InlineEditState } from "@/types";
+import {
+  ensureUniqueElement,
+  getElementName,
+  setElementName,
+  makeUniqueName,
+} from "@/utils/naming";
+import {
+  createReferenceCopy as makeReferenceCopy,
+  syncReferenceUpdates,
+  syncBatchReferenceUpdates,
+  pruneDanglingReferences,
+} from "@/utils/reference";
 
 interface HistoryEntry {
   elements: CanvasElement[];
@@ -49,6 +61,7 @@ export interface CanvasStoreState {
   // Element CRUD with Undo
   addElement: (element: CanvasElement) => void;
   addElements: (elements: CanvasElement[]) => void;
+  createReferenceCopy: (id: string) => CanvasElement | null;
   updateElement: (id: string, patch: Partial<CanvasElement>) => void;
   updateElements: (patches: Array<{ id: string } & Partial<CanvasElement>>) => void;
   deleteElements: (ids: string[]) => void;
@@ -125,45 +138,121 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
   addElement: (element) => {
     const current = get().elements;
+    const uniqueElement = ensureUniqueElement(element, current);
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: [...state.elements, element],
-      selectedIds: [element.id],
+      elements: [...state.elements, uniqueElement],
+      selectedIds: [uniqueElement.id],
+      selectedField: null,
+      inlineEdit: null,
     }));
   },
 
   addElements: (elements) => {
     const current = get().elements;
+    const processed: CanvasElement[] = [];
+    let running = [...current];
+    for (const el of elements) {
+      const uniqueEl = ensureUniqueElement(el, running);
+      processed.push(uniqueEl);
+      running.push(uniqueEl);
+    }
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: [...state.elements, ...elements],
-      selectedIds: elements.map((e) => e.id),
+      elements: [...state.elements, ...processed],
+      selectedIds: processed.map((e) => e.id),
+      selectedField: null,
+      inlineEdit: null,
     }));
+  },
+
+  createReferenceCopy: (id) => {
+    const current = get().elements;
+    const source = current.find((el) => el.id === id);
+    if (!source) return null;
+
+    const { sourcePatch, copy } = makeReferenceCopy(source);
+    const updatedCurrent = current.map((el) =>
+      el.id === sourcePatch.id ? { ...el, referenceId: sourcePatch.referenceId } : el,
+    );
+
+    set((state) => ({
+      undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
+      redoStack: [],
+      elements: [...updatedCurrent, copy],
+      selectedIds: [copy.id],
+      selectedField: null,
+      inlineEdit: null,
+    }));
+    return copy;
   },
 
   updateElement: (id, patch) => {
     const current = get().elements;
+    const target = current.find((el) => el.id === id);
+    if (!target) return;
+
+    let finalPatch = { ...patch };
+    if (patch.data) {
+      const currentName = getElementName(target);
+      const nextName = getElementName({ ...target, data: patch.data });
+      if (nextName && nextName !== currentName) {
+        const candidates = current.filter((el) => {
+          if (el.id === target.id) return false;
+          if (el.type !== target.type) return false;
+          if (target.referenceId && el.referenceId === target.referenceId) return false;
+          return true;
+        });
+        const takenNames = candidates.map(getElementName).filter((n): n is string => Boolean(n));
+        const uniqueName = makeUniqueName(nextName, takenNames);
+        if (uniqueName !== nextName) {
+          finalPatch.data = setElementName({ ...target, data: patch.data }, uniqueName).data;
+        }
+      }
+    }
+
+    const updatedElements = syncReferenceUpdates(current, id, finalPatch);
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: state.elements.map((el) =>
-        el.id === id ? { ...el, ...patch } : el,
-      ),
+      elements: updatedElements,
     }));
   },
 
   updateElements: (patches) => {
     const current = get().elements;
-    const patchMap = new Map(patches.map((p) => [p.id, p]));
+    const finalPatches = patches.map((patch) => {
+      const target = current.find((el) => el.id === patch.id);
+      if (!target || !patch.data) return patch;
+
+      const currentName = getElementName(target);
+      const nextName = getElementName({ ...target, data: patch.data });
+      if (nextName && nextName !== currentName) {
+        const candidates = current.filter((el) => {
+          if (el.id === target.id) return false;
+          if (el.type !== target.type) return false;
+          if (target.referenceId && el.referenceId === target.referenceId) return false;
+          return true;
+        });
+        const takenNames = candidates.map(getElementName).filter((n): n is string => Boolean(n));
+        const uniqueName = makeUniqueName(nextName, takenNames);
+        if (uniqueName !== nextName) {
+          return {
+            ...patch,
+            data: setElementName({ ...target, data: patch.data }, uniqueName).data,
+          };
+        }
+      }
+      return patch;
+    });
+
+    const updatedElements = syncBatchReferenceUpdates(current, finalPatches);
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: state.elements.map((el) => {
-        const patch = patchMap.get(el.id);
-        return patch ? { ...el, ...patch } : el;
-      }),
+      elements: updatedElements,
     }));
   },
 
@@ -171,11 +260,22 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     if (ids.length === 0) return;
     const idSet = new Set(ids);
     const current = get().elements;
+    const remaining = current.filter((el) => !idSet.has(el.id));
+    const cleaned = pruneDanglingReferences(remaining);
+
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: state.elements.filter((el) => !idSet.has(el.id)),
+      elements: cleaned,
       selectedIds: state.selectedIds.filter((id) => !idSet.has(id)),
+      selectedField:
+        state.selectedField && idSet.has(state.selectedField.elementId)
+          ? null
+          : state.selectedField,
+      inlineEdit:
+        state.inlineEdit && idSet.has(state.inlineEdit.elementId)
+          ? null
+          : state.inlineEdit,
     }));
   },
 
