@@ -54,11 +54,12 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
       text: element.data.text || "Note",
       style: {
         fontSize: 13,
-        fontFamily: "Geist Mono, monospace",
+        fontFamily: '"Geist Mono", monospace',
         fill: textHex,
         wordWrap: true,
         wordWrapWidth: Math.max(element.width - 24, 40),
       },
+      resolution: context.textResolution,
     });
     text.x = 12;
     text.y = 12;

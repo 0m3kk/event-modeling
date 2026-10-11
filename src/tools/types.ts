@@ -8,6 +8,7 @@ export interface RenderContext {
   isSelected: boolean;
   isHovered: boolean;
   zoom: number;
+  textResolution: number;
 }
 
 export interface ToolAIOperation<TData> {

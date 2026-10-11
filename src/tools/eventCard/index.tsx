@@ -82,9 +82,10 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
       style: {
         fontSize: 13,
         fontWeight: "bold",
-        fontFamily: "Geist Mono, monospace",
+        fontFamily: '"Geist Mono", monospace',
         fill: 0xffffff,
       },
+      resolution: context.textResolution,
     });
     title.x = 12;
     title.y = 9;
@@ -98,9 +99,10 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
           text: field.name,
           style: {
             fontSize: 12,
-            fontFamily: "Geist Mono, monospace",
+            fontFamily: '"Geist Mono", monospace',
             fill: isDark ? 0xe4e4e7 : 0x27272a,
           },
+          resolution: context.textResolution,
         });
         fieldName.x = 12;
         fieldName.y = currentY;
@@ -110,9 +112,10 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
           text: field.type,
           style: {
             fontSize: 11,
-            fontFamily: "Geist Mono, monospace",
+            fontFamily: '"Geist Mono", monospace',
             fill: isDark ? 0xa1a1aa : 0x71717a,
           },
+          resolution: context.textResolution,
         });
         typeLabel.x = element.width - typeLabel.width - 12;
         typeLabel.y = currentY + 1;
@@ -125,9 +128,10 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
         text: "(no fields)",
         style: {
           fontSize: 11,
-          fontFamily: "Geist Mono, monospace",
+          fontFamily: '"Geist Mono", monospace',
           fill: isDark ? 0x71717a : 0xa1a1aa,
         },
+        resolution: context.textResolution,
       });
       emptyHint.x = 12;
       emptyHint.y = currentY;

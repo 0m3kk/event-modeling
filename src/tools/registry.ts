@@ -53,9 +53,10 @@ export function renderFallbackElement(
     text: `Unknown: ${element.type}`,
     style: {
       fontSize: 12,
-      fontFamily: "Geist Mono, monospace",
+      fontFamily: '"Geist Mono", monospace',
       fill: isDark ? 0xa1a1aa : 0x71717a,
     },
+    resolution: context.textResolution,
   });
   label.x = 8;
   label.y = 8;

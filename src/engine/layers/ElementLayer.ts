@@ -2,9 +2,14 @@ import { Container } from "pixi.js";
 import type { CanvasElement, ResolvedTheme } from "@/types";
 import { toolRegistry, renderFallbackElement } from "@/tools";
 import type { RenderContext } from "@/tools/types";
+import { computeTextResolution } from "../textResolution";
+
+interface CacheableContainer extends Container {
+  _drawKey?: string;
+}
 
 export class ElementLayer extends Container {
-  private elementContainers = new Map<string, Container>();
+  private elementContainers = new Map<string, CacheableContainer>();
 
   renderElements(
     elements: CanvasElement[],
@@ -13,12 +18,13 @@ export class ElementLayer extends Container {
     zoom: number,
   ) {
     const activeIds = new Set<string>();
+    const textResolution = computeTextResolution(zoom);
 
     for (const element of elements) {
       activeIds.add(element.id);
       let container = this.elementContainers.get(element.id);
       if (!container) {
-        container = new Container();
+        container = new Container() as CacheableContainer;
         this.addChild(container);
         this.elementContainers.set(element.id, container);
       }
@@ -27,18 +33,27 @@ export class ElementLayer extends Container {
       container.y = element.y;
 
       const isSelected = selectedIds.has(element.id);
-      const context: RenderContext = {
-        theme,
-        isSelected,
-        isHovered: false,
-        zoom,
-      };
 
-      const tool = toolRegistry.get(element.type);
-      if (tool) {
-        tool.render(container, element, context);
-      } else {
-        renderFallbackElement(container, element, context);
+      // Cache key: only re-render children when content, selection, theme, size, or resolution changes
+      const drawKey = `${element.id}_${element.width}x${element.height}_${isSelected}_${theme}_${textResolution}_${JSON.stringify(element.data)}`;
+
+      if (container._drawKey !== drawKey) {
+        container._drawKey = drawKey;
+
+        const context: RenderContext = {
+          theme,
+          isSelected,
+          isHovered: false,
+          zoom,
+          textResolution,
+        };
+
+        const tool = toolRegistry.get(element.type);
+        if (tool) {
+          tool.render(container, element, context);
+        } else {
+          renderFallbackElement(container, element, context);
+        }
       }
     }
 
