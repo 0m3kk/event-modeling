@@ -206,4 +206,83 @@ describe("OptionsBar data workflows & undo/redo", () => {
       fieldIndex: 0,
     });
   });
+
+  it("updates field type via updateSelectedFieldType with full undo/redo", () => {
+    const card: CanvasElement<EventCardData> = {
+      id: "card-1",
+      type: "eventCard",
+      x: 100,
+      y: 100,
+      width: 220,
+      height: 88,
+      data: {
+        name: "OrderPlaced",
+        fields: [
+          { name: "orderId", type: "string" },
+          { name: "amount", type: "number" },
+        ],
+      },
+    };
+
+    useCanvasStore.getState().addElement(card);
+    useCanvasStore.getState().setSelectedIds(["card-1"]);
+    useCanvasStore.getState().setSelectedField({
+      elementId: "card-1",
+      fieldIndex: 0,
+    });
+
+    // Change orderId from "string" to "uuid"
+    useCanvasStore.getState().updateSelectedFieldType("uuid");
+
+    let updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
+    expect(updated?.data.fields[0].type).toBe("uuid");
+    expect(updated?.data.fields[0].name).toBe("orderId");
+
+    // Undo reverts back to string
+    useCanvasStore.getState().undo();
+    updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
+    expect(updated?.data.fields[0].type).toBe("string");
+
+    // Redo restores uuid
+    useCanvasStore.getState().redo();
+    updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
+    expect(updated?.data.fields[0].type).toBe("uuid");
+  });
+
+  it("syncs field type change across reference copies", () => {
+    const card: CanvasElement<EventCardData> = {
+      id: "card-1",
+      type: "eventCard",
+      x: 100,
+      y: 100,
+      width: 220,
+      height: 88,
+      data: {
+        name: "OrderPlaced",
+        fields: [
+          { name: "orderId", type: "string" },
+          { name: "amount", type: "number" },
+        ],
+      },
+    };
+
+    useCanvasStore.getState().addElement(card);
+    const copy = useCanvasStore.getState().createReferenceCopy("card-1")!;
+
+    useCanvasStore.getState().setSelectedIds([copy.id]);
+    useCanvasStore.getState().setSelectedField({
+      elementId: copy.id,
+      fieldIndex: 1,
+    });
+
+    // Change amount from "number" to "Money" (custom domain type) on the copy
+    useCanvasStore.getState().updateSelectedFieldType("Money");
+
+    const original = useCanvasStore.getState().elements.find((e) => e.id === "card-1")!;
+    const refCopy = useCanvasStore.getState().elements.find((e) => e.id === copy.id)!;
+
+    expect(refCopy.data.fields[1].type).toBe("Money");
+    expect(original.data.fields[1].type).toBe("Money");
+  });
 });
+

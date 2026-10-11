@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
-import { Trash2, Copy, Palette, Link2 } from "lucide-react";
+import { Trash2, Copy, Palette, Link2, ChevronDown } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
+import { FieldTypePopover } from "./FieldTypePopover";
 import type { CanvasElement } from "@/types";
 import { isElementOriginal } from "@/utils/reference";
 
@@ -16,8 +17,10 @@ export function OptionsBar() {
   const deleteElements = useCanvasStore((s) => s.deleteElements);
   const selectedField = useCanvasStore((s) => s.selectedField);
   const deleteSelectedField = useCanvasStore((s) => s.deleteSelectedField);
+  const updateSelectedFieldType = useCanvasStore((s) => s.updateSelectedFieldType);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const [isTypePickerOpen, setIsTypePickerOpen] = useState(false);
 
   // Compute selected items and bounding rect
   const { selectedElements, bounds } = useMemo(() => {
@@ -95,6 +98,16 @@ export function OptionsBar() {
 
   const isFieldSelected = Boolean(selectedField && selectedIds.includes(selectedField.elementId));
 
+  // Active selected field (if any)
+  const currentField = useMemo(() => {
+    if (!isSingle || !singleElement || !isFieldSelected || !selectedField) return null;
+    const fields = singleElement.data?.fields;
+    if (Array.isArray(fields) && fields[selectedField.fieldIndex]) {
+      return fields[selectedField.fieldIndex] as { name: string; type: string };
+    }
+    return null;
+  }, [isSingle, singleElement, isFieldSelected, selectedField]);
+
   const handleCopyReference = () => {
     if (isSingle && singleElement) {
       createReferenceCopy(singleElement.id);
@@ -147,6 +160,32 @@ export function OptionsBar() {
             placement={popoverPlacement}
           />
         </div>
+
+        {/* 2. FIELD TYPE SELECTOR (When a field is actively selected) */}
+        {currentField && (
+          <>
+            <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
+            <div className="relative">
+              <button
+                onClick={() => setIsTypePickerOpen(!isTypePickerOpen)}
+                title="Change Field Type"
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200/80 px-2 py-1 text-xs font-mono font-medium text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+              >
+                <span className="text-[11px] text-gray-400 dark:text-zinc-500 font-sans">type:</span>
+                <span className="text-blue-600 dark:text-blue-400 font-semibold">{currentField.type}</span>
+                <ChevronDown size={12} className="text-gray-400" />
+              </button>
+
+              <FieldTypePopover
+                currentType={currentField.type}
+                isOpen={isTypePickerOpen}
+                onClose={() => setIsTypePickerOpen(false)}
+                onSelectType={(newType) => updateSelectedFieldType(newType)}
+                placement={popoverPlacement}
+              />
+            </div>
+          </>
+        )}
 
         {/* 2. TOOL-SPECIFIC CUSTOM OPTIONS (if defined by tool plugin) */}
         {isSingle && singleElement && ToolCustomOptions && (

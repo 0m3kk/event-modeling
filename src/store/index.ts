@@ -69,6 +69,7 @@ export interface CanvasStoreState {
   updateElements: (patches: Array<{ id: string } & Partial<CanvasElement>>) => void;
   deleteElements: (ids: string[]) => void;
   deleteSelectedField: () => void;
+  updateSelectedFieldType: (type: string) => void;
   navigateSelectedField: (direction: "up" | "down") => void;
   clearBoard: () => void;
   loadProject: (project: ProjectFileV2) => void;
@@ -291,6 +292,28 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         : null;
       set({ selectedField: nextSelected });
     }
+  },
+
+  updateSelectedFieldType: (type) => {
+    const { selectedField, elements } = get();
+    if (!selectedField) return;
+
+    const element = elements.find((el) => el.id === selectedField.elementId);
+    if (!element || !Array.isArray(element.data?.fields)) return;
+
+    const fields = element.data.fields;
+    const index = selectedField.fieldIndex;
+    if (index < 0 || index >= fields.length) return;
+
+    const trimmedType = type.trim();
+    if (!trimmedType || fields[index].type === trimmedType) return;
+
+    const nextFields = [...fields];
+    nextFields[index] = { ...fields[index], type: trimmedType };
+
+    get().updateElement(element.id, {
+      data: { ...element.data, fields: nextFields },
+    });
   },
 
   navigateSelectedField: (direction) => {
