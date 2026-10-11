@@ -44,7 +44,7 @@ describe("EventCardTool sub-selection & inline edit targets", () => {
 
     const target = eventCardTool.getInlineEditTarget!(card, { x: 50, y: 15 });
     expect(target).not.toBeNull();
-    expect(target?.initialValue).toBe("OrderPlaced");
+    expect(target?.initialValue).toBe("Order Placed");
     expect(target?.multiline).toBe(false);
 
     // Commit change
@@ -65,7 +65,7 @@ describe("EventCardTool sub-selection & inline edit targets", () => {
     // Double click on field 0 (orderId)
     const target = eventCardTool.getInlineEditTarget!(card, { x: 30, y: 50 });
     expect(target).not.toBeNull();
-    expect(target?.initialValue).toBe("orderId");
+    expect(target?.initialValue).toBe("Order ID");
 
     // Commit change
     target?.onCommit("invoiceId");

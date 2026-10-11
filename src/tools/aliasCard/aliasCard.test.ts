@@ -45,7 +45,7 @@ describe("aliasCardTool", () => {
 
     const target = aliasCardTool.getInlineEditTarget!(card, { x: 50, y: 15 });
     expect(target).not.toBeNull();
-    expect(target?.initialValue).toBe("CustomerId");
+    expect(target?.initialValue).toBe("Customer ID");
 
     target?.onCommit("OrderId");
 

@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import type { ToolDefinition } from "../types";
 import type { CanvasElement, InlineEditState, Point, SelectedField } from "@/types";
 import { useCanvasStore } from "@/store";
-import { nameKey, toDisplayName } from "@/utils/naming";
+import { isSameIdentifier, nameKey, toDisplayName } from "@/utils/naming";
 import { ConstraintCardOptions } from "./ConstraintCardOptions";
 import {
   renderStandardCardTitle,
@@ -465,11 +465,11 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
           width: element.width - 16,
           height: 24,
         },
-        initialValue: element.data?.name || "Constraint",
+        initialValue: toDisplayName(element.data?.name) || "Constraint",
         multiline: false,
         onCommit: (newValue) => {
           const trimmed = newValue.trim();
-          if (trimmed && trimmed !== element.data?.name) {
+          if (trimmed && !isSameIdentifier(trimmed, element.data?.name)) {
             useCanvasStore.getState().updateElement(element.id, {
               data: { ...element.data, name: trimmed },
             });

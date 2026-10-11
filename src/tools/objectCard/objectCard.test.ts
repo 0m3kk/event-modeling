@@ -58,7 +58,7 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
 
     const target = objectCardTool.getInlineEditTarget!(card, { x: 30, y: 50 });
     expect(target).not.toBeNull();
-    expect(target?.initialValue).toBe("street");
+    expect(target?.initialValue).toBe("Street");
 
     target?.onCommit("streetLine1");
 

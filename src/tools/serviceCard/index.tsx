@@ -15,7 +15,7 @@ import {
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
-import { toDisplayName, toDisplayType } from "@/utils/naming";
+import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { validateFieldTypes } from "../common/typeValidation";
 import {
@@ -709,11 +709,11 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
           width: element.width - 16,
           height: 24,
         },
-        initialValue: element.data?.name || "Service",
+        initialValue: toDisplayName(element.data?.name) || "Service",
         multiline: false,
         onCommit: (newValue) => {
           const trimmed = newValue.trim();
-          if (trimmed && trimmed !== element.data?.name) {
+          if (trimmed && !isSameIdentifier(trimmed, element.data?.name)) {
             useCanvasStore.getState().updateElement(element.id, {
               data: { ...element.data, name: trimmed },
             });
@@ -743,11 +743,11 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
             width: Math.max(80, element.width - 40),
             height: 22,
           },
-          initialValue: method.name,
+          initialValue: toDisplayName(method.name),
           multiline: false,
           onCommit: (newName) => {
             const trimmed = newName.trim();
-            if (trimmed && trimmed !== method.name) {
+            if (trimmed && !isSameIdentifier(trimmed, method.name)) {
               const methods = [...(element.data.methods ?? [])];
               methods[layout.methodIndex] = { ...method, name: trimmed };
               useCanvasStore.getState().updateElement(element.id, {
@@ -921,11 +921,11 @@ function resolveRowEditTarget(
       width: Math.max(80, element.width - 60),
       height: 22,
     },
-    initialValue: field.name,
+    initialValue: toDisplayName(field.name),
     multiline: false,
     onCommit: (newName) => {
       const trimmed = newName.trim();
-      if (trimmed && trimmed !== field.name) {
+      if (trimmed && !isSameIdentifier(trimmed, field.name)) {
         const methods = [...(element.data.methods ?? [])];
         const nextRows = [...rows];
         nextRows[index] = { ...field, name: trimmed };

@@ -1,4 +1,5 @@
 import type { CanvasElement } from "@/types";
+import { toCamelIdentifier } from "./naming";
 
 /**
  * DCB tag metadata collected from the Event cards on the board.
@@ -38,7 +39,9 @@ export function collectBoardTags(elements: CanvasElement[]): BoardTagInfo[] {
     if (el.type !== "eventCard") continue;
     const fields = Array.isArray(el.data?.fields) ? el.data.fields : [];
     for (const field of fields) {
-      const tag = typeof field?.tag === "string" ? field.tag.trim() : "";
+      // Tags are stored canonically in camelCase; normalize again here so a
+      // legacy board (not rewritten on load) still matches its references.
+      const tag = toCamelIdentifier(typeof field?.tag === "string" ? field.tag : "");
       if (!tag) continue;
       const entry = map.get(tag) ?? { types: new Set<string>(), events: new Set<string>() };
       entry.types.add(fieldTypeKey(field));

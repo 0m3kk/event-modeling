@@ -6,7 +6,12 @@ import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point, SelectedField } from "@/types";
 import { useCanvasStore } from "@/store";
 import { collectBoardTagCatalog, fieldTypeKey } from "@/utils/eventTags";
-import { toDisplayName, toDisplayType } from "@/utils/naming";
+import {
+  isSameIdentifier,
+  toCamelIdentifier,
+  toDisplayName,
+  toDisplayType,
+} from "@/utils/naming";
 import { StateCardOptions } from "./StateCardOptions";
 import {
   getStateParams,
@@ -380,7 +385,7 @@ function renderQueryItemRow(
 
     // Right column: tag badges (one per line, centered).
     tags.forEach((ref, i) => {
-      const tag = ref.tag || "";
+      const tag = toCamelIdentifier(ref.tag || "");
       const fieldName = ref.field || "";
       const paramField = paramByName.get(fieldName);
       const allowed = tagCatalog.get(tag);
@@ -948,11 +953,11 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
           width: element.width - 16,
           height: 24,
         },
-        initialValue: element.data?.name || "State",
+        initialValue: toDisplayName(element.data?.name) || "State",
         multiline: false,
         onCommit: (newValue) => {
           const trimmed = newValue.trim();
-          if (trimmed && trimmed !== element.data?.name) {
+          if (trimmed && !isSameIdentifier(trimmed, element.data?.name)) {
             useCanvasStore.getState().updateElement(element.id, {
               data: { ...element.data, name: trimmed },
             });
@@ -992,11 +997,11 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
             width: Math.max(80, element.width - 80),
             height: 24,
           },
-          initialValue: field.name,
+          initialValue: toDisplayName(field.name),
           multiline: false,
           onCommit: (newName) => {
             const trimmed = newName.trim();
-            if (trimmed && trimmed !== field.name) {
+            if (trimmed && !isSameIdentifier(trimmed, field.name)) {
               const nextParams = [...params];
               nextParams[index] = { ...field, name: trimmed };
               useCanvasStore.getState().updateElement(element.id, {
@@ -1049,11 +1054,11 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
             width: Math.max(80, element.width - 80),
             height: 24,
           },
-          initialValue: field.name,
+          initialValue: toDisplayName(field.name),
           multiline: false,
           onCommit: (newName) => {
             const trimmed = newName.trim();
-            if (trimmed && trimmed !== field.name) {
+            if (trimmed && !isSameIdentifier(trimmed, field.name)) {
               const nextStates = [...states];
               nextStates[index] = { ...field, name: trimmed };
               useCanvasStore.getState().updateElement(element.id, {

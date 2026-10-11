@@ -115,7 +115,7 @@ describe("stateCardTool multi-section (params, query, states)", () => {
   it("edits the state field name inline", () => {
     useCanvasStore.getState().addElement(card);
     const target = stateCardTool.getInlineEditTarget!(card, { x: 30, y: 195 });
-    expect(target?.initialValue).toBe("exists");
+    expect(target?.initialValue).toBe("Exists");
     target?.onCommit("available");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "state-1");

@@ -162,13 +162,13 @@ describe("serviceCardTool (methods with params & returns)", () => {
 
     // Card header
     const serviceTarget = serviceCardTool.getInlineEditTarget!(card, { x: 50, y: 15 });
-    expect(serviceTarget?.initialValue).toBe("OrderService");
+    expect(serviceTarget?.initialValue).toBe("Order Service");
     serviceTarget?.onCommit("CheckoutService");
     expect(useCanvasStore.getState().elements[0].data.name).toBe("checkoutService");
 
     // Method header
     const methodTarget = serviceCardTool.getInlineEditTarget!(card, { x: 40, y: 40 });
-    expect(methodTarget?.initialValue).toBe("placeOrder");
+    expect(methodTarget?.initialValue).toBe("Place Order");
     methodTarget?.onCommit("submitOrder");
     expect(useCanvasStore.getState().elements[0].data.methods[0].name).toBe("submitOrder");
     expect(useCanvasStore.getState().selectedField).toEqual({
@@ -180,7 +180,7 @@ describe("serviceCardTool (methods with params & returns)", () => {
 
     // Param row
     const rowTarget = serviceCardTool.getInlineEditTarget!(card, { x: 30, y: 80 });
-    expect(rowTarget?.initialValue).toBe("orderId");
+    expect(rowTarget?.initialValue).toBe("Order ID");
     rowTarget?.onCommit("cartId");
     expect(useCanvasStore.getState().elements[0].data.methods[0].params[0].name).toBe("cartId");
     expect(useCanvasStore.getState().selectedField).toEqual({

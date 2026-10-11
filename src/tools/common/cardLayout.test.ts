@@ -113,7 +113,7 @@ describe("cardLayout helpers", () => {
       const target = getStandardCardInlineEditTarget(mockElement, { x: 50, y: 15 });
       expect(target).not.toBeNull();
       expect(target?.elementId).toBe("card-1");
-      expect(target?.initialValue).toBe("OrderPlaced");
+      expect(target?.initialValue).toBe("Order Placed");
       expect(target?.worldBounds).toEqual({
         x: 108,
         y: 204,
@@ -127,7 +127,7 @@ describe("cardLayout helpers", () => {
       const target = getStandardCardInlineEditTarget(mockElement, { x: 50, y: 45 });
       expect(target).not.toBeNull();
       expect(target?.elementId).toBe("card-1");
-      expect(target?.initialValue).toBe("orderId");
+      expect(target?.initialValue).toBe("Order ID");
       expect(target?.worldBounds.y).toBe(200 + 32 + 0 * 28 + 2);
     });
 

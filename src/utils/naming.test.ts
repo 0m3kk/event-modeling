@@ -5,6 +5,7 @@ import {
   toDisplayType,
   toCamelIdentifier,
   normalizeIdentifierNames,
+  isSameIdentifier,
   makeUniqueName,
   getElementName,
   setElementName,
@@ -137,18 +138,31 @@ describe("Naming utility", () => {
       });
     });
 
-    it("camelCases query tag field refs and event type lists", () => {
+    it("camelCases query tag refs, DCB tags and event type lists", () => {
       const input = {
         name: "Order state",
         params: [{ name: "Order ID", type: "uuid" }],
-        items: [{ types: ["Order Placed", "Order Cancelled"], tags: [{ tag: "order", field: "Order ID" }] }],
+        items: [
+          {
+            types: ["Order Placed", "Order Cancelled"],
+            tags: [{ tag: "Order Tag", field: "Order ID" }],
+          },
+        ],
       };
       const out = normalizeIdentifierNames(input, "stateCard") as any;
       expect(out.name).toBe("orderState");
       expect(out.items[0].types).toEqual(["orderPlaced", "orderCancelled"]);
       expect(out.items[0].tags[0].field).toBe("orderId");
-      // Free-text tag values are left untouched.
-      expect(out.items[0].tags[0].tag).toBe("order");
+      expect(out.items[0].tags[0].tag).toBe("orderTag");
+    });
+
+    it("camelCases event field DCB tags", () => {
+      const input = {
+        name: "Order Placed",
+        fields: [{ name: "Order ID", type: "string", tag: "Order Tag" }],
+      };
+      const out = normalizeIdentifierNames(input, "eventCard") as any;
+      expect(out.fields[0].tag).toBe("orderTag");
     });
 
     it("keeps enum member values untouched", () => {
@@ -175,6 +189,23 @@ describe("Naming utility", () => {
       expect(out.color).toBe("#c026d3");
       expect(out.rules).toEqual(["Account Status must be Active"]);
       expect(out.description).toBe("free text");
+    });
+  });
+
+  describe("isSameIdentifier", () => {
+    it("treats the human-readable form of the stored value as unchanged", () => {
+      // Editor shows "Order ID" while the data holds "orderId".
+      expect(isSameIdentifier("Order ID", "orderId")).toBe(true);
+      expect(isSameIdentifier("orderId", "orderId")).toBe(true);
+      expect(isSameIdentifier("  orderId  ", "orderId")).toBe(true);
+    });
+
+    it("detects a genuine change", () => {
+      expect(isSameIdentifier("Customer Id", "orderId")).toBe(false);
+    });
+
+    it("keeps enum-like values that are not camelCased", () => {
+      expect(isSameIdentifier("Active", "Active")).toBe(true);
     });
   });
 

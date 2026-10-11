@@ -15,7 +15,7 @@ import {
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
-import { toDisplayName, toDisplayType } from "@/utils/naming";
+import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { navigateSubSelect } from "@/utils/subSelection";
 import { validateFieldTypes } from "../common/typeValidation";
@@ -667,11 +667,11 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           width: element.width - 16,
           height: 24,
         },
-        initialValue: element.data?.name || "Command",
+        initialValue: toDisplayName(element.data?.name) || "Command",
         multiline: false,
         onCommit: (newValue) => {
           const trimmed = newValue.trim();
-          if (trimmed && trimmed !== element.data?.name) {
+          if (trimmed && !isSameIdentifier(trimmed, element.data?.name)) {
             useCanvasStore.getState().updateElement(element.id, {
               data: { ...element.data, name: trimmed },
             });
@@ -706,11 +706,11 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
             width: Math.max(80, element.width - 80),
             height: 24,
           },
-          initialValue: inputField.name,
+          initialValue: toDisplayName(inputField.name),
           multiline: false,
           onCommit: (newName) => {
             const trimmed = newName.trim();
-            if (trimmed && trimmed !== inputField.name) {
+            if (trimmed && !isSameIdentifier(trimmed, inputField.name)) {
               const nextInputs = [...inputs];
               nextInputs[index] = { ...inputField, name: trimmed };
               useCanvasStore.getState().updateElement(element.id, {
@@ -748,11 +748,11 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
             width: Math.max(80, element.width - 80),
             height: 24,
           },
-          initialValue: respField.name,
+          initialValue: toDisplayName(respField.name),
           multiline: false,
           onCommit: (newName) => {
             const trimmed = newName.trim();
-            if (trimmed && trimmed !== respField.name) {
+            if (trimmed && !isSameIdentifier(trimmed, respField.name)) {
               const nextResponses = [...responses];
               nextResponses[index] = { ...respField, name: trimmed };
               useCanvasStore.getState().updateElement(element.id, {

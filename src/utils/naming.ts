@@ -139,9 +139,21 @@ export function toCamelIdentifier(input: string | undefined | null): string {
 /**
  * Identifier-valued string keys inside element data. `name` covers card titles,
  * fields, params, responses, methods and constraint state references; `field`
- * is a query-tag field reference; `type`/`aliasedType` are type references.
+ * is a query-tag field reference; `tag` is a DCB tag; `type`/`aliasedType` are
+ * type references.
  */
-const IDENTIFIER_STRING_KEYS = new Set(["name", "field", "type", "aliasedType"]);
+const IDENTIFIER_STRING_KEYS = new Set(["name", "field", "tag", "type", "aliasedType"]);
+
+/**
+ * True when committing `input` would leave the stored identifier `current`
+ * unchanged. Tolerance for the display layer: the inline editor shows the
+ * human-readable form while the data holds camelCase, so an untouched commit
+ * must not create a spurious edit (or undo step).
+ */
+export function isSameIdentifier(input: string, current: string | undefined): boolean {
+  const trimmed = input.trim();
+  return trimmed === current || toCamelIdentifier(trimmed) === current;
+}
 
 /**
  * Rewrites identifier names inside an element's data to canonical camelCase,

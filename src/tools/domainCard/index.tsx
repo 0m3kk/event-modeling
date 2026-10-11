@@ -4,7 +4,7 @@ import { Graphics, Text, type Container } from "pixi.js";
 import type { ToolDefinition } from "../types";
 import type { InlineEditState } from "@/types";
 import { useCanvasStore } from "@/store";
-import { toDisplayName } from "@/utils/naming";
+import { isSameIdentifier, toDisplayName } from "@/utils/naming";
 import {
   DOMAIN_DEFAULT_HEIGHT,
   DOMAIN_DEFAULT_WIDTH,
@@ -130,11 +130,11 @@ export const domainCardTool: ToolDefinition<DomainData> = {
         width: Math.max(80, element.width - 16),
         height: 22,
       },
-      initialValue: element.data?.name || "Domain",
+      initialValue: toDisplayName(element.data?.name) || "Domain",
       multiline: false,
       onCommit: (newValue) => {
         const trimmed = newValue.trim();
-        if (trimmed && trimmed !== element.data?.name) {
+        if (trimmed && !isSameIdentifier(trimmed, element.data?.name)) {
           useCanvasStore.getState().updateElement(element.id, {
             data: { ...element.data, name: trimmed },
           });

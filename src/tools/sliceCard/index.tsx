@@ -12,6 +12,7 @@ import {
   renderStandardCardTitle,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
+import { isSameIdentifier, toDisplayName } from "@/utils/naming";
 import {
   SLICE_HEADER_HEIGHT,
   SLICE_LANE_LABEL_HEIGHT,
@@ -344,11 +345,11 @@ export const sliceCardTool: ToolDefinition<SliceData> = {
           width: element.width - 16,
           height: 24,
         },
-        initialValue: element.data?.name || "Slice",
+        initialValue: toDisplayName(element.data?.name) || "Slice",
         multiline: false,
         onCommit: (newValue) => {
           const trimmed = newValue.trim();
-          if (trimmed && trimmed !== element.data?.name) {
+          if (trimmed && !isSameIdentifier(trimmed, element.data?.name)) {
             useCanvasStore.getState().updateElement(element.id, {
               data: { ...element.data, name: trimmed },
             });

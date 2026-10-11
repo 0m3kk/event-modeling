@@ -43,7 +43,7 @@ describe("enumCardTool", () => {
 
     const target = enumCardTool.getInlineEditTarget!(card, { x: 50, y: 15 });
     expect(target).not.toBeNull();
-    expect(target?.initialValue).toBe("OrderStatus");
+    expect(target?.initialValue).toBe("Order Status");
 
     target?.onCommit("PaymentStatus");
 

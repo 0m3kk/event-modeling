@@ -6,7 +6,7 @@ import type {
   InlineEditState,
 } from "@/types";
 import { getContrastTextColor } from "@/utils/color";
-import { toDisplayName, toDisplayType } from "@/utils/naming";
+import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { useCanvasStore } from "@/store";
 import { addDescZone } from "./descZones";
 
@@ -531,11 +531,11 @@ export function getStandardCardInlineEditTarget<
         width: element.width - 16,
         height: 24,
       },
-      initialValue: element.data?.name || fallbackName,
+      initialValue: toDisplayName(element.data?.name) || fallbackName,
       multiline: false,
       onCommit: (newValue) => {
         const trimmed = newValue.trim();
-        if (trimmed && trimmed !== element.data?.name) {
+        if (trimmed && !isSameIdentifier(trimmed, element.data?.name)) {
           useCanvasStore.getState().updateElement(element.id, {
             data: { ...element.data, name: trimmed },
           });
@@ -563,11 +563,11 @@ export function getStandardCardInlineEditTarget<
         width: Math.max(80, element.width - 80),
         height: 24,
       },
-      initialValue: field.name,
+      initialValue: toDisplayName(field.name),
       multiline: false,
       onCommit: (newName) => {
         const trimmed = newName.trim();
-        if (trimmed && trimmed !== field.name) {
+        if (trimmed && !isSameIdentifier(trimmed, field.name)) {
           const nextFields = [...fields];
           nextFields[index] = { ...field, name: trimmed };
           useCanvasStore.getState().updateElement(element.id, {

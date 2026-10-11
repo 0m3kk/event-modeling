@@ -1,6 +1,7 @@
 import type { CanvasElement } from "@/types";
 import type { ValidationIssue } from "../types";
 import { collectBoardTagCatalog, fieldTypeKey } from "@/utils/eventTags";
+import { toCamelIdentifier } from "@/utils/naming";
 import { validateFieldTypes } from "../common/typeValidation";
 import type { EventCardData } from "./index";
 
@@ -38,7 +39,7 @@ export function validateEventCardData(
   const cardTypes = new Map<string, Set<string>>();
 
   fields.forEach((field, index) => {
-    const tag = typeof field?.tag === "string" ? field.tag.trim() : "";
+    const tag = toCamelIdentifier(typeof field?.tag === "string" ? field.tag : "");
     if (!tag) return;
 
     const typeKey = fieldTypeKey(field);

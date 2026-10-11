@@ -88,7 +88,7 @@ describe("queryCardTool multi-section (params & responses)", () => {
 
     const target = queryCardTool.getInlineEditTarget!(card, { x: 50, y: 15 });
     expect(target).not.toBeNull();
-    expect(target?.initialValue).toBe("GetOrder");
+    expect(target?.initialValue).toBe("Get Order");
     expect(target?.multiline).toBe(false);
 
     // Commit change
@@ -109,7 +109,7 @@ describe("queryCardTool multi-section (params & responses)", () => {
     // Double click on param 0 (orderId) at y = 65
     const target = queryCardTool.getInlineEditTarget!(card, { x: 30, y: 65 });
     expect(target).not.toBeNull();
-    expect(target?.initialValue).toBe("orderId");
+    expect(target?.initialValue).toBe("Order ID");
 
     // Commit change
     target?.onCommit("cartId");
@@ -133,7 +133,7 @@ describe("queryCardTool multi-section (params & responses)", () => {
     // Double click on response 0 (trackingCode) at y = 145
     const target = queryCardTool.getInlineEditTarget!(card, { x: 30, y: 145 });
     expect(target).not.toBeNull();
-    expect(target?.initialValue).toBe("trackingCode");
+    expect(target?.initialValue).toBe("Tracking Code");
 
     // Commit change
     target?.onCommit("shipmentId");

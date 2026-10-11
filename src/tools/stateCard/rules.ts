@@ -2,7 +2,7 @@ import type { CanvasElement } from "@/types";
 import type { ValidationIssue } from "../types";
 import { collectBoardTagCatalog, fieldTypeKey } from "@/utils/eventTags";
 import { collectEventTypeNames } from "@/utils/typeCatalog";
-import { nameKey } from "@/utils/naming";
+import { nameKey, toCamelIdentifier } from "@/utils/naming";
 import { validateFieldTypes } from "../common/typeValidation";
 
 /** A typed field row used by both the `params` and `states` sections. */
@@ -127,7 +127,7 @@ export function validateStateCardData(
     const validTags: QueryTag[] = [];
 
     inputTags.forEach((ref, tagIndex) => {
-      const tag = (ref?.tag || "").trim();
+      const tag = toCamelIdentifier(ref?.tag || "");
       const fieldName = (ref?.field || "").trim();
       const path = `queryItems[${itemIndex}].tags[${tagIndex}]`;
 
