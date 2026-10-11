@@ -8,7 +8,7 @@ import {
   PRIMITIVE_FIELD_TYPES,
 } from "@/utils/typeCatalog";
 import { z } from "zod";
-import { sendChatMessage, type AISettings, type ChatMessage } from "./client";
+import { sendChatMessage, createSessionId, type AISettings, type ChatMessage } from "./client";
 import type { CanvasElement, Point } from "@/types";
 
 export interface AgentStepCallback {
@@ -432,6 +432,7 @@ export async function runAgentConversation(
   settings: AISettings,
   conversationHistory: ChatMessage[],
   callbacks?: AgentStepCallback,
+  sessionId: string = createSessionId(),
 ): Promise<string> {
   const systemPrompt = `You are the AI Event Modeling Architect.
 You help software architects and developers design domain events, business models, and reactive systems on an infinite canvas.
@@ -474,7 +475,7 @@ Be concise, clear, and professional. Reply in the same language the user uses (V
 
   while (maxTurns > 0) {
     maxTurns--;
-    const response = await sendChatMessage(settings, wireMessages, tools);
+    const response = await sendChatMessage(settings, wireMessages, tools, sessionId);
 
     if (response.toolCalls.length > 0) {
       // Record assistant call

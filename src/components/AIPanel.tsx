@@ -14,6 +14,7 @@ import { useCanvasStore } from "@/store";
 import {
   getStoredAISettings,
   storeAISettings,
+  createSessionId,
   DEFAULT_AI_SETTINGS,
   type AISettings,
   type ChatMessage,
@@ -77,6 +78,10 @@ export function AIPanel() {
   // captured id no longer matches are discarded instead of polluting the new chat.
   const sessionIdRef = useRef(0);
 
+  // Stable id sent to the opencode gateway as `x-opencode-session`, shared by
+  // every turn of the current chat and refreshed when a new chat starts.
+  const opencodeSessionRef = useRef<string>(createSessionId());
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -86,6 +91,7 @@ export function AIPanel() {
   // Start a fresh chat session, dropping any pending reply from the old one.
   const handleNewSession = () => {
     sessionIdRef.current += 1;
+    opencodeSessionRef.current = createSessionId();
     lastTurnRef.current = null;
     setMessages([]);
     setInput("");
@@ -160,20 +166,26 @@ export function AIPanel() {
     setIsLoading(true);
     try {
       const assistantId = `assistant-${Date.now()}`;
-      const finalReply = await runAgentConversation(settings, history, {
-        onToolCall: (name) => {
+      const callbacks = {
+        onToolCall: (name: string) => {
           if (sessionIdRef.current !== sessionId) return;
           setMessages((prev) => [
             ...prev,
             {
               id: `tool-${Date.now()}`,
-              role: "assistant",
+              role: "assistant" as const,
               content: `Executing ${name}...`,
               toolName: name,
             },
           ]);
         },
-      });
+      };
+      const finalReply = await runAgentConversation(
+        settings,
+        history,
+        callbacks,
+        opencodeSessionRef.current,
+      );
 
       if (sessionIdRef.current !== sessionId) return;
       setMessages((prev) => [
@@ -240,7 +252,7 @@ export function AIPanel() {
   return (
     <aside
       style={{ width: `${panelWidth}px` }}
-      className="absolute right-0 top-14 bottom-0 z-20 flex flex-col border-l border-gray-200/80 bg-white/95 backdrop-blur-md shadow-2xl select-text dark:border-zinc-800/80 dark:bg-zinc-900/95"
+      className="absolute right-0 top-14 bottom-6 z-20 flex flex-col border-l border-gray-200/80 bg-white/95 backdrop-blur-md shadow-2xl select-text dark:border-zinc-800/80 dark:bg-zinc-900/95"
     >
       {/* Drag handle to resize panel */}
       <div

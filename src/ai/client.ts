@@ -43,6 +43,27 @@ export function storeAISettings(settings: AISettings) {
   }
 }
 
+/**
+ * Generates a session id sent as the `x-opencode-session` header.
+ *
+ * The opencode AI gateway requires this header on every request to group a
+ * conversation together, so we fall back to a UUID v4 when `crypto.randomUUID`
+ * is unavailable (older browsers / non-secure contexts).
+ */
+export function createSessionId(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export interface ChatMessage {
   id: string;
   role: "system" | "user" | "assistant" | "tool";
@@ -60,6 +81,7 @@ export async function sendChatMessage(
   settings: AISettings,
   messages: Array<{ role: string; content: string; tool_calls?: any; tool_call_id?: string }>,
   tools: any[],
+  sessionId: string,
 ): Promise<{
   content: string;
   toolCalls: Array<{ id: string; name: string; arguments: any }>;
@@ -84,6 +106,8 @@ export async function sendChatMessage(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${settings.apiKey.trim()}`,
+      // Required by the opencode AI gateway to group requests into a session.
+      "x-opencode-session": sessionId,
     },
     body: JSON.stringify(body),
   });
