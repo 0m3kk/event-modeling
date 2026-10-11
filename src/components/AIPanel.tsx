@@ -24,9 +24,9 @@ import {
 import { runAgentConversation } from "@/ai/agent";
 
 const AI_PANEL_WIDTH_STORAGE_KEY = "event_modeling_ai_panel_width";
-const MIN_PANEL_WIDTH = 300;
-const MAX_PANEL_WIDTH = 700;
-const DEFAULT_PANEL_WIDTH = 380;
+const MIN_PANEL_WIDTH = 320;
+const MAX_PANEL_WIDTH = 800;
+const DEFAULT_PANEL_WIDTH = 480;
 
 const AI_PANEL_FONT_SCALE_STORAGE_KEY = "event_modeling_ai_panel_font_scale";
 // Discrete multipliers applied to the panel's base text sizes. The 1.0 entry is
@@ -35,7 +35,7 @@ const FONT_SCALE_LEVELS = [0.85, 1, 1.15, 1.3, 1.5];
 const DEFAULT_FONT_SCALE = 1;
 
 // Max height (px) the prompt textarea grows to before it starts scrolling.
-const MAX_INPUT_HEIGHT = 160;
+const MAX_INPUT_HEIGHT = 220;
 
 /** Restores the panel font scale from the last session, snapped to a known level. */
 function getStoredFontScale(): number {
@@ -502,7 +502,7 @@ export function AIPanel() {
           >
             <textarea
               ref={inputRef}
-              rows={1}
+              rows={3}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
