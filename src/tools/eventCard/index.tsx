@@ -24,6 +24,7 @@ export interface EventField {
   isTag?: boolean;
   tag?: string;
   isArray?: boolean;
+  isRequired?: boolean;
   description?: string;
 }
 
@@ -44,6 +45,7 @@ export const EventCardSchema = z.object({
         isTag: z.boolean().optional(),
         tag: z.string().optional(),
         isArray: z.boolean().optional(),
+        isRequired: z.boolean().optional(),
         description: z.string().optional(),
       }),
     )
@@ -233,6 +235,19 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     };
   },
 
+  onToggleSubSelectRequired: (element, field) => {
+    const fields = element.data.fields;
+    if (!fields || field.fieldIndex < 0 || field.fieldIndex >= fields.length) {
+      return null;
+    }
+    const nextFields = [...fields];
+    const cur = nextFields[field.fieldIndex];
+    nextFields[field.fieldIndex] = { ...cur, isRequired: !cur.isRequired };
+    return {
+      data: { ...element.data, fields: nextFields },
+    };
+  },
+
   getSelectedFieldItem: (element, field) => {
     return element.data.fields?.[field.fieldIndex] ?? null;
   },
@@ -267,6 +282,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
             name: z.string().describe("Field name in camelCase"),
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
+            isRequired: z.boolean().optional().describe("True when the field is required"),
           }),
         )
         .optional()

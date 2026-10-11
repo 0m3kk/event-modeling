@@ -26,6 +26,7 @@ export interface CommandField {
   name: string;
   type: string;
   isArray?: boolean;
+  isRequired?: boolean;
   description?: string;
 }
 
@@ -118,6 +119,7 @@ export const CommandCardSchema = z.object({
         name: z.string(),
         type: z.string(),
         isArray: z.boolean().optional(),
+        isRequired: z.boolean().optional(),
         description: z.string().optional(),
       }),
     )
@@ -128,6 +130,7 @@ export const CommandCardSchema = z.object({
         name: z.string(),
         type: z.string(),
         isArray: z.boolean().optional(),
+        isRequired: z.boolean().optional(),
         description: z.string().optional(),
       }),
     )
@@ -312,6 +315,23 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           fieldName.y = rowY + 7;
           container.addChild(fieldName);
 
+          // Required marker: a "*" right after the field name.
+          if (field.isRequired) {
+            const requiredStar = new Text({
+              text: "*",
+              style: {
+                fontSize: 13,
+                fontWeight: "bold",
+                fontFamily: '"Geist Mono", monospace',
+                fill: isDark ? 0xf87171 : 0xdc2626,
+              },
+              resolution: context.textResolution,
+            });
+            requiredStar.x = fieldName.x + fieldName.width + 2;
+            requiredStar.y = rowY + 6;
+            container.addChild(requiredStar);
+          }
+
           const typeLabel = new Text({
             text: `${field.type}${field.isArray ? "[]" : ""}`,
             style: {
@@ -394,6 +414,23 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           fieldName.x = 12;
           fieldName.y = rowY + 7;
           container.addChild(fieldName);
+
+          // Required marker: a "*" right after the field name.
+          if (field.isRequired) {
+            const requiredStar = new Text({
+              text: "*",
+              style: {
+                fontSize: 13,
+                fontWeight: "bold",
+                fontFamily: '"Geist Mono", monospace',
+                fill: isDark ? 0xf87171 : 0xdc2626,
+              },
+              resolution: context.textResolution,
+            });
+            requiredStar.x = fieldName.x + fieldName.width + 2;
+            requiredStar.y = rowY + 6;
+            container.addChild(requiredStar);
+          }
 
           const typeLabel = new Text({
             text: `${field.type}${field.isArray ? "[]" : ""}`,
@@ -559,6 +596,29 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     }
   },
 
+  onToggleSubSelectRequired: (element, field) => {
+    const inputs = getCommandInputs(element.data);
+    const responses = getCommandResponses(element.data);
+
+    if (field.sectionIndex === 1) {
+      if (field.fieldIndex < 0 || field.fieldIndex >= responses.length) return null;
+      const nextResponses = [...responses];
+      const cur = nextResponses[field.fieldIndex];
+      nextResponses[field.fieldIndex] = { ...cur, isRequired: !cur.isRequired };
+      return {
+        data: { ...element.data, inputs, responses: nextResponses },
+      };
+    } else {
+      if (field.fieldIndex < 0 || field.fieldIndex >= inputs.length) return null;
+      const nextInputs = [...inputs];
+      const cur = nextInputs[field.fieldIndex];
+      nextInputs[field.fieldIndex] = { ...cur, isRequired: !cur.isRequired };
+      return {
+        data: { ...element.data, inputs: nextInputs, responses },
+      };
+    }
+  },
+
   getSelectedFieldItem: (element, field) => {
     if (field.sectionIndex === 1) {
       const responses = getCommandResponses(element.data);
@@ -708,6 +768,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
             name: z.string().describe("Input field name in camelCase"),
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
+            isRequired: z.boolean().optional().describe("True when the field is required"),
           }),
         )
         .optional()
@@ -718,6 +779,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
             name: z.string().describe("Response field name in camelCase"),
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
+            isRequired: z.boolean().optional().describe("True when the field is required"),
           }),
         )
         .optional()
@@ -728,6 +790,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
             name: z.string().describe("Field name in camelCase"),
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
+            isRequired: z.boolean().optional().describe("True when the field is required"),
           }),
         )
         .optional()

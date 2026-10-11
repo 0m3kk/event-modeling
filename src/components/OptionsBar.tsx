@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets } from "lucide-react";
+import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets, Asterisk } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
@@ -24,6 +24,7 @@ export function OptionsBar() {
   const toggleSelectedFieldTag = useCanvasStore((s) => s.toggleSelectedFieldTag);
   const updateSelectedFieldTag = useCanvasStore((s) => s.updateSelectedFieldTag);
   const toggleSelectedFieldArray = useCanvasStore((s) => s.toggleSelectedFieldArray);
+  const toggleSelectedFieldRequired = useCanvasStore((s) => s.toggleSelectedFieldRequired);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -156,7 +157,7 @@ export function OptionsBar() {
     if (Array.isArray(singleElement.data?.fields)) {
       return (
         (singleElement.data.fields[selectedField.fieldIndex] as
-          | { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean }
+          | { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean; isRequired?: boolean }
           | undefined) ?? null
       );
     }
@@ -265,6 +266,19 @@ export function OptionsBar() {
               }`}
             >
               <Brackets size={16} />
+            </button>
+
+            {/* Required toggle: renders a "*" after the field name */}
+            <button
+              onClick={() => toggleSelectedFieldRequired()}
+              title={currentField.isRequired ? "Field is required (click to unset)" : "Mark field as required"}
+              className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
+                currentField.isRequired
+                  ? "bg-red-500/15 text-red-600 dark:bg-red-950/50 dark:text-red-400"
+                  : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <Asterisk size={16} />
             </button>
 
             {/* Event Card Field Tag Popover (DCB consistency boundary) */}

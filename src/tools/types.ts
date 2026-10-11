@@ -75,8 +75,11 @@ export interface ToolDefinition<TData = any> {
   // Optional: handles toggling array status on sub-element (renders as "type[]")
   onToggleSubSelectArray?: (element: CanvasElement<TData>, field: SelectedField) => Partial<CanvasElement<TData>> | null;
 
+  // Optional: handles toggling required status on sub-element (renders a "*" after the name)
+  onToggleSubSelectRequired?: (element: CanvasElement<TData>, field: SelectedField) => Partial<CanvasElement<TData>> | null;
+
   // Optional: resolves selected item data for UI (e.g. OptionsBar)
-  getSelectedFieldItem?: (element: CanvasElement<TData>, field: SelectedField) => { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean } | null;
+  getSelectedFieldItem?: (element: CanvasElement<TData>, field: SelectedField) => { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean; isRequired?: boolean } | null;
 
   // Optional: handles custom navigation between sub-elements / sections
   onNavigateSubSelect?: (

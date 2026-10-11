@@ -36,6 +36,7 @@ export interface CardFieldItem {
   isTag?: boolean;
   tag?: string;
   isArray?: boolean;
+  isRequired?: boolean;
   description?: string;
 }
 
@@ -343,6 +344,25 @@ export function renderStandardCardFields(
       fieldName.y = currentY + 7;
       container.addChild(fieldName);
 
+      // Required marker: a "*" right after the field name.
+      let nameEndX = fieldName.x + fieldName.width;
+      if (field.isRequired) {
+        const requiredStar = new Text({
+          text: "*",
+          style: {
+            fontSize: 13,
+            fontWeight: "bold",
+            fontFamily: '"Geist Mono", monospace',
+            fill: isDark ? 0xf87171 : 0xdc2626,
+          },
+          resolution: textResolution,
+        });
+        requiredStar.x = nameEndX + 2;
+        requiredStar.y = currentY + 6;
+        container.addChild(requiredStar);
+        nameEndX = requiredStar.x + requiredStar.width;
+      }
+
       const typeLabel = new Text({
         text: `${field.type}${field.isArray ? "[]" : ""}`,
         style: {
@@ -405,7 +425,7 @@ export function renderStandardCardFields(
 
         const badgeW = tagText.width + 8;
         const badgeH = 15;
-        const badgeX = fieldName.x + fieldName.width + 6;
+        const badgeX = nameEndX + 6;
         const badgeY = currentY + 6.5;
 
         if (badgeX + badgeW < typeLabel.x - 4) {
