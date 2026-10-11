@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Type } from "lucide-react";
+import { Pencil } from "lucide-react";
 import type { CanvasElement } from "@/types";
 import type { StickyNoteData } from "./index";
 
@@ -48,10 +48,9 @@ export function StickyNoteOptions({ element, onUpdate }: StickyNoteOptionsProps)
             setIsEditing(true);
           }}
           title="Edit Text"
-          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+          className="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
         >
-          <Type size={13} />
-          <span>Edit</span>
+          <Pencil size={16} />
         </button>
       )}
     </div>

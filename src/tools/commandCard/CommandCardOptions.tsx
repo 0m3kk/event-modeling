@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { LogIn, LogOut } from "lucide-react";
 import type { CanvasElement } from "@/types";
 import type { CommandCardData, CommandField } from "./index";
 import { commandCardTool, getCommandInputs, getCommandResponses } from "./index";
@@ -57,19 +57,17 @@ export function CommandCardOptions({ element }: CommandCardOptionsProps) {
       <button
         onClick={handleAddInput}
         title="Add Input Field"
-        className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+        className="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
       >
-        <Plus size={14} />
-        <span>Input</span>
+        <LogIn size={16} />
       </button>
 
       <button
         onClick={handleAddResponse}
         title="Add Response Field"
-        className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+        className="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
       >
-        <Plus size={14} />
-        <span>Response</span>
+        <LogOut size={16} />
       </button>
     </div>
   );

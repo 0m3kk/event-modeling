@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Trash2, Copy, Palette, Link2, ChevronDown, Tag, Info } from "lucide-react";
+import { Trash2, Copy, Palette, Link2, Tag, Info, Braces } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
@@ -211,7 +211,7 @@ export function OptionsBar() {
           <button
             onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
             title="Change Color"
-            className="flex items-center gap-1.5 rounded-xl border border-gray-200/80 p-1.5 hover:bg-gray-100 dark:border-zinc-800 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
           >
             <span
               className="h-4.5 w-4.5 rounded-full border border-black/10 shadow-xs"
@@ -234,14 +234,14 @@ export function OptionsBar() {
           <>
             <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
             <div className="relative">
+              {/* Type is already rendered on the card row, so the bar only
+                  exposes the action — an icon-only button that opens the picker. */}
               <button
                 onClick={() => setIsTypePickerOpen(!isTypePickerOpen)}
-                title="Change Field Type"
-                className="flex items-center gap-1.5 rounded-xl border border-gray-200/80 px-2.5 py-1 text-xs font-mono font-medium text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+                title={`Change Field Type (${currentField.type})`}
+                className="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
               >
-                <span className="text-xs text-gray-400 dark:text-zinc-500 font-sans">type:</span>
-                <span className="text-blue-600 dark:text-blue-400 font-semibold text-[13px]">{currentField.type}</span>
-                <ChevronDown size={13} className="text-gray-400" />
+                <Braces size={16} />
               </button>
 
               <FieldTypePopover
@@ -256,6 +256,8 @@ export function OptionsBar() {
             {/* Event Card Field Tag Popover (DCB consistency boundary) */}
             {(singleElement?.type === "eventCard" || Boolean(toolDef?.onToggleSubSelectTag)) && (
               <div className="relative">
+                {/* Tag value lives on the card badge; the bar only shows the
+                    action, with an amber highlight when a tag is attached. */}
                 <button
                   onClick={() => setIsTagPickerOpen(!isTagPickerOpen)}
                   title={
@@ -263,22 +265,20 @@ export function OptionsBar() {
                       ? `DCB Consistency Boundary Tag: #${currentField.tag} (Click to change)`
                       : "Attach DCB Consistency Boundary Tag"
                   }
-                  className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono font-medium transition-colors cursor-pointer border ${
+                  className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
                     currentField.tag || currentField.isTag
-                      ? "border-amber-400 bg-amber-500/15 text-amber-600 dark:border-amber-500 dark:bg-amber-950/50 dark:text-amber-400"
-                      : "border-gray-200/80 text-gray-600 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      ? "bg-amber-500/15 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   }`}
                 >
                   <Tag
-                    size={13}
+                    size={16}
                     className={
                       currentField.tag || currentField.isTag
                         ? "fill-amber-500 text-amber-500"
-                        : "text-gray-400 dark:text-zinc-500"
+                        : ""
                     }
                   />
-                  <span>{currentField.tag ? `#${currentField.tag}` : "+ tag"}</span>
-                  <ChevronDown size={13} className="text-gray-400" />
                 </button>
 
                 <FieldTagPopover
@@ -316,10 +316,10 @@ export function OptionsBar() {
             <button
               onClick={() => setIsDescriptionOpen(!isDescriptionOpen)}
               title={hasDescription ? "Edit Description" : "Add Description"}
-              className={`flex items-center justify-center rounded-xl border p-1.5 transition-colors cursor-pointer ${
+              className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
                 hasDescription
-                  ? "border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/40"
-                  : "border-transparent hover:bg-gray-100 dark:hover:bg-zinc-800"
+                  ? "bg-sky-50 dark:bg-sky-950/40"
+                  : "hover:bg-gray-100 dark:hover:bg-zinc-800"
               }`}
             >
               <Info size={16} className="text-sky-600 dark:text-sky-400" />
