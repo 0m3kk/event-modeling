@@ -18,6 +18,7 @@ export function OptionsBar() {
   const selectedField = useCanvasStore((s) => s.selectedField);
   const deleteSelectedField = useCanvasStore((s) => s.deleteSelectedField);
   const updateSelectedFieldType = useCanvasStore((s) => s.updateSelectedFieldType);
+  const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [isTypePickerOpen, setIsTypePickerOpen] = useState(false);
@@ -58,8 +59,6 @@ export function OptionsBar() {
     };
   }, [selectedIds, elements]);
 
-  const isDragging = useCanvasStore((s) => s.isDragging);
-
   if (isDragging || !bounds || selectedElements.length === 0) return null;
 
   const isSingle = selectedElements.length === 1;
@@ -99,14 +98,10 @@ export function OptionsBar() {
   const isFieldSelected = Boolean(selectedField && selectedIds.includes(selectedField.elementId));
 
   // Active selected field (if any)
-  const currentField = useMemo(() => {
-    if (!isSingle || !singleElement || !isFieldSelected || !selectedField) return null;
-    const fields = singleElement.data?.fields;
-    if (Array.isArray(fields) && fields[selectedField.fieldIndex]) {
-      return fields[selectedField.fieldIndex] as { name: string; type: string };
-    }
-    return null;
-  }, [isSingle, singleElement, isFieldSelected, selectedField]);
+  const currentField =
+    isSingle && singleElement && isFieldSelected && selectedField && Array.isArray(singleElement.data?.fields)
+      ? ((singleElement.data.fields[selectedField.fieldIndex] as { name: string; type: string } | undefined) ?? null)
+      : null;
 
   const handleCopyReference = () => {
     if (isSingle && singleElement) {
