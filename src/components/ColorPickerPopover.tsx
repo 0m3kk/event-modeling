@@ -53,15 +53,15 @@ export function ColorPickerPopover({
   return (
     <div
       ref={popoverRef}
-      className={`absolute left-0 ${positionClasses} w-[184px] rounded-2xl border border-gray-200/90 bg-white/95 p-2.5 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
+      className={`absolute left-0 ${positionClasses} w-[196px] rounded-2xl border border-gray-200/90 bg-white/95 p-2.5 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
     >
-      <div className="mb-2 flex items-center justify-between px-0.5 text-[11px] font-semibold text-gray-500 dark:text-zinc-400">
+      <div className="mb-2 flex items-center justify-between px-1 text-xs font-semibold text-gray-500 dark:text-zinc-400">
         <span className="flex items-center gap-1.5">
-          <Palette size={13} />
+          <Palette size={14} />
           <span>Color</span>
         </span>
         {currentColor && (
-          <span className="font-mono text-[10px] uppercase text-gray-400 dark:text-zinc-500">
+          <span className="font-mono text-[11px] uppercase text-gray-400 dark:text-zinc-500">
             {currentColor}
           </span>
         )}
@@ -99,8 +99,8 @@ export function ColorPickerPopover({
       </div>
 
       {/* Custom Color Native Picker */}
-      <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800 flex items-center justify-between px-0.5">
-        <span className="text-[10px] text-gray-400 dark:text-zinc-500 font-mono">Custom</span>
+      <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800 flex items-center justify-between px-1">
+        <span className="text-xs text-gray-400 dark:text-zinc-500 font-mono">Custom</span>
         <label className="relative flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity">
           <span
             className="h-4 w-4 rounded-md border border-black/15 shadow-xs"
@@ -112,7 +112,7 @@ export function ColorPickerPopover({
             onChange={(e) => onSelectColor(e.target.value)}
             className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
           />
-          <span className="text-[10px] font-mono text-gray-500 dark:text-zinc-400">Pick</span>
+          <span className="text-xs font-mono text-gray-600 dark:text-zinc-300">Pick</span>
         </label>
       </div>
     </div>

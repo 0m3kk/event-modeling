@@ -131,7 +131,7 @@ export function OptionsBar() {
     >
       <div
         onPointerDown={(e) => e.stopPropagation()}
-        className="pointer-events-auto relative flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-2.5 py-1.5 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 select-none"
+        className="pointer-events-auto relative flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3 py-1.5 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 select-none"
       >
         {/* 1. FIRST OPTION: COLOR PICKER (Common to ALL tools) */}
         <div className="relative">
@@ -141,10 +141,10 @@ export function OptionsBar() {
             className="flex items-center gap-1.5 rounded-xl border border-gray-200/80 p-1.5 hover:bg-gray-100 dark:border-zinc-800 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
           >
             <span
-              className="h-4 w-4 rounded-full border border-black/10 shadow-xs"
+              className="h-4.5 w-4.5 rounded-full border border-black/10 shadow-xs"
               style={{ backgroundColor: currentColor }}
             />
-            <Palette size={13} className="text-gray-500 dark:text-zinc-400" />
+            <Palette size={14} className="text-gray-500 dark:text-zinc-400" />
           </button>
 
           <ColorPickerPopover
@@ -164,11 +164,11 @@ export function OptionsBar() {
               <button
                 onClick={() => setIsTypePickerOpen(!isTypePickerOpen)}
                 title="Change Field Type"
-                className="flex items-center gap-1.5 rounded-xl border border-gray-200/80 px-2 py-1 text-xs font-mono font-medium text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200/80 px-2.5 py-1 text-xs font-mono font-medium text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
               >
-                <span className="text-[11px] text-gray-400 dark:text-zinc-500 font-sans">type:</span>
-                <span className="text-blue-600 dark:text-blue-400 font-semibold">{currentField.type}</span>
-                <ChevronDown size={12} className="text-gray-400" />
+                <span className="text-xs text-gray-400 dark:text-zinc-500 font-sans">type:</span>
+                <span className="text-blue-600 dark:text-blue-400 font-semibold text-[13px]">{currentField.type}</span>
+                <ChevronDown size={13} className="text-gray-400" />
               </button>
 
               <FieldTypePopover
@@ -204,18 +204,18 @@ export function OptionsBar() {
           <>
             {isElementOriginal(singleElement, elements) ? (
               <div
-                className="flex items-center gap-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200/80 dark:border-purple-800/80 px-2 py-1 text-[11px] font-medium text-purple-600 dark:text-purple-400"
+                className="flex items-center gap-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200/80 dark:border-purple-800/80 px-2.5 py-1 text-xs font-medium text-purple-600 dark:text-purple-400"
                 title="Original (Master): content edits automatically synchronize to all reference copies."
               >
-                <span className="text-[12px] leading-none">❖</span>
+                <span className="text-[13px] leading-none">❖</span>
                 <span>Original</span>
               </div>
             ) : (
               <div
-                className="flex items-center gap-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800/80 px-2 py-1 text-[11px] font-medium text-sky-600 dark:text-sky-400"
+                className="flex items-center gap-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800/80 px-2.5 py-1 text-xs font-medium text-sky-600 dark:text-sky-400"
                 title="Reference Copy: linked to original entity. Content edits stay synchronized."
               >
-                <Link2 size={12} className="stroke-[2.5]" />
+                <Link2 size={13} className="stroke-[2.5]" />
                 <span>Ref Copy</span>
               </div>
             )}
@@ -230,7 +230,7 @@ export function OptionsBar() {
             title="Copy Reference"
             className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
           >
-            <Copy size={15} />
+            <Copy size={16} />
           </button>
         )}
 
@@ -239,7 +239,7 @@ export function OptionsBar() {
           title={isFieldSelected ? "Delete Field" : "Delete"}
           className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer transition-colors"
         >
-          <Trash2 size={15} />
+          <Trash2 size={16} />
         </button>
       </div>
     </div>

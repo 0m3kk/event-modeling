@@ -35,9 +35,9 @@ export function EventCardOptions({ element, onUpdate }: EventCardOptionsProps) {
       <button
         onClick={handleAddField}
         title="Add Field"
-        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+        className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
       >
-        <Plus size={13} />
+        <Plus size={14} />
         <span>Field</span>
       </button>
     </div>
