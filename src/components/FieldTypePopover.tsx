@@ -8,12 +8,12 @@ export interface FieldTypePreset {
 }
 
 export const COMMON_FIELD_TYPES: FieldTypePreset[] = [
-  { type: "string", label: "string", description: "Text string" },
-  { type: "number", label: "number", description: "Numeric value" },
-  { type: "boolean", label: "boolean", description: "True / False" },
-  { type: "date", label: "date", description: "Calendar date (YYYY-MM-DD)" },
-  { type: "datetime", label: "datetime", description: "ISO timestamp" },
-  { type: "uuid", label: "uuid", description: "Unique identifier" },
+  { type: "string", label: "string", description: "Text" },
+  { type: "number", label: "number", description: "Numeric" },
+  { type: "boolean", label: "boolean", description: "True/False" },
+  { type: "date", label: "date", description: "YYYY-MM-DD" },
+  { type: "datetime", label: "datetime", description: "Timestamp" },
+  { type: "uuid", label: "uuid", description: "ID" },
 ];
 
 interface FieldTypePopoverProps {
@@ -70,11 +70,11 @@ export function FieldTypePopover({
     <div
       ref={popoverRef}
       onWheel={(e) => e.stopPropagation()}
-      className={`absolute left-0 ${positionClasses} w-[224px] max-h-[min(380px,calc(100vh-120px))] overflow-y-auto rounded-2xl border border-gray-200/90 bg-white/95 p-2.5 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
+      className={`absolute left-0 ${positionClasses} w-[228px] max-h-[calc(100vh-80px)] overflow-y-auto rounded-2xl border border-gray-200/90 bg-white/95 p-2 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
     >
-      <div className="mb-2 flex items-center justify-between px-1 text-xs font-semibold text-gray-500 dark:text-zinc-400">
+      <div className="mb-1.5 flex items-center justify-between px-1.5 text-xs font-semibold text-gray-500 dark:text-zinc-400">
         <span className="flex items-center gap-1.5">
-          <Code2 size={14} />
+          <Code2 size={13} />
           <span>Field Type</span>
         </span>
         <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-medium">
@@ -95,13 +95,13 @@ export function FieldTypePopover({
                 onSelectType(preset.type);
                 onClose();
               }}
-              className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left transition-colors cursor-pointer ${
+              className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-left transition-colors cursor-pointer ${
                 isSelected
                   ? "bg-blue-50 text-blue-600 font-semibold dark:bg-blue-950/60 dark:text-blue-400"
                   : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               }`}
             >
-              <div className="flex flex-col">
+              <div className="flex items-center gap-2">
                 <span className="font-mono text-[13px] font-medium">{preset.label}</span>
                 <span className="text-[11px] text-gray-400 dark:text-zinc-500">
                   {preset.description}
