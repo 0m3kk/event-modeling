@@ -162,7 +162,6 @@ export function computeSliceLayout(
     kids.sort((a, b) => a.x - b.x || a.y - b.y);
   }
 
-  // Floor the content width at the default so an empty slice keeps a stable size.
   let widestContent = 0;
   const laneLayouts: SliceLaneLayout[] = [];
   let y = SLICE_HEADER_HEIGHT;
@@ -197,10 +196,14 @@ export function computeSliceLayout(
     y += height;
   });
 
-  const width = Math.max(
-    SLICE_DEFAULT_WIDTH,
-    Math.round(SLICE_LANE_PADDING * 2 + widestContent),
-  );
+  // Size to the widest lane's cards. A slice with no cards at all falls back to
+  // the default width so it stays a stable drop target; once cards are present
+  // the slice hugs them (equal padding left and right) instead of leaving dead
+  // space on the right.
+  const width =
+    widestContent > 0
+      ? Math.round(SLICE_LANE_PADDING * 2 + widestContent)
+      : SLICE_DEFAULT_WIDTH;
 
   // Center each lane's cards within the widest lane's content width, so narrower
   // lanes line up with the widest one.

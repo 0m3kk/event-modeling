@@ -105,10 +105,35 @@ describe("slice layout", () => {
     expect(layout.placements.get("a1")!.x).toBe(SLICE_LANE_PADDING + (widest - 150) / 2);
   });
 
+  it("hugs its content instead of leaving dead space on the right", () => {
+    const lane = createSliceLane();
+    const slice = makeSlice("s1", 0, 0, { name: "Slice", lanes: [lane] });
+    const card = makeCard("c1", "commandCard", 0, 0, {
+      sliceId: "s1",
+      laneId: lane.id,
+      width: 200,
+    });
+
+    const layout = computeSliceLayout(slice, [card]);
+
+    // Width shrinks to the card plus equal padding on both sides...
+    expect(layout.width).toBe(200 + SLICE_LANE_PADDING * 2);
+    // ...and the card sits flush with the left padding, so the gaps match.
+    const p = layout.placements.get("c1")!;
+    expect(p.x).toBe(SLICE_LANE_PADDING);
+    expect(layout.width - (p.x + 200)).toBe(SLICE_LANE_PADDING);
+  });
+
   it("keeps a stable default size for an empty slice", () => {
     const size = computeSliceCardSize({ name: "Slice", lanes: [] });
     expect(size.width).toBe(320);
     expect(size.height).toBeGreaterThan(SLICE_HEADER_HEIGHT);
+  });
+
+  it("keeps the default width for a lane that is still empty", () => {
+    const lane = createSliceLane("commandCard");
+    const slice = makeSlice("s1", 0, 0, { name: "Slice", lanes: [lane] });
+    expect(computeSliceLayout(slice, []).width).toBe(320);
   });
 });
 
