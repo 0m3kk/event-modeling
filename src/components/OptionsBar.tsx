@@ -9,7 +9,7 @@ import { DescriptionPopover } from "./DescriptionPopover";
 import type { CanvasElement } from "@/types";
 import { isElementOriginal } from "@/utils/reference";
 import { findDescriptionText } from "@/utils/description";
-import { toDisplayType } from "@/utils/naming";
+import { toDisplayName, toDisplayType } from "@/utils/naming";
 
 export function OptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
@@ -304,7 +304,7 @@ export function OptionsBar() {
                   onClick={() => setIsTagPickerOpen(!isTagPickerOpen)}
                   title={
                     currentField.tag
-                      ? `DCB Consistency Boundary Tag: #${currentField.tag} (Click to change)`
+                      ? `DCB Consistency Boundary Tag: #${toDisplayName(currentField.tag)} (Click to change)`
                       : "Attach DCB Consistency Boundary Tag"
                   }
                   className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${

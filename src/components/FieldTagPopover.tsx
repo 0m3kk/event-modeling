@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Tag, Check, Trash2, Hash } from "lucide-react";
+import { toDisplayName } from "@/utils/naming";
 
 interface FieldTagPopoverProps {
   currentTag?: string;
@@ -82,7 +83,7 @@ export function FieldTagPopover({
         </span>
         {currentTag ? (
           <span className="font-mono text-xs text-amber-600 dark:text-amber-400 font-bold">
-            #{currentTag}
+            #{toDisplayName(currentTag)}
           </span>
         ) : (
           <span className="text-[11px] text-gray-400 dark:text-zinc-500 font-normal">
@@ -137,7 +138,7 @@ export function FieldTagPopover({
                 className="flex items-center gap-0.5 rounded-md border border-amber-200/80 bg-amber-50/60 px-2 py-0.5 text-[11px] font-mono font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-400 dark:hover:bg-amber-950 cursor-pointer transition-colors"
               >
                 <Hash size={10} className="text-amber-500" />
-                <span>{sug}</span>
+                <span>{toDisplayName(sug)}</span>
               </button>
             ))}
           </div>

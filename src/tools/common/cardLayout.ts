@@ -423,7 +423,9 @@ export function renderStandardCardFields(
       // Render #tag badge if field is tagged
       if (field.isTag || field.tag) {
         const tagText = new Text({
-          text: field.tag ? `#${field.tag}` : "#tag",
+          // Tags are stored as camelCase identifiers; show them human-readable
+          // like the field names/types on the same row.
+          text: field.tag ? `#${toDisplayName(field.tag)}` : "#tag",
           style: {
             fontSize: 9,
             fontWeight: "bold",
