@@ -14,7 +14,7 @@
     "saveToDrive": "Save to Drive",
     "openFromDrive": "Open from Drive",
     "search": "Search (Ctrl+K)",
-    "aiAssistant": "AI Assistant"
+    "aiAssistant": "AI"
   },
   "toolbar": {
     "select": "Select (V)",
@@ -22,7 +22,7 @@
     "clearCanvas": "Clear Canvas"
   },
   "ai": {
-    "title": "AI Copilot",
+    "title": "AI",
     "placeholder": "Ask AI to model your domain...",
     "send": "Send",
     "settings": "Settings",
@@ -30,6 +30,11 @@
     "baseUrl": "Base URL",
     "model": "Model",
     "saveSettings": "Save Settings",
+    "retry": "Retry with last prompt",
+    "newChat": "New chat (⌘/Ctrl+Alt+N)",
+    "maxTokens": "Max tokens",
+    "maxTurns": "Max tool turns",
+    "limitsHelp": "Maximum tokens per response and maximum tool-call turns per request.",
     "toolsCalled": "Tools invoked"
   },
   "drive": {

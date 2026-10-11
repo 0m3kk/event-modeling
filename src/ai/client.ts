@@ -3,6 +3,7 @@ export interface AISettings {
   apiKey: string | null;
   model: string;
   maxTokens: number;
+  maxTurns: number;
 }
 
 const AI_SETTINGS_STORAGE_KEY = "event_modeling_ai_settings_v2";
@@ -12,6 +13,7 @@ export const DEFAULT_AI_SETTINGS: AISettings = {
   apiKey: null,
   model: "gpt-4o-mini",
   maxTokens: 4096,
+  maxTurns: 5,
 };
 
 export function getStoredAISettings(): AISettings {
@@ -24,6 +26,7 @@ export function getStoredAISettings(): AISettings {
         apiKey: parsed.apiKey || null,
         model: parsed.model || DEFAULT_AI_SETTINGS.model,
         maxTokens: parsed.maxTokens || DEFAULT_AI_SETTINGS.maxTokens,
+        maxTurns: parsed.maxTurns || DEFAULT_AI_SETTINGS.maxTurns,
       };
     }
   } catch {

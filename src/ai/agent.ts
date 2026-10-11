@@ -470,7 +470,7 @@ Be concise, clear, and professional. Reply in the same language the user uses (V
   }
 
   const tools = buildOpenAITools();
-  let maxTurns = 5;
+  let maxTurns = Math.max(1, Math.floor(settings.maxTurns) || 1);
 
   while (maxTurns > 0) {
     maxTurns--;

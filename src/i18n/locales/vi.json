@@ -30,6 +30,11 @@
     "baseUrl": "Base URL",
     "model": "Tên Model",
     "saveSettings": "Lưu cài đặt",
+    "retry": "Thử lại với prompt cuối",
+    "newChat": "Phiên chat mới (⌘/Ctrl+Alt+N)",
+    "maxTokens": "Giới hạn token",
+    "maxTurns": "Số vòng gọi công cụ tối đa",
+    "limitsHelp": "Số token tối đa cho mỗi phản hồi và số vòng gọi công cụ tối đa cho một yêu cầu.",
     "toolsCalled": "Công cụ đã kích hoạt"
   },
   "drive": {
