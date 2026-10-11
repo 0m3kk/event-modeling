@@ -1,15 +1,17 @@
 import { toolRegistry } from "./registry";
 import { commandCardTool } from "./commandCard";
+import { enumCardTool } from "./enumCard";
 import { eventCardTool } from "./eventCard";
 import { objectCardTool } from "./objectCard";
 import { stickyNoteTool } from "./stickyNote";
 
-// Register default decoupled tools
+// Register default decoupled tools (order here drives the toolbar order)
 toolRegistry.register(commandCardTool);
 toolRegistry.register(eventCardTool);
 toolRegistry.register(objectCardTool);
+toolRegistry.register(enumCardTool);
 toolRegistry.register(stickyNoteTool);
 
 export * from "./types";
 export * from "./registry";
-export { commandCardTool, eventCardTool, objectCardTool, stickyNoteTool };
+export { commandCardTool, enumCardTool, eventCardTool, objectCardTool, stickyNoteTool };

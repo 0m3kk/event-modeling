@@ -32,7 +32,8 @@ export const DESC_HIT_HALF = 9;
 
 export interface CardFieldItem {
   name: string;
-  type: string;
+  /** Optional: typeless rows (e.g. Enum members) omit the type column. */
+  type?: string;
   isTag?: boolean;
   tag?: string;
   isArray?: boolean;
@@ -363,25 +364,33 @@ export function renderStandardCardFields(
         nameEndX = requiredStar.x + requiredStar.width;
       }
 
-      const typeLabel = new Text({
-        text: `${field.type}${field.isArray ? "[]" : ""}`,
-        style: {
-          fontSize: 11,
-          fontFamily: '"Geist Mono", monospace',
-          fill: isDark ? 0xa1a1aa : 0x71717a,
-        },
-        resolution: textResolution,
-      });
+      // Type label is optional: typeless rows (e.g. Enum members) only render
+      // a name, so the right-edge anchor falls back to the row padding.
+      const typeText = field.type ? `${field.type}${field.isArray ? "[]" : ""}` : "";
+      let rightAnchorX = width - 12;
+      if (typeText) {
+        const typeLabel = new Text({
+          text: typeText,
+          style: {
+            fontSize: 11,
+            fontFamily: '"Geist Mono", monospace',
+            fill: isDark ? 0xa1a1aa : 0x71717a,
+          },
+          resolution: textResolution,
+        });
+        typeLabel.x = width - typeLabel.width - 12;
+        typeLabel.y = currentY + 8;
+        container.addChild(typeLabel);
+        rightAnchorX = typeLabel.x;
+      }
 
-      // Row ⓘ badge sits just left of the type label when the row has a
-      // description or is selected (dimmed as an "add info" affordance).
+      // Row ⓘ badge sits just left of the type label (or the right edge for
+      // typeless rows) when the row has a description or is selected (dimmed
+      // as an "add info" affordance).
       const showDescBadge = Boolean(field.description) || isFieldSelected;
-      typeLabel.x = width - typeLabel.width - 12;
-      typeLabel.y = currentY + 8;
-      container.addChild(typeLabel);
 
       if (showDescBadge) {
-        const badgeCx = typeLabel.x - DESC_ROW_BADGE_GAP;
+        const badgeCx = rightAnchorX - DESC_ROW_BADGE_GAP;
         const badgeCy = currentY + CARD_ROW_HEIGHT / 2;
         const badgeG = new Graphics();
         drawInfoBadge(badgeG, container, badgeCx, badgeCy, {
@@ -428,7 +437,7 @@ export function renderStandardCardFields(
         const badgeX = nameEndX + 6;
         const badgeY = currentY + 6.5;
 
-        if (badgeX + badgeW < typeLabel.x - 4) {
+        if (badgeX + badgeW < rightAnchorX - 4) {
           const tagBadge = new Graphics();
           tagBadge.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
           tagBadge.fill({ color: isDark ? 0x451a03 : 0xfef3c7, alpha: 0.9 });

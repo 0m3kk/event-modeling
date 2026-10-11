@@ -180,6 +180,14 @@ export function OptionsBar() {
 
   const ToolCustomOptions = toolDef?.optionsBar;
 
+  // Field rows that carry a data type expose the type/array/required controls.
+  // Typeless rows (e.g. Enum members) skip them entirely.
+  const showFieldTypeControls = Boolean(currentField?.type);
+  const showFieldTagControl =
+    Boolean(currentField) &&
+    (singleElement?.type === "eventCard" || Boolean(toolDef?.onToggleSubSelectTag));
+  const showAnyFieldControl = showFieldTypeControls || showFieldTagControl;
+
   // Description scope: a selected field row (if any) or the card itself.
   const descriptionScopeField =
     isSingle && singleElement && isFieldSelected ? selectedField : null;
@@ -232,57 +240,62 @@ export function OptionsBar() {
         </div>
 
         {/* 2. FIELD TYPE SELECTOR & TAG TOGGLE (When a field is actively selected) */}
-        {currentField && (
+        {showAnyFieldControl && currentField && (
           <>
             <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
-            <div className="relative">
-              {/* Type is already rendered on the card row, so the bar only
-                  exposes the action — an icon-only button that opens the picker. */}
-              <button
-                onClick={() => setIsTypePickerOpen(!isTypePickerOpen)}
-                title={`Change Field Type (${currentField.type})`}
-                className="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
-              >
-                <Braces size={16} />
-              </button>
 
-              <FieldTypePopover
-                currentType={currentField.type}
-                isOpen={isTypePickerOpen}
-                onClose={() => setIsTypePickerOpen(false)}
-                onSelectType={(newType) => updateSelectedFieldType(newType)}
-                placement={popoverPlacement}
-              />
-            </div>
+            {showFieldTypeControls && (
+              <>
+                <div className="relative">
+                  {/* Type is already rendered on the card row, so the bar only
+                      exposes the action — an icon-only button that opens the picker. */}
+                  <button
+                    onClick={() => setIsTypePickerOpen(!isTypePickerOpen)}
+                    title={`Change Field Type (${currentField.type})`}
+                    className="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+                  >
+                    <Braces size={16} />
+                  </button>
 
-            {/* Array toggle: marks the field type as a list (renders as "type[]") */}
-            <button
-              onClick={() => toggleSelectedFieldArray()}
-              title={currentField.isArray ? "Field is an array (click to unset)" : "Mark field as array"}
-              className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
-                currentField.isArray
-                  ? "bg-violet-500/15 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400"
-                  : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              }`}
-            >
-              <Brackets size={16} />
-            </button>
+                  <FieldTypePopover
+                    currentType={currentField.type}
+                    isOpen={isTypePickerOpen}
+                    onClose={() => setIsTypePickerOpen(false)}
+                    onSelectType={(newType) => updateSelectedFieldType(newType)}
+                    placement={popoverPlacement}
+                  />
+                </div>
 
-            {/* Required toggle: renders a "*" after the field name */}
-            <button
-              onClick={() => toggleSelectedFieldRequired()}
-              title={currentField.isRequired ? "Field is required (click to unset)" : "Mark field as required"}
-              className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
-                currentField.isRequired
-                  ? "bg-red-500/15 text-red-600 dark:bg-red-950/50 dark:text-red-400"
-                  : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              }`}
-            >
-              <Asterisk size={16} />
-            </button>
+                {/* Array toggle: marks the field type as a list (renders as "type[]") */}
+                <button
+                  onClick={() => toggleSelectedFieldArray()}
+                  title={currentField.isArray ? "Field is an array (click to unset)" : "Mark field as array"}
+                  className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
+                    currentField.isArray
+                      ? "bg-violet-500/15 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  <Brackets size={16} />
+                </button>
+
+                {/* Required toggle: renders a "*" after the field name */}
+                <button
+                  onClick={() => toggleSelectedFieldRequired()}
+                  title={currentField.isRequired ? "Field is required (click to unset)" : "Mark field as required"}
+                  className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
+                    currentField.isRequired
+                      ? "bg-red-500/15 text-red-600 dark:bg-red-950/50 dark:text-red-400"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  <Asterisk size={16} />
+                </button>
+              </>
+            )}
 
             {/* Event Card Field Tag Popover (DCB consistency boundary) */}
-            {(singleElement?.type === "eventCard" || Boolean(toolDef?.onToggleSubSelectTag)) && (
+            {showFieldTagControl && (
               <div className="relative">
                 {/* Tag value lives on the card badge; the bar only shows the
                     action, with an amber highlight when a tag is attached. */}
