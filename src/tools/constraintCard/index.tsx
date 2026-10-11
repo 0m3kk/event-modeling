@@ -167,7 +167,7 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
   type: "constraintCard",
   name: "Constraint",
   description:
-    "A Constraint: declares free-text rules over the fields of one or more State cards (e.g. AccountStatus.status must be active)",
+    "A Constraint: declares free-text business rules in plain language over one or more State cards (e.g. The account must be active)",
   icon: ShieldCheck,
   color: "#e11d48",
   category: "modeling",
@@ -538,9 +538,10 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
   ai: {
     toolName: "create_constraint_card",
     description:
-      "Create a Constraint card that declares rules over the fields of one or more State cards. " +
+      "Create a Constraint card that declares business rules over one or more State cards. " +
       "It has two sections: states (the State cards this constraint reads from, referenced by name) " +
-      "and rules (free-text assertions, e.g. 'AccountStatus.status must be active'). " +
+      "and rules (free-text business rules written in plain, human language, e.g. 'The account must be active'). " +
+      "Write rules as readable sentences, never as field-name notation such as 'accountStatus.status == active'. " +
       "RULE: every entry in `states` must match the name of an existing State card on the board; use " +
       "get_canvas_overview to discover existing State cards and their fields first. The card is rejected " +
       "if a state is unknown.",
@@ -554,7 +555,7 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
         .array(z.string())
         .optional()
         .describe(
-          "Free-text rules, one per entry (e.g. 'AccountStatus.status must be active')",
+          "Free-text business rules in plain, human language, one per entry (e.g. 'The account must be active'). Avoid field-name notation.",
         ),
       color: z.string().optional().describe("Optional header color hex code"),
       description: z.string().optional().describe("Optional plain-language description of the constraint"),

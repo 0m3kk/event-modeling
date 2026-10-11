@@ -364,7 +364,8 @@ export const sliceCardTool: ToolDefinition<SliceData> = {
     toolName: "create_slice",
     description:
       "Create a Slice: a vertical grouping whose lanes are stacked top-to-bottom. Each lane holds cards of a single type; declare the lane types up front. " +
-      "A flow is ONE slice: a write slice is commandCard then eventCard (write slice stops at events); a read slice is queryCard then viewCard or stateCard. " +
+      "A flow is ONE slice. A write slice is usually commandCard, constraintCard, eventCard — add a queryCard lane when the command reads data, and a serviceCard lane only when it executes a service. " +
+      "A read slice is queryCard then viewCard or stateCard — add a constraintCard lane only when a rule must be checked. " +
       "After creating the slice, create each lane's card(s) and place them in the lane by passing `slice` (and `lane` when the type is ambiguous).",
     parameters: z.object({
       name: z.string().describe("PascalCase slice name (e.g. PlaceOrderSlice)"),
