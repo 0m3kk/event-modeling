@@ -59,7 +59,9 @@ describe("Store Reference Copies & Unique Naming", () => {
     const referenceCopy = elements.find((e) => e.id !== "card-1")!;
 
     expect(original.referenceId).toBeDefined();
+    expect(original.isOriginal).toBe(true);
     expect(referenceCopy.referenceId).toBe(original.referenceId);
+    expect(referenceCopy.isOriginal).toBe(false);
 
     // Reference copy MUST have the exact same name!
     expect(referenceCopy.data.name).toBe("OrderPlaced");

@@ -16,6 +16,7 @@ export interface CanvasElement<TData = any> {
   id: string;
   type: string;
   referenceId?: string;
+  isOriginal?: boolean;
   x: number;
   y: number;
   width: number;
@@ -44,6 +45,7 @@ export const CanvasElementSchema = z.object({
   id: z.string(),
   type: z.string(),
   referenceId: z.string().optional(),
+  isOriginal: z.boolean().optional(),
   x: z.number(),
   y: z.number(),
   width: z.number(),

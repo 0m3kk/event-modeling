@@ -2,13 +2,15 @@ import { nanoid } from "nanoid";
 import type { CanvasElement } from "@/types";
 
 export interface ReferenceCopyResult {
-  sourcePatch: { id: string; referenceId: string };
+  sourcePatch: { id: string; referenceId: string; isOriginal?: boolean };
   copy: CanvasElement;
 }
 
 /**
  * Creates a linked reference copy of a source element.
  * If source has no referenceId, generates a new one.
+ * The source is marked as Original (isOriginal: true),
+ * and the copy is marked as Copy (isOriginal: false).
  * The copy shares the referenceId, domain data, and dimensions,
  * but has a new id and offset canvas coordinates (x+30, y+30).
  */
@@ -18,13 +20,14 @@ export function createReferenceCopy(source: CanvasElement): ReferenceCopyResult 
     ...source,
     id: `${source.type}-${nanoid(6)}`,
     referenceId: refId,
+    isOriginal: false,
     x: source.x + 30,
     y: source.y + 30,
     data: JSON.parse(JSON.stringify(source.data)),
   };
 
   return {
-    sourcePatch: { id: source.id, referenceId: refId },
+    sourcePatch: { id: source.id, referenceId: refId, isOriginal: true },
     copy,
   };
 }
@@ -111,6 +114,8 @@ export function syncBatchReferenceUpdates(
 
 /**
  * Removes dangling referenceIds if fewer than 2 elements share that referenceId.
+ * Cleans up referenceId and isOriginal if orphaned.
+ * If the original member was deleted, promotes the first remaining member to isOriginal: true.
  */
 export function pruneDanglingReferences(elements: CanvasElement[]): CanvasElement[] {
   const counts = new Map<string, number>();
@@ -120,15 +125,51 @@ export function pruneDanglingReferences(elements: CanvasElement[]): CanvasElemen
     }
   }
 
+  // Check if an original exists in groups with >= 2 members
+  const hasOriginal = new Set<string>();
+  for (const el of elements) {
+    if (el.referenceId && (counts.get(el.referenceId) || 0) > 1 && el.isOriginal) {
+      hasOriginal.add(el.referenceId);
+    }
+  }
+
+  const firstMemberPromoted = new Set<string>();
   let changed = false;
+
   const result = elements.map((el) => {
     if (el.referenceId && (counts.get(el.referenceId) || 0) <= 1) {
       changed = true;
-      const { referenceId: _, ...rest } = el;
+      const { referenceId: _, isOriginal: __, ...rest } = el;
       return rest as CanvasElement;
+    }
+    // If original was deleted, promote first remaining member
+    if (
+      el.referenceId &&
+      !hasOriginal.has(el.referenceId) &&
+      !firstMemberPromoted.has(el.referenceId)
+    ) {
+      firstMemberPromoted.add(el.referenceId);
+      changed = true;
+      return { ...el, isOriginal: true };
     }
     return el;
   });
 
   return changed ? result : elements;
+}
+
+/**
+ * Checks whether an element is the Original (Master) in a reference set.
+ */
+export function isElementOriginal(
+  element: CanvasElement,
+  allElements?: CanvasElement[],
+): boolean {
+  if (!element.referenceId) return false;
+  if (element.isOriginal !== undefined) return element.isOriginal;
+  if (allElements) {
+    const first = allElements.find((el) => el.referenceId === element.referenceId);
+    return first?.id === element.id;
+  }
+  return false;
 }

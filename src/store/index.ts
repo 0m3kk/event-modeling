@@ -182,7 +182,13 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
     const { sourcePatch, copy } = makeReferenceCopy(source);
     const updatedCurrent = current.map((el) =>
-      el.id === sourcePatch.id ? { ...el, referenceId: sourcePatch.referenceId } : el,
+      el.id === sourcePatch.id
+        ? {
+            ...el,
+            referenceId: sourcePatch.referenceId,
+            isOriginal: sourcePatch.isOriginal,
+          }
+        : el,
     );
 
     set((state) => ({

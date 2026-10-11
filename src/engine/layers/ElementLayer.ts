@@ -4,7 +4,8 @@ import { toolRegistry, renderFallbackElement } from "@/tools";
 import type { RenderContext } from "@/tools/types";
 import { computeTextResolution } from "../textResolution";
 import { useCanvasStore } from "@/store";
-import { drawLinkBadge } from "./linkBadge";
+import { drawReferenceIndicator } from "./linkBadge";
+import { isElementOriginal } from "@/utils/reference";
 
 interface CacheableContainer extends Container {
   _drawKey?: string;
@@ -41,8 +42,10 @@ export class ElementLayer extends Container {
           ? `${selectedField.sectionIndex ?? 0}_${selectedField.fieldIndex}`
           : -1;
 
-      // Cache key: only re-render children when content, selection, selected field, theme, size, resolution, or referenceId changes
-      const drawKey = `${element.id}_${element.width}x${element.height}_${isSelected}_${fieldKey}_${theme}_${textResolution}_${element.referenceId || ""}_${JSON.stringify(element.data)}`;
+      const isOriginal = isElementOriginal(element, elements);
+
+      // Cache key: only re-render children when content, selection, selected field, theme, size, resolution, referenceId, or isOriginal changes
+      const drawKey = `${element.id}_${element.width}x${element.height}_${isSelected}_${fieldKey}_${theme}_${textResolution}_${element.referenceId || ""}_${isOriginal}_${JSON.stringify(element.data)}`;
 
       if (container._drawKey !== drawKey) {
         container._drawKey = drawKey;
@@ -63,11 +66,11 @@ export class ElementLayer extends Container {
           renderFallbackElement(container, element, context);
         }
 
-        // Reference-copy badge — marks linked cards on canvas
+        // Reference indicator badge — marks Original (Master ❖) vs Reference Copy (Link 🔗)
         if (element.referenceId) {
           const badgeGraphics = new Graphics();
           badgeGraphics.eventMode = "none";
-          drawLinkBadge(badgeGraphics, element, {
+          drawReferenceIndicator(badgeGraphics, element, isOriginal, {
             theme,
             radius: 9,
           });

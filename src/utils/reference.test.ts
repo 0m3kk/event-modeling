@@ -27,7 +27,9 @@ describe("Reference utility", () => {
 
     expect(sourcePatch.id).toBe("source-1");
     expect(sourcePatch.referenceId).toMatch(/^ref-/);
+    expect(sourcePatch.isOriginal).toBe(true);
     expect(copy.referenceId).toBe(sourcePatch.referenceId);
+    expect(copy.isOriginal).toBe(false);
     expect(copy.id).not.toBe(source.id);
     expect(copy.x).toBe(130);
     expect(copy.y).toBe(130);
@@ -113,5 +115,15 @@ describe("Reference utility", () => {
     expect(cleaned[0].referenceId).toBeUndefined();
     expect(cleaned[1].referenceId).toBe("ref-2");
     expect(cleaned[2].referenceId).toBe("ref-2");
+  });
+
+  it("promotes first remaining member to isOriginal: true if original is deleted", () => {
+    // Copy 1 and Copy 2 remain after Original was deleted
+    const copy1: CanvasElement = { ...source, id: "copy-1", referenceId: "ref-2", isOriginal: false };
+    const copy2: CanvasElement = { ...source, id: "copy-2", referenceId: "ref-2", isOriginal: false };
+
+    const cleaned = pruneDanglingReferences([copy1, copy2]);
+    expect(cleaned[0].isOriginal).toBe(true);
+    expect(cleaned[1].isOriginal).toBe(false);
   });
 });

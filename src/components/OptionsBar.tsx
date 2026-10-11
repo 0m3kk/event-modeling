@@ -4,6 +4,7 @@ import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import type { CanvasElement } from "@/types";
+import { isElementOriginal } from "@/utils/reference";
 
 export function OptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
@@ -164,16 +165,26 @@ export function OptionsBar() {
 
         <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
 
-        {/* Linked Reference Copy status indicator */}
+        {/* Linked Reference status indicator (Original ❖ vs Ref Copy 🔗) */}
         {isSingle && singleElement?.referenceId && (
           <>
-            <div
-              className="flex items-center gap-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800/80 px-2 py-1 text-[11px] font-medium text-sky-600 dark:text-sky-400"
-              title="Linked reference copy: content stays synchronized across all copies."
-            >
-              <Link2 size={12} className="stroke-[2.5]" />
-              <span>Ref Copy</span>
-            </div>
+            {isElementOriginal(singleElement, elements) ? (
+              <div
+                className="flex items-center gap-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200/80 dark:border-purple-800/80 px-2 py-1 text-[11px] font-medium text-purple-600 dark:text-purple-400"
+                title="Original (Master): content edits automatically synchronize to all reference copies."
+              >
+                <span className="text-[12px] leading-none">❖</span>
+                <span>Original</span>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800/80 px-2 py-1 text-[11px] font-medium text-sky-600 dark:text-sky-400"
+                title="Reference Copy: linked to original entity. Content edits stay synchronized."
+              >
+                <Link2 size={12} className="stroke-[2.5]" />
+                <span>Ref Copy</span>
+              </div>
+            )}
             <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
           </>
         )}
