@@ -277,7 +277,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
 
   ai: {
     toolName: "create_event_card",
-    description: "Create a domain Event card in the Event Model",
+    description: "Create a domain Event card in the Event Model. When tagging fields with a DCB tag, use the domain entity noun (e.g. \"account\", \"user\"), never an id field like \"accountId\".",
     parameters: z.object({
       name: z.string().describe("PascalCase event name (e.g. OrderPlaced, ItemAdded)"),
       fields: z
@@ -291,7 +291,9 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
               .string()
               .optional()
               .describe(
-                "Optional DCB tag for this field (consistency boundary). All events reusing a tag MUST use the same field type.",
+                "Optional DCB tag naming the domain entity/aggregate this event belongs to. " +
+                  "Use the entity noun, NOT an id field: for a field \"accountId\" use \"account\", " +
+                  "for \"userId\" use \"user\", for \"orderId\" use \"order\". All events reusing a tag MUST use the same field type.",
               ),
           }),
         )
