@@ -8,7 +8,14 @@ import { InteractionManager } from "./interactions/InteractionManager";
 import type { InteractionContext } from "./interactions/types";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
-import type { Point, ResolvedTheme, DescHoverTarget } from "@/types";
+import type {
+  Point,
+  ResolvedTheme,
+  DescHoverTarget,
+  CanvasElement,
+  SelectedField,
+  Viewport,
+} from "@/types";
 
 let activeEngine: PixiEngine | null = null;
 export const getActiveEngine = () => activeEngine;
@@ -32,6 +39,21 @@ export class PixiEngine {
   public currentTheme: ResolvedTheme = "light";
   private isDestroyed = false;
   private initPromise: Promise<void> | null = null;
+
+  // Last rendered slices, used to skip redundant work when only the viewport
+  // position changed (e.g. while panning). `null` means "not rendered yet".
+  private prevElements: CanvasElement[] | null = null;
+  private prevSelectedIds: string[] | null = null;
+  private prevSelectedField: SelectedField | null | undefined = undefined;
+  private prevViewport: Viewport = {
+    x: NaN,
+    y: NaN,
+    zoom: NaN,
+    screenWidth: NaN,
+    screenHeight: NaN,
+  };
+  private prevTheme: ResolvedTheme | null = null;
+  private prevTool: string | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -64,9 +86,11 @@ export class PixiEngine {
 
       this.container.appendChild(this.app.canvas);
 
-      // Build scene graph
+      // Build scene graph. The grid is a screen-space layer (it slides itself
+      // instead of being re-drawn while panning), so it sits directly on the
+      // stage behind the zoomed world container.
+      this.app.stage.addChild(this.gridLayer);
       this.app.stage.addChild(this.worldContainer);
-      this.worldContainer.addChild(this.gridLayer);
       this.worldContainer.addChild(this.elementLayer);
       this.worldContainer.addChild(this.previewLayer);
       this.worldContainer.addChild(this.gizmoLayer);
@@ -150,30 +174,59 @@ export class PixiEngine {
     this.worldContainer.scale.set(zoom);
   }
 
+  /**
+   * Reconciles the scene with the store. Work is split by what actually
+   * changed: panning only slides the world/grid transform, while new data or a
+   * zoom/selection/theme change triggers the heavier element and gizmo passes.
+   */
   public syncFromStore() {
     const state = useCanvasStore.getState();
-    const { elements, selectedIds, viewport } = state;
-    const selectedSet = new Set(selectedIds);
+    const { elements, selectedIds, selectedField, viewport, tool } = state;
 
+    const firstRun = this.prevElements === null;
+    const elementsChanged = this.prevElements !== elements;
+    const selectionChanged =
+      this.prevSelectedIds !== selectedIds || this.prevSelectedField !== selectedField;
+    const zoomChanged = this.prevViewport.zoom !== viewport.zoom;
+    const sizeChanged =
+      this.prevViewport.screenWidth !== viewport.screenWidth ||
+      this.prevViewport.screenHeight !== viewport.screenHeight;
+    const themeChanged = this.prevTheme !== this.currentTheme;
+    const toolChanged = this.prevTool !== tool;
+
+    // Cheap on every change: move the world and slide the grid pattern.
     this.applyViewportTransform(viewport.x, viewport.y, viewport.zoom);
+    this.gridLayer.updatePosition(viewport);
 
-    // Spatial Index
-    this.spatialIndex.rebuild(elements);
+    // Grid geometry only depends on zoom, viewport size and theme (it is a
+    // no-op otherwise, so panning never rebuilds it).
+    if (firstRun || zoomChanged || sizeChanged || themeChanged) {
+      this.gridLayer.renderGrid(viewport, this.currentTheme);
+    }
 
-    // Grid
-    this.gridLayer.renderGrid(viewport, this.currentTheme);
+    if (firstRun || elementsChanged) {
+      this.spatialIndex.rebuild(elements);
+    }
 
-    // Elements
-    this.elementLayer.renderElements(elements, selectedSet, this.currentTheme, viewport.zoom);
+    if (firstRun || elementsChanged || selectionChanged || zoomChanged || themeChanged) {
+      const selectedSet = new Set(selectedIds);
+      this.elementLayer.renderElements(elements, selectedSet, this.currentTheme, viewport.zoom);
 
-    // Gizmo
-    const selectedElements = elements.filter((el) => selectedSet.has(el.id));
-    this.gizmoLayer.drawSelectionBounds(selectedElements, viewport.zoom);
+      const selectedElements = elements.filter((el) => selectedSet.has(el.id));
+      this.gizmoLayer.drawSelectionBounds(selectedElements, viewport.zoom);
+    }
 
     // Hide preview if tool was reset to select
-    if (state.tool === "select") {
+    if ((firstRun || toolChanged) && tool === "select") {
       this.previewLayer.hidePreview();
     }
+
+    this.prevElements = elements;
+    this.prevSelectedIds = selectedIds;
+    this.prevSelectedField = selectedField;
+    this.prevViewport = viewport;
+    this.prevTheme = this.currentTheme;
+    this.prevTool = tool;
   }
 
   private setupListeners() {

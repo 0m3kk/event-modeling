@@ -5,11 +5,16 @@ import type { RenderContext } from "@/tools/types";
 import { computeTextResolution } from "../textResolution";
 import { useCanvasStore } from "@/store";
 import { drawReferenceIndicator, drawMethodCopyBadge } from "./linkBadge";
-import { isElementOriginal } from "@/utils/reference";
 import { clearDescZones } from "@/tools/common/descZones";
 
 interface CacheableContainer extends Container {
-  _drawKey?: string;
+  /** Element object last rendered into this container (store updates are immutable). */
+  _src?: CanvasElement;
+  _isSelected?: boolean;
+  _fieldKey?: string | number;
+  _theme?: ResolvedTheme;
+  _textResolution?: number;
+  _isOriginal?: boolean;
 }
 
 export class ElementLayer extends Container {
@@ -24,6 +29,15 @@ export class ElementLayer extends Container {
     const activeIds = new Set<string>();
     const textResolution = computeTextResolution(zoom);
     const selectedField = useCanvasStore.getState().selectedField;
+
+    // Precompute "is this the Original of its reference set?" in O(n) instead of
+    // calling isElementOriginal per element (which was O(n²) overall).
+    const firstIdByRef = new Map<string, string>();
+    for (const el of elements) {
+      if (el.referenceId && !firstIdByRef.has(el.referenceId)) {
+        firstIdByRef.set(el.referenceId, el.id);
+      }
+    }
 
     for (const element of elements) {
       activeIds.add(element.id);
@@ -43,13 +57,31 @@ export class ElementLayer extends Container {
           ? `${selectedField.sectionIndex ?? 0}_${selectedField.fieldIndex}`
           : -1;
 
-      const isOriginal = isElementOriginal(element, elements);
+      const isOriginal = element.referenceId
+        ? element.isOriginal !== undefined
+          ? element.isOriginal
+          : firstIdByRef.get(element.referenceId) === element.id
+        : false;
 
-      // Cache key: only re-render children when content, selection, selected field, theme, size, resolution, referenceId, or isOriginal changes
-      const drawKey = `${element.id}_${element.width}x${element.height}_${isSelected}_${fieldKey}_${theme}_${textResolution}_${element.referenceId || ""}_${isOriginal}_${JSON.stringify(element.data)}`;
+      // The store updates are immutable, so a changed element is a new object
+      // reference. Comparing by reference (plus the render flags) lets us skip
+      // the expensive per-element redraw — including the old JSON.stringify of
+      // every element's data on every pass.
+      const needsRender =
+        container._src !== element ||
+        container._isSelected !== isSelected ||
+        container._fieldKey !== fieldKey ||
+        container._theme !== theme ||
+        container._textResolution !== textResolution ||
+        container._isOriginal !== isOriginal;
 
-      if (container._drawKey !== drawKey) {
-        container._drawKey = drawKey;
+      if (needsRender) {
+        container._src = element;
+        container._isSelected = isSelected;
+        container._fieldKey = fieldKey;
+        container._theme = theme;
+        container._textResolution = textResolution;
+        container._isOriginal = isOriginal;
 
         const context: RenderContext = {
           theme,
