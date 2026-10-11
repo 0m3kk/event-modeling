@@ -42,6 +42,22 @@ function command(): CanvasElement {
   };
 }
 
+function query(): CanvasElement {
+  return {
+    id: "qry-1",
+    type: "queryCard",
+    x: 0,
+    y: 0,
+    width: 220,
+    height: 132,
+    data: {
+      name: "GetOrder",
+      params: [{ name: "orderId", type: "string", description: "Param id" }],
+      responses: [{ name: "ok", type: "boolean" }],
+    },
+  };
+}
+
 describe("description utility", () => {
   describe("getFieldSections", () => {
     it("returns a single fields band for standard cards", () => {
@@ -50,6 +66,10 @@ describe("description utility", () => {
 
     it("returns inputs then responses for command cards", () => {
       expect(getFieldSections(command()).map((s) => s.key)).toEqual(["inputs", "responses"]);
+    });
+
+    it("returns params then responses for query cards", () => {
+      expect(getFieldSections(query()).map((s) => s.key)).toEqual(["params", "responses"]);
     });
 
     it("falls back to legacy `fields` for command inputs", () => {
@@ -83,6 +103,13 @@ describe("description utility", () => {
       const response: SelectedField = { elementId: "cmd-1", sectionIndex: 1, fieldIndex: 0 };
       expect(findDescriptionText(command(), input)).toBe("Input id");
       expect(findDescriptionText(command(), response)).toBeUndefined();
+    });
+
+    it("reads query param and response descriptions", () => {
+      const param: SelectedField = { elementId: "qry-1", sectionIndex: 0, fieldIndex: 0 };
+      const response: SelectedField = { elementId: "qry-1", sectionIndex: 1, fieldIndex: 0 };
+      expect(findDescriptionText(query(), param)).toBe("Param id");
+      expect(findDescriptionText(query(), response)).toBeUndefined();
     });
 
     it("returns undefined when absent", () => {

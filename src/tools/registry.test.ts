@@ -3,12 +3,14 @@ import { toolRegistry } from "./index";
 import { stickyNoteTool } from "./stickyNote";
 import { eventCardTool } from "./eventCard";
 import { commandCardTool } from "./commandCard";
+import { queryCardTool } from "./queryCard";
 import { enumCardTool } from "./enumCard";
 import { aliasCardTool } from "./aliasCard";
 
 describe("toolRegistry", () => {
   it("registers and retrieves tools", () => {
     expect(toolRegistry.get("commandCard")).toBe(commandCardTool);
+    expect(toolRegistry.get("queryCard")).toBe(queryCardTool);
     expect(toolRegistry.get("stickyNote")).toBe(stickyNoteTool);
     expect(toolRegistry.get("eventCard")).toBe(eventCardTool);
     expect(toolRegistry.get("enumCard")).toBe(enumCardTool);
@@ -20,6 +22,7 @@ describe("toolRegistry", () => {
     const all = toolRegistry.getAll();
     expect(all.length).toBeGreaterThanOrEqual(3);
     expect(all.some((t) => t.type === "commandCard")).toBe(true);
+    expect(all.some((t) => t.type === "queryCard")).toBe(true);
     expect(all.some((t) => t.type === "eventCard")).toBe(true);
   });
 
@@ -27,6 +30,7 @@ describe("toolRegistry", () => {
     const aiTools = toolRegistry.getAITools();
     expect(aiTools.length).toBeGreaterThanOrEqual(3);
     expect(aiTools.some((t) => t.toolName === "create_command_card")).toBe(true);
+    expect(aiTools.some((t) => t.toolName === "create_query_card")).toBe(true);
     expect(aiTools.some((t) => t.toolName === "create_event_card")).toBe(true);
     expect(aiTools.some((t) => t.toolName === "create_sticky_note")).toBe(true);
   });

@@ -9,7 +9,7 @@ export interface DescribableField {
   description?: string;
 }
 
-export type FieldSectionKey = "fields" | "inputs" | "responses";
+export type FieldSectionKey = "fields" | "inputs" | "params" | "responses";
 
 export interface FieldSection {
   /** Key on `element.data` that holds this section's array. */
@@ -20,11 +20,24 @@ export interface FieldSection {
 /**
  * Resolves the ordered field bands of an element, matching the `sectionIndex`
  * used by `SelectedField` (Event = single "fields" band; Command = inputs then
- * responses). Elements without field rows (e.g. Sticky Notes) yield an empty
- * list and only support a card-level description.
+ * responses; Query = params then responses). Elements without field rows
+ * (e.g. Sticky Notes) yield an empty list and only support a card-level
+ * description.
  */
 export function getFieldSections(element: CanvasElement): FieldSection[] {
   const data = element.data ?? {};
+
+  if (element.type === "queryCard") {
+    // Query cards always store their input rows under `params`.
+    const params = Array.isArray(data.params) ? (data.params as DescribableField[]) : [];
+    const responses = Array.isArray(data.responses)
+      ? (data.responses as DescribableField[])
+      : [];
+    return [
+      { key: "params", fields: params },
+      { key: "responses", fields: responses },
+    ];
+  }
 
   if (element.type === "commandCard") {
     // Legacy boards stored Command inputs under `fields`; keep writing back to
