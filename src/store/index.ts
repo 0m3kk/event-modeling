@@ -13,7 +13,10 @@ import {
   pruneDanglingReferences,
 } from "@/utils/reference";
 import { toolRegistry } from "@/tools/registry";
-import { navigateSubSelect } from "@/utils/subSelection";
+import {
+  navigateSubSelect,
+  getAdjacentSubSelectAfterDeletion,
+} from "@/utils/subSelection";
 
 interface HistoryEntry {
   elements: CanvasElement[];
@@ -309,7 +312,11 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
     if (patch) {
       get().updateElement(element.id, patch);
-      set({ selectedField: null });
+      const updatedElement = get().elements.find((el) => el.id === element.id);
+      const nextSelected = updatedElement
+        ? getAdjacentSubSelectAfterDeletion(updatedElement, selectedField, tool)
+        : null;
+      set({ selectedField: nextSelected });
     }
   },
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   getSubSelectSections,
   navigateSubSelect,
+  getAdjacentSubSelectAfterDeletion,
 } from "./subSelection";
 import type { CanvasElement, SelectedField } from "@/types";
 import type { ToolDefinition } from "@/tools/types";
@@ -240,6 +241,139 @@ describe("subSelection navigation utility", () => {
       elementId: "card-1",
       sectionIndex: 99,
       fieldIndex: 42,
+    });
+  });
+
+  describe("getAdjacentSubSelectAfterDeletion", () => {
+    it("selects next field when deleting first or middle item in single-section card", () => {
+      // Element originally had 3 fields, field 0 was deleted, 2 fields remain
+      const updatedCard: CanvasElement = {
+        id: "card-1",
+        type: "eventCard",
+        x: 0,
+        y: 0,
+        width: 220,
+        height: 88,
+        data: {
+          fields: [{ name: "amount" }, { name: "timestamp" }],
+        },
+      };
+
+      // Deleted was index 0 -> adjacent is new index 0 (which is "amount")
+      const next = getAdjacentSubSelectAfterDeletion(updatedCard, {
+        elementId: "card-1",
+        fieldIndex: 0,
+      });
+      expect(next).toEqual({
+        elementId: "card-1",
+        sectionIndex: 0,
+        sectionId: "fields",
+        fieldIndex: 0,
+      });
+    });
+
+    it("selects previous field when deleting last item in single-section card", () => {
+      // Element originally had 2 fields, last field (index 1) was deleted, 1 field remains (index 0)
+      const updatedCard: CanvasElement = {
+        id: "card-1",
+        type: "eventCard",
+        x: 0,
+        y: 0,
+        width: 220,
+        height: 60,
+        data: {
+          fields: [{ name: "id" }],
+        },
+      };
+
+      const next = getAdjacentSubSelectAfterDeletion(updatedCard, {
+        elementId: "card-1",
+        fieldIndex: 1, // index 1 was deleted
+      });
+      expect(next).toEqual({
+        elementId: "card-1",
+        sectionIndex: 0,
+        sectionId: "fields",
+        fieldIndex: 0,
+      });
+    });
+
+    it("returns null when all fields in card have been deleted", () => {
+      const emptyCard: CanvasElement = {
+        id: "card-1",
+        type: "eventCard",
+        x: 0,
+        y: 0,
+        width: 220,
+        height: 60,
+        data: {
+          fields: [],
+        },
+      };
+
+      const next = getAdjacentSubSelectAfterDeletion(emptyCard, {
+        elementId: "card-1",
+        fieldIndex: 0,
+      });
+      expect(next).toBeNull();
+    });
+
+    it("moves to next non-empty section when current section becomes empty", () => {
+      const multiCard: CanvasElement = {
+        id: "card-multi",
+        type: "custom",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 200,
+        data: {
+          sections: [
+            { id: "sec-0", name: "Empty Now", fields: [] },
+            { id: "sec-1", name: "Has Fields", fields: [{ name: "f1" }, { name: "f2" }] },
+          ],
+        },
+      };
+
+      const next = getAdjacentSubSelectAfterDeletion(multiCard, {
+        elementId: "card-multi",
+        sectionIndex: 0,
+        fieldIndex: 0,
+      });
+      expect(next).toEqual({
+        elementId: "card-multi",
+        sectionIndex: 1,
+        sectionId: "sec-1",
+        fieldIndex: 0,
+      });
+    });
+
+    it("moves to previous non-empty section when last section becomes empty", () => {
+      const multiCard: CanvasElement = {
+        id: "card-multi",
+        type: "custom",
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 200,
+        data: {
+          sections: [
+            { id: "sec-0", name: "Has Fields", fields: [{ name: "f0" }] },
+            { id: "sec-1", name: "Now Empty", fields: [] },
+          ],
+        },
+      };
+
+      const next = getAdjacentSubSelectAfterDeletion(multiCard, {
+        elementId: "card-multi",
+        sectionIndex: 1,
+        fieldIndex: 0,
+      });
+      expect(next).toEqual({
+        elementId: "card-multi",
+        sectionIndex: 0,
+        sectionId: "sec-0",
+        fieldIndex: 0,
+      });
     });
   });
 });

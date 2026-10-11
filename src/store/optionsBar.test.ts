@@ -140,7 +140,13 @@ describe("OptionsBar data workflows & undo/redo", () => {
     expect(updated?.data.fields).toHaveLength(1);
     expect(updated?.data.fields[0].name).toBe("amount");
     expect(updated?.height).toBe(60); // 32 header + 1 field * 28 = 60
-    expect(useCanvasStore.getState().selectedField).toBeNull();
+    // Adjacent remaining field (amount at index 0) is automatically selected
+    expect(useCanvasStore.getState().selectedField).toEqual({
+      elementId: "card-1",
+      sectionIndex: 0,
+      sectionId: "fields",
+      fieldIndex: 0,
+    });
     // Card itself is NOT deleted!
     expect(useCanvasStore.getState().elements).toHaveLength(1);
 
@@ -191,5 +197,13 @@ describe("OptionsBar data workflows & undo/redo", () => {
     expect(refCopy.data.fields).toHaveLength(1);
     expect(refCopy.data.fields[0].name).toBe("orderId");
     expect(refCopy.height).toBe(60);
+
+    // Adjacent field (orderId at index 0) is automatically selected
+    expect(useCanvasStore.getState().selectedField).toEqual({
+      elementId: copy.id,
+      sectionIndex: 0,
+      sectionId: "fields",
+      fieldIndex: 0,
+    });
   });
 });

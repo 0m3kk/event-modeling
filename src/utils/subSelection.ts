@@ -135,3 +135,63 @@ export function navigateSubSelect(
     };
   }
 }
+
+/**
+ * Computes the adjacent sub-select target after an element's field has been deleted.
+ * Targets the next field at the same position, or the previous field if deleting the last item,
+ * or moves to the next/previous non-empty section, or returns null if no fields remain.
+ */
+export function getAdjacentSubSelectAfterDeletion(
+  updatedElement: CanvasElement<any>,
+  deleted: SelectedField,
+  tool?: ToolDefinition<any> | null,
+): SelectedField | null {
+  const sections = getSubSelectSections(updatedElement, tool);
+  if (sections.length === 0) return null;
+
+  const hasAnyItems = sections.some((s) => s.count > 0);
+  if (!hasAnyItems) return null;
+
+  let secIdx = deleted.sectionIndex ?? 0;
+  if (secIdx < 0) secIdx = 0;
+  if (secIdx >= sections.length) secIdx = sections.length - 1;
+
+  const targetSection = sections[secIdx];
+
+  // 1. If target section still has fields, select the adjacent field
+  if (targetSection.count > 0) {
+    const nextFieldIdx = Math.min(deleted.fieldIndex, targetSection.count - 1);
+    return {
+      elementId: updatedElement.id,
+      sectionIndex: secIdx,
+      sectionId: targetSection.id,
+      fieldIndex: nextFieldIdx,
+    };
+  }
+
+  // 2. Target section is now empty: look for next non-empty section
+  for (let s = secIdx + 1; s < sections.length; s++) {
+    if (sections[s].count > 0) {
+      return {
+        elementId: updatedElement.id,
+        sectionIndex: s,
+        sectionId: sections[s].id,
+        fieldIndex: 0,
+      };
+    }
+  }
+
+  // 3. Look for previous non-empty section
+  for (let s = secIdx - 1; s >= 0; s--) {
+    if (sections[s].count > 0) {
+      return {
+        elementId: updatedElement.id,
+        sectionIndex: s,
+        sectionId: sections[s].id,
+        fieldIndex: sections[s].count - 1,
+      };
+    }
+  }
+
+  return null;
+}

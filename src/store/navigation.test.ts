@@ -123,4 +123,48 @@ describe("navigateSelectedField in canvas store", () => {
       fieldIndex: 1,
     });
   });
+
+  it("auto-selects adjacent field after deletion enabling consecutive deletions and navigation", () => {
+    useCanvasStore.getState().addElement(card);
+    useCanvasStore.getState().setSelectedIds(["card-nav"]);
+
+    // Select middle field (orderId at index 1 of [id, orderId, total])
+    useCanvasStore.getState().setSelectedField({
+      elementId: "card-nav",
+      fieldIndex: 1,
+    });
+
+    // 1. Delete orderId
+    useCanvasStore.getState().deleteSelectedField();
+
+    let el = useCanvasStore.getState().elements.find((e) => e.id === "card-nav");
+    expect(el?.data.fields).toHaveLength(2);
+    expect(el?.data.fields.map((f: any) => f.name)).toEqual(["id", "total"]);
+
+    // Adjacent field (now "total" at index 1) is selected
+    expect(useCanvasStore.getState().selectedField?.fieldIndex).toBe(1);
+
+    // 2. Navigate up to "id" (index 0)
+    useCanvasStore.getState().navigateSelectedField("up");
+    expect(useCanvasStore.getState().selectedField?.fieldIndex).toBe(0);
+
+    // 3. Delete "id" (index 0)
+    useCanvasStore.getState().deleteSelectedField();
+
+    el = useCanvasStore.getState().elements.find((e) => e.id === "card-nav");
+    expect(el?.data.fields).toHaveLength(1);
+    expect(el?.data.fields[0].name).toBe("total");
+
+    // Only remaining field ("total" at index 0) is selected
+    expect(useCanvasStore.getState().selectedField?.fieldIndex).toBe(0);
+
+    // 4. Delete the last remaining field
+    useCanvasStore.getState().deleteSelectedField();
+
+    el = useCanvasStore.getState().elements.find((e) => e.id === "card-nav");
+    expect(el?.data.fields).toHaveLength(0);
+
+    // When card has 0 fields left, selectedField cleanly becomes null
+    expect(useCanvasStore.getState().selectedField).toBeNull();
+  });
 });
