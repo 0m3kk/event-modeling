@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Trash2, Copy, Palette } from "lucide-react";
+import { Trash2, Copy, Palette, Link2 } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
@@ -163,6 +163,20 @@ export function OptionsBar() {
         )}
 
         <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
+
+        {/* Linked Reference Copy status indicator */}
+        {isSingle && singleElement?.referenceId && (
+          <>
+            <div
+              className="flex items-center gap-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800/80 px-2 py-1 text-[11px] font-medium text-sky-600 dark:text-sky-400"
+              title="Linked reference copy: content stays synchronized across all copies."
+            >
+              <Link2 size={12} className="stroke-[2.5]" />
+              <span>Ref Copy</span>
+            </div>
+            <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
+          </>
+        )}
 
         {/* 3. COMMON ACTIONS: COPY REFERENCE & DELETE */}
         {isSingle && !isFieldSelected && (

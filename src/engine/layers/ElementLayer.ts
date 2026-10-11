@@ -1,9 +1,10 @@
-import { Container } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import type { CanvasElement, ResolvedTheme } from "@/types";
 import { toolRegistry, renderFallbackElement } from "@/tools";
 import type { RenderContext } from "@/tools/types";
 import { computeTextResolution } from "../textResolution";
 import { useCanvasStore } from "@/store";
+import { drawLinkBadge } from "./linkBadge";
 
 interface CacheableContainer extends Container {
   _drawKey?: string;
@@ -40,8 +41,8 @@ export class ElementLayer extends Container {
           ? `${selectedField.sectionIndex ?? 0}_${selectedField.fieldIndex}`
           : -1;
 
-      // Cache key: only re-render children when content, selection, selected field, theme, size, or resolution changes
-      const drawKey = `${element.id}_${element.width}x${element.height}_${isSelected}_${fieldKey}_${theme}_${textResolution}_${JSON.stringify(element.data)}`;
+      // Cache key: only re-render children when content, selection, selected field, theme, size, resolution, or referenceId changes
+      const drawKey = `${element.id}_${element.width}x${element.height}_${isSelected}_${fieldKey}_${theme}_${textResolution}_${element.referenceId || ""}_${JSON.stringify(element.data)}`;
 
       if (container._drawKey !== drawKey) {
         container._drawKey = drawKey;
@@ -60,6 +61,17 @@ export class ElementLayer extends Container {
           tool.render(container, element, context);
         } else {
           renderFallbackElement(container, element, context);
+        }
+
+        // Reference-copy badge — marks linked cards on canvas
+        if (element.referenceId) {
+          const badgeGraphics = new Graphics();
+          badgeGraphics.eventMode = "none";
+          drawLinkBadge(badgeGraphics, element, {
+            theme,
+            radius: 9,
+          });
+          container.addChild(badgeGraphics);
         }
       }
     }
