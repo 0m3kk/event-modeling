@@ -1,6 +1,7 @@
 import type { CanvasInteraction, InteractionContext } from "./types";
 import type { Point, CanvasElement } from "@/types";
 import { useCanvasStore } from "@/store";
+import { toolRegistry } from "@/tools";
 
 export class DragElementsInteraction implements CanvasInteraction {
   readonly id = "dragElements";
@@ -37,6 +38,29 @@ export class DragElementsInteraction implements CanvasInteraction {
       }
     } else if (!isAlreadySelected) {
       useCanvasStore.getState().setSelectedIds([hitId]);
+    }
+
+    // Sub-element selection (e.g. fields)
+    const hitElement = elements.find((item) => item.id === hitId);
+    if (hitElement) {
+      const tool = toolRegistry.get(hitElement.type);
+      if (tool?.onSubSelect) {
+        const localPoint: Point = {
+          x: worldPoint.x - hitElement.x,
+          y: worldPoint.y - hitElement.y,
+        };
+        const subIndex = tool.onSubSelect(hitElement, localPoint);
+        if (subIndex !== null && subIndex !== undefined) {
+          useCanvasStore.getState().setSelectedField({
+            elementId: hitId,
+            fieldIndex: subIndex,
+          });
+        } else {
+          useCanvasStore.getState().setSelectedField(null);
+        }
+      } else {
+        useCanvasStore.getState().setSelectedField(null);
+      }
     }
 
     // Capture initial positions of all items to drag

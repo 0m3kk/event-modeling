@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { CanvasElement, Viewport, ProjectFileV2, ThemeMode } from "@/types";
+import type { CanvasElement, Viewport, ProjectFileV2, ThemeMode, SelectedField, InlineEditState } from "@/types";
 
 interface HistoryEntry {
   elements: CanvasElement[];
@@ -13,6 +13,8 @@ export interface CanvasStoreState {
   // Canvas data
   elements: CanvasElement[];
   selectedIds: string[];
+  selectedField: SelectedField | null;
+  inlineEdit: InlineEditState | null;
   tool: string; // "select" or tool type
   viewport: Viewport;
 
@@ -33,6 +35,8 @@ export interface CanvasStoreState {
   setTool: (tool: string) => void;
   setViewport: (viewport: Partial<Viewport>) => void;
   setSelectedIds: (ids: string[]) => void;
+  setSelectedField: (field: SelectedField | null) => void;
+  setInlineEdit: (edit: InlineEditState | null) => void;
   selectAll: () => void;
   clearSelection: () => void;
 
@@ -70,6 +74,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
   elements: [],
   selectedIds: [],
+  selectedField: null,
+  inlineEdit: null,
   tool: "select",
   viewport: {
     x: 0,
@@ -94,10 +100,19 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   setViewport: (patch) =>
     set((state) => ({ viewport: { ...state.viewport, ...patch } })),
 
-  setSelectedIds: (ids) => set({ selectedIds: ids }),
+  setSelectedIds: (ids) =>
+    set((state) => ({
+      selectedIds: ids,
+      selectedField:
+        state.selectedField && ids.includes(state.selectedField.elementId)
+          ? state.selectedField
+          : null,
+    })),
+  setSelectedField: (field) => set({ selectedField: field }),
+  setInlineEdit: (edit) => set({ inlineEdit: edit }),
   selectAll: () =>
     set((state) => ({ selectedIds: state.elements.map((e) => e.id) })),
-  clearSelection: () => set({ selectedIds: [] }),
+  clearSelection: () => set({ selectedIds: [], selectedField: null, inlineEdit: null }),
 
   setSearchOpen: (open) => set({ isSearchOpen: open }),
   setGoogleDriveModalOpen: (open, tab = "save") =>

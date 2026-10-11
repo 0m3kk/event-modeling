@@ -3,6 +3,7 @@ import type { CanvasElement, ResolvedTheme } from "@/types";
 import { toolRegistry, renderFallbackElement } from "@/tools";
 import type { RenderContext } from "@/tools/types";
 import { computeTextResolution } from "../textResolution";
+import { useCanvasStore } from "@/store";
 
 interface CacheableContainer extends Container {
   _drawKey?: string;
@@ -19,6 +20,7 @@ export class ElementLayer extends Container {
   ) {
     const activeIds = new Set<string>();
     const textResolution = computeTextResolution(zoom);
+    const selectedField = useCanvasStore.getState().selectedField;
 
     for (const element of elements) {
       activeIds.add(element.id);
@@ -33,9 +35,13 @@ export class ElementLayer extends Container {
       container.y = element.y;
 
       const isSelected = selectedIds.has(element.id);
+      const fieldKey =
+        selectedField && selectedField.elementId === element.id
+          ? selectedField.fieldIndex
+          : -1;
 
-      // Cache key: only re-render children when content, selection, theme, size, or resolution changes
-      const drawKey = `${element.id}_${element.width}x${element.height}_${isSelected}_${theme}_${textResolution}_${JSON.stringify(element.data)}`;
+      // Cache key: only re-render children when content, selection, selected field, theme, size, or resolution changes
+      const drawKey = `${element.id}_${element.width}x${element.height}_${isSelected}_${fieldKey}_${theme}_${textResolution}_${JSON.stringify(element.data)}`;
 
       if (container._drawKey !== drawKey) {
         container._drawKey = drawKey;
@@ -43,6 +49,7 @@ export class ElementLayer extends Container {
         const context: RenderContext = {
           theme,
           isSelected,
+          selectedField,
           isHovered: false,
           zoom,
           textResolution,

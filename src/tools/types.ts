@@ -1,11 +1,12 @@
 import type { ComponentType } from "react";
 import type { Container } from "pixi.js";
 import { z } from "zod";
-import type { CanvasElement, Point, ResolvedTheme } from "@/types";
+import type { CanvasElement, Point, ResolvedTheme, SelectedField, InlineEditState } from "@/types";
 
 export interface RenderContext {
   theme: ResolvedTheme;
   isSelected: boolean;
+  selectedField?: SelectedField | null;
   isHovered: boolean;
   zoom: number;
   textResolution: number;
@@ -40,5 +41,12 @@ export interface ToolDefinition<TData = any> {
     onUpdate: (partial: Partial<TData>) => void;
   }>;
 
+  // Optional: handles sub-element selection on pointer down (e.g. select field)
+  onSubSelect?: (element: CanvasElement<TData>, localPoint: Point) => number | null;
+
+  // Optional: provides inline edit target on double click (e.g. edit name, field name)
+  getInlineEditTarget?: (element: CanvasElement<TData>, localPoint: Point) => InlineEditState | null;
+
   ai?: ToolAIOperation<TData>;
 }
+

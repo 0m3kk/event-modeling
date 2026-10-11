@@ -6,6 +6,7 @@ import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point } from "@/types";
 import { getContrastTextColor } from "@/utils/color";
 import { StickyNoteOptions } from "./StickyNoteOptions";
+import { useCanvasStore } from "@/store";
 
 export interface StickyNoteData {
   text: string;
@@ -68,6 +69,25 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
     text.x = 12;
     text.y = 12;
     container.addChild(text);
+  },
+
+  getInlineEditTarget: (element) => {
+    return {
+      elementId: element.id,
+      worldBounds: {
+        x: element.x + 8,
+        y: element.y + 8,
+        width: element.width - 16,
+        height: element.height - 16,
+      },
+      initialValue: element.data.text || "",
+      multiline: true,
+      onCommit: (newText) => {
+        useCanvasStore.getState().updateElement(element.id, {
+          data: { ...element.data, text: newText },
+        });
+      },
+    };
   },
 
   ai: {

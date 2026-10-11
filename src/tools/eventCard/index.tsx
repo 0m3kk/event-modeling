@@ -6,6 +6,7 @@ import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point } from "@/types";
 import { getContrastTextColor } from "@/utils/color";
 import { EventCardOptions } from "./EventCardOptions";
+import { useCanvasStore } from "@/store";
 
 export interface EventField {
   name: string;
@@ -105,14 +106,39 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
 
     // Fields list (symmetric 10px padding from header bottom and card bottom)
     let currentY = 42;
+    const selectedFieldIndex =
+      context.selectedField?.elementId === element.id
+        ? context.selectedField.fieldIndex
+        : -1;
+
     if (element.data.fields && element.data.fields.length > 0) {
-      for (const field of element.data.fields) {
+      element.data.fields.forEach((field, idx) => {
+        const isFieldSelected = idx === selectedFieldIndex;
+
+        if (isFieldSelected) {
+          const highlight = new Graphics();
+          highlight.roundRect(6, currentY - 2, element.width - 12, 20, 4);
+          highlight.fill({
+            color: isDark ? 0x3b82f6 : 0xbfdbfe,
+            alpha: isDark ? 0.35 : 0.45,
+          });
+          highlight.stroke({
+            color: 0x3b82f6,
+            width: 1,
+            alpha: 0.8,
+          });
+          container.addChild(highlight);
+        }
+
         const fieldName = new Text({
           text: field.name,
           style: {
             fontSize: 12,
+            fontWeight: isFieldSelected ? "bold" : "normal",
             fontFamily: '"Geist Mono", monospace',
-            fill: isDark ? 0xe4e4e7 : 0x27272a,
+            fill: isFieldSelected
+              ? isDark ? 0x93c5fd : 0x1d4ed8
+              : isDark ? 0xe4e4e7 : 0x27272a,
           },
           resolution: context.textResolution,
         });
@@ -134,7 +160,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
         container.addChild(typeLabel);
 
         currentY += 22;
-      }
+      });
     } else {
       const emptyHint = new Text({
         text: "(no fields)",
@@ -149,6 +175,75 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
       emptyHint.y = currentY;
       container.addChild(emptyHint);
     }
+  },
+
+  onSubSelect: (element, localPoint) => {
+    // Header area (y <= 32) is not a field
+    if (localPoint.y <= 32) return null;
+    const index = Math.floor((localPoint.y - 42) / 22);
+    if (index >= 0 && index < (element.data.fields?.length || 0)) {
+      return index;
+    }
+    return null;
+  },
+
+  getInlineEditTarget: (element, localPoint) => {
+    // 1. Double click on Header -> Edit Event Name
+    if (localPoint.y <= 32) {
+      return {
+        elementId: element.id,
+        worldBounds: {
+          x: element.x + 8,
+          y: element.y + 4,
+          width: element.width - 16,
+          height: 24,
+        },
+        initialValue: element.data.name || "Event",
+        multiline: false,
+        onCommit: (newValue) => {
+          const trimmed = newValue.trim();
+          if (trimmed && trimmed !== element.data.name) {
+            useCanvasStore.getState().updateElement(element.id, {
+              data: { ...element.data, name: trimmed },
+            });
+          }
+        },
+      };
+    }
+
+    // 2. Double click on Field Name (only the name, hold off on type for now)
+    const index = Math.floor((localPoint.y - 42) / 22);
+    if (index >= 0 && index < (element.data.fields?.length || 0)) {
+      const field = element.data.fields[index];
+      useCanvasStore.getState().setSelectedField({
+        elementId: element.id,
+        fieldIndex: index,
+      });
+
+      return {
+        elementId: element.id,
+        worldBounds: {
+          x: element.x + 10,
+          y: element.y + 42 + index * 22 - 2,
+          width: Math.max(80, element.width - 80),
+          height: 20,
+        },
+        initialValue: field.name,
+        multiline: false,
+        onCommit: (newName) => {
+          const trimmed = newName.trim();
+          if (trimmed && trimmed !== field.name) {
+            const nextFields = [...element.data.fields];
+            nextFields[index] = { ...field, name: trimmed };
+            useCanvasStore.getState().updateElement(element.id, {
+              data: { ...element.data, fields: nextFields },
+            });
+          }
+        },
+      };
+    }
+
+    return null;
   },
 
   ai: {

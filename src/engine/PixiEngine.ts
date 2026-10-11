@@ -6,6 +6,7 @@ import { SpatialIndex } from "./SpatialIndex";
 import { InteractionManager } from "./interactions/InteractionManager";
 import type { InteractionContext } from "./interactions/types";
 import { useCanvasStore } from "@/store";
+import { toolRegistry } from "@/tools";
 import type { Point, ResolvedTheme } from "@/types";
 
 let activeEngine: PixiEngine | null = null;
@@ -190,7 +191,34 @@ export class PixiEngine {
     window.addEventListener("pointermove", this.handlePointerMove);
     window.addEventListener("pointerup", this.handlePointerUp);
     el.addEventListener("wheel", this.handleWheel, { passive: false });
+    el.addEventListener("dblclick", this.handleDblClick);
   }
+
+  private handleDblClick = (e: MouseEvent) => {
+    const rect = this.container.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const worldPoint = this.screenToWorld(screenX, screenY);
+
+    const hitId = this.spatialIndex.hitTest(worldPoint);
+    if (!hitId) return;
+
+    const element = useCanvasStore.getState().elements.find((el) => el.id === hitId);
+    if (!element) return;
+
+    const tool = toolRegistry.get(element.type);
+    if (!tool?.getInlineEditTarget) return;
+
+    const localPoint: Point = {
+      x: worldPoint.x - element.x,
+      y: worldPoint.y - element.y,
+    };
+
+    const target = tool.getInlineEditTarget(element, localPoint);
+    if (target) {
+      useCanvasStore.getState().setInlineEdit(target);
+    }
+  };
 
   private handlePointerDown = (e: PointerEvent) => {
     if (e.button !== 0 && e.button !== 1) return;
@@ -290,6 +318,7 @@ export class PixiEngine {
     window.removeEventListener("pointermove", this.handlePointerMove);
     window.removeEventListener("pointerup", this.handlePointerUp);
     el.removeEventListener("wheel", this.handleWheel);
+    el.removeEventListener("dblclick", this.handleDblClick);
 
     this.gridLayer.destroy();
     this.elementLayer.destroy();
