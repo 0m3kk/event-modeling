@@ -7,6 +7,7 @@ import type { InteractionContext } from "./types";
 import { SpatialIndex } from "../SpatialIndex";
 import { GizmoLayer } from "../layers/GizmoLayer";
 import { ElementLayer } from "../layers/ElementLayer";
+import { PreviewLayer } from "../layers/PreviewLayer";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 
@@ -15,11 +16,13 @@ describe("Interaction System", () => {
   let spatialIndex: SpatialIndex;
   let gizmoLayer: GizmoLayer;
   let elementLayer: ElementLayer;
+  let previewLayer: PreviewLayer;
 
   beforeEach(() => {
     spatialIndex = new SpatialIndex();
     gizmoLayer = new GizmoLayer();
     elementLayer = new ElementLayer();
+    previewLayer = new PreviewLayer();
 
     ctx = {
       screenToWorld: (x, y) => ({ x, y }),
@@ -27,6 +30,7 @@ describe("Interaction System", () => {
       spatialIndex,
       gizmoLayer,
       elementLayer,
+      previewLayer,
       setCursor: vi.fn(),
       theme: "light",
       isSpaceHeld: () => false,
@@ -150,6 +154,40 @@ describe("Interaction System", () => {
       expect(useCanvasStore.getState().isDragging).toBe(false);
       expect(useCanvasStore.getState().elements[0].x).toBe(80);
       expect(useCanvasStore.getState().elements[0].y).toBe(80);
+    });
+
+    it("displays ghost card preview on pointer move when creation tool is active", () => {
+      const manager = new InteractionManager(ctx);
+      useCanvasStore.setState({ tool: "eventCard" });
+
+      const showPreviewSpy = vi.spyOn(previewLayer, "showPreview");
+      const hidePreviewSpy = vi.spyOn(previewLayer, "hidePreview");
+
+      // Pointer move with creation tool
+      const moveEvent = { clientX: 200, clientY: 150 } as PointerEvent;
+      manager.handlePointerMove(moveEvent, { x: 200, y: 150 });
+
+      expect(showPreviewSpy).toHaveBeenCalledWith("eventCard", { x: 200, y: 150 }, "light", 1);
+      expect(previewLayer.visible).toBe(true);
+
+      // Clicking creates the card and resets preview
+      const clickEvent = { button: 0, clientX: 200, clientY: 150 } as PointerEvent;
+      const handled = manager.handlePointerDown(clickEvent, { x: 200, y: 150 });
+      expect(handled).toBe(true);
+      expect(hidePreviewSpy).toHaveBeenCalled();
+      expect(useCanvasStore.getState().tool).toBe("select");
+      expect(useCanvasStore.getState().elements).toHaveLength(1);
+    });
+
+    it("hides ghost preview when tool is select", () => {
+      const manager = new InteractionManager(ctx);
+      useCanvasStore.setState({ tool: "select" });
+
+      const hidePreviewSpy = vi.spyOn(previewLayer, "hidePreview");
+      const moveEvent = { clientX: 200, clientY: 150 } as PointerEvent;
+      manager.handlePointerMove(moveEvent, { x: 200, y: 150 });
+
+      expect(hidePreviewSpy).toHaveBeenCalled();
     });
   });
 });

@@ -2,6 +2,7 @@ import type { Point, Rect, ResolvedTheme } from "@/types";
 import type { SpatialIndex } from "../SpatialIndex";
 import type { GizmoLayer } from "../layers/GizmoLayer";
 import type { ElementLayer } from "../layers/ElementLayer";
+import type { PreviewLayer } from "../layers/PreviewLayer";
 
 export interface InteractionContext {
   screenToWorld(screenX: number, screenY: number): Point;
@@ -9,6 +10,7 @@ export interface InteractionContext {
   spatialIndex: SpatialIndex;
   gizmoLayer: GizmoLayer;
   elementLayer: ElementLayer;
+  previewLayer: PreviewLayer;
   setCursor(cursor: string): void;
   theme: ResolvedTheme;
   isSpaceHeld(): boolean;

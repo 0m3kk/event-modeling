@@ -4,6 +4,7 @@ import { MarqueeInteraction } from "./MarqueeInteraction";
 import { DragElementsInteraction } from "./DragElementsInteraction";
 import { CreateElementInteraction } from "./CreateElementInteraction";
 import type { Point } from "@/types";
+import { useCanvasStore } from "@/store";
 
 export class InteractionManager {
   private pan = new PanInteraction();
@@ -23,12 +24,15 @@ export class InteractionManager {
 
     // 1. Element creation tool
     if (this.createElement.onPointerDown(e, worldPoint, this.ctx)) {
+      this.ctx.previewLayer.hidePreview();
+      this.ctx.setCursor("default");
       return true;
     }
 
     // 2. Spacebar held or middle click forces Pan
     if (this.ctx.isSpaceHeld() || e.button === 1) {
       if (this.pan.onPointerDown(e, worldPoint, this.ctx)) {
+        this.ctx.previewLayer.hidePreview();
         this.activeInteraction = this.pan;
         return true;
       }
@@ -36,6 +40,7 @@ export class InteractionManager {
 
     // 3. Click/Drag on existing element
     if (this.dragElements.onPointerDown(e, worldPoint, this.ctx)) {
+      this.ctx.previewLayer.hidePreview();
       this.activeInteraction = this.dragElements;
       return true;
     }
@@ -44,6 +49,7 @@ export class InteractionManager {
     // If Command (Mac) or Ctrl (Windows) held -> Marquee selection box!
     if (e.metaKey || e.ctrlKey) {
       if (this.marquee.onPointerDown(e, worldPoint, this.ctx)) {
+        this.ctx.previewLayer.hidePreview();
         this.activeInteraction = this.marquee;
         return true;
       }
@@ -51,6 +57,7 @@ export class InteractionManager {
 
     // Otherwise -> Pan canvas (natural hand navigation on empty space)
     if (this.pan.onPointerDown(e, worldPoint, this.ctx)) {
+      this.ctx.previewLayer.hidePreview();
       this.activeInteraction = this.pan;
       return true;
     }
@@ -60,7 +67,26 @@ export class InteractionManager {
 
   handlePointerMove(e: PointerEvent, worldPoint: Point): void {
     if (this.activeInteraction) {
+      this.ctx.previewLayer.hidePreview();
       this.activeInteraction.onPointerMove(e, worldPoint, this.ctx);
+      return;
+    }
+
+    // Spacebar held -> show grab cursor and hide ghost
+    if (this.ctx.isSpaceHeld()) {
+      this.ctx.previewLayer.hidePreview();
+      this.ctx.setCursor("grab");
+      return;
+    }
+
+    // Show ghost preview when a creation tool is active
+    const currentTool = useCanvasStore.getState().tool;
+    if (currentTool !== "select") {
+      const zoom = useCanvasStore.getState().viewport.zoom;
+      this.ctx.previewLayer.showPreview(currentTool, worldPoint, this.ctx.theme, zoom);
+      this.ctx.setCursor("crosshair");
+    } else {
+      this.ctx.previewLayer.hidePreview();
     }
   }
 
@@ -76,5 +102,6 @@ export class InteractionManager {
       this.activeInteraction.onCancel?.(this.ctx);
       this.activeInteraction = null;
     }
+    this.ctx.previewLayer.hidePreview();
   }
 }

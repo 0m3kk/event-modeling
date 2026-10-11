@@ -1,6 +1,7 @@
 import { Application, Container } from "pixi.js";
 import { GridLayer } from "./layers/GridLayer";
 import { ElementLayer } from "./layers/ElementLayer";
+import { PreviewLayer } from "./layers/PreviewLayer";
 import { GizmoLayer } from "./layers/GizmoLayer";
 import { SpatialIndex } from "./SpatialIndex";
 import { InteractionManager } from "./interactions/InteractionManager";
@@ -18,6 +19,7 @@ export class PixiEngine {
 
   public gridLayer = new GridLayer();
   public elementLayer = new ElementLayer();
+  public previewLayer = new PreviewLayer();
   public gizmoLayer = new GizmoLayer();
   public spatialIndex = new SpatialIndex();
 
@@ -66,6 +68,7 @@ export class PixiEngine {
       this.app.stage.addChild(this.worldContainer);
       this.worldContainer.addChild(this.gridLayer);
       this.worldContainer.addChild(this.elementLayer);
+      this.worldContainer.addChild(this.previewLayer);
       this.worldContainer.addChild(this.gizmoLayer);
 
       // Initialize Interaction Manager with decoupled context
@@ -101,6 +104,7 @@ export class PixiEngine {
       spatialIndex: this.spatialIndex,
       gizmoLayer: this.gizmoLayer,
       elementLayer: this.elementLayer,
+      previewLayer: this.previewLayer,
       setCursor: (cursor) => {
         this.container.style.cursor = cursor;
       },
@@ -165,6 +169,11 @@ export class PixiEngine {
     // Gizmo
     const selectedElements = elements.filter((el) => selectedSet.has(el.id));
     this.gizmoLayer.drawSelectionBounds(selectedElements);
+
+    // Hide preview if tool was reset to select
+    if (state.tool === "select") {
+      this.previewLayer.hidePreview();
+    }
   }
 
   private setupListeners() {
@@ -190,9 +199,14 @@ export class PixiEngine {
     el.addEventListener("pointerdown", this.handlePointerDown);
     window.addEventListener("pointermove", this.handlePointerMove);
     window.addEventListener("pointerup", this.handlePointerUp);
+    el.addEventListener("pointerleave", this.handlePointerLeave);
     el.addEventListener("wheel", this.handleWheel, { passive: false });
     el.addEventListener("dblclick", this.handleDblClick);
   }
+
+  private handlePointerLeave = () => {
+    this.previewLayer.hidePreview();
+  };
 
   private handleDblClick = (e: MouseEvent) => {
     const rect = this.container.getBoundingClientRect();
@@ -317,11 +331,13 @@ export class PixiEngine {
     el.removeEventListener("pointerdown", this.handlePointerDown);
     window.removeEventListener("pointermove", this.handlePointerMove);
     window.removeEventListener("pointerup", this.handlePointerUp);
+    el.removeEventListener("pointerleave", this.handlePointerLeave);
     el.removeEventListener("wheel", this.handleWheel);
     el.removeEventListener("dblclick", this.handleDblClick);
 
     this.gridLayer.destroy();
     this.elementLayer.destroy();
+    this.previewLayer.destroy();
     this.gizmoLayer.destroy();
 
     if (activeEngine === this) {
