@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { enumCardTool, type EnumCardData } from "./index";
+import { enumCardTool, computeEnumCardSize, type EnumCardData } from "./index";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 import { applyDescription, findDescriptionText } from "@/utils/description";
@@ -31,6 +31,19 @@ describe("enumCardTool", () => {
     expect(enumCardTool.defaultSize).toEqual({ width: 220, height: 60 });
   });
 
+  it("widens to fit the longest value but never narrows below the default", () => {
+    const wide = computeEnumCardSize({
+      name: "OrderStatus",
+      fields: [{ name: "aVeryLongEnumValueNameForTesting" }],
+    });
+    expect(wide.width).toBeGreaterThan(220);
+
+    const short = computeEnumCardSize({ name: "OrderStatus", fields: [{ name: "Draft" }] });
+    expect(short.width).toBe(220);
+    // Height still tracks the row count.
+    expect(short.height).toBe(32 + 28);
+  });
+
   it("sub-selects values correctly", () => {
     expect(enumCardTool.onSubSelect!(card, { x: 50, y: 15 })).toBeNull();
     expect(enumCardTool.onSubSelect!(card, { x: 50, y: 50 })).toBe(0);
@@ -56,14 +69,33 @@ describe("enumCardTool", () => {
 
     const target = enumCardTool.getInlineEditTarget!(card, { x: 30, y: 50 });
     expect(target).not.toBeNull();
-    expect(target?.initialValue).toBe("Draft");
+    // Editor shows the card's display form: verbatim, ALL CAPS.
+    expect(target?.initialValue).toBe("DRAFT");
 
     target?.onCommit("Pending");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "enum-1");
-    expect(updated?.data.fields[0].name).toBe("Pending");
+    // Commit always stores canonical camelCase.
+    expect(updated?.data.fields[0].name).toBe("pending");
     // Values stay typeless.
     expect("type" in updated!.data.fields[0]).toBe(false);
+  });
+
+  it("shows values in ALL CAPS but stores them as camelCase", () => {
+    const underscored: CanvasElement<EnumCardData> = {
+      ...card,
+      data: { ...card.data, fields: [{ name: "in_progress" }] },
+    };
+    useCanvasStore.getState().addElement(underscored);
+
+    const target = enumCardTool.getInlineEditTarget!(underscored, { x: 30, y: 50 });
+    // Display keeps underscores and uppercases them.
+    expect(target?.initialValue).toBe("IN_PROGRESS");
+
+    target?.onCommit("ON_HOLD");
+    const updated = useCanvasStore.getState().elements.find((e) => e.id === "enum-1");
+    // Whatever was typed, the stored value is camelCase.
+    expect(updated?.data.fields[0].name).toBe("onHold");
   });
 
   it("reports selected values as typeless", () => {

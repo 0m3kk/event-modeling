@@ -6,7 +6,12 @@ import type {
   InlineEditState,
 } from "@/types";
 import { getContrastTextColor } from "@/utils/color";
-import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
+import {
+  isSameIdentifier,
+  toCamelIdentifier,
+  toDisplayName,
+  toDisplayType,
+} from "@/utils/naming";
 import { useCanvasStore } from "@/store";
 import { addDescZone } from "./descZones";
 
@@ -184,6 +189,19 @@ export interface RenderStandardCardFieldsOptions {
   isDark: boolean;
   textResolution: number;
   emptyHintText?: string;
+  /**
+   * When true (default) field names are treated as identifiers and shown via
+   * {@link toDisplayName} (camelCase/snake_case -> "Human Readable"). Enum
+   * members are domain values whose casing is stored verbatim, so their card
+   * passes false to show the stored value untouched (underscores included).
+   */
+  humanizeFieldNames?: boolean;
+  /**
+   * Display-only uppercase pass applied after the humanize/verbatim choice.
+   * Used by Enum to render value names in ALL CAPS while the stored value and
+   * the inline editor keep their original casing.
+   */
+  uppercaseFieldNames?: boolean;
 }
 
 /**
@@ -303,6 +321,19 @@ export function renderStandardCardTitle(
 }
 
 /**
+ * Produces the on-canvas label for a field/value row. Kept separate from the
+ * Pixi render path so the display rules (humanize vs. verbatim, optional ALL
+ * CAPS) are testable without a DOM. Display-only: never changes stored data.
+ */
+export function formatFieldNameLabel(
+  name: string | undefined,
+  { humanize = true, uppercase = false }: { humanize?: boolean; uppercase?: boolean } = {},
+): string {
+  const label = humanize ? toDisplayName(name) : name ?? "";
+  return uppercase ? label.toUpperCase() : label;
+}
+
+/**
  * Renders the field rows with Geist Mono typography, optional #tag badge, and selection awareness.
  */
 export function renderStandardCardFields(
@@ -319,6 +350,8 @@ export function renderStandardCardFields(
     isDark,
     textResolution,
     emptyHintText = "(no fields)",
+    humanizeFieldNames = true,
+    uppercaseFieldNames = false,
   } = options;
   let currentY = CARD_HEADER_HEIGHT;
 
@@ -326,8 +359,12 @@ export function renderStandardCardFields(
     fields.forEach((field, idx) => {
       const isFieldSelected = idx === selectedFieldIndex;
 
+      const label = formatFieldNameLabel(field.name, {
+        humanize: humanizeFieldNames,
+        uppercase: uppercaseFieldNames,
+      });
       const fieldName = new Text({
-        text: toDisplayName(field.name),
+        text: label,
         style: {
           fontSize: 12,
           fontWeight: isFieldSelected ? "bold" : "normal",
@@ -511,6 +548,30 @@ export function navigateStandardCardSubSelect(
   };
 }
 
+export interface StandardCardInlineEditOptions<TData> {
+  /**
+   * Mirrors {@link RenderStandardCardFieldsOptions.humanizeFieldNames}: when
+   * false the field editor shows the stored value verbatim instead of a
+   * humanized label (used for Enum members).
+   */
+  humanizeFieldNames?: boolean;
+  /**
+   * Mirrors {@link RenderStandardCardFieldsOptions.uppercaseFieldNames}: when
+   * true the field editor shows the value in ALL CAPS to match the card.
+   */
+  uppercaseFieldNames?: boolean;
+  /**
+   * When true a committed field value is stored as a canonical camelCase
+   * identifier (see {@link toCamelIdentifier}), whatever the editor contained.
+   */
+  camelCaseFieldNames?: boolean;
+  /**
+   * Optional content-driven size resolver. When set, a committed header/field
+   * edit also resizes the card (e.g. Enum widens to fit a longer value).
+   */
+  resolveSize?: (data: TData) => { width: number; height: number } | null;
+}
+
 /**
  * Standard inline edit target resolution for domain cards:
  * - Header double-click edits card name
@@ -522,7 +583,21 @@ export function getStandardCardInlineEditTarget<
   element: CanvasElement<TData>,
   localPoint: Point,
   fallbackName = "Card",
+  options: StandardCardInlineEditOptions<TData> = {},
 ): InlineEditState | null {
+  const {
+    humanizeFieldNames = true,
+    uppercaseFieldNames = false,
+    camelCaseFieldNames = false,
+    resolveSize,
+  } = options;
+
+  /** Resizes the card alongside a data patch when a resolver is configured. */
+  const sizePatch = (nextData: TData) => {
+    const size = resolveSize ? resolveSize(nextData) : null;
+    return size ? { width: size.width, height: size.height } : {};
+  };
+
   // 1. Double click on Header -> Edit Card Name
   if (localPoint.y <= CARD_HEADER_HEIGHT) {
     return {
@@ -538,8 +613,10 @@ export function getStandardCardInlineEditTarget<
       onCommit: (newValue) => {
         const trimmed = newValue.trim();
         if (trimmed && !isSameIdentifier(trimmed, element.data?.name)) {
+          const nextData = { ...element.data, name: trimmed };
           useCanvasStore.getState().updateElement(element.id, {
-            data: { ...element.data, name: trimmed },
+            ...sizePatch(nextData),
+            data: nextData,
           });
         }
       },
@@ -565,15 +642,25 @@ export function getStandardCardInlineEditTarget<
         width: Math.max(80, element.width - 80),
         height: 24,
       },
-      initialValue: toDisplayName(field.name),
+      initialValue: formatFieldNameLabel(field.name, {
+        humanize: humanizeFieldNames,
+        uppercase: uppercaseFieldNames,
+      }),
       multiline: false,
       onCommit: (newName) => {
         const trimmed = newName.trim();
-        if (trimmed && !isSameIdentifier(trimmed, field.name)) {
+        // Storage form: canonical camelCase when requested, else the raw text.
+        const nextName = camelCaseFieldNames ? toCamelIdentifier(trimmed) : trimmed;
+        const changed = humanizeFieldNames
+          ? !isSameIdentifier(trimmed, field.name)
+          : nextName !== field.name;
+        if (nextName && changed) {
           const nextFields = [...fields];
-          nextFields[index] = { ...field, name: trimmed };
+          nextFields[index] = { ...field, name: nextName };
+          const nextData = { ...element.data, fields: nextFields };
           useCanvasStore.getState().updateElement(element.id, {
-            data: { ...element.data, fields: nextFields },
+            ...sizePatch(nextData),
+            data: nextData,
           });
         }
       },

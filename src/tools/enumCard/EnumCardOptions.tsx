@@ -21,6 +21,7 @@ export function EnumCardOptions({ element, onUpdate }: EnumCardOptionsProps) {
 
     if (nextSize) {
       useCanvasStore.getState().updateElement(element.id, {
+        width: nextSize.width,
         height: nextSize.height,
         data: nextData,
       });

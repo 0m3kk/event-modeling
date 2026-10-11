@@ -6,10 +6,12 @@ import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point } from "@/types";
 import { EnumCardOptions } from "./EnumCardOptions";
 import {
-  computeStandardCardSize,
+  CARD_HEADER_HEIGHT,
+  CARD_ROW_HEIGHT,
   drawStandardCardFrame,
   renderStandardCardTitle,
   renderStandardCardFields,
+  formatFieldNameLabel,
   renderHeaderDescBadge,
   getStandardCardSubSelect,
   navigateStandardCardSubSelect,
@@ -17,7 +19,57 @@ import {
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
+import { measureMonospaceText } from "@/utils/textWrap";
+import { toDisplayName } from "@/utils/naming";
 import { beginDescZones, hitDescZone } from "../common/descZones";
+
+/** Left padding before a value label (mirrors renderStandardCardFields). */
+const ENUM_ROW_LEFT_PADDING = 12;
+/** Space kept right of the longest value so it clears the row ⓘ badge/edge. */
+const ENUM_ROW_RIGHT_RESERVE = 34;
+/** Font size of a value label in renderStandardCardFields. */
+const ENUM_VALUE_FONT_SIZE = 12;
+/** Font size of the header title in renderStandardCardTitle. */
+const ENUM_TITLE_FONT_SIZE = 13;
+/** Space kept right of the title for the header ⓘ badge. */
+const ENUM_TITLE_RIGHT_RESERVE = 30;
+
+/** On-canvas label of an enum value: verbatim (underscores kept) + ALL CAPS. */
+export function enumValueLabel(name: string | undefined): string {
+  return formatFieldNameLabel(name, { humanize: false, uppercase: true });
+}
+
+/**
+ * Content-driven size: the card widens (never narrows below `customWidth`)
+ * so the longest value label or the title is never clipped, and grows tall
+ * enough for one row per value.
+ */
+export function computeEnumCardSize(
+  data: EnumCardData,
+  customWidth = CARD_DEFAULT_WIDTH,
+): { width: number; height: number } {
+  const fields = data.fields ?? [];
+  const height = CARD_HEADER_HEIGHT + Math.max(1, fields.length) * CARD_ROW_HEIGHT;
+
+  let required = ENUM_ROW_LEFT_PADDING + measureMonospaceText("", ENUM_VALUE_FONT_SIZE) + ENUM_ROW_RIGHT_RESERVE;
+  for (const field of fields) {
+    required = Math.max(
+      required,
+      ENUM_ROW_LEFT_PADDING +
+        measureMonospaceText(enumValueLabel(field.name), ENUM_VALUE_FONT_SIZE) +
+        ENUM_ROW_RIGHT_RESERVE,
+    );
+  }
+
+  required = Math.max(
+    required,
+    ENUM_ROW_LEFT_PADDING +
+      measureMonospaceText(toDisplayName(data.name), ENUM_TITLE_FONT_SIZE) +
+      ENUM_TITLE_RIGHT_RESERVE,
+  );
+
+  return { width: Math.max(customWidth, Math.ceil(required)), height };
+}
 
 /**
  * An Enum member: a named value with an optional description. Unlike an Object
@@ -67,7 +119,7 @@ export const enumCardTool: ToolDefinition<EnumCardData> = {
 
   defaultSize: { width: CARD_DEFAULT_WIDTH, height: 60 },
 
-  computeSize: (data) => computeStandardCardSize(data.fields?.length || 0),
+  computeSize: (data) => computeEnumCardSize(data),
 
   optionsBar: EnumCardOptions,
 
@@ -116,6 +168,12 @@ export const enumCardTool: ToolDefinition<EnumCardData> = {
       isDark,
       textResolution: context.textResolution,
       emptyHintText: "(no values)",
+      // Enum members are stored values, not identifiers, so display them
+      // verbatim (underscores and casing preserved) and in ALL CAPS — e.g.
+      // "in_progress" renders as "IN_PROGRESS" while the stored value is
+      // untouched and the inline editor still shows the original.
+      humanizeFieldNames: false,
+      uppercaseFieldNames: true,
     });
 
     // 4. Header ⓘ description badge (shows when present or selected)
@@ -174,7 +232,14 @@ export const enumCardTool: ToolDefinition<EnumCardData> = {
     ),
 
   getInlineEditTarget: (element, localPoint) =>
-    getStandardCardInlineEditTarget(element, localPoint, "Enum"),
+    getStandardCardInlineEditTarget(element, localPoint, "Enum", {
+      // Editor shows the value in ALL CAPS (matching the card), but committing
+      // stores a canonical camelCase identifier. The card widens/shrinks to fit.
+      humanizeFieldNames: false,
+      uppercaseFieldNames: true,
+      camelCaseFieldNames: true,
+      resolveSize: (data) => computeEnumCardSize(data, element.width),
+    }),
 
   ai: {
     toolName: "create_enum_card",

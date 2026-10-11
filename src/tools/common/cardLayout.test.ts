@@ -9,6 +9,7 @@ import {
   drawStandardCardFrame,
   renderStandardCardTitle,
   renderStandardCardFields,
+  formatFieldNameLabel,
   renderHeaderDescBadge,
   getStandardCardSubSelect,
   getHeaderDescBadgeCenter,
@@ -135,6 +136,26 @@ describe("cardLayout helpers", () => {
       const target = getStandardCardInlineEditTarget(mockElement, { x: 50, y: 300 });
       expect(target).toBeNull();
     });
+
+    it("shows verbatim/uppercased names when humanize is off", () => {
+      const rawElement: CanvasElement<{ name: string; fields: { name: string }[] }> = {
+        ...mockElement,
+        data: { name: "OrderStatus", fields: [{ name: "in_progress" }] },
+      };
+
+      const verbatim = getStandardCardInlineEditTarget(rawElement, { x: 50, y: 45 }, "Enum", {
+        humanizeFieldNames: false,
+      });
+      expect(verbatim?.initialValue).toBe("in_progress");
+
+      // Editor mirrors the card display: verbatim, ALL CAPS.
+      const upper = getStandardCardInlineEditTarget(rawElement, { x: 50, y: 45 }, "Enum", {
+        humanizeFieldNames: false,
+        uppercaseFieldNames: true,
+        camelCaseFieldNames: true,
+      });
+      expect(upper?.initialValue).toBe("IN_PROGRESS");
+    });
   });
 
   describe("Rendering helpers", () => {
@@ -169,6 +190,19 @@ describe("cardLayout helpers", () => {
           textResolution: 1,
         });
       }).not.toThrow();
+    });
+
+    it("formats field labels per the humanize/uppercase display rules", () => {
+      // Identifiers are humanized by default.
+      expect(formatFieldNameLabel("orderId")).toBe("Order ID");
+      // Enum-style: verbatim (underscores kept) ...
+      expect(formatFieldNameLabel("in_progress", { humanize: false })).toBe("in_progress");
+      // ... and uppercased for display only.
+      expect(
+        formatFieldNameLabel("in_progress", { humanize: false, uppercase: true }),
+      ).toBe("IN_PROGRESS");
+      // Missing names never throw.
+      expect(formatFieldNameLabel(undefined, { humanize: false })).toBe("");
     });
   });
 
