@@ -42,7 +42,17 @@
     "saveBtn": "Lưu",
     "loading": "Đang tải...",
     "noFiles": "Không tìm thấy tệp event-modeling nào trên Drive.",
-    "selectFile": "Mở tệp đã chọn"
+    "selectFile": "Mở tệp đã chọn",
+    "connectDesc": "Kết nối Google Drive để lưu trữ và mở các bản thiết kế trực tiếp trên đám mây.",
+    "clientIdLabel": "Google Client ID (Web Application):",
+    "clientIdPlaceholder": "xxxx.apps.googleusercontent.com",
+    "clientIdHelp": "Tạo OAuth 2.0 Web Client ID trong Google Cloud Console với Authorized JavaScript origin là URL hiện tại.",
+    "connected": "Đã kết nối Google",
+    "errorList": "Lỗi tải danh sách: {{message}}",
+    "saveSuccess": "✅ Đã lưu thành công lên Google Drive!",
+    "errorSave": "Lỗi lưu: {{message}}",
+    "openSuccess": "✅ Đã mở tệp {{name}}",
+    "errorOpen": "Lỗi mở tệp: {{message}}"
   },
   "modal": {
     "newBoardTitle": "Tạo bảng vẽ mới?",

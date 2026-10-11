@@ -57,7 +57,7 @@ export function GoogleDriveModal() {
       const list = await listDriveFiles(auth.accessToken);
       setFiles(list);
     } catch (err: any) {
-      setStatusMessage(`Lỗi tải danh sách: ${err.message}`);
+      setStatusMessage(t("drive.errorList", { message: err.message }));
     } finally {
       setIsLoading(false);
     }
@@ -102,10 +102,10 @@ export function GoogleDriveModal() {
       );
       setGoogleDriveFileId(res.id);
       setProjectName(saveFileName);
-      setStatusMessage("✅ Đã lưu thành công lên Google Drive!");
+      setStatusMessage(t("drive.saveSuccess"));
       setTimeout(() => setOpen(false), 1200);
     } catch (err: any) {
-      setStatusMessage(`Lỗi lưu: ${err.message}`);
+      setStatusMessage(t("drive.errorSave", { message: err.message }));
     } finally {
       setIsLoading(false);
     }
@@ -120,10 +120,10 @@ export function GoogleDriveModal() {
       const project = parseProjectFile(json);
       useCanvasStore.getState().loadProject(project);
       setGoogleDriveFileId(file.id);
-      setStatusMessage(`✅ Đã mở tệp ${file.name}`);
+      setStatusMessage(t("drive.openSuccess", { name: file.name }));
       setTimeout(() => setOpen(false), 800);
     } catch (err: any) {
-      setStatusMessage(`Lỗi mở tệp: ${err.message}`);
+      setStatusMessage(t("drive.errorOpen", { message: err.message }));
     } finally {
       setIsLoading(false);
     }
@@ -153,23 +153,23 @@ export function GoogleDriveModal() {
           /* Sign-in prompt */
           <div className="space-y-4 py-4">
             <p className="text-xs text-gray-600 dark:text-zinc-400 leading-relaxed">
-              Kết nối Google Drive để lưu trữ và mở các bản thiết kế trực tiếp trên đám mây.
+              {t("drive.connectDesc")}
             </p>
 
             {isConfiguringClientId || !clientId ? (
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-gray-700 dark:text-zinc-300">
-                  Google Client ID (Web Application):
+                  {t("drive.clientIdLabel")}
                 </label>
                 <input
                   type="text"
-                  placeholder="xxxx.apps.googleusercontent.com"
+                  placeholder={t("drive.clientIdPlaceholder")}
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                   className="w-full rounded-xl border border-gray-300 bg-transparent px-3 py-2 text-xs outline-none focus:border-blue-500 dark:border-zinc-700 dark:text-zinc-100"
                 />
                 <p className="text-[11px] text-gray-400">
-                  Tạo OAuth 2.0 Web Client ID trong Google Cloud Console với Authorized JavaScript origin là URL hiện tại.
+                  {t("drive.clientIdHelp")}
                 </p>
               </div>
             ) : null}
@@ -203,7 +203,7 @@ export function GoogleDriveModal() {
                   </div>
                 )}
                 <span className="text-xs font-medium text-gray-800 dark:text-zinc-200">
-                  {auth.user?.email || "Google Connected"}
+                  {auth.user?.email || t("drive.connected")}
                 </span>
               </div>
               <button

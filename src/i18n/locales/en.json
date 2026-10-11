@@ -42,7 +42,17 @@
     "saveBtn": "Save",
     "loading": "Loading...",
     "noFiles": "No event modeling files found on your Drive.",
-    "selectFile": "Open Selected"
+    "selectFile": "Open Selected",
+    "connectDesc": "Connect Google Drive to store and open your designs directly in the cloud.",
+    "clientIdLabel": "Google Client ID (Web Application):",
+    "clientIdPlaceholder": "xxxx.apps.googleusercontent.com",
+    "clientIdHelp": "Create an OAuth 2.0 Web Client ID in Google Cloud Console with the Authorized JavaScript origin set to the current URL.",
+    "connected": "Google Connected",
+    "errorList": "Failed to load file list: {{message}}",
+    "saveSuccess": "✅ Saved to Google Drive successfully!",
+    "errorSave": "Failed to save: {{message}}",
+    "openSuccess": "✅ Opened file {{name}}",
+    "errorOpen": "Failed to open file: {{message}}"
   },
   "modal": {
     "newBoardTitle": "Create New Board?",

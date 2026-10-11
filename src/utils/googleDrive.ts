@@ -4,6 +4,39 @@ export interface GoogleDriveFile {
   modifiedTime: string;
 }
 
+/**
+ * Error thrown when a Google Drive API request fails.
+ * Carries the HTTP status plus the raw reason/message returned by Google
+ * so the UI can show *why* the request was rejected (disabled API,
+ * missing scope, insufficient file permission, quota, ...) instead of a
+ * bare status code.
+ */
+export class GoogleDriveApiError extends Error {
+  status: number;
+  reason: string;
+
+  constructor(status: number, message: string, reason = "") {
+    super(message);
+    this.name = "GoogleDriveApiError";
+    this.status = status;
+    this.reason = reason;
+  }
+}
+
+async function toGoogleDriveError(res: Response, fallback: string): Promise<GoogleDriveApiError> {
+  let detail = "";
+  let reason = "";
+  try {
+    const body = await res.json();
+    detail = body?.error?.message || "";
+    reason = body?.error?.errors?.[0]?.reason || body?.error?.status || "";
+  } catch {
+    // Response had no JSON body; keep the fallback message.
+  }
+  const suffix = detail ? `: ${detail}` : "";
+  return new GoogleDriveApiError(res.status, `${fallback} (${res.status})${suffix}`, reason);
+}
+
 export interface GoogleUserProfile {
   email: string;
   name?: string;
@@ -115,16 +148,16 @@ export async function listDriveFiles(accessToken: string): Promise<GoogleDriveFi
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  if (!res.ok) throw new Error(`Failed to list Google Drive files (${res.status})`);
+  if (!res.ok) throw await toGoogleDriveError(res, "Failed to list Google Drive files");
   const data = await res.json();
   return data.files || [];
 }
 
-export async function saveToGoogleDrive(
+async function uploadDriveFile(
   accessToken: string,
   fileName: string,
   fileContent: string,
-  existingFileId?: string | null,
+  existingFileId: string | null,
 ): Promise<{ id: string; name: string }> {
   const boundary = "boundary_event_modeling_gdrive";
   const metadata = {
@@ -155,8 +188,31 @@ export async function saveToGoogleDrive(
     body: multipartBody,
   });
 
-  if (!res.ok) throw new Error(`Failed to save to Google Drive (${res.status})`);
+  if (!res.ok) throw await toGoogleDriveError(res, "Failed to save to Google Drive");
   return res.json();
+}
+
+export async function saveToGoogleDrive(
+  accessToken: string,
+  fileName: string,
+  fileContent: string,
+  existingFileId?: string | null,
+): Promise<{ id: string; name: string }> {
+  if (existingFileId) {
+    try {
+      return await uploadDriveFile(accessToken, fileName, fileContent, existingFileId);
+    } catch (err) {
+      // The stored id may point to a file that was deleted, moved to the
+      // trash, or created by a different client/session. Under the
+      // `drive.file` scope that yields 403/404, so fall back to creating a
+      // fresh file instead of failing the save.
+      if (err instanceof GoogleDriveApiError && (err.status === 403 || err.status === 404)) {
+        return await uploadDriveFile(accessToken, fileName, fileContent, null);
+      }
+      throw err;
+    }
+  }
+  return await uploadDriveFile(accessToken, fileName, fileContent, null);
 }
 
 export async function downloadFromGoogleDrive(
@@ -167,6 +223,6 @@ export async function downloadFromGoogleDrive(
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  if (!res.ok) throw new Error(`Failed to download from Google Drive (${res.status})`);
+  if (!res.ok) throw await toGoogleDriveError(res, "Failed to download from Google Drive");
   return res.text();
 }
