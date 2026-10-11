@@ -61,9 +61,9 @@ export function getFieldSections(element: CanvasElement): FieldSection[] {
     ];
   }
 
-  if (element.type === "stateCard") {
-    // State cards expose params, then query items, then states - matching the
-    // `sectionIndex` produced by the State card's sub-selection.
+  if (element.type === "stateCard" || element.type === "viewCard") {
+    // State and View cards expose params, then query items, then states -
+    // matching the `sectionIndex` produced by their sub-selection.
     const params = Array.isArray(data.params) ? (data.params as DescribableField[]) : [];
     const queryItems = Array.isArray(data.queryItems)
       ? (data.queryItems as DescribableField[])

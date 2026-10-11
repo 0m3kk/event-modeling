@@ -20,6 +20,7 @@ describe("AIAgent", () => {
     expect(toolNames).toContain("clear_canvas");
     expect(toolNames).toContain("create_event_card");
     expect(toolNames).toContain("create_sticky_note");
+    expect(toolNames).toContain("create_view_card");
   });
 
   it("executes create_event_card via AI bridge", async () => {
@@ -58,8 +59,7 @@ describe("AIAgent", () => {
     expect(props.queryItems.items.properties.tags.items.properties.field.type).toBe("string");
   });
 
-  it("rejects an AI state card that references an unknown tag, then accepts it", async () => {
-    const failed = JSON.parse(
+  it("rejects an AI state card that references an unknown tag, then accepts it", async () => {    const failed = JSON.parse(
       await executeAITool("create_state_card", {
         name: "Course",
         params: [{ name: "courseId", type: "string" }],
@@ -86,6 +86,27 @@ describe("AIAgent", () => {
     );
     expect(ok.status).toBe("success");
     expect(ok.type).toBe("stateCard");
+  });
+
+  it("creates a View card once its tag exists on the board", async () => {
+    await executeAITool("create_event_card", {
+      name: "CourseDefined",
+      fields: [{ name: "courseId", type: "string", tag: "course" }],
+    });
+
+    const ok = JSON.parse(
+      await executeAITool("create_view_card", {
+        name: "CourseCatalog",
+        params: [{ name: "courseId", type: "string" }],
+        queryItems: [{ types: ["CourseDefined"], tags: [{ tag: "course", field: "courseId" }] }],
+        states: [{ name: "title", type: "string" }],
+      }),
+    );
+    expect(ok.status).toBe("success");
+    expect(ok.type).toBe("viewCard");
+
+    const view = useCanvasStore.getState().elements.find((e) => e.type === "viewCard");
+    expect(view?.data.name).toBe("CourseCatalog");
   });
 
   it("rejects an AI event card with an unknown field type", async () => {
@@ -153,6 +174,7 @@ describe("AIAgent", () => {
     const names = tools.map((t) => t.function.name);
     expect(names).toContain("update_event_card");
     expect(names).toContain("update_state_card");
+    expect(names).toContain("update_view_card");
     expect(names).toContain("update_alias_card");
     expect(names).toContain("delete_element");
 

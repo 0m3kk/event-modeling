@@ -4,6 +4,7 @@ import { commandCardTool } from "./commandCard";
 import { constraintCardTool } from "./constraintCard";
 import { queryCardTool } from "./queryCard";
 import { stateCardTool } from "./stateCard";
+import { viewCardTool } from "./viewCard";
 import { enumCardTool } from "./enumCard";
 import { eventCardTool } from "./eventCard";
 import { objectCardTool } from "./objectCard";
@@ -15,6 +16,7 @@ toolRegistry.register(commandCardTool);
 toolRegistry.register(queryCardTool);
 toolRegistry.register(eventCardTool);
 toolRegistry.register(stateCardTool);
+toolRegistry.register(viewCardTool);
 toolRegistry.register(constraintCardTool);
 toolRegistry.register(serviceCardTool);
 toolRegistry.register(objectCardTool);
@@ -30,6 +32,7 @@ export {
   constraintCardTool,
   queryCardTool,
   stateCardTool,
+  viewCardTool,
   enumCardTool,
   eventCardTool,
   objectCardTool,
