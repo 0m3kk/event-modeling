@@ -20,6 +20,12 @@ export interface ToolAIOperation<TData> {
   onUpdate?: (element: CanvasElement<TData>, params: Record<string, any>) => CanvasElement<TData>;
 }
 
+export interface SubSelectSection {
+  id?: string;
+  name?: string;
+  count: number;
+}
+
 export interface ToolDefinition<TData = any> {
   type: string;
   name: string;
@@ -41,11 +47,21 @@ export interface ToolDefinition<TData = any> {
     onUpdate: (partial: Partial<TData>) => void;
   }>;
 
+  // Optional: returns sections for sub-element navigation (e.g. Header, Fields, Relations)
+  getSubSelectSections?: (element: CanvasElement<TData>) => SubSelectSection[];
+
   // Optional: handles sub-element selection on pointer down (e.g. select field)
   onSubSelect?: (element: CanvasElement<TData>, localPoint: Point) => number | null;
 
   // Optional: handles sub-element deletion (e.g. delete field)
   onDeleteSubSelect?: (element: CanvasElement<TData>, subIndex: number) => Partial<CanvasElement<TData>> | null;
+
+  // Optional: handles custom navigation between sub-elements / sections
+  onNavigateSubSelect?: (
+    element: CanvasElement<TData>,
+    current: SelectedField,
+    direction: "up" | "down",
+  ) => SelectedField | null;
 
   // Optional: provides inline edit target on double click (e.g. edit name, field name)
   getInlineEditTarget?: (element: CanvasElement<TData>, localPoint: Point) => InlineEditState | null;

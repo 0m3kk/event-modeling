@@ -37,7 +37,7 @@ export class ElementLayer extends Container {
       const isSelected = selectedIds.has(element.id);
       const fieldKey =
         selectedField && selectedField.elementId === element.id
-          ? selectedField.fieldIndex
+          ? `${selectedField.sectionIndex ?? 0}_${selectedField.fieldIndex}`
           : -1;
 
       // Cache key: only re-render children when content, selection, selected field, theme, size, or resolution changes

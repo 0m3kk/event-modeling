@@ -98,8 +98,12 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     g.fill({ color: cardBg });
 
     // 3. Highlight selected field: FULL-WIDTH edge-to-edge, NO side padding
+    const isSectionActive =
+      !context.selectedField?.sectionIndex ||
+      context.selectedField.sectionIndex === 0;
+
     const selectedFieldIndex =
-      context.selectedField?.elementId === element.id
+      context.selectedField?.elementId === element.id && isSectionActive
         ? context.selectedField.fieldIndex
         : -1;
 
@@ -224,6 +228,37 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
       height: nextSize ? nextSize.height : element.height,
       data: nextData,
     };
+  },
+
+  getSubSelectSections: (element) => [
+    {
+      id: "fields",
+      name: "fields",
+      count: element.data.fields?.length || 0,
+    },
+  ],
+
+  onNavigateSubSelect: (element, current, direction) => {
+    const fields = element.data.fields;
+    if (!fields || fields.length === 0) return null;
+    const currentIndex = Math.max(0, Math.min(current.fieldIndex, fields.length - 1));
+    if (direction === "down") {
+      const nextIndex = Math.min(fields.length - 1, currentIndex + 1);
+      return {
+        elementId: element.id,
+        sectionIndex: 0,
+        sectionId: "fields",
+        fieldIndex: nextIndex,
+      };
+    } else {
+      const nextIndex = Math.max(0, currentIndex - 1);
+      return {
+        elementId: element.id,
+        sectionIndex: 0,
+        sectionId: "fields",
+        fieldIndex: nextIndex,
+      };
+    }
   },
 
   getInlineEditTarget: (element, localPoint) => {

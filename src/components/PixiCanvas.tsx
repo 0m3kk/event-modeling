@@ -84,6 +84,17 @@ export function PixiCanvas() {
         return;
       }
 
+      // Arrow Up / Down navigation between fields and sections
+      if (!isCmdOrCtrl && (e.code === "ArrowUp" || e.code === "ArrowDown" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        const state = useCanvasStore.getState();
+        if (state.selectedField && !state.inlineEdit) {
+          e.preventDefault();
+          const direction = (e.code === "ArrowDown" || e.key === "ArrowDown") ? "down" : "up";
+          state.navigateSelectedField(direction);
+          return;
+        }
+      }
+
       // Delete selected
       if (e.code === "Delete" || e.code === "Backspace") {
         const selectedField = useCanvasStore.getState().selectedField;

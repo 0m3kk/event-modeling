@@ -13,6 +13,7 @@ import {
   pruneDanglingReferences,
 } from "@/utils/reference";
 import { toolRegistry } from "@/tools/registry";
+import { navigateSubSelect } from "@/utils/subSelection";
 
 interface HistoryEntry {
   elements: CanvasElement[];
@@ -67,6 +68,7 @@ export interface CanvasStoreState {
   updateElements: (patches: Array<{ id: string } & Partial<CanvasElement>>) => void;
   deleteElements: (ids: string[]) => void;
   deleteSelectedField: () => void;
+  navigateSelectedField: (direction: "up" | "down") => void;
   clearBoard: () => void;
   loadProject: (project: ProjectFileV2) => void;
 
@@ -308,6 +310,21 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     if (patch) {
       get().updateElement(element.id, patch);
       set({ selectedField: null });
+    }
+  },
+
+  navigateSelectedField: (direction) => {
+    const { selectedField, selectedIds, elements } = get();
+    if (!selectedField) return;
+    if (!selectedIds.includes(selectedField.elementId)) return;
+
+    const element = elements.find((el) => el.id === selectedField.elementId);
+    if (!element) return;
+
+    const tool = toolRegistry.get(element.type);
+    const next = navigateSubSelect(element, selectedField, direction, tool);
+    if (next) {
+      set({ selectedField: next });
     }
   },
 

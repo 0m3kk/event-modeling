@@ -6,6 +6,8 @@ export type ResolvedTheme = "light" | "dark";
 export interface SelectedField {
   elementId: string;
   fieldIndex: number;
+  sectionIndex?: number;
+  sectionId?: string;
 }
 
 export interface InlineEditState {
