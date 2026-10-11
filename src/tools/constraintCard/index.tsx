@@ -22,50 +22,33 @@ import {
   type ConstraintCardData,
   type ConstraintState,
 } from "./rules";
+import {
+  CONSTRAINT_HEADER_HEIGHT,
+  CONSTRAINT_SECTION_HEADER_HEIGHT,
+  CONSTRAINT_ROW_HEIGHT,
+  CONSTRAINT_DEFAULT_WIDTH,
+  CONSTRAINT_RULE_LINE_HEIGHT,
+  CONSTRAINT_RULE_FONT_SIZE,
+  computeConstraintLayout,
+  computeConstraintCardSize,
+  findRuleIndexAt,
+  getRuleRowTop,
+  getStatesEndY,
+} from "./layout";
 
-export const CONSTRAINT_HEADER_HEIGHT = 32;
-export const CONSTRAINT_SECTION_HEADER_HEIGHT = 22;
-export const CONSTRAINT_ROW_HEIGHT = 28;
-export const CONSTRAINT_DEFAULT_WIDTH = 260;
-
+export {
+  CONSTRAINT_HEADER_HEIGHT,
+  CONSTRAINT_SECTION_HEADER_HEIGHT,
+  CONSTRAINT_ROW_HEIGHT,
+  CONSTRAINT_DEFAULT_WIDTH,
+  computeConstraintCardSize,
+} from "./layout";
 export type { ConstraintCardData, ConstraintState } from "./rules";
 export {
   getConstraintStates,
   getConstraintRules,
   collectBoardStateCards,
 } from "./rules";
-
-interface ConstraintLayout {
-  states: ConstraintState[];
-  rules: string[];
-  statesCount: number;
-  rulesCount: number;
-  statesStartY: number;
-  rulesHeaderY: number;
-  rulesStartY: number;
-}
-
-/** Row geometry shared by the renderer, hit-testing and inline editing. */
-function computeLayout(data: ConstraintCardData): ConstraintLayout {
-  const states = getConstraintStates(data);
-  const rules = getConstraintRules(data);
-  const statesCount = Math.max(1, states.length);
-  const rulesCount = Math.max(1, rules.length);
-
-  const statesStartY = CONSTRAINT_HEADER_HEIGHT + CONSTRAINT_SECTION_HEADER_HEIGHT;
-  const rulesHeaderY = statesStartY + statesCount * CONSTRAINT_ROW_HEIGHT;
-  const rulesStartY = rulesHeaderY + CONSTRAINT_SECTION_HEADER_HEIGHT;
-
-  return { states, rules, statesCount, rulesCount, statesStartY, rulesHeaderY, rulesStartY };
-}
-
-export function computeConstraintCardSize(
-  data: ConstraintCardData,
-  customWidth = CONSTRAINT_DEFAULT_WIDTH,
-): { width: number; height: number } {
-  const { rulesStartY, rulesCount } = computeLayout(data);
-  return { width: customWidth, height: rulesStartY + rulesCount * CONSTRAINT_ROW_HEIGHT };
-}
 
 /** One STATES row: the referenced state's name (+ a resolved badge/hint). */
 function renderStateRow(
@@ -123,23 +106,30 @@ function renderStateRow(
   container.addChild(hint);
 }
 
-/** One RULES row: a free-text assertion, left-aligned on the row. */
+/**
+ * One RULES row: a free-text assertion, left-aligned on the row. The text is
+ * pre-wrapped to the card width (see {@link computeConstraintLayout}) and
+ * rendered with explicit line breaks so the row height always matches the
+ * layout and the text never spills past the card edge.
+ */
 function renderRuleRow(
   container: Container,
   opts: {
-    text: string;
+    lines: string[];
     rowY: number;
+    rowHeight: number;
     isDark: boolean;
     isSelectedRow: boolean;
     textResolution: number;
   },
 ): void {
-  const { text, rowY, isDark, isSelectedRow, textResolution } = opts;
+  const { lines, rowY, rowHeight, isDark, isSelectedRow, textResolution } = opts;
 
   const rule = new Text({
-    text,
+    text: lines.join("\n"),
     style: {
-      fontSize: 12,
+      fontSize: CONSTRAINT_RULE_FONT_SIZE,
+      lineHeight: CONSTRAINT_RULE_LINE_HEIGHT,
       fontWeight: isSelectedRow ? "bold" : "normal",
       fontFamily: '"Geist Mono", monospace',
       fill: isSelectedRow
@@ -153,7 +143,8 @@ function renderRuleRow(
     resolution: textResolution,
   });
   rule.x = 12;
-  rule.y = rowY + 7;
+  // Vertically center the wrapped block within the (possibly taller) row.
+  rule.y = rowY + Math.max(0, (rowHeight - lines.length * CONSTRAINT_RULE_LINE_HEIGHT) / 2);
   container.addChild(rule);
 }
 
@@ -190,9 +181,13 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
   }),
 
   // Header + two sections ("STATES" and "RULES") that each reserve one row.
-  defaultSize: { width: CONSTRAINT_DEFAULT_WIDTH, height: 132 },
+  defaultSize: { width: CONSTRAINT_DEFAULT_WIDTH, height: 126 },
 
   computeSize: (data) => computeConstraintCardSize(data),
+
+  // Rules wrap to the card width, so widening/narrowing the card reflows its
+  // height to keep the wrapped text inside the frame.
+  computeHeightForWidth: (data, width) => computeConstraintCardSize(data, width).height,
 
   optionsBar: ConstraintCardOptions,
 
@@ -211,8 +206,8 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
     const h = element.height;
     const r = CARD_CORNER_RADIUS;
 
-    const { states, rules, rulesCount, statesStartY, rulesHeaderY, rulesStartY } =
-      computeLayout(element.data);
+    const layout = computeConstraintLayout(element.data, w);
+    const { states, ruleRows, rulesCount, statesStartY, rulesHeaderY, rulesStartY } = layout;
 
     const boardByName = new Map(
       collectBoardStateCards(useCanvasStore.getState().elements).map((card) => [
@@ -261,12 +256,14 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
     // 4. Sunken highlight for the active row
     if (isThisElement && activeFieldIndex >= 0) {
       let rowY = -1;
+      let rowH = CONSTRAINT_ROW_HEIGHT;
       let isBottomRow = false;
 
       if (activeSection === 0 && activeFieldIndex < states.length) {
         rowY = statesStartY + activeFieldIndex * CONSTRAINT_ROW_HEIGHT;
-      } else if (activeSection === 1 && activeFieldIndex < rules.length) {
-        rowY = rulesStartY + activeFieldIndex * CONSTRAINT_ROW_HEIGHT;
+      } else if (activeSection === 1 && activeFieldIndex < ruleRows.length) {
+        rowY = getRuleRowTop(layout, activeFieldIndex);
+        rowH = ruleRows[activeFieldIndex].height;
         isBottomRow = activeFieldIndex === rulesCount - 1;
       }
 
@@ -281,7 +278,7 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
           g.closePath();
           g.fill({ color: sunkenColor });
         } else {
-          g.rect(0, rowY, w, CONSTRAINT_ROW_HEIGHT);
+          g.rect(0, rowY, w, rowH);
           g.fill({ color: sunkenColor });
         }
       }
@@ -363,12 +360,13 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
       container.addChild(empty);
     }
 
-    // 8. Rules rows
-    if (rules.length > 0) {
-      rules.forEach((rule, idx) => {
+    // 8. Rules rows (each wrapped to the card width; row height grows with it)
+    if (ruleRows.length > 0) {
+      ruleRows.forEach((row, idx) => {
         renderRuleRow(container, {
-          text: rule,
-          rowY: rulesStartY + idx * CONSTRAINT_ROW_HEIGHT,
+          lines: row.lines,
+          rowY: getRuleRowTop(layout, idx),
+          rowHeight: row.height,
           isDark,
           isSelectedRow: activeSection === 1 && activeFieldIndex === idx,
           textResolution: context.textResolution,
@@ -385,7 +383,7 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
         resolution: context.textResolution,
       });
       empty.x = 12;
-      empty.y = rulesStartY + 7;
+      empty.y = rulesStartY + 5;
       container.addChild(empty);
     }
   },
@@ -393,9 +391,10 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
   getDescHoverTarget: (element, localPoint) => hitDescZone(element.id, localPoint),
 
   onSubSelect: (element, localPoint): SelectedField | null => {
-    const { states, rules, statesStartY, rulesStartY } = computeLayout(element.data);
+    const layout = computeConstraintLayout(element.data, element.width);
+    const { states, statesStartY } = layout;
 
-    const statesEndY = statesStartY + Math.max(1, states.length) * CONSTRAINT_ROW_HEIGHT;
+    const statesEndY = getStatesEndY(layout);
     if (localPoint.y >= statesStartY && localPoint.y < statesEndY) {
       if (states.length === 0) return null;
       const index = Math.floor((localPoint.y - statesStartY) / CONSTRAINT_ROW_HEIGHT);
@@ -405,14 +404,9 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
       return null;
     }
 
-    const rulesEndY = rulesStartY + Math.max(1, rules.length) * CONSTRAINT_ROW_HEIGHT;
-    if (localPoint.y >= rulesStartY && localPoint.y < rulesEndY) {
-      if (rules.length === 0) return null;
-      const index = Math.floor((localPoint.y - rulesStartY) / CONSTRAINT_ROW_HEIGHT);
-      if (index >= 0 && index < rules.length) {
-        return { elementId: element.id, sectionIndex: 1, sectionId: "rules", fieldIndex: index };
-      }
-      return null;
+    const index = findRuleIndexAt(layout, localPoint.y);
+    if (index !== null) {
+      return { elementId: element.id, sectionIndex: 1, sectionId: "rules", fieldIndex: index };
     }
 
     return null;
@@ -432,7 +426,7 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
       nextData = { ...element.data, states: states.filter((_, i) => i !== fieldIndex) };
     }
 
-    const nextSize = computeConstraintCardSize(nextData);
+    const nextSize = computeConstraintCardSize(nextData, element.width);
     return { height: nextSize.height, data: nextData };
   },
 
@@ -478,10 +472,11 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
       };
     }
 
-    const { states, rules, statesStartY, rulesStartY } = computeLayout(element.data);
+    const layout = computeConstraintLayout(element.data, element.width);
+    const { states, rules, ruleRows, statesStartY } = layout;
 
     // 2. States row -> select it (the state is chosen from the options bar)
-    const statesEndY = statesStartY + Math.max(1, states.length) * CONSTRAINT_ROW_HEIGHT;
+    const statesEndY = getStatesEndY(layout);
     if (localPoint.y >= statesStartY && localPoint.y < statesEndY) {
       const index = Math.floor((localPoint.y - statesStartY) / CONSTRAINT_ROW_HEIGHT);
       if (index >= 0 && index < states.length) {
@@ -496,40 +491,45 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
     }
 
     // 3. Rules row -> inline-edit the rule text
-    const rulesEndY = rulesStartY + Math.max(1, rules.length) * CONSTRAINT_ROW_HEIGHT;
-    if (localPoint.y >= rulesStartY && localPoint.y < rulesEndY) {
-      const index = Math.floor((localPoint.y - rulesStartY) / CONSTRAINT_ROW_HEIGHT);
-      if (index >= 0 && index < rules.length) {
-        const text = rules[index];
-        useCanvasStore.getState().setSelectedField({
-          elementId: element.id,
-          sectionIndex: 1,
-          sectionId: "rules",
-          fieldIndex: index,
-        });
-        return {
-          elementId: element.id,
-          worldBounds: {
-            x: element.x + 8,
-            y: element.y + rulesStartY + index * CONSTRAINT_ROW_HEIGHT + 2,
-            width: Math.max(80, element.width - 16),
-            height: 24,
-          },
-          initialValue: text,
-          multiline: false,
-          onCommit: (newValue) => {
-            const trimmed = newValue.trim();
-            if (trimmed && trimmed !== text) {
-              const nextRules = [...rules];
-              nextRules[index] = trimmed;
-              useCanvasStore.getState().updateElement(element.id, {
-                data: { ...element.data, rules: nextRules },
-              });
-            }
-          },
-        };
-      }
-      return null;
+    const index = findRuleIndexAt(layout, localPoint.y);
+    if (index !== null) {
+      const text = rules[index];
+      const rowTop = getRuleRowTop(layout, index);
+      const lineCount = ruleRows[index].lines.length;
+      useCanvasStore.getState().setSelectedField({
+        elementId: element.id,
+        sectionIndex: 1,
+        sectionId: "rules",
+        fieldIndex: index,
+      });
+      return {
+        elementId: element.id,
+        worldBounds: {
+          // Stretch the editor nearly edge-to-edge. Its height tracks the
+          // wrapped line count (plus room for the textarea's own padding and
+          // border) so the full text shows without an inner scrollbar.
+          x: element.x + 4,
+          y: element.y + rowTop + 2,
+          width: Math.max(80, element.width - 8),
+          height: Math.max(24, lineCount * CONSTRAINT_RULE_LINE_HEIGHT + 10),
+        },
+        initialValue: text,
+        // Rules wrap onto multiple lines on the card, so let the editor grow to
+        // match the row (Enter commits, Shift+Enter inserts a line break).
+        multiline: true,
+        onCommit: (newValue) => {
+          const trimmed = newValue.trim();
+          if (trimmed && trimmed !== text) {
+            const nextRules = [...rules];
+            nextRules[index] = trimmed;
+            const nextData = { ...element.data, rules: nextRules };
+            useCanvasStore.getState().updateElement(element.id, {
+              data: nextData,
+              height: computeConstraintCardSize(nextData, element.width).height,
+            });
+          }
+        },
+      };
     }
 
     return null;

@@ -49,12 +49,13 @@ describe("constraintCardTool (states + rules sections)", () => {
     expect(constraintCardTool.name).toBe("Constraint");
     expect(constraintCardTool.color).toBe("#e11d48");
     expect(constraintCardTool.category).toBe("modeling");
-    expect(constraintCardTool.defaultSize).toEqual({ width: 260, height: 132 });
+    expect(constraintCardTool.defaultSize).toEqual({ width: 260, height: 126 });
   });
 
   it("computes height for both sections", () => {
-    // 32 + (22 + 1*28) + (22 + 1*28) = 132
-    expect(computeConstraintCardSize(card.data).height).toBe(132);
+    // The 36-char rule wraps to 2 lines at the default width:
+    // 32 + (22 + 28) + (22 + (2*15 + 4)) = 138
+    expect(computeConstraintCardSize(card.data).height).toBe(138);
   });
 
   it("grows with additional rules", () => {
@@ -62,8 +63,8 @@ describe("constraintCardTool (states + rules sections)", () => {
       ...card.data,
       rules: ["a", "b", "c"],
     };
-    // 32 + (22 + 28) + (22 + 3*28) = 188
-    expect(computeConstraintCardSize(multi).height).toBe(188);
+    // 32 + (22 + 28) + (22 + 3*22) = 170
+    expect(computeConstraintCardSize(multi).height).toBe(170);
   });
 
   it("sub-selects rows across states and rules", () => {
@@ -80,7 +81,7 @@ describe("constraintCardTool (states + rules sections)", () => {
     });
     // rules banner (82..104)
     expect(constraintCardTool.onSubSelect!(card, { x: 50, y: 90 })).toBeNull();
-    // rule 0 [104, 132)
+    // rule 0 [104, 138)
     expect(constraintCardTool.onSubSelect!(card, { x: 50, y: 115 })).toEqual({
       elementId: "constraint-1",
       sectionIndex: 1,
@@ -136,13 +137,83 @@ describe("constraintCardTool (states + rules sections)", () => {
     const delRule = constraintCardTool.onDeleteSubSelect!(card, 0, 1);
     expect(delRule?.data?.rules?.length).toBe(0);
     expect(delRule?.data?.states?.length).toBe(1);
-    expect(delRule?.height).toBe(132);
+    // No rules left: only the empty rules row remains (104 + 22 = 126).
+    expect(delRule?.height).toBe(126);
 
     const delState = constraintCardTool.onDeleteSubSelect!(card, 0, 0);
     expect(delState?.data?.states?.length).toBe(0);
     // Rules are free text, so they are not cascade-deleted with the state.
     expect(delState?.data?.rules?.length).toBe(1);
-    expect(delState?.height).toBe(132);
+    // The rule still wraps to two lines: 104 + 34 = 138.
+    expect(delState?.height).toBe(138);
+  });
+});
+
+describe("constraintCardTool rule wrapping", () => {
+  // At width 120 the rule text fits 13 characters per line (12px * 0.6 = 7.2px).
+  const narrow: CanvasElement<ConstraintCardData> = {
+    ...card,
+    width: 120,
+    data: {
+      name: "WrappedRules",
+      states: [{ name: "AccountStatus" }],
+      rules: [
+        "alpha beta gamma delta", // wraps to 2 lines -> row height 40
+        "one two", // stays on 1 line -> row height 28
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    useCanvasStore.getState().clearBoard();
+  });
+
+  it("grows the card height for wrapped rule lines", () => {
+    // 32 + (22 + 28) + (22 + 34 + 22) = 160
+    expect(computeConstraintCardSize(narrow.data, narrow.width).height).toBe(160);
+  });
+
+  it("exposes the width-aware height through the tool hook", () => {
+    expect(constraintCardTool.computeHeightForWidth!(narrow.data, narrow.width)).toBe(160);
+    // The sample rule wraps to two lines at the default width too.
+    expect(computeConstraintCardSize(card.data, 260).height).toBe(138);
+  });
+
+  it("sub-selects the correct wrapped rule row by Y", () => {
+    // First rule spans [104, 138), second spans [138, 160).
+    expect(constraintCardTool.onSubSelect!(narrow, { x: 50, y: 120 })).toEqual({
+      elementId: "constraint-1",
+      sectionIndex: 1,
+      sectionId: "rules",
+      fieldIndex: 0,
+    });
+    expect(constraintCardTool.onSubSelect!(narrow, { x: 50, y: 150 })).toEqual({
+      elementId: "constraint-1",
+      sectionIndex: 1,
+      sectionId: "rules",
+      fieldIndex: 1,
+    });
+  });
+
+  it("opens a multiline editor sized to the wrapped row", () => {
+    useCanvasStore.getState().addElement(narrow);
+    const target = constraintCardTool.getInlineEditTarget!(narrow, { x: 30, y: 150 });
+    expect(target?.initialValue).toBe("one two");
+    expect(target?.multiline).toBe(true);
+    expect(target?.worldBounds.y).toBe(narrow.y + 138 + 2);
+  });
+
+  it("reflows the height when an edited rule wraps", () => {
+    useCanvasStore.getState().addElement(narrow);
+    const target = constraintCardTool.getInlineEditTarget!(narrow, { x: 30, y: 150 });
+    target?.onCommit("one two three four five six");
+
+    const updated = useCanvasStore
+      .getState()
+      .elements.find((e) => e.id === "constraint-1");
+    expect(updated?.data.rules?.[1]).toBe("one two three four five six");
+    // The second rule now wraps to two lines: 160 - 22 + 34 = 172.
+    expect(updated?.height).toBe(172);
   });
 });
 

@@ -78,6 +78,13 @@ export interface ToolDefinition<TData = any> {
   defaultSize: { width: number; height: number };
   computeSize?: (data: TData) => { width: number; height: number };
   /**
+   * Optional: the height a card needs when its width is `width`. Used while
+   * resizing so cards whose content wraps to the width (e.g. a Constraint's
+   * rules) reflow instead of overflowing. When omitted, resizing only changes
+   * the width.
+   */
+  computeHeightForWidth?: (data: TData, width: number) => number;
+  /**
    * Whether the card exposes left/right resize handles. Defaults to true.
    * Auto-sized containers (e.g. a Slice) set this to false.
    */

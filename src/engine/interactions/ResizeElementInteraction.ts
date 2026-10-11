@@ -1,12 +1,24 @@
 import type { CanvasInteraction, InteractionContext } from "./types";
-import type { Point } from "@/types";
+import type { CanvasElement, Point } from "@/types";
 import { useCanvasStore } from "@/store";
+import { toolRegistry } from "@/tools";
 import {
   hitResizeHandle,
   isResizableElement,
   MIN_ELEMENT_WIDTH,
   type ResizeSide,
 } from "../layers/GizmoLayer";
+
+/**
+ * Height an element should have at `width`. Cards that wrap their content to
+ * the card width expose `computeHeightForWidth`; others keep their height.
+ */
+function reflowHeight(element: CanvasElement, width: number): number {
+  const tool = toolRegistry.get(element.type);
+  return tool?.computeHeightForWidth
+    ? tool.computeHeightForWidth(element.data, width)
+    : element.height;
+}
 
 /**
  * Pure geometry for a width resize. `side` is the dragged handle; `dx` is the
@@ -94,7 +106,14 @@ export class ResizeElementInteraction implements CanvasInteraction {
 
     const state = useCanvasStore.getState();
     const nextElements = state.elements.map((el) =>
-      el.id === this.elementId ? { ...el, x: this.next.x, width: this.next.width } : el,
+      el.id === this.elementId
+        ? {
+            ...el,
+            x: this.next.x,
+            width: this.next.width,
+            height: reflowHeight(el, this.next.width),
+          }
+        : el,
     );
 
     ctx.elementLayer.renderElements(
@@ -114,7 +133,9 @@ export class ResizeElementInteraction implements CanvasInteraction {
     if (!this.active || !this.elementId) return;
 
     const id = this.elementId;
-    const patch = { x: this.next.x, width: this.next.width };
+    const element = useCanvasStore.getState().elements.find((el) => el.id === id);
+    const patch: Partial<CanvasElement> = { x: this.next.x, width: this.next.width };
+    if (element) patch.height = reflowHeight(element, this.next.width);
     const changed = this.next.x !== this.start.x || this.next.width !== this.start.width;
     this.reset();
 

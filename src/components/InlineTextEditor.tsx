@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useCanvasStore } from "@/store";
 
 export function InlineTextEditor() {
@@ -10,7 +10,9 @@ export function InlineTextEditor() {
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const isCommittedRef = useRef(false);
 
-  useEffect(() => {
+  // Sync before the browser paints, so switching the edit target (e.g. double
+  // clicking another field) never flashes the previous field's text first.
+  useLayoutEffect(() => {
     if (inlineEdit) {
       setValue(inlineEdit.initialValue || "");
       isCommittedRef.current = false;
@@ -75,9 +77,12 @@ export function InlineTextEditor() {
           onChange={(e) => setValue(e.target.value)}
           onBlur={commit}
           onKeyDown={handleKeyDown}
-          className="h-full w-full resize-none rounded-md border-2 border-blue-500 bg-white/95 dark:bg-zinc-900/95 p-1.5 font-mono text-xs text-gray-900 dark:text-zinc-100 shadow-xl outline-none"
+          className="h-full w-full resize-none rounded-md border-2 border-blue-500 bg-white/95 dark:bg-zinc-900/95 px-1.5 py-0.5 font-mono text-xs text-gray-900 dark:text-zinc-100 shadow-xl outline-none"
           style={{
             fontSize: `${Math.max(11, Math.round(12 * zoom))}px`,
+            // Scale the line box with the (zoomed) font so wrapped lines still
+            // fit inside the editor instead of triggering a scrollbar.
+            lineHeight: 1.25,
           }}
         />
       ) : (

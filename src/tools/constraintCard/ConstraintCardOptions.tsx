@@ -41,7 +41,8 @@ export function ConstraintCardOptions({ element }: ConstraintCardOptionsProps) {
     : -1;
 
   const commit = (data: ConstraintCardData) => {
-    const size = computeConstraintCardSize(data);
+    // Wrap rules to the card's current width so the height always fits.
+    const size = computeConstraintCardSize(data, element.width);
     useCanvasStore.getState().updateElement(element.id, { height: size.height, data });
   };
 
