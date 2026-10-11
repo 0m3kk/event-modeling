@@ -18,6 +18,7 @@ import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 import { validateTypeValue } from "../common/typeValidation";
 import { collectDefinedTypeNames } from "@/utils/typeCatalog";
+import { toDisplayType } from "@/utils/naming";
 
 /**
  * An Alias: a named domain type that wraps a single existing type
@@ -103,7 +104,7 @@ export const aliasCardTool: ToolDefinition<AliasCardData> = {
     // 3. Render the wrapped type as a single body line.
     if (typeof document !== "undefined") {
       const wrapped = new Text({
-        text: `${element.data.aliasedType || "unknown"}${element.data.isArray ? "[]" : ""}`,
+        text: toDisplayType(element.data.aliasedType || "unknown", element.data.isArray),
         style: {
           fontSize: 12,
           fontFamily: '"Geist Mono", monospace',

@@ -58,6 +58,73 @@ describe("useCanvasStore", () => {
     expect(useCanvasStore.getState().elements[0].x).toBe(50);
   });
 
+  it("stores identifiers in camelCase on add, regardless of input casing", () => {
+    const el: CanvasElement = {
+      id: "el-1",
+      type: "eventCard",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 88,
+      data: {
+        name: "Order Placed",
+        fields: [{ name: "Order ID", type: "UUID" }],
+      },
+    };
+    useCanvasStore.getState().addElement(el);
+
+    const data = useCanvasStore.getState().elements[0].data as any;
+    expect(data.name).toBe("orderPlaced");
+    expect(data.fields[0].name).toBe("orderId");
+    expect(data.fields[0].type).toBe("uuid");
+  });
+
+  it("normalizes identifiers on update", () => {
+    const el: CanvasElement = {
+      id: "el-1",
+      type: "eventCard",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 88,
+      data: { name: "orderPlaced", fields: [{ name: "orderId", type: "string" }] },
+    };
+    useCanvasStore.getState().addElement(el);
+    useCanvasStore.getState().updateElement("el-1", {
+      data: { name: "Order Placed", fields: [{ name: "Order ID", type: "uuid" }] },
+    });
+
+    const data = useCanvasStore.getState().elements[0].data as any;
+    expect(data.name).toBe("orderPlaced");
+    expect(data.fields[0].name).toBe("orderId");
+  });
+
+  it("does not rewrite existing identifiers when loading a board", () => {
+    useCanvasStore.getState().loadProject({
+      version: 2,
+      id: "proj-1",
+      name: "Legacy",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+      viewport: { x: 0, y: 0, zoom: 1 },
+      groups: [],
+      elements: [
+        {
+          id: "el-1",
+          type: "eventCard",
+          x: 0,
+          y: 0,
+          width: 220,
+          height: 88,
+          data: { name: "OrderPlaced", fields: [{ name: "orderId", type: "string" }] },
+        } as CanvasElement,
+      ],
+    });
+
+    const data = useCanvasStore.getState().elements[0].data as any;
+    expect(data.name).toBe("OrderPlaced");
+  });
+
   it("deletes elements", () => {
     const el1: CanvasElement = {
       id: "el-1",

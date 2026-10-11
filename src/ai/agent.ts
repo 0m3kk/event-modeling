@@ -2,7 +2,7 @@ import { toolRegistry, ToolValidationError } from "@/tools";
 import type { ValidationIssue } from "@/tools";
 import { useCanvasStore } from "@/store";
 import { collectBoardTags } from "@/utils/eventTags";
-import { getElementName, nameKey } from "@/utils/naming";
+import { getElementName, nameKey, normalizeIdentifierNames } from "@/utils/naming";
 import {
   listDefinedTypeNames,
   PRIMITIVE_FIELD_TYPES,
@@ -322,6 +322,10 @@ function executeUpdateElement(updateName: string, args: any): string {
     nextData = { ...nextData, methodRef: existingData.methodRef };
   }
 
+  // Enforce canonical camelCase identifiers before validating, so type/name
+  // references the model wrote in any casing still resolve against the board.
+  nextData = normalizeIdentifierNames(nextData, definition.type);
+
   // Validate against the board WITHOUT this element, otherwise its own tags
   // would look like a conflict with themselves.
   const others = state.elements.filter((el) => el.id !== existing.id);
@@ -397,7 +401,12 @@ export async function executeAITool(name: string, args: any): Promise<string> {
     const spawnPoint = { x: center.x + offset, y: center.y + offset };
 
     try {
-      const element = matchedTool.onCreate(args, spawnPoint);
+      const created = matchedTool.onCreate(args, spawnPoint);
+      // Normalize identifiers before validating so any casing the model used
+      // still resolves (e.g. a type written as "Customer Id" -> "customerId").
+      const normalizedData = normalizeIdentifierNames(created.data, created.type);
+      const element =
+        normalizedData === created.data ? created : { ...created, data: normalizedData };
 
       // Reject before touching the canvas if the built data breaks domain
       // rules (unknown types, unknown event types/tags, tag type conflicts...).

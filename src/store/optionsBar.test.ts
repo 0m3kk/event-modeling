@@ -283,8 +283,8 @@ describe("OptionsBar data workflows & undo/redo", () => {
     const original = useCanvasStore.getState().elements.find((e) => e.id === "card-1")!;
     const refCopy = useCanvasStore.getState().elements.find((e) => e.id === copy.id)!;
 
-    expect(refCopy.data.fields[1].type).toBe("Money");
-    expect(original.data.fields[1].type).toBe("Money");
+    expect(refCopy.data.fields[1].type).toBe("money");
+    expect(original.data.fields[1].type).toBe("money");
   });
 });
 

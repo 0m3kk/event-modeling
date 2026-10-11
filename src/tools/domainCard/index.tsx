@@ -4,6 +4,7 @@ import { Graphics, Text, type Container } from "pixi.js";
 import type { ToolDefinition } from "../types";
 import type { InlineEditState } from "@/types";
 import { useCanvasStore } from "@/store";
+import { toDisplayName } from "@/utils/naming";
 import {
   DOMAIN_DEFAULT_HEIGHT,
   DOMAIN_DEFAULT_WIDTH,
@@ -90,7 +91,7 @@ export const domainCardTool: ToolDefinition<DomainData> = {
     const children = getDomainChildren(all, element.id);
 
     const label = new Text({
-      text: element.data.name || "Domain",
+      text: toDisplayName(element.data.name) || "Domain",
       style: {
         fontSize: 12,
         fontWeight: "bold",

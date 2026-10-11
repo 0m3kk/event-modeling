@@ -98,7 +98,7 @@ describe("Store method-execution copies (Service methods)", () => {
     });
 
     const updatedCopy = copyOf(copy.id);
-    expect(updatedCopy.data.name).toBe("CheckoutService");
+    expect(updatedCopy.data.name).toBe("checkoutService");
     expect(updatedCopy.data.color).toBe("#111827");
   });
 

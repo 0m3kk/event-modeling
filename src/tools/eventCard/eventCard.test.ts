@@ -51,12 +51,12 @@ describe("EventCardTool sub-selection & inline edit targets", () => {
     target?.onCommit("PaymentReceived");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
-    expect(updated?.data.name).toBe("PaymentReceived");
+    expect(updated?.data.name).toBe("paymentReceived");
 
     // Undo reverts back
     useCanvasStore.getState().undo();
     const reverted = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
-    expect(reverted?.data.name).toBe("OrderPlaced");
+    expect(reverted?.data.name).toBe("orderPlaced");
   });
 
   it("returns inline edit target for Field Name (name only, not type)", () => {

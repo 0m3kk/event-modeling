@@ -6,6 +6,7 @@ import type {
   InlineEditState,
 } from "@/types";
 import { getContrastTextColor } from "@/utils/color";
+import { toDisplayName, toDisplayType } from "@/utils/naming";
 import { useCanvasStore } from "@/store";
 import { addDescZone } from "./descZones";
 
@@ -286,7 +287,7 @@ export function renderStandardCardTitle(
       : headerColor;
 
   const title = new Text({
-    text: titleText,
+    text: toDisplayName(titleText),
     style: {
       fontSize: 13,
       fontWeight: "bold",
@@ -326,7 +327,7 @@ export function renderStandardCardFields(
       const isFieldSelected = idx === selectedFieldIndex;
 
       const fieldName = new Text({
-        text: field.name,
+        text: toDisplayName(field.name),
         style: {
           fontSize: 12,
           fontWeight: isFieldSelected ? "bold" : "normal",
@@ -366,7 +367,7 @@ export function renderStandardCardFields(
 
       // Type label is optional: typeless rows (e.g. Enum members) only render
       // a name, so the right-edge anchor falls back to the row padding.
-      const typeText = field.type ? `${field.type}${field.isArray ? "[]" : ""}` : "";
+      const typeText = toDisplayType(field.type, field.isArray);
       let rightAnchorX = width - 12;
       if (typeText) {
         const typeLabel = new Text({

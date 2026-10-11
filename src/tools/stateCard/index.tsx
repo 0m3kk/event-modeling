@@ -6,6 +6,7 @@ import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point, SelectedField } from "@/types";
 import { useCanvasStore } from "@/store";
 import { collectBoardTagCatalog, fieldTypeKey } from "@/utils/eventTags";
+import { toDisplayName, toDisplayType } from "@/utils/naming";
 import { StateCardOptions } from "./StateCardOptions";
 import {
   getStateParams,
@@ -188,7 +189,7 @@ function renderFieldRow(
     opts;
 
   const fieldName = new Text({
-    text: field.name,
+    text: toDisplayName(field.name),
     style: {
       fontSize: 12,
       fontWeight: isSelectedRow ? "bold" : "normal",
@@ -224,7 +225,7 @@ function renderFieldRow(
   }
 
   const typeLabel = new Text({
-    text: `${field.type}${field.isArray ? "[]" : ""}`,
+    text: toDisplayType(field.type, field.isArray),
     style: {
       fontSize: 11,
       fontFamily: '"Geist Mono", monospace',
@@ -347,7 +348,7 @@ function renderQueryItemRow(
     if (types.length > 0) {
       types.forEach((type, i) => {
         const text = new Text({
-          text: type,
+          text: toDisplayName(type),
           style: {
             fontSize: 11,
             fontWeight: isSelectedRow ? "bold" : "normal",
@@ -386,7 +387,7 @@ function renderQueryItemRow(
       const valid = Boolean(allowed && paramField && allowed.has(fieldTypeKey(paramField)));
 
       const label = new Text({
-        text: `#${tag}:{${fieldName}}`,
+        text: `#${tag}:{${toDisplayName(fieldName)}}`,
         style: {
           fontSize: 9,
           fontWeight: "bold",

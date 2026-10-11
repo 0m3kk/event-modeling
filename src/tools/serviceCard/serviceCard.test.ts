@@ -164,7 +164,7 @@ describe("serviceCardTool (methods with params & returns)", () => {
     const serviceTarget = serviceCardTool.getInlineEditTarget!(card, { x: 50, y: 15 });
     expect(serviceTarget?.initialValue).toBe("OrderService");
     serviceTarget?.onCommit("CheckoutService");
-    expect(useCanvasStore.getState().elements[0].data.name).toBe("CheckoutService");
+    expect(useCanvasStore.getState().elements[0].data.name).toBe("checkoutService");
 
     // Method header
     const methodTarget = serviceCardTool.getInlineEditTarget!(card, { x: 40, y: 40 });

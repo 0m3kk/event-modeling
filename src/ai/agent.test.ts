@@ -35,7 +35,8 @@ describe("AIAgent", () => {
 
     const elements = useCanvasStore.getState().elements;
     expect(elements.length).toBe(1);
-    expect((elements[0].data as any).name).toBe("UserRegistered");
+    // Identifiers are stored canonically in camelCase.
+    expect((elements[0].data as any).name).toBe("userRegistered");
   });
 
   it("executes get_canvas_overview", async () => {
@@ -106,7 +107,7 @@ describe("AIAgent", () => {
     expect(ok.type).toBe("viewCard");
 
     const view = useCanvasStore.getState().elements.find((e) => e.type === "viewCard");
-    expect(view?.data.name).toBe("CourseCatalog");
+    expect(view?.data.name).toBe("courseCatalog");
   });
 
   it("rejects an AI event card with an unknown field type", async () => {
@@ -165,7 +166,7 @@ describe("AIAgent", () => {
   it("reports defined and primitive types in the canvas overview", async () => {
     await executeAITool("create_object_card", { name: "Address", fields: [] });
     const res = JSON.parse(await executeAITool("get_canvas_overview", {}));
-    expect(res.definedTypes).toContain("Address");
+    expect(res.definedTypes).toContain("address");
     expect(res.primitiveTypes).toContain("string");
   });
 
@@ -208,7 +209,7 @@ describe("AIAgent", () => {
     const elements = useCanvasStore.getState().elements;
     expect(elements).toHaveLength(1);
     expect(elements[0].id).toBe(id);
-    expect(elements[0].data.name).toBe("OrderSubmitted");
+    expect(elements[0].data.name).toBe("orderSubmitted");
     expect(elements[0].data.fields).toHaveLength(2);
   });
 

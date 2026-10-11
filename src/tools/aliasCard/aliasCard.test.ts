@@ -50,7 +50,7 @@ describe("aliasCardTool", () => {
     target?.onCommit("OrderId");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "alias-1");
-    expect(updated?.data.name).toBe("OrderId");
+    expect(updated?.data.name).toBe("orderId");
   });
 
   it("does not start an inline edit on the wrapped-type line", () => {

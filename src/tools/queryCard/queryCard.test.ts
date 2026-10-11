@@ -95,12 +95,12 @@ describe("queryCardTool multi-section (params & responses)", () => {
     target?.onCommit("FindOrder");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "qry-1");
-    expect(updated?.data.name).toBe("FindOrder");
+    expect(updated?.data.name).toBe("findOrder");
 
     // Undo reverts back
     useCanvasStore.getState().undo();
     const reverted = useCanvasStore.getState().elements.find((e) => e.id === "qry-1");
-    expect(reverted?.data.name).toBe("GetOrder");
+    expect(reverted?.data.name).toBe("getOrder");
   });
 
   it("returns inline edit target for Param Field Name", () => {

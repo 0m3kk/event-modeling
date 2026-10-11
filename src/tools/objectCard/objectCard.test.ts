@@ -50,7 +50,7 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
     target?.onCommit("CustomerAddress");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "obj-1");
-    expect(updated?.data.name).toBe("CustomerAddress");
+    expect(updated?.data.name).toBe("customerAddress");
   });
 
   it("returns inline edit target for Field Name", () => {
@@ -82,7 +82,7 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
 
     useCanvasStore.getState().updateSelectedFieldType("Address");
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "obj-1");
-    expect(updated?.data.fields[1].type).toBe("Address");
+    expect(updated?.data.fields[1].type).toBe("address");
   });
 
   it("deletes a field", () => {

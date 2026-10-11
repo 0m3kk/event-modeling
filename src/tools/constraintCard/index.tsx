@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import type { ToolDefinition } from "../types";
 import type { CanvasElement, InlineEditState, Point, SelectedField } from "@/types";
 import { useCanvasStore } from "@/store";
-import { nameKey } from "@/utils/naming";
+import { nameKey, toDisplayName } from "@/utils/naming";
 import { ConstraintCardOptions } from "./ConstraintCardOptions";
 import {
   renderStandardCardTitle,
@@ -84,7 +84,7 @@ function renderStateRow(
   const { state, resolvable, fieldCount, rowY, width, isDark, isSelectedRow, textResolution } = opts;
 
   const name = new Text({
-    text: state.name,
+    text: toDisplayName(state.name),
     style: {
       fontSize: 12,
       fontWeight: isSelectedRow ? "bold" : "normal",

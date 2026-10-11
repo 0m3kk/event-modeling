@@ -3,6 +3,7 @@ import type { CanvasElement, Viewport, ProjectFileV2, ThemeMode, SelectedField, 
 import {
   ensureUniqueElement,
   resolveUniqueDataOnUpdate,
+  normalizeIdentifierNames,
 } from "@/utils/naming";
 import {
   createReferenceCopy as makeReferenceCopy,
@@ -97,11 +98,23 @@ export interface CanvasStoreState {
 const MAX_HISTORY = 50;
 
 /**
- * Repairs an element's data through its tool's normalizer (if any) before it
- * enters the canvas. Guards against rule-breaking data from AI/import/paste
- * paths that bypass the interactive UI.
+ * Canonicalizes identifier casing (camelCase) inside an element's data before
+ * it enters or changes on the canvas. This is the storage counterpart of the
+ * human-readable display layer: however a human or AI writes a name, only one
+ * form is persisted. Returns the same reference when nothing changed.
  */
-function normalizeElementData(
+function normalizeDataIdentifiers(
+  elementType: string,
+  data: any,
+): any {
+  return normalizeIdentifierNames(data, elementType);
+}
+
+/**
+ * Runs only the tool's own data repair (if any). Used where existing data must
+ * be preserved as-is (loading a saved board), so old boards are not rewritten.
+ */
+function repairElementData(
   element: CanvasElement,
   elements: CanvasElement[],
 ): CanvasElement {
@@ -109,6 +122,21 @@ function normalizeElementData(
   if (!tool?.normalizeData) return element;
   const nextData = tool.normalizeData(element.data, { elements });
   return nextData === element.data ? element : { ...element, data: nextData };
+}
+
+/**
+ * Canonicalizes identifier casing, then repairs the data through its tool's
+ * normalizer. Applied when new data enters the canvas (new cards, edits,
+ * AI/import/paste) so human- and AI-authored names land in one agreed form.
+ */
+function normalizeElementData(
+  element: CanvasElement,
+  elements: CanvasElement[],
+): CanvasElement {
+  const identifiedData = normalizeDataIdentifiers(element.type, element.data);
+  const identified =
+    identifiedData === element.data ? element : { ...element, data: identifiedData };
+  return repairElementData(identified, elements);
 }
 
 function snapshotState(elements: CanvasElement[]): HistoryEntry {
@@ -280,7 +308,14 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     if (!target) return;
 
     const finalPatch = patch.data
-      ? { ...patch, data: resolveUniqueDataOnUpdate(target, patch.data, current) }
+      ? {
+          ...patch,
+          data: resolveUniqueDataOnUpdate(
+            target,
+            normalizeDataIdentifiers(target.type, patch.data),
+            current,
+          ),
+        }
       : patch;
 
     const withReferences = syncReferenceUpdates(current, id, finalPatch);
@@ -299,7 +334,11 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
       if (!target || !patch.data) return patch;
       return {
         ...patch,
-        data: resolveUniqueDataOnUpdate(target, patch.data, current),
+        data: resolveUniqueDataOnUpdate(
+          target,
+          normalizeDataIdentifiers(target.type, patch.data),
+          current,
+        ),
       };
     });
 
@@ -562,7 +601,9 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   },
 
   loadProject: (project) => {
-    const normalized = project.elements.map((el) => normalizeElementData(el, project.elements));
+    // Existing board data is preserved as-is (no identifier rewriting); only
+    // each tool's own reference repair runs.
+    const normalized = project.elements.map((el) => repairElementData(el, project.elements));
     set({
       projectName: project.name,
       elements: applyContainerLayout(normalized),

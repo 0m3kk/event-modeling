@@ -15,6 +15,7 @@ import {
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
+import { toDisplayName, toDisplayType } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { validateFieldTypes } from "../common/typeValidation";
 import {
@@ -163,7 +164,7 @@ function renderServiceRow(
   }: ServiceRowRenderOptions,
 ): void {
   const nameText = new Text({
-    text: field.name,
+    text: toDisplayName(field.name),
     style: {
       fontSize: 12,
       fontWeight: isSelected ? "bold" : "normal",
@@ -198,7 +199,7 @@ function renderServiceRow(
     container.addChild(requiredStar);
   }
 
-  const typeText = field.type ? `${field.type}${field.isArray ? "[]" : ""}` : "";
+  const typeText = toDisplayType(field.type, field.isArray);
   let rightAnchorX = width - 12;
   if (typeText) {
     const typeLabel = new Text({
@@ -422,7 +423,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
       );
 
       const nameText = new Text({
-        text: method.name,
+        text: toDisplayName(method.name),
         style: {
           fontSize: 12,
           fontWeight: "bold",

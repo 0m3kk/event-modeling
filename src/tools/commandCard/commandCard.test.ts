@@ -97,12 +97,12 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
     target?.onCommit("CancelOrder");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "cmd-1");
-    expect(updated?.data.name).toBe("CancelOrder");
+    expect(updated?.data.name).toBe("cancelOrder");
 
     // Undo reverts back
     useCanvasStore.getState().undo();
     const reverted = useCanvasStore.getState().elements.find((e) => e.id === "cmd-1");
-    expect(reverted?.data.name).toBe("PlaceOrder");
+    expect(reverted?.data.name).toBe("placeOrder");
   });
 
   it("returns inline edit target for Input Field Name", () => {

@@ -35,13 +35,13 @@ describe("Store Reference Copies & Unique Naming", () => {
     const card3 = makeCard("card-3");
 
     useCanvasStore.getState().addElement(card1);
-    expect(useCanvasStore.getState().elements[0].data.name).toBe("NewEvent");
+    expect(useCanvasStore.getState().elements[0].data.name).toBe("newEvent");
 
     useCanvasStore.getState().addElement(card2);
-    expect(useCanvasStore.getState().elements[1].data.name).toBe("NewEvent 2");
+    expect(useCanvasStore.getState().elements[1].data.name).toBe("newEvent 2");
 
     useCanvasStore.getState().addElement(card3);
-    expect(useCanvasStore.getState().elements[2].data.name).toBe("NewEvent 3");
+    expect(useCanvasStore.getState().elements[2].data.name).toBe("newEvent 3");
   });
 
   it("creates a reference copy that shares referenceId and identical name", () => {
@@ -64,7 +64,7 @@ describe("Store Reference Copies & Unique Naming", () => {
     expect(referenceCopy.isOriginal).toBe(false);
 
     // Reference copy MUST have the exact same name!
-    expect(referenceCopy.data.name).toBe("OrderPlaced");
+    expect(referenceCopy.data.name).toBe("orderPlaced");
 
     // Offsets position
     expect(referenceCopy.x).toBe(original.x + 30);
@@ -85,8 +85,8 @@ describe("Store Reference Copies & Unique Naming", () => {
     const original = elements.find((e) => e.id === "card-1")!;
     const reference = elements.find((e) => e.id === copy.id)!;
 
-    expect(original.data.name).toBe("OrderCompleted");
-    expect(reference.data.name).toBe("OrderCompleted");
+    expect(original.data.name).toBe("orderCompleted");
+    expect(reference.data.name).toBe("orderCompleted");
   });
 
   it("syncs field additions and size changes across all reference copies", () => {

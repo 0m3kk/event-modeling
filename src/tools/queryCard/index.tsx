@@ -15,6 +15,7 @@ import {
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
+import { toDisplayName, toDisplayType } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { validateFieldTypes } from "../common/typeValidation";
 
@@ -302,7 +303,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
           const isFieldSelected = isThisElement && activeSection === 0 && activeFieldIndex === idx;
 
           const fieldName = new Text({
-            text: field.name,
+            text: toDisplayName(field.name),
             style: {
               fontSize: 12,
               fontWeight: isFieldSelected ? "bold" : "normal",
@@ -339,7 +340,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
           }
 
           const typeLabel = new Text({
-            text: `${field.type}${field.isArray ? "[]" : ""}`,
+            text: toDisplayType(field.type, field.isArray),
             style: {
               fontSize: 11,
               fontFamily: '"Geist Mono", monospace',
@@ -402,7 +403,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
           const isFieldSelected = isThisElement && activeSection === 1 && activeFieldIndex === idx;
 
           const fieldName = new Text({
-            text: field.name,
+            text: toDisplayName(field.name),
             style: {
               fontSize: 12,
               fontWeight: isFieldSelected ? "bold" : "normal",
@@ -439,7 +440,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
           }
 
           const typeLabel = new Text({
-            text: `${field.type}${field.isArray ? "[]" : ""}`,
+            text: toDisplayType(field.type, field.isArray),
             style: {
               fontSize: 11,
               fontFamily: '"Geist Mono", monospace',

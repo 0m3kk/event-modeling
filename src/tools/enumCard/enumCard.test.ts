@@ -48,7 +48,7 @@ describe("enumCardTool", () => {
     target?.onCommit("PaymentStatus");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "enum-1");
-    expect(updated?.data.name).toBe("PaymentStatus");
+    expect(updated?.data.name).toBe("paymentStatus");
   });
 
   it("returns inline edit target for a value name", () => {
