@@ -3,9 +3,10 @@ import { GridLayer } from "./layers/GridLayer";
 import { ElementLayer } from "./layers/ElementLayer";
 import { GizmoLayer } from "./layers/GizmoLayer";
 import { SpatialIndex } from "./SpatialIndex";
+import { InteractionManager } from "./interactions/InteractionManager";
+import type { InteractionContext } from "./interactions/types";
 import { useCanvasStore } from "@/store";
-import { toolRegistry } from "@/tools";
-import type { CanvasElement, Point, Rect, ResolvedTheme } from "@/types";
+import type { Point, ResolvedTheme } from "@/types";
 
 let activeEngine: PixiEngine | null = null;
 export const getActiveEngine = () => activeEngine;
@@ -22,20 +23,9 @@ export class PixiEngine {
   private container: HTMLElement;
   private resizeObserver: ResizeObserver | null = null;
   private unsubscribeStore: (() => void) | null = null;
+  private interactionManager!: InteractionManager;
 
-  // Interaction state
   private isSpaceHeld = false;
-  private isPanning = false;
-  private panStartScreen: Point = { x: 0, y: 0 };
-  private panStartViewport: Point = { x: 0, y: 0 };
-
-  private isDraggingElements = false;
-  private dragStartWorld: Point = { x: 0, y: 0 };
-  private initialElementPositions = new Map<string, Point>();
-
-  private isMarqueeSelecting = false;
-  private marqueeStartWorld: Point = { x: 0, y: 0 };
-
   public currentTheme: ResolvedTheme = "light";
   private isDestroyed = false;
   private initPromise: Promise<void> | null = null;
@@ -77,6 +67,9 @@ export class PixiEngine {
       this.worldContainer.addChild(this.elementLayer);
       this.worldContainer.addChild(this.gizmoLayer);
 
+      // Initialize Interaction Manager with decoupled context
+      this.interactionManager = new InteractionManager(this.createInteractionContext());
+
       // Sync initial viewport state
       const currentViewport = useCanvasStore.getState().viewport;
       useCanvasStore.getState().setViewport({
@@ -100,6 +93,23 @@ export class PixiEngine {
     return this.initPromise;
   }
 
+  private createInteractionContext(): InteractionContext {
+    return {
+      screenToWorld: (sx, sy) => this.screenToWorld(sx, sy),
+      worldToScreen: (wx, wy) => this.worldToScreen(wx, wy),
+      spatialIndex: this.spatialIndex,
+      gizmoLayer: this.gizmoLayer,
+      elementLayer: this.elementLayer,
+      setCursor: (cursor) => {
+        this.container.style.cursor = cursor;
+      },
+      get theme() {
+        return activeEngine?.currentTheme || "light";
+      },
+      isSpaceHeld: () => this.isSpaceHeld,
+    };
+  }
+
   setSpaceHeld(held: boolean) {
     this.isSpaceHeld = held;
     this.container.style.cursor = held ? "grab" : "default";
@@ -107,7 +117,9 @@ export class PixiEngine {
 
   setTheme(theme: ResolvedTheme) {
     this.currentTheme = theme;
-    this.app.renderer.background.color = theme === "dark" ? 0x121214 : 0xf9fafb;
+    if (this.app?.renderer) {
+      this.app.renderer.background.color = theme === "dark" ? 0x121214 : 0xf9fafb;
+    }
     this.syncFromStore();
   }
 
@@ -162,7 +174,7 @@ export class PixiEngine {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
         if (width > 0 && height > 0) {
-          this.app.renderer.resize(width, height);
+          this.app.renderer?.resize(width, height);
           useCanvasStore.getState().setViewport({
             screenWidth: width,
             screenHeight: height,
@@ -173,7 +185,7 @@ export class PixiEngine {
     });
     this.resizeObserver.observe(el);
 
-    // Pointer Down
+    // Pointer events
     el.addEventListener("pointerdown", this.handlePointerDown);
     window.addEventListener("pointermove", this.handlePointerMove);
     window.addEventListener("pointerup", this.handlePointerUp);
@@ -181,81 +193,13 @@ export class PixiEngine {
   }
 
   private handlePointerDown = (e: PointerEvent) => {
-    if (e.button !== 0 && e.button !== 1) return; // Only left or middle button
+    if (e.button !== 0 && e.button !== 1) return;
     const rect = this.container.getBoundingClientRect();
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
     const worldPoint = this.screenToWorld(screenX, screenY);
 
-    // Panning with Middle Click or Space + Left Click
-    if (e.button === 1 || this.isSpaceHeld) {
-      this.isPanning = true;
-      this.panStartScreen = { x: e.clientX, y: e.clientY };
-      const vp = useCanvasStore.getState().viewport;
-      this.panStartViewport = { x: vp.x, y: vp.y };
-      this.container.style.cursor = "grabbing";
-      return;
-    }
-
-    const { tool, selectedIds, elements } = useCanvasStore.getState();
-
-    // Check if active tool is an element creation tool
-    if (tool !== "select") {
-      const toolDef = toolRegistry.get(tool);
-      if (toolDef) {
-        const data = toolDef.createDefaultData();
-        const size = toolDef.computeSize ? toolDef.computeSize(data) : toolDef.defaultSize;
-        const newElement: CanvasElement = {
-          id: `${tool}-${Date.now().toString(36)}`,
-          type: tool,
-          x: Math.round(worldPoint.x - size.width / 2),
-          y: Math.round(worldPoint.y - size.height / 2),
-          width: size.width,
-          height: size.height,
-          data,
-        };
-        useCanvasStore.getState().addElement(newElement);
-        useCanvasStore.getState().setTool("select");
-        return;
-      }
-    }
-
-    // Select Tool Hit Testing
-    const hitId = this.spatialIndex.hitTest(worldPoint);
-    if (hitId) {
-      const isAlreadySelected = selectedIds.includes(hitId);
-      if (e.shiftKey) {
-        if (isAlreadySelected) {
-          useCanvasStore.getState().setSelectedIds(selectedIds.filter((id) => id !== hitId));
-        } else {
-          useCanvasStore.getState().setSelectedIds([...selectedIds, hitId]);
-        }
-      } else if (!isAlreadySelected) {
-        useCanvasStore.getState().setSelectedIds([hitId]);
-      }
-
-      // Start dragging selected elements
-      this.isDraggingElements = true;
-      this.dragStartWorld = worldPoint;
-      this.initialElementPositions.clear();
-
-      const currentSelected = useCanvasStore.getState().selectedIds;
-      for (const id of currentSelected) {
-        const element = elements.find((el) => el.id === id);
-        if (element) {
-          this.initialElementPositions.set(id, { x: element.x, y: element.y });
-        }
-      }
-    } else {
-      // Clicked on empty space
-      if (!e.shiftKey) {
-        useCanvasStore.getState().clearSelection();
-      }
-      // Start marquee selection
-      this.isMarqueeSelecting = true;
-      this.marqueeStartWorld = worldPoint;
-      this.gizmoLayer.drawMarquee(null);
-    }
+    this.interactionManager.handlePointerDown(e, worldPoint);
   };
 
   private handlePointerMove = (e: PointerEvent) => {
@@ -264,95 +208,16 @@ export class PixiEngine {
     const screenY = e.clientY - rect.top;
     const worldPoint = this.screenToWorld(screenX, screenY);
 
-    if (this.isPanning) {
-      const dx = e.clientX - this.panStartScreen.x;
-      const dy = e.clientY - this.panStartScreen.y;
-      useCanvasStore.getState().setViewport({
-        x: this.panStartViewport.x + dx,
-        y: this.panStartViewport.y + dy,
-      });
-      return;
-    }
-
-    if (this.isDraggingElements) {
-      const dx = worldPoint.x - this.dragStartWorld.x;
-      const dy = worldPoint.y - this.dragStartWorld.y;
-
-      // Update positions live (without undo pollution during dragging)
-      const state = useCanvasStore.getState();
-      const nextElements = state.elements.map((el) => {
-        const initial = this.initialElementPositions.get(el.id);
-        if (initial) {
-          return {
-            ...el,
-            x: Math.round(initial.x + dx),
-            y: Math.round(initial.y + dy),
-          };
-        }
-        return el;
-      });
-
-      // Update elementLayer and gizmoLayer directly for high FPS performance
-      const selectedSet = new Set(state.selectedIds);
-      this.elementLayer.renderElements(
-        nextElements,
-        selectedSet,
-        this.currentTheme,
-        state.viewport.zoom,
-      );
-      const selected = nextElements.filter((el) => selectedSet.has(el.id));
-      this.gizmoLayer.drawSelectionBounds(selected);
-      return;
-    }
-
-    if (this.isMarqueeSelecting) {
-      const rect: Rect = {
-        x: this.marqueeStartWorld.x,
-        y: this.marqueeStartWorld.y,
-        width: worldPoint.x - this.marqueeStartWorld.x,
-        height: worldPoint.y - this.marqueeStartWorld.y,
-      };
-      this.gizmoLayer.drawMarquee(rect);
-
-      // Realtime search elements in marquee
-      const intersectedIds = this.spatialIndex.searchRect(rect);
-      useCanvasStore.getState().setSelectedIds(intersectedIds);
-      return;
-    }
+    this.interactionManager.handlePointerMove(e, worldPoint);
   };
 
   private handlePointerUp = (e: PointerEvent) => {
-    if (this.isPanning) {
-      this.isPanning = false;
-      this.container.style.cursor = this.isSpaceHeld ? "grab" : "default";
-    }
+    const rect = this.container.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const worldPoint = this.screenToWorld(screenX, screenY);
 
-    if (this.isDraggingElements) {
-      this.isDraggingElements = false;
-      const rect = this.container.getBoundingClientRect();
-      const worldPoint = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-      const dx = worldPoint.x - this.dragStartWorld.x;
-      const dy = worldPoint.y - this.dragStartWorld.y;
-
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        // Commit drag movement to store with snapshot for Undo!
-        const updates: Array<{ id: string } & Partial<CanvasElement>> = [];
-        for (const [id, initial] of this.initialElementPositions.entries()) {
-          updates.push({
-            id,
-            x: Math.round(initial.x + dx),
-            y: Math.round(initial.y + dy),
-          });
-        }
-        useCanvasStore.getState().updateElements(updates);
-      }
-      this.initialElementPositions.clear();
-    }
-
-    if (this.isMarqueeSelecting) {
-      this.isMarqueeSelecting = false;
-      this.gizmoLayer.drawMarquee(null);
-    }
+    this.interactionManager.handlePointerUp(e, worldPoint);
   };
 
   private handleWheel = (e: WheelEvent) => {
@@ -388,6 +253,10 @@ export class PixiEngine {
       });
     }
   };
+
+  public cancelInteraction(): void {
+    this.interactionManager?.cancelActive();
+  }
 
   private cleanupApp(): void {
     try {

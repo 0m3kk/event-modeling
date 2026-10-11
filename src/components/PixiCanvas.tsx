@@ -85,6 +85,7 @@ export function PixiCanvas() {
 
       // Escape
       if (e.code === "Escape") {
+        engine.cancelInteraction();
         useCanvasStore.getState().setTool("select");
         useCanvasStore.getState().clearSelection();
         useCanvasStore.getState().setSearchOpen(false);
