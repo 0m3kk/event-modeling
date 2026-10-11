@@ -51,14 +51,11 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
   schema: EventCardSchema,
   createDefaultData: () => ({
     name: "NewEvent",
-    fields: [
-      { name: "id", type: "string" },
-      { name: "timestamp", type: "datetime" },
-    ],
+    fields: [],
     color: "#f97316",
   }),
 
-  defaultSize: { width: CARD_DEFAULT_WIDTH, height: 88 },
+  defaultSize: { width: CARD_DEFAULT_WIDTH, height: 60 },
 
   computeSize: (data) => computeStandardCardSize(data.fields?.length || 0),
 
@@ -165,10 +162,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
       color: z.string().optional().describe("Optional header color hex code"),
     }),
     onCreate: (params, center: Point): CanvasElement<EventCardData> => {
-      const fields = params.fields || [
-        { name: "id", type: "string" },
-        { name: "timestamp", type: "datetime" },
-      ];
+      const fields = params.fields || [];
       const data: EventCardData = {
         name: params.name || "Event",
         fields,

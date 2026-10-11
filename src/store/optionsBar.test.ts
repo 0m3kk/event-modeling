@@ -87,15 +87,17 @@ describe("OptionsBar data workflows & undo/redo", () => {
       x: 100,
       y: 100,
       width: 220,
-      height: 88,
+      height: 60,
       data: eventCardTool.createDefaultData(),
     };
 
     useCanvasStore.getState().addElement(card);
 
     const initialHeight = card.height;
-    const newField = { name: "customerEmail", type: "string" };
-    const nextFields = [...card.data.fields, newField];
+    const nextFields = [
+      { name: "id", type: "string" },
+      { name: "customerEmail", type: "string" },
+    ];
     const nextData: EventCardData = { ...card.data, fields: nextFields };
     const nextSize = eventCardTool.computeSize!(nextData);
 
@@ -106,7 +108,7 @@ describe("OptionsBar data workflows & undo/redo", () => {
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
     expect(updated?.height).toBeGreaterThan(initialHeight);
-    expect(updated?.data.fields).toHaveLength(3);
+    expect(updated?.data.fields).toHaveLength(2);
   });
 
   it("deletes selected field and shrinks card height using deleteSelectedField", () => {

@@ -51,14 +51,11 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
   schema: CommandCardSchema,
   createDefaultData: () => ({
     name: "NewCommand",
-    fields: [
-      { name: "id", type: "string" },
-      { name: "amount", type: "number" },
-    ],
+    fields: [],
     color: "#2563eb",
   }),
 
-  defaultSize: { width: CARD_DEFAULT_WIDTH, height: 88 },
+  defaultSize: { width: CARD_DEFAULT_WIDTH, height: 60 },
 
   computeSize: (data) => computeStandardCardSize(data.fields?.length || 0),
 
@@ -165,10 +162,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
       color: z.string().optional().describe("Optional header color hex code"),
     }),
     onCreate: (params, center: Point): CanvasElement<CommandCardData> => {
-      const fields = params.fields || [
-        { name: "id", type: "string" },
-        { name: "amount", type: "number" },
-      ];
+      const fields = params.fields || [];
       const data: CommandCardData = {
         name: params.name || "Command",
         fields,

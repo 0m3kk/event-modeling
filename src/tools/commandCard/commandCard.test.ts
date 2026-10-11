@@ -30,7 +30,7 @@ describe("commandCardTool sub-selection & inline edit targets", () => {
     expect(commandCardTool.name).toBe("Command");
     expect(commandCardTool.color).toBe("#2563eb");
     expect(commandCardTool.category).toBe("modeling");
-    expect(commandCardTool.defaultSize).toEqual({ width: 220, height: 88 });
+    expect(commandCardTool.defaultSize).toEqual({ width: 220, height: 60 });
   });
 
   it("sub-selects fields correctly", () => {
