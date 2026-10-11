@@ -74,6 +74,7 @@ export interface CanvasStoreState {
   updateSelectedFieldType: (type: string) => void;
   toggleSelectedFieldTag: () => void;
   updateSelectedFieldTag: (tag: string | null) => void;
+  toggleSelectedFieldArray: () => void;
   navigateSelectedField: (direction: "up" | "down") => void;
   clearBoard: () => void;
   loadProject: (project: ProjectFileV2) => void;
@@ -399,6 +400,37 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     } else {
       nextFields[index] = { ...cur, tag: undefined, isTag: false };
     }
+
+    get().updateElement(element.id, {
+      data: { ...element.data, fields: nextFields },
+    });
+  },
+
+  toggleSelectedFieldArray: () => {
+    const { selectedField, elements } = get();
+    if (!selectedField) return;
+
+    const element = elements.find((el) => el.id === selectedField.elementId);
+    if (!element) return;
+
+    const tool = toolRegistry.get(element.type);
+    if (tool?.onToggleSubSelectArray) {
+      const patch = tool.onToggleSubSelectArray(element, selectedField);
+      if (patch) {
+        get().updateElement(element.id, patch);
+      }
+      return;
+    }
+
+    if (!Array.isArray(element.data?.fields)) return;
+
+    const fields = element.data.fields;
+    const index = selectedField.fieldIndex;
+    if (index < 0 || index >= fields.length) return;
+
+    const nextFields = [...fields];
+    const cur = nextFields[index];
+    nextFields[index] = { ...cur, isArray: !cur.isArray };
 
     get().updateElement(element.id, {
       data: { ...element.data, fields: nextFields },

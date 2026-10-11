@@ -25,6 +25,7 @@ export const COMMAND_DEFAULT_WIDTH = 220;
 export interface CommandField {
   name: string;
   type: string;
+  isArray?: boolean;
   description?: string;
 }
 
@@ -116,6 +117,7 @@ export const CommandCardSchema = z.object({
       z.object({
         name: z.string(),
         type: z.string(),
+        isArray: z.boolean().optional(),
         description: z.string().optional(),
       }),
     )
@@ -125,6 +127,7 @@ export const CommandCardSchema = z.object({
       z.object({
         name: z.string(),
         type: z.string(),
+        isArray: z.boolean().optional(),
         description: z.string().optional(),
       }),
     )
@@ -310,7 +313,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           container.addChild(fieldName);
 
           const typeLabel = new Text({
-            text: field.type,
+            text: `${field.type}${field.isArray ? "[]" : ""}`,
             style: {
               fontSize: 11,
               fontFamily: '"Geist Mono", monospace',
@@ -393,7 +396,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           container.addChild(fieldName);
 
           const typeLabel = new Text({
-            text: field.type,
+            text: `${field.type}${field.isArray ? "[]" : ""}`,
             style: {
               fontSize: 11,
               fontFamily: '"Geist Mono", monospace',
@@ -527,6 +530,29 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
       if (field.fieldIndex < 0 || field.fieldIndex >= inputs.length) return null;
       const nextInputs = [...inputs];
       nextInputs[field.fieldIndex] = { ...inputs[field.fieldIndex], type: trimmed };
+      return {
+        data: { ...element.data, inputs: nextInputs, responses },
+      };
+    }
+  },
+
+  onToggleSubSelectArray: (element, field) => {
+    const inputs = getCommandInputs(element.data);
+    const responses = getCommandResponses(element.data);
+
+    if (field.sectionIndex === 1) {
+      if (field.fieldIndex < 0 || field.fieldIndex >= responses.length) return null;
+      const nextResponses = [...responses];
+      const cur = nextResponses[field.fieldIndex];
+      nextResponses[field.fieldIndex] = { ...cur, isArray: !cur.isArray };
+      return {
+        data: { ...element.data, inputs, responses: nextResponses },
+      };
+    } else {
+      if (field.fieldIndex < 0 || field.fieldIndex >= inputs.length) return null;
+      const nextInputs = [...inputs];
+      const cur = nextInputs[field.fieldIndex];
+      nextInputs[field.fieldIndex] = { ...cur, isArray: !cur.isArray };
       return {
         data: { ...element.data, inputs: nextInputs, responses },
       };
@@ -681,6 +707,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           z.object({
             name: z.string().describe("Input field name in camelCase"),
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
+            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
           }),
         )
         .optional()
@@ -690,6 +717,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           z.object({
             name: z.string().describe("Response field name in camelCase"),
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
+            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
           }),
         )
         .optional()
@@ -699,6 +727,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           z.object({
             name: z.string().describe("Field name in camelCase"),
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
+            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
           }),
         )
         .optional()

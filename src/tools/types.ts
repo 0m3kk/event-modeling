@@ -72,8 +72,11 @@ export interface ToolDefinition<TData = any> {
   // Optional: handles updating tag name on sub-element (e.g. DCB tag on event field)
   onUpdateSubSelectTag?: (element: CanvasElement<TData>, field: SelectedField, tag: string | null) => Partial<CanvasElement<TData>> | null;
 
+  // Optional: handles toggling array status on sub-element (renders as "type[]")
+  onToggleSubSelectArray?: (element: CanvasElement<TData>, field: SelectedField) => Partial<CanvasElement<TData>> | null;
+
   // Optional: resolves selected item data for UI (e.g. OptionsBar)
-  getSelectedFieldItem?: (element: CanvasElement<TData>, field: SelectedField) => { name: string; type: string; isTag?: boolean; tag?: string } | null;
+  getSelectedFieldItem?: (element: CanvasElement<TData>, field: SelectedField) => { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean } | null;
 
   // Optional: handles custom navigation between sub-elements / sections
   onNavigateSubSelect?: (

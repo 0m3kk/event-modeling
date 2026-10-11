@@ -21,6 +21,7 @@ import { beginDescZones, hitDescZone } from "../common/descZones";
 export interface ObjectField {
   name: string;
   type: string;
+  isArray?: boolean;
   description?: string;
 }
 
@@ -38,6 +39,7 @@ export const ObjectCardSchema = z.object({
       z.object({
         name: z.string(),
         type: z.string(),
+        isArray: z.boolean().optional(),
         description: z.string().optional(),
       }),
     )
@@ -160,6 +162,19 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
     };
   },
 
+  onToggleSubSelectArray: (element, field) => {
+    const fields = element.data.fields;
+    if (!fields || field.fieldIndex < 0 || field.fieldIndex >= fields.length) {
+      return null;
+    }
+    const nextFields = [...fields];
+    const cur = nextFields[field.fieldIndex];
+    nextFields[field.fieldIndex] = { ...cur, isArray: !cur.isArray };
+    return {
+      data: { ...element.data, fields: nextFields },
+    };
+  },
+
   getSelectedFieldItem: (element, field) => {
     return element.data.fields?.[field.fieldIndex] ?? null;
   },
@@ -196,6 +211,7 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
             type: z
               .string()
               .describe("Field data type (e.g. string, number, boolean, or another object name)"),
+            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
           }),
         )
         .optional()

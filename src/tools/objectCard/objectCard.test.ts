@@ -98,6 +98,22 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
     expect(updated?.data.fields).toEqual([{ name: "zip", type: "string" }]);
   });
 
+  it("toggles a field as an array", () => {
+    useCanvasStore.getState().addElement(card);
+    useCanvasStore.getState().setSelectedField({
+      elementId: "obj-1",
+      fieldIndex: 0,
+    });
+
+    useCanvasStore.getState().toggleSelectedFieldArray();
+    let updated = useCanvasStore.getState().elements.find((e) => e.id === "obj-1");
+    expect(updated?.data.fields[0].isArray).toBe(true);
+
+    useCanvasStore.getState().toggleSelectedFieldArray();
+    updated = useCanvasStore.getState().elements.find((e) => e.id === "obj-1");
+    expect(updated?.data.fields[0].isArray).toBe(false);
+  });
+
   it("exposes an AI creation operation", () => {
     expect(objectCardTool.ai?.toolName).toBe("create_object_card");
     const element = objectCardTool.ai!.onCreate(

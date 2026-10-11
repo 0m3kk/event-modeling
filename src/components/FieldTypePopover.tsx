@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, Check, Code2, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+import { Box, Check, Code2 } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { getElementName } from "@/utils/naming";
 
@@ -34,8 +34,6 @@ export function FieldTypePopover({
   placement = "top",
 }: FieldTypePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [customValue, setCustomValue] = useState("");
 
   // Objects defined on the board (Object cards) can be reused as a field type.
   const elements = useCanvasStore((s) => s.elements);
@@ -50,10 +48,7 @@ export function FieldTypePopover({
   }, [elements]);
 
   useEffect(() => {
-    if (!isOpen) {
-      setCustomValue("");
-      return;
-    }
+    if (!isOpen) return;
 
     const handleOutside = (e: MouseEvent) => {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
@@ -70,15 +65,6 @@ export function FieldTypePopover({
     placement === "bottom"
       ? "top-full mt-2"
       : "bottom-full mb-2";
-
-  const handleCustomSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = customValue.trim();
-    if (trimmed) {
-      onSelectType(trimmed);
-      onClose();
-    }
-  };
 
   return (
     <div
@@ -160,28 +146,6 @@ export function FieldTypePopover({
           </div>
         </div>
       )}
-
-      {/* Custom Type Input Form */}
-      <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800">
-        <form onSubmit={handleCustomSubmit} className="flex items-center gap-1.5">
-          <input
-            ref={inputRef}
-            type="text"
-            value={customValue}
-            onChange={(e) => setCustomValue(e.target.value)}
-            placeholder="Custom type..."
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-mono text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:bg-white focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:placeholder-zinc-500"
-          />
-          <button
-            type="submit"
-            disabled={!customValue.trim()}
-            title="Set custom type"
-            className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40 cursor-pointer transition-colors"
-          >
-            <Sparkles size={13} />
-          </button>
-        </form>
-      </div>
     </div>
   );
 }

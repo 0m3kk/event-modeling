@@ -35,6 +35,7 @@ export interface CardFieldItem {
   type: string;
   isTag?: boolean;
   tag?: string;
+  isArray?: boolean;
   description?: string;
 }
 
@@ -343,7 +344,7 @@ export function renderStandardCardFields(
       container.addChild(fieldName);
 
       const typeLabel = new Text({
-        text: field.type,
+        text: `${field.type}${field.isArray ? "[]" : ""}`,
         style: {
           fontSize: 11,
           fontFamily: '"Geist Mono", monospace',

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Trash2, Copy, Palette, Link2, Tag, Info, Braces } from "lucide-react";
+import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
@@ -23,6 +23,7 @@ export function OptionsBar() {
   const updateSelectedFieldType = useCanvasStore((s) => s.updateSelectedFieldType);
   const toggleSelectedFieldTag = useCanvasStore((s) => s.toggleSelectedFieldTag);
   const updateSelectedFieldTag = useCanvasStore((s) => s.updateSelectedFieldTag);
+  const toggleSelectedFieldArray = useCanvasStore((s) => s.toggleSelectedFieldArray);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -155,7 +156,7 @@ export function OptionsBar() {
     if (Array.isArray(singleElement.data?.fields)) {
       return (
         (singleElement.data.fields[selectedField.fieldIndex] as
-          | { name: string; type: string; isTag?: boolean; tag?: string }
+          | { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean }
           | undefined) ?? null
       );
     }
@@ -252,6 +253,19 @@ export function OptionsBar() {
                 placement={popoverPlacement}
               />
             </div>
+
+            {/* Array toggle: marks the field type as a list (renders as "type[]") */}
+            <button
+              onClick={() => toggleSelectedFieldArray()}
+              title={currentField.isArray ? "Field is an array (click to unset)" : "Mark field as array"}
+              className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
+                currentField.isArray
+                  ? "bg-violet-500/15 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400"
+                  : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <Brackets size={16} />
+            </button>
 
             {/* Event Card Field Tag Popover (DCB consistency boundary) */}
             {(singleElement?.type === "eventCard" || Boolean(toolDef?.onToggleSubSelectTag)) && (
