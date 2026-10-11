@@ -50,13 +50,13 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     color: "#f97316",
   }),
 
-  defaultSize: { width: 220, height: 96 },
+  defaultSize: { width: 220, height: 88 },
 
   computeSize: (data) => {
     const fieldsCount = data.fields?.length || 0;
     const contentCount = Math.max(1, fieldsCount);
-    // Header (32px) + top padding (10px) + fields (count * 22px) + bottom padding (10px)
-    const height = 52 + contentCount * 22;
+    // Header (32px) + fields (count * 28px) with zero padding above/below
+    const height = 32 + contentCount * 28;
     return { width: 220, height };
   },
 
@@ -83,7 +83,33 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     g.rect(0, 20, element.width, 12);
     g.fill({ color: headerColor });
 
-    // 3. Draw single uniform border stroke around entire card (after fills so border is consistent)
+    // 3. Highlight selected field: FULL-WIDTH edge-to-edge, NO side padding
+    const selectedFieldIndex =
+      context.selectedField?.elementId === element.id
+        ? context.selectedField.fieldIndex
+        : -1;
+
+    const fieldsCount = element.data.fields?.length || 0;
+    if (selectedFieldIndex >= 0 && selectedFieldIndex < fieldsCount) {
+      const isLast = selectedFieldIndex === fieldsCount - 1;
+      const highlightY = 32 + selectedFieldIndex * 28;
+      const sunkenColor = isDark ? 0x121214 : 0xf1f5f9;
+
+      if (isLast) {
+        // Last row matches card bottom rounded corners (radius 8)
+        g.roundRect(0, highlightY, element.width, 28, 8);
+        g.fill({ color: sunkenColor });
+        // Straighten top part of highlight
+        g.rect(0, highlightY, element.width, 14);
+        g.fill({ color: sunkenColor });
+      } else {
+        // Full width rectangle spanning from x=0 to element.width
+        g.rect(0, highlightY, element.width, 28);
+        g.fill({ color: sunkenColor });
+      }
+    }
+
+    // 4. Draw single uniform border stroke around entire card (after all fills)
     g.roundRect(0, 0, element.width, element.height, 8);
     g.stroke({ color: borderCol, width: isSelected ? 2 : 1 });
 
@@ -104,31 +130,12 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     title.y = 8;
     container.addChild(title);
 
-    // Fields list (symmetric 10px padding from header bottom and card bottom)
-    let currentY = 42;
-    const selectedFieldIndex =
-      context.selectedField?.elementId === element.id
-        ? context.selectedField.fieldIndex
-        : -1;
+    // Fields list: starts immediately at header bottom (y = 32), 28px height per row
+    let currentY = 32;
 
     if (element.data.fields && element.data.fields.length > 0) {
       element.data.fields.forEach((field, idx) => {
         const isFieldSelected = idx === selectedFieldIndex;
-
-        if (isFieldSelected) {
-          const highlight = new Graphics();
-          highlight.roundRect(6, currentY - 2, element.width - 12, 20, 4);
-          highlight.fill({
-            color: isDark ? 0x3b82f6 : 0xbfdbfe,
-            alpha: isDark ? 0.35 : 0.45,
-          });
-          highlight.stroke({
-            color: 0x3b82f6,
-            width: 1,
-            alpha: 0.8,
-          });
-          container.addChild(highlight);
-        }
 
         const fieldName = new Text({
           text: field.name,
@@ -137,13 +144,13 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
             fontWeight: isFieldSelected ? "bold" : "normal",
             fontFamily: '"Geist Mono", monospace',
             fill: isFieldSelected
-              ? isDark ? 0x93c5fd : 0x1d4ed8
+              ? isDark ? 0xf4f4f5 : 0x09090b
               : isDark ? 0xe4e4e7 : 0x27272a,
           },
           resolution: context.textResolution,
         });
         fieldName.x = 12;
-        fieldName.y = currentY;
+        fieldName.y = currentY + 7;
         container.addChild(fieldName);
 
         const typeLabel = new Text({
@@ -156,10 +163,10 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
           resolution: context.textResolution,
         });
         typeLabel.x = element.width - typeLabel.width - 12;
-        typeLabel.y = currentY + 1;
+        typeLabel.y = currentY + 8;
         container.addChild(typeLabel);
 
-        currentY += 22;
+        currentY += 28;
       });
     } else {
       const emptyHint = new Text({
@@ -172,7 +179,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
         resolution: context.textResolution,
       });
       emptyHint.x = 12;
-      emptyHint.y = currentY;
+      emptyHint.y = currentY + 7;
       container.addChild(emptyHint);
     }
   },
@@ -180,7 +187,9 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
   onSubSelect: (element, localPoint) => {
     // Header area (y <= 32) is not a field
     if (localPoint.y <= 32) return null;
-    const index = Math.floor((localPoint.y - 42) / 22);
+    const startY = 32;
+    const rowHeight = 28;
+    const index = Math.floor((localPoint.y - startY) / rowHeight);
     if (index >= 0 && index < (element.data.fields?.length || 0)) {
       return index;
     }
@@ -212,7 +221,9 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     }
 
     // 2. Double click on Field Name (only the name, hold off on type for now)
-    const index = Math.floor((localPoint.y - 42) / 22);
+    const startY = 32;
+    const rowHeight = 28;
+    const index = Math.floor((localPoint.y - startY) / rowHeight);
     if (index >= 0 && index < (element.data.fields?.length || 0)) {
       const field = element.data.fields[index];
       useCanvasStore.getState().setSelectedField({
@@ -224,9 +235,9 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
         elementId: element.id,
         worldBounds: {
           x: element.x + 10,
-          y: element.y + 42 + index * 22 - 2,
+          y: element.y + startY + index * rowHeight + 2,
           width: Math.max(80, element.width - 80),
-          height: 20,
+          height: 24,
         },
         initialValue: field.name,
         multiline: false,

@@ -14,7 +14,7 @@ describe("EventCardTool sub-selection & inline edit targets", () => {
     x: 100,
     y: 100,
     width: 220,
-    height: 96,
+    height: 88,
     data: {
       name: "OrderPlaced",
       fields: [
