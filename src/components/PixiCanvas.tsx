@@ -104,7 +104,7 @@ export function PixiCanvas() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
-      engine.destroy();
+      void engine.destroy();
       engineRef.current = null;
     };
   }, []);

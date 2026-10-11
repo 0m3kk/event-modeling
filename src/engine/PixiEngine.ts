@@ -37,6 +37,8 @@ export class PixiEngine {
   private marqueeStartWorld: Point = { x: 0, y: 0 };
 
   public currentTheme: ResolvedTheme = "light";
+  private isDestroyed = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -44,45 +46,54 @@ export class PixiEngine {
     activeEngine = this;
   }
 
-  async init() {
-    const width = this.container.clientWidth || window.innerWidth;
-    const height = this.container.clientHeight || window.innerHeight;
+  async init(): Promise<void> {
+    this.initPromise = (async () => {
+      const width = this.container.clientWidth || window.innerWidth;
+      const height = this.container.clientHeight || window.innerHeight;
 
-    await this.app.init({
-      width,
-      height,
-      backgroundColor: this.currentTheme === "dark" ? 0x121214 : 0xf9fafb,
-      resolution: window.devicePixelRatio || 1,
-      autoDensity: true,
-      antialias: true,
-    });
+      await this.app.init({
+        width,
+        height,
+        backgroundColor: this.currentTheme === "dark" ? 0x121214 : 0xf9fafb,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true,
+        antialias: true,
+      });
 
-    this.container.appendChild(this.app.canvas);
+      if (this.isDestroyed) {
+        this.cleanupApp();
+        return;
+      }
 
-    // Build scene graph
-    this.app.stage.addChild(this.worldContainer);
-    this.worldContainer.addChild(this.gridLayer);
-    this.worldContainer.addChild(this.elementLayer);
-    this.worldContainer.addChild(this.gizmoLayer);
+      this.container.appendChild(this.app.canvas);
 
-    // Sync initial viewport state
-    const currentViewport = useCanvasStore.getState().viewport;
-    useCanvasStore.getState().setViewport({
-      screenWidth: width,
-      screenHeight: height,
-    });
-    this.applyViewportTransform(currentViewport.x, currentViewport.y, currentViewport.zoom);
+      // Build scene graph
+      this.app.stage.addChild(this.worldContainer);
+      this.worldContainer.addChild(this.gridLayer);
+      this.worldContainer.addChild(this.elementLayer);
+      this.worldContainer.addChild(this.gizmoLayer);
 
-    // Initial render
-    this.syncFromStore();
+      // Sync initial viewport state
+      const currentViewport = useCanvasStore.getState().viewport;
+      useCanvasStore.getState().setViewport({
+        screenWidth: width,
+        screenHeight: height,
+      });
+      this.applyViewportTransform(currentViewport.x, currentViewport.y, currentViewport.zoom);
 
-    // Subscribe to store updates
-    this.unsubscribeStore = useCanvasStore.subscribe(() => {
+      // Initial render
       this.syncFromStore();
-    });
 
-    // Setup DOM Listeners
-    this.setupListeners();
+      // Subscribe to store updates
+      this.unsubscribeStore = useCanvasStore.subscribe(() => {
+        this.syncFromStore();
+      });
+
+      // Setup DOM Listeners
+      this.setupListeners();
+    })();
+
+    return this.initPromise;
   }
 
   setSpaceHeld(held: boolean) {
@@ -374,7 +385,30 @@ export class PixiEngine {
     }
   };
 
-  destroy() {
+  private cleanupApp(): void {
+    try {
+      if (this.app.canvas && this.app.canvas.parentNode) {
+        this.app.canvas.parentNode.removeChild(this.app.canvas);
+      }
+      if (this.app.renderer) {
+        this.app.destroy(true, { children: true });
+      }
+    } catch (e) {
+      console.warn("PixiEngine cleanup warning:", e);
+    }
+  }
+
+  async destroy(): Promise<void> {
+    this.isDestroyed = true;
+
+    if (this.initPromise) {
+      try {
+        await this.initPromise;
+      } catch {
+        // Ignore initialization cancellation errors
+      }
+    }
+
     this.resizeObserver?.disconnect();
     this.unsubscribeStore?.();
 
@@ -387,7 +421,11 @@ export class PixiEngine {
     this.gridLayer.destroy();
     this.elementLayer.destroy();
     this.gizmoLayer.destroy();
-    this.app.destroy(true, { children: true });
-    activeEngine = null;
+
+    if (activeEngine === this) {
+      activeEngine = null;
+    }
+
+    this.cleanupApp();
   }
 }
