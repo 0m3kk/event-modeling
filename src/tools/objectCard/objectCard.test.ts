@@ -139,4 +139,24 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
     expect(element.type).toBe("objectCard");
     expect((element.data as ObjectCardData).fields).toHaveLength(1);
   });
+
+  it("keeps the object and per-field descriptions from AI params", () => {
+    const element = objectCardTool.ai!.onCreate(
+      {
+        name: "Money",
+        description: "An amount of money in a given currency",
+        fields: [
+          {
+            name: "amount",
+            type: "number",
+            description: "The numeric value, in minor units",
+          },
+        ],
+      },
+      { x: 0, y: 0 },
+    );
+    const data = element.data as ObjectCardData;
+    expect(data.description).toBe("An amount of money in a given currency");
+    expect(data.fields[0].description).toBe("The numeric value, in minor units");
+  });
 });

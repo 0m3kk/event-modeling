@@ -223,7 +223,8 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
   ai: {
     toolName: "create_object_card",
     description:
-      "Create a shared Object definition card (a reusable value/struct type) in the Event Model",
+      "Create a shared Object definition card (a reusable value/struct type) in the Event Model. " +
+      "Always provide a description for the object itself and a description for each field.",
     parameters: z.object({
       name: z.string().describe("PascalCase object name (e.g. Address, Customer)"),
       fields: z
@@ -235,6 +236,10 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
               .describe("Field data type (e.g. string, number, boolean, or another object name)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
             isRequired: z.boolean().optional().describe("True when the field is required"),
+            description: z
+              .string()
+              .optional()
+              .describe("Plain-language description of what this field means"),
           }),
         )
         .optional()

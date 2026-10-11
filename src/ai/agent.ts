@@ -13,6 +13,11 @@ import {
   type SliceElement,
   type SliceLane,
 } from "@/tools/sliceCard/layout";
+import {
+  DOMAIN_TYPE,
+  isNestableInDomain,
+  type DomainElement,
+} from "@/tools/domainCard/layout";
 import { z } from "zod";
 import { sendChatMessage, createSessionId, type AISettings, type ChatMessage } from "./client";
 import type { CanvasElement, Point } from "@/types";
@@ -135,6 +140,22 @@ const SLICE_PLACEMENT_PROPS: Record<string, any> = {
   },
 };
 
+/**
+ * Extra JSON-schema property injected into every non-Domain card tool so the
+ * model can place the card (or slice) inside a Domain frame in the same call.
+ * Resolved by {@link resolveDomainMembership}.
+ */
+const DOMAIN_PLACEMENT_PROPS: Record<string, any> = {
+  domain: {
+    type: "string",
+    description:
+      "Optional: name of an existing Domain frame to place this card (or Slice) inside. " +
+      "If no Domain exists yet, create one first with create_domain_card, then pass its name here. " +
+      "A card that lives in a Slice lane cannot also be in a Domain — put the Slice itself, " +
+      "not its lane cards, into the Domain.",
+  },
+};
+
 export function buildOpenAITools(): any[] {
   const aiTools = toolRegistry.getAITools();
   const tools: any[] = [];
@@ -147,8 +168,9 @@ export function buildOpenAITools(): any[] {
       description:
         "Read all current elements on the canvas, including their IDs, types, and summary data. " +
         "Also returns `eventTypes`, `tagCatalog` (every DCB tag currently attached to an event field, " +
-        "with its type and source events) and `slices` (each Slice with its lanes and the cards already " +
-        "placed in them) so you can build valid State card query tags and target slice lanes.",
+        "with its type and source events), `slices` (each Slice with its lanes and the cards already " +
+        "placed in them) and `domains` (each Domain frame with the cards/slices it contains) so you " +
+        "can build valid State card query tags, target slice lanes, and place new items into the right Domain.",
       parameters: {
         type: "object",
         properties: {},
@@ -200,11 +222,13 @@ export function buildOpenAITools(): any[] {
   //    also accept `slice` / `lane` so the model can drop the card straight
   //    into a Slice lane instead of leaving AI-made slices empty.
   for (const t of aiTools) {
-    const eligibleForLane = isSliceEligibleChild(
-      toolRegistry.getByAIToolName(t.toolName)?.type ?? "",
-    );
+    const definition = toolRegistry.getByAIToolName(t.toolName);
+    const eligibleForLane = isSliceEligibleChild(definition?.type ?? "");
+    // Every card can live in a Domain except a Domain itself (no nesting).
+    const eligibleForDomain = definition?.type !== DOMAIN_TYPE;
     const createParams = zodToJsonSchema(t.parameters);
     if (eligibleForLane) Object.assign(createParams.properties, SLICE_PLACEMENT_PROPS);
+    if (eligibleForDomain) Object.assign(createParams.properties, DOMAIN_PLACEMENT_PROPS);
 
     tools.push({
       type: "function",
@@ -223,6 +247,7 @@ export function buildOpenAITools(): any[] {
       }),
     );
     if (eligibleForLane) Object.assign(updateParams.properties, SLICE_PLACEMENT_PROPS);
+    if (eligibleForDomain) Object.assign(updateParams.properties, DOMAIN_PLACEMENT_PROPS);
 
     tools.push({
       type: "function",
@@ -398,6 +423,72 @@ function summarizeSlices(elements: CanvasElement[]): any[] {
     });
 }
 
+/** Compact Domain summary for the model (name + the cards/slices it contains). */
+function summarizeDomains(elements: CanvasElement[]): any[] {
+  return elements
+    .filter((el) => el.type === DOMAIN_TYPE)
+    .map((el) => ({
+      id: el.id,
+      name: getElementName(el) ?? "Domain",
+      cards: elements
+        .filter((child) => child.domainId === el.id)
+        .map((child) => getElementName(child) ?? child.id),
+    }));
+}
+
+interface DomainPlacement {
+  /** True only when the call actually carried a `domain` argument. */
+  requested: boolean;
+  domainId?: string;
+  error?: { message: string; issues: ValidationIssue[] };
+}
+
+const DOMAIN_NOT_REQUESTED: DomainPlacement = { requested: false };
+
+/**
+ * Turns the optional `domain` argument of a create/update call into concrete
+ * `domainId` membership for a card. `domain` is the Domain's name; an explicit
+ * empty `domain` detaches the card from any Domain.
+ *
+ * Domains nest no further, so a Domain card itself can never be placed inside
+ * another one. A card that is being placed into a Slice lane is handled
+ * separately (lane and domain membership are mutually exclusive).
+ */
+function resolveDomainMembership(
+  elements: CanvasElement[],
+  cardType: string,
+  args: any,
+): DomainPlacement {
+  if (!args || typeof args !== "object" || !("domain" in args)) return DOMAIN_NOT_REQUESTED;
+
+  const domainName = typeof args.domain === "string" ? args.domain.trim() : "";
+  if (!domainName) return { requested: true, domainId: undefined };
+
+  const issue = (code: string, message: string): DomainPlacement => ({
+    requested: true,
+    error: { message, issues: [{ path: "domain", code, message }] },
+  });
+
+  if (!isNestableInDomain(cardType)) {
+    return issue(
+      "domain_ineligible_card",
+      "A Domain cannot be placed inside another Domain (domains do not nest).",
+    );
+  }
+
+  const domain = elements.find(
+    (el) => el.type === DOMAIN_TYPE && nameKey(getElementName(el) ?? "") === nameKey(domainName),
+  ) as DomainElement | undefined;
+  if (!domain) {
+    return issue(
+      "domain_not_found",
+      `No Domain named "${domainName}" exists on the board. Create it first with create_domain_card or use get_canvas_overview to list domains.`,
+    );
+  }
+
+  return { requested: true, domainId: domain.id };
+}
+
 /** Deletes a single element located by name (and optional type). */
 function executeDeleteElement(args: any): string {
   const state = useCanvasStore.getState();
@@ -519,9 +610,43 @@ function executeUpdateElement(updateName: string, args: any): string {
       issues: placement.error.issues,
     });
   }
+  const inLane = placement.requested && Boolean(placement.sliceId);
   const membership: Partial<CanvasElement> = placement.requested
     ? { sliceId: placement.sliceId, laneId: placement.laneId }
     : {};
+  const nextWidth = Math.max(existing.width, size.width);
+
+  // Optional Domain placement carried by the update. Lane and domain membership
+  // are mutually exclusive, so a lane placement wins when both are requested.
+  const movedIntoDomain: Partial<CanvasElement> = {};
+  if (!inLane) {
+    const domainPlacement = resolveDomainMembership(state.elements, definition.type, args);
+    if (domainPlacement.error) {
+      return JSON.stringify({
+        status: "error",
+        error: "domain_placement_failed",
+        message: domainPlacement.error.message,
+        issues: domainPlacement.error.issues,
+      });
+    }
+    if (domainPlacement.requested) {
+      membership.domainId = domainPlacement.domainId;
+      // When landing in a real Domain, sit beside its other children so the
+      // frame grows around the card instead of stretching to its old position.
+      if (domainPlacement.domainId) {
+        const domainChildren = state.elements.filter(
+          (el) => el.domainId === domainPlacement.domainId && el.id !== existing.id,
+        );
+        const spot = findFreeSpot(
+          domainChildren,
+          { x: existing.x, y: existing.y, width: nextWidth, height: size.height },
+          AI_PLACEMENT_GAP,
+        );
+        movedIntoDomain.x = spot.x;
+        movedIntoDomain.y = spot.y;
+      }
+    }
+  }
 
   // Keep the card's position. Height is always content-driven; width only ever
   // grows, so wide query items (event types / tag badges) still fit after an AI
@@ -529,7 +654,8 @@ function executeUpdateElement(updateName: string, args: any): string {
   state.updateElement(existing.id, {
     data: nextData,
     height: size.height,
-    width: Math.max(existing.width, size.width),
+    width: nextWidth,
+    ...movedIntoDomain,
     ...membership,
   });
 
@@ -561,6 +687,7 @@ export async function executeAITool(name: string, args: any): Promise<string> {
       definedTypes,
       primitiveTypes: Array.from(PRIMITIVE_FIELD_TYPES),
       slices: summarizeSlices(state.elements),
+      domains: summarizeDomains(state.elements),
     });
   }
 
@@ -615,17 +742,51 @@ export async function executeAITool(name: string, args: any): Promise<string> {
           slices: summarizeSlices(state.elements),
         });
       }
+
       if (placement.requested && placement.sliceId) {
+        // Lane membership: the card sits inside its slice lane.
         element = { ...element, sliceId: placement.sliceId, laneId: placement.laneId };
       } else {
-        // Free-standing card: nudge it to the nearest free slot so a batch of
-        // AI-created cards spreads out instead of stacking on the same spot.
-        const spot = findFreeSpot(
-          state.elements,
-          { x: element.x, y: element.y, width: element.width, height: element.height },
-          AI_PLACEMENT_GAP,
-        );
-        element = { ...element, x: spot.x, y: spot.y };
+        // Optional Domain placement carried by the create call. A card in a
+        // Slice lane cannot also belong to a Domain, so lanes take precedence.
+        const domainPlacement = resolveDomainMembership(state.elements, element.type, args);
+        if (domainPlacement.error) {
+          return JSON.stringify({
+            status: "error",
+            error: "domain_placement_failed",
+            message: domainPlacement.error.message,
+            issues: domainPlacement.error.issues,
+            domains: summarizeDomains(state.elements),
+          });
+        }
+
+        if (domainPlacement.requested && domainPlacement.domainId) {
+          // Land beside the domain's existing children so a batch spreads out
+          // instead of stacking, and so the card sits inside the frame.
+          const domainChildren = state.elements.filter(
+            (el) => el.domainId === domainPlacement.domainId,
+          );
+          const spot = findFreeSpot(
+            domainChildren,
+            { x: element.x, y: element.y, width: element.width, height: element.height },
+            AI_PLACEMENT_GAP,
+          );
+          element = {
+            ...element,
+            x: spot.x,
+            y: spot.y,
+            domainId: domainPlacement.domainId,
+          };
+        } else {
+          // Free-standing card: nudge it to the nearest free slot so a batch of
+          // AI-created cards spreads out instead of stacking on the same spot.
+          const spot = findFreeSpot(
+            state.elements,
+            { x: element.x, y: element.y, width: element.width, height: element.height },
+            AI_PLACEMENT_GAP,
+          );
+          element = { ...element, x: spot.x, y: spot.y };
+        }
       }
 
       state.addElement(element);
@@ -654,16 +815,22 @@ export async function runAgentConversation(
 ): Promise<string> {
   const systemPrompt = `You are the AI Event Modeling Architect.
 You help software architects and developers design domain events, business models, and reactive systems on an infinite canvas.
-You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create state (projection/decision-model) cards, create view (persisted read-model) cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), create constraint cards (assert business rules in plain language, e.g. "The account must be active", over one or more State cards), create slices (a slice stacks lanes top-to-bottom, each lane holding cards of ONE type), and clear the board.
+You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create state (projection/decision-model) cards, create view (persisted read-model) cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), create constraint cards (assert business rules in plain language, e.g. "The account must be active", over one or more State cards), create Domain frames (a dashed bounded-context boundary that groups related cards and slices), create slices (a slice stacks lanes top-to-bottom, each lane holding cards of ONE type), and clear the board.
 When the user asks to add or create something, always call the appropriate creation tool!
+DOMAINS (IMPORTANT): keep new work inside a Domain (bounded context). Before creating anything, call get_canvas_overview and check its "domains" list.
+- If one or more Domains already exist, place each new card or Slice into the most relevant existing one by passing "domain" = the domain's name (this also moves it there on update). Prefer an existing Domain over inventing a new one.
+- If NO Domain exists yet, first call create_domain_card with a meaningful bounded-context name (e.g. Ordering, Billing), then place the new card(s)/Slice into it with "domain".
+- A card that lives in a Slice lane cannot also belong to a Domain, so put the Slice itself into the Domain — not the individual cards inside its lanes.
+- Mention to the user which Domain you placed the new work into.
 FLOW SEMANTICS (IMPORTANT): a "flow" in Event Modeling is ONE slice, not the whole command→event→read-model chain. There are two kinds:
 - Write slice: a Command that emits one or more Events. Its usual shape is three lanes top-to-bottom: commandCard, constraintCard, eventCard. Add a queryCard lane when the command must read data first, and a serviceCard lane only when the flow actually executes a service method (case-dependent).
-- Read slice: a Query that reads Events into a read model. Its usual shape is queryCard then viewCard (or stateCard). A constraintCard lane is optional — add it only when a rule must be checked (e.g. whether the query's target exists); not every read slice has one.
+- Read slice: a Query that reads Events into a read model. Its usual shape is queryCard then viewCard (or stateCard when the projection is specific to that one flow — a reusable State usually stays outside the slice). A constraintCard lane is optional — add it only when a rule must be checked (e.g. whether the query's target exists); not every read slice has one.
 When the user asks to "draw/build a flow" (e.g. "vẽ flow") without naming the kind, produce exactly ONE write slice OR ONE read slice that matches their description — never both, and never the full command→event→view chain. Ask only when the kind is genuinely ambiguous. A write slice stops at the emitted events (no query/view); a read slice starts at the query (no command).
 To change an existing card, prefer its matching update tool (e.g. update_event_card) over deleting and recreating it: pass "target" = the card's current name and send the COMPLETE corrected definition. This preserves the card's id, position and links. Use delete_element (by "target" name) to remove a card.
 Data types: every field "type" MUST be either a primitive (${Array.from(PRIMITIVE_FIELD_TYPES).join(", ")}) or the exact name of an Object, Enum or Alias card that already exists on the board. Any other type is rejected — create the Object/Enum/Alias card first, then reference it by name.
 For Event cards: a DCB tag names the domain entity (aggregate) the event belongs to and identifies ONE field type across the whole board. Tag with the entity noun, never an id field: for a field "accountId" use the tag "account", for "userId" use "user", for "orderId" use "order" — the same entity always gets the same tag. Reusing a tag with a different field type is rejected, so keep the type identical whenever you reuse a tag.
-For State cards: call get_canvas_overview first to discover existing event types, DCB tags and defined types. Every query item's "types" must be names of Event cards on the board. Every query tag is a { tag, field } pair where "tag" already exists on an event field and "field" is one of the card's params with the SAME type. If a creation tool returns status "error" with issues, fix them (e.g. create the missing event/tag/type first) and try again.
+Field descriptions (IMPORTANT): for EVERY field you create — Event fields, Command inputs/responses, Query params/responses, Object fields, State params/states, View params/states, Service method params/returns, Enum values — always add a "description" explaining what that field means. Also give each card itself a "description" (and for an Object, a description of the object definition). These definitions are reused across the model, so each must be self-explanatory on its own.
+For State cards: call get_canvas_overview first to discover existing event types, DCB tags and defined types. Every query item's "types" must be names of Event cards on the board. Every query tag is a { tag, field } pair where "tag" already exists on an event field and "field" is one of the card's params with the SAME type. If a creation tool returns status "error" with issues, fix them (e.g. create the missing event/tag/type first) and try again. A State is a REUSABLE projection/decision model that many flows can share, so it usually lives OUTSIDE any slice (free-standing) and is referenced by Constraint cards; only place a State inside a slice lane when the projection genuinely belongs to that single flow and is not shared.
 For View cards: same shape and rules as State cards (params, query items, states), but a View represents a persisted read model stored in a database for sorting, searching and filtering. Use create_view_card when the user wants a queryable read model rather than an in-memory decision state.
 For Constraint cards: call get_canvas_overview first to discover existing State cards. List the State cards the constraint uses in "states" (by name); those must exist on the board. "rules" is a list of free-text business rules written in plain, human language (e.g. "The account must be active", "An order can only be paid once") — do NOT write them in field-name notation like "accountStatus.status == 'active'"; keep them readable.
 For Slices: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom), each lane with a "type". A lane type must be one of commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote — Enum/Object/Alias cards and nested Slices are NOT allowed in lanes. Give at least one lane and do not repeat the same lane type twice.

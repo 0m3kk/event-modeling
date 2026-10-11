@@ -806,6 +806,10 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
                     ),
                   isArray: z.boolean().optional().describe("True when the field is an array of the type"),
                   isRequired: z.boolean().optional().describe("True when the field is required"),
+                  description: z
+                    .string()
+                    .optional()
+                    .describe("Plain-language description of what this param means"),
                 }),
               )
               .optional()
@@ -821,6 +825,10 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
                     ),
                   isArray: z.boolean().optional().describe("True when the field is an array of the type"),
                   isRequired: z.boolean().optional().describe("True when the field is required"),
+                  description: z
+                    .string()
+                    .optional()
+                    .describe("Plain-language description of what this return field means"),
                 }),
               )
               .optional()

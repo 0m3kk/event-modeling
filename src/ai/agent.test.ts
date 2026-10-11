@@ -60,6 +60,59 @@ describe("AIAgent", () => {
     expect(props.queryItems.items.properties.tags.items.properties.field.type).toBe("string");
   });
 
+  it("advertises field-level descriptions across card tools", () => {
+    const tools = buildOpenAITools();
+    const tool = (name: string) => tools.find((t) => t.function.name === name)!;
+
+    // Object: object description + per-field description.
+    const object = tool("create_object_card");
+    expect(object.function.parameters.properties.description.type).toBe("string");
+    expect(object.function.parameters.properties.fields.items.properties.description.type).toBe(
+      "string",
+    );
+
+    // Event: per-field description.
+    expect(
+      tool("create_event_card").function.parameters.properties.fields.items.properties.description.type,
+    ).toBe("string");
+
+    // Command: inputs + responses + legacy fields.
+    const command = tool("create_command_card").function.parameters.properties;
+    expect(command.inputs.items.properties.description.type).toBe("string");
+    expect(command.responses.items.properties.description.type).toBe("string");
+    expect(command.fields.items.properties.description.type).toBe("string");
+
+    // Query: params + responses.
+    const query = tool("create_query_card").function.parameters.properties;
+    expect(query.params.items.properties.description.type).toBe("string");
+    expect(query.responses.items.properties.description.type).toBe("string");
+
+    // State: params + states + query items.
+    const state = tool("create_state_card").function.parameters.properties;
+    expect(state.params.items.properties.description.type).toBe("string");
+    expect(state.states.items.properties.description.type).toBe("string");
+    expect(state.queryItems.items.properties.description.type).toBe("string");
+
+    // View: params + states + query items.
+    const view = tool("create_view_card").function.parameters.properties;
+    expect(view.params.items.properties.description.type).toBe("string");
+    expect(view.states.items.properties.description.type).toBe("string");
+    expect(view.queryItems.items.properties.description.type).toBe("string");
+
+    // Service: method params + returns.
+    const service = tool("create_service_card").function.parameters.properties;
+    expect(service.methods.items.properties.params.items.properties.description.type).toBe("string");
+    expect(service.methods.items.properties.returns.items.properties.description.type).toBe(
+      "string",
+    );
+
+    // Enum: value description.
+    const enumTool = tool("create_enum_card");
+    expect(enumTool.function.parameters.properties.values.items.properties.description.type).toBe(
+      "string",
+    );
+  });
+
   it("rejects an AI state card that references an unknown tag, then accepts it", async () => {    const failed = JSON.parse(
       await executeAITool("create_state_card", {
         name: "Course",
@@ -108,6 +161,41 @@ describe("AIAgent", () => {
 
     const view = useCanvasStore.getState().elements.find((e) => e.type === "viewCard");
     expect(view?.data.name).toBe("courseCatalog");
+  });
+
+  it("preserves field descriptions on state and view cards", async () => {
+    await executeAITool("create_event_card", {
+      name: "CourseDefined",
+      fields: [{ name: "courseId", type: "string", tag: "course" }],
+    });
+
+    const state = JSON.parse(
+      await executeAITool("create_state_card", {
+        name: "Course",
+        description: "Course projection",
+        params: [{ name: "courseId", type: "string", description: "The course id" }],
+        queryItems: [{ types: ["CourseDefined"], description: "Matches course definitions" }],
+        states: [{ name: "title", type: "string", description: "Course title" }],
+      }),
+    );
+    expect(state.status).toBe("success");
+    const stateEl = useCanvasStore.getState().elements.find((e) => e.type === "stateCard")!;
+    expect(stateEl.data.params[0].description).toBe("The course id");
+    expect(stateEl.data.states[0].description).toBe("Course title");
+    expect(stateEl.data.queryItems[0].description).toBe("Matches course definitions");
+
+    const view = JSON.parse(
+      await executeAITool("create_view_card", {
+        name: "CourseCatalog",
+        params: [{ name: "courseId", type: "string", description: "The course id" }],
+        queryItems: [{ types: ["CourseDefined"] }],
+        states: [{ name: "title", type: "string", description: "Course title" }],
+      }),
+    );
+    expect(view.status).toBe("success");
+    const viewEl = useCanvasStore.getState().elements.find((e) => e.type === "viewCard")!;
+    expect(viewEl.data.params[0].description).toBe("The course id");
+    expect(viewEl.data.states[0].description).toBe("Course title");
   });
 
   it("rejects an AI event card with an unknown field type", async () => {
@@ -522,8 +610,7 @@ describe("AIAgent", () => {
     }
   });
 
-  it("moves an existing card into a lane via update, and detaches it again", async () => {
-    await executeAITool("create_slice", { name: "WriteSlice", lanes: [{ type: "eventCard" }] });
+  it("moves an existing card into a lane via update, and detaches it again", async () => {    await executeAITool("create_slice", { name: "WriteSlice", lanes: [{ type: "eventCard" }] });
     const created = JSON.parse(
       await executeAITool("create_event_card", { name: "OrderPlaced", fields: [] }),
     );
@@ -553,5 +640,117 @@ describe("AIAgent", () => {
     event = useCanvasStore.getState().elements.find((e) => e.id === created.createdId)!;
     expect(event.sliceId).toBeUndefined();
     expect(event.laneId).toBeUndefined();
+  });
+
+  it("exposes create_domain_card without a nested domain param", () => {
+    const tools = buildOpenAITools();
+    const names = tools.map((t) => t.function.name);
+    expect(names).toContain("create_domain_card");
+    expect(names).toContain("update_domain_card");
+
+    // A Domain cannot nest, so its own tool must not advertise `domain`.
+    const domainTool = tools.find((t) => t.function.name === "create_domain_card")!;
+    expect(domainTool.function.parameters.properties.domain).toBeUndefined();
+
+    // Every other card tool can be placed in a domain.
+    const eventTool = tools.find((t) => t.function.name === "create_event_card")!;
+    expect(eventTool.function.parameters.properties.domain.type).toBe("string");
+    const sliceTool = tools.find((t) => t.function.name === "create_slice")!;
+    expect(sliceTool.function.parameters.properties.domain.type).toBe("string");
+  });
+
+  it("creates a domain and places a new card inside it", async () => {
+    const domainRes = JSON.parse(
+      await executeAITool("create_domain_card", { name: "Ordering" }),
+    );
+    expect(domainRes.status).toBe("success");
+    expect(domainRes.type).toBe("domainCard");
+
+    const evtRes = JSON.parse(
+      await executeAITool("create_event_card", {
+        name: "OrderPlaced",
+        fields: [],
+        domain: "Ordering",
+      }),
+    );
+    expect(evtRes.status).toBe("success");
+
+    const elements = useCanvasStore.getState().elements;
+    const domain = elements.find((e) => e.type === "domainCard")!;
+    const event = elements.find((e) => e.type === "eventCard")!;
+    expect(event.domainId).toBe(domain.id);
+
+    const overview = JSON.parse(await executeAITool("get_canvas_overview", {}));
+    const info = overview.domains.find((d: any) => d.name.toLowerCase() === "ordering");
+    expect(info.cards).toContain("orderPlaced");
+  });
+
+  it("places a slice (with its lanes) inside a domain, not the lane cards", async () => {
+    await executeAITool("create_domain_card", { name: "Ordering" });
+    const sliceRes = JSON.parse(
+      await executeAITool("create_slice", {
+        name: "PlaceOrderSlice",
+        lanes: [{ type: "eventCard" }],
+        domain: "Ordering",
+      }),
+    );
+    expect(sliceRes.status).toBe("success");
+
+    await executeAITool("create_event_card", {
+      name: "OrderPlaced",
+      fields: [],
+      slice: "PlaceOrderSlice",
+    });
+
+    const elements = useCanvasStore.getState().elements;
+    const domain = elements.find((e) => e.type === "domainCard")!;
+    const slice = elements.find((e) => e.type === "sliceCard")!;
+    const event = elements.find((e) => e.type === "eventCard")!;
+    expect(slice.domainId).toBe(domain.id);
+    // The lane card belongs to the slice, not directly to the domain.
+    expect(event.domainId).toBeUndefined();
+    expect(event.sliceId).toBe(slice.id);
+  });
+
+  it("reports domain_placement_failed when the domain does not exist", async () => {
+    const res = JSON.parse(
+      await executeAITool("create_event_card", { name: "Ghost", fields: [], domain: "Nope" }),
+    );
+    expect(res.status).toBe("error");
+    expect(res.error).toBe("domain_placement_failed");
+    expect(res.issues.map((i: any) => i.code)).toContain("domain_not_found");
+    expect(useCanvasStore.getState().elements).toHaveLength(0);
+  });
+
+  it("moves an existing card into a domain via update, and detaches it again", async () => {
+    await executeAITool("create_domain_card", { name: "Ordering" });
+    const created = JSON.parse(
+      await executeAITool("create_event_card", { name: "OrderPlaced", fields: [] }),
+    );
+
+    const moved = JSON.parse(
+      await executeAITool("update_event_card", {
+        target: "OrderPlaced",
+        name: "OrderPlaced",
+        fields: [],
+        domain: "Ordering",
+      }),
+    );
+    expect(moved.status).toBe("success");
+    const domain = useCanvasStore.getState().elements.find((e) => e.type === "domainCard")!;
+    let event = useCanvasStore.getState().elements.find((e) => e.id === created.createdId)!;
+    expect(event.domainId).toBe(domain.id);
+
+    const detached = JSON.parse(
+      await executeAITool("update_event_card", {
+        target: "OrderPlaced",
+        name: "OrderPlaced",
+        fields: [],
+        domain: "",
+      }),
+    );
+    expect(detached.status).toBe("success");
+    event = useCanvasStore.getState().elements.find((e) => e.id === created.createdId)!;
+    expect(event.domainId).toBeUndefined();
   });
 });

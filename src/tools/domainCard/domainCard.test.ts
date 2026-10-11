@@ -232,3 +232,13 @@ describe("domain drop placement (interaction)", () => {
     expect(overlaps).toBe(false);
   });
 });
+
+describe("domain AI operation", () => {
+  it("creates a domain card at the spawn point", () => {
+    expect(domainCardTool.ai?.toolName).toBe("create_domain_card");
+    const element = domainCardTool.ai!.onCreate({ name: "Ordering" }, { x: 0, y: 0 });
+    expect(element.type).toBe(DOMAIN_TYPE);
+    expect((element.data as DomainData).name).toBe("Ordering");
+    expect((element.data as DomainData).color).toBe(domainCardTool.color);
+  });
+});

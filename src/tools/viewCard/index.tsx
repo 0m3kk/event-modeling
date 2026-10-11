@@ -1165,6 +1165,10 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
             type: z.string().describe("Field data type (e.g. string, number, boolean, uuid)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
             isRequired: z.boolean().optional().describe("True when the field is required"),
+            description: z
+              .string()
+              .optional()
+              .describe("Plain-language description of what this param means"),
           }),
         )
         .optional()
@@ -1191,6 +1195,10 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
               )
               .optional()
               .describe("DCB tags the item requires (all must match)"),
+            description: z
+              .string()
+              .optional()
+              .describe("Plain-language description of what this query item selects"),
           }),
         )
         .optional()
@@ -1202,6 +1210,10 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
             isRequired: z.boolean().optional().describe("True when the field is required"),
+            description: z
+              .string()
+              .optional()
+              .describe("Plain-language description of what this view field means"),
           }),
         )
         .optional()
@@ -1215,6 +1227,7 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
         type: p.type,
         ...(p.isArray ? { isArray: true } : {}),
         ...(p.isRequired ? { isRequired: true } : {}),
+        ...(p.description ? { description: p.description } : {}),
       }));
       const queryItems: ViewQueryItem[] = (params.queryItems || []).map((item: ViewQueryItem) => ({
         types: Array.isArray(item.types) ? item.types : [],
@@ -1228,6 +1241,7 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
         type: s.type,
         ...(s.isArray ? { isArray: true } : {}),
         ...(s.isRequired ? { isRequired: true } : {}),
+        ...(s.description ? { description: s.description } : {}),
       }));
 
       const data: ViewCardData = {

@@ -776,6 +776,10 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
             isRequired: z.boolean().optional().describe("True when the field is required"),
+            description: z
+              .string()
+              .optional()
+              .describe("Plain-language description of what this field means"),
           }),
         )
         .optional()
@@ -787,6 +791,10 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
             type: z.string().describe("Field data type (e.g. string, number, boolean)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
             isRequired: z.boolean().optional().describe("True when the field is required"),
+            description: z
+              .string()
+              .optional()
+              .describe("Plain-language description of what this field means"),
           }),
         )
         .optional()

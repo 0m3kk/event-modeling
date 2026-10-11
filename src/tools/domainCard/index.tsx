@@ -1,8 +1,9 @@
 import { BoxSelect } from "lucide-react";
 import { z } from "zod";
 import { Graphics, Text, type Container } from "pixi.js";
+import { nanoid } from "nanoid";
 import type { ToolDefinition } from "../types";
-import type { InlineEditState } from "@/types";
+import type { CanvasElement, InlineEditState, Point } from "@/types";
 import { useCanvasStore } from "@/store";
 import { isSameIdentifier, toDisplayName } from "@/utils/naming";
 import {
@@ -141,5 +142,32 @@ export const domainCardTool: ToolDefinition<DomainData> = {
         }
       },
     };
+  },
+
+  ai: {
+    toolName: "create_domain_card",
+    description:
+      "Create a Domain frame — a dashed boundary that groups related cards and Slices into one bounded context. " +
+      "Domains cannot be nested inside another Domain. Give it a meaningful bounded-context name (e.g. Ordering, Billing).",
+    parameters: z.object({
+      name: z.string().describe("PascalCase domain name (e.g. Ordering, Billing)"),
+      color: z.string().optional().describe("Optional header color hex code"),
+    }),
+    onCreate: (params, center: Point): CanvasElement<DomainData> => {
+      const width = DOMAIN_DEFAULT_WIDTH;
+      const height = DOMAIN_DEFAULT_HEIGHT;
+      return {
+        id: `domain-${nanoid(6)}`,
+        type: DOMAIN_TYPE,
+        x: Math.round(center.x - width / 2),
+        y: Math.round(center.y - height / 2),
+        width,
+        height,
+        data: {
+          name: params.name || "Domain",
+          color: params.color || domainCardTool.color,
+        },
+      };
+    },
   },
 };
