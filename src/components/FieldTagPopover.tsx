@@ -72,7 +72,8 @@ export function FieldTagPopover({
   return (
     <div
       ref={popoverRef}
-      className={`absolute left-0 ${positionClasses} w-[236px] rounded-2xl border border-gray-200/90 bg-white/95 p-3 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
+      onWheel={(e) => e.stopPropagation()}
+      className={`absolute left-0 ${positionClasses} w-[236px] max-h-[min(380px,calc(100vh-120px))] overflow-y-auto rounded-2xl border border-gray-200/90 bg-white/95 p-3 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
     >
       <div className="mb-2 flex items-center justify-between px-0.5 text-xs font-semibold text-gray-500 dark:text-zinc-400">
         <span className="flex items-center gap-1.5">

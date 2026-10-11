@@ -94,7 +94,19 @@ export function OptionsBar() {
   const barX = screenX + screenW / 2;
   const isAbove = screenY >= 56;
   const barY = isAbove ? screenY - 12 : screenY + screenH + 12;
-  const popoverPlacement: "top" | "bottom" = isAbove && barY >= 140 ? "top" : "bottom";
+
+  // Viewport-aware smart popover placement:
+  // OptionsBar is ~44px tall. When isAbove is true, it is shifted up by -translate-y-full.
+  const barTop = isAbove ? barY - 48 : barY;
+  const barBottom = isAbove ? barY : barY + 48;
+  const windowHeight = typeof window !== "undefined" ? window.innerHeight : 800;
+  const spaceAbove = Math.max(0, barTop);
+  const spaceBelow = Math.max(0, windowHeight - barBottom);
+
+  // Popover needs ~280px height. Open upwards ('top') ONLY if there is ample space above (>= 280px)
+  // and more space above than below. Otherwise, open downwards ('bottom') to prevent screen clipping.
+  const popoverPlacement: "top" | "bottom" =
+    spaceAbove >= 280 && spaceAbove >= spaceBelow ? "top" : "bottom";
 
   // Active color
   const currentColor =
@@ -169,6 +181,7 @@ export function OptionsBar() {
     >
       <div
         onPointerDown={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
         className="pointer-events-auto relative flex items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3 py-1.5 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 select-none"
       >
         {/* 1. FIRST OPTION: COLOR PICKER (Common to ALL tools) */}

@@ -11,10 +11,9 @@ export const COMMON_FIELD_TYPES: FieldTypePreset[] = [
   { type: "string", label: "string", description: "Text string" },
   { type: "number", label: "number", description: "Numeric value" },
   { type: "boolean", label: "boolean", description: "True / False" },
+  { type: "date", label: "date", description: "Calendar date (YYYY-MM-DD)" },
   { type: "datetime", label: "datetime", description: "ISO timestamp" },
   { type: "uuid", label: "uuid", description: "Unique identifier" },
-  { type: "object", label: "object", description: "Nested structure" },
-  { type: "array", label: "array", description: "List / Collection" },
 ];
 
 interface FieldTypePopoverProps {
@@ -70,7 +69,8 @@ export function FieldTypePopover({
   return (
     <div
       ref={popoverRef}
-      className={`absolute left-0 ${positionClasses} w-[224px] rounded-2xl border border-gray-200/90 bg-white/95 p-2.5 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
+      onWheel={(e) => e.stopPropagation()}
+      className={`absolute left-0 ${positionClasses} w-[224px] max-h-[min(380px,calc(100vh-120px))] overflow-y-auto rounded-2xl border border-gray-200/90 bg-white/95 p-2.5 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
     >
       <div className="mb-2 flex items-center justify-between px-1 text-xs font-semibold text-gray-500 dark:text-zinc-400">
         <span className="flex items-center gap-1.5">
