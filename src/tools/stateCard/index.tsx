@@ -43,8 +43,10 @@ export const STATE_DEFAULT_WIDTH = 220;
 export const STATE_QUERY_LINE_HEIGHT = 18;
 /** Vertical padding above/below the lines of a query item. */
 export const STATE_QUERY_ITEM_PADDING_Y = 5;
-/** Font size of an event-type line in a query item. */
+/** Font size of an event-type badge label in a query item. */
 export const STATE_QUERY_TYPE_FONT_SIZE = 11;
+/** Horizontal padding inside an event-type badge (badge width = label width + this). */
+export const STATE_QUERY_TYPE_PADDING_X = 8;
 /** Font size of a tag badge label in a query item. */
 export const STATE_QUERY_TAG_FONT_SIZE = 9;
 /** Horizontal padding inside a tag badge (badge width = label width + this). */
@@ -78,6 +80,16 @@ export function queryItemHeight(item: QueryItem): number {
   return STATE_QUERY_ITEM_PADDING_Y * 2 + lines * STATE_QUERY_LINE_HEIGHT;
 }
 
+/** Display label of a query item's event-type badge (kept in sync with the renderer). */
+export function queryTypeLabel(type: string | undefined): string {
+  return toDisplayName(type || "");
+}
+
+/** Width of a query item's event-type badge, including its horizontal padding. */
+export function queryTypeBadgeWidth(type: string | undefined): number {
+  return measureMonospaceText(queryTypeLabel(type), STATE_QUERY_TYPE_FONT_SIZE) + STATE_QUERY_TYPE_PADDING_X;
+}
+
 /** Display label of a query item's tag badge (kept in sync with the renderer). */
 export function queryTagLabel(tag: string | undefined, field: string | undefined): string {
   return `#${toCamelIdentifier(tag || "")}:{${toDisplayName(field || "")}}`;
@@ -90,8 +102,8 @@ export function queryTagBadgeWidth(tag: string | undefined, field: string | unde
 
 /**
  * Minimum card width that keeps every query item's two columns fully inside the
- * card with breathing room. Event types fill the left half and tag badges the
- * right half, both centered, so a column's content (plus its padding on both
+ * card with breathing room. Event-type badges fill the left half and tag badges
+ * the right half, both centered, so a column's content (plus its padding on both
  * sides) needs the card to be twice as wide. The card grows to this width
  * instead of clipping a long event type or tag.
  */
@@ -103,8 +115,8 @@ export function computeQueryContentWidth(items: QueryItem[]): number {
   for (const item of items) {
     const types = Array.isArray(item.types) ? item.types.filter(Boolean) : [];
     for (const type of types) {
-      const textWidth = measureMonospaceText(toDisplayName(type), STATE_QUERY_TYPE_FONT_SIZE);
-      required = Math.max(required, textWidth * 2 + padding);
+      const badgeWidth = queryTypeBadgeWidth(type);
+      required = Math.max(required, badgeWidth * 2 + padding);
     }
 
     const tags = Array.isArray(item.tags) ? item.tags : [];
@@ -309,7 +321,7 @@ function renderFieldRow(
 }
 
 /**
- * Renders one query item as TWO centered columns: event types on the left,
+ * Renders one query item as TWO centered columns: event-type badges on the left,
  * `tag:{field}` badges on the right. Each type/tag takes its own line, so the
  * item grows vertically. Tag badges turn red when they violate the DCB rules.
  * An ⓘ badge sits in the right gutter when the item carries a description.
@@ -369,13 +381,6 @@ function renderQueryItemRow(
   const lineTop = itemY + STATE_QUERY_ITEM_PADDING_Y;
 
   const dimColor = isDark ? 0x71717a : 0xa1a1aa;
-  const typesColor = isSelectedRow
-    ? isDark
-      ? 0xf4f4f5
-      : 0x09090b
-    : isDark
-      ? 0xe4e4e7
-      : 0x27272a;
 
   // Subtle vertical separator between the two columns.
   if (!isEmpty) {
@@ -401,23 +406,38 @@ function renderQueryItemRow(
     text.y = lineTop + 3;
     container.addChild(text);
   } else {
-    // Left column: event types (one per line, centered).
+    // Left column: event-type badges (one per line, centered).
     if (types.length > 0) {
       types.forEach((type, i) => {
-        const text = new Text({
-          text: toDisplayName(type),
+        const label = new Text({
+          text: queryTypeLabel(type),
           style: {
             fontSize: STATE_QUERY_TYPE_FONT_SIZE,
-            fontWeight: isSelectedRow ? "bold" : "normal",
+            fontWeight: "bold",
             fontFamily: '"Geist Mono", monospace',
-            fill: typesColor,
+            fill: isDark ? 0x5eead4 : 0x0f766e,
           },
           resolution: textResolution,
         });
-        text.anchor.set(0.5, 0);
-        text.x = leftCenter;
-        text.y = lineTop + typesOffset + i * STATE_QUERY_LINE_HEIGHT + 3;
-        container.addChild(text);
+
+        const badgeW = label.width + STATE_QUERY_TYPE_PADDING_X;
+        const badgeH = 17;
+        const lineY = lineTop + typesOffset + i * STATE_QUERY_LINE_HEIGHT;
+        // Center in the left column, but never spill past the column edges.
+        let badgeX = leftCenter - badgeW / 2;
+        if (badgeX + badgeW > colWidth - 2) badgeX = colWidth - 2 - badgeW;
+        if (badgeX < 2) badgeX = 2;
+        const badgeY = lineY + (STATE_QUERY_LINE_HEIGHT - badgeH) / 2;
+
+        const badge = new Graphics();
+        badge.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
+        badge.fill({ color: isDark ? 0x042f2e : 0xccfbf1, alpha: 0.9 });
+        badge.stroke({ color: isDark ? 0x0f766e : 0x5eead4, width: 1, alpha: 0.8 });
+        container.addChild(badge);
+
+        label.x = badgeX + STATE_QUERY_TYPE_PADDING_X / 2;
+        label.y = badgeY + (badgeH - label.height) / 2;
+        container.addChild(label);
       });
     } else {
       const text = new Text({

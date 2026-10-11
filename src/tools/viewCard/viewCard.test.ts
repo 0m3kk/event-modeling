@@ -212,18 +212,19 @@ describe("viewCardTool query width auto-grow", () => {
   it("keeps the default width for short query content", () => {
     const data: ViewCardData = {
       ...base,
-      queryItems: [{ types: ["CourseDefined"], tags: [] }],
+      queryItems: [{ types: ["OrderPlaced"], tags: [] }],
     };
     expect(computeViewCardSize(data).width).toBe(220);
   });
 
-  it("widens the card to fit a long event type", () => {
+  it("widens the card to fit a long event-type badge", () => {
     const data: ViewCardData = {
       ...base,
       queryItems: [{ types: ["abcdefghijklmnopqrstuvwxyz"], tags: [] }],
     };
-    // 26 display chars at 11px * 0.6 = 171.6px; two columns + 4*8 padding.
-    expect(computeViewCardSize(data).width).toBe(376);
+    // 26 display chars at 11px * 0.6 = 171.6px + 8px badge padding = 179.6px;
+    // two columns + 4*8 padding -> 392.
+    expect(computeViewCardSize(data).width).toBe(392);
   });
 
   it("widens the card to fit a long tag badge", () => {

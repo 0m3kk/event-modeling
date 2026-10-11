@@ -230,7 +230,7 @@ describe("AIAgent", () => {
     );
     const id = created.createdId;
     const before = useCanvasStore.getState().elements.find((e) => e.id === id)!;
-    expect(before.width).toBe(220);
+    expect(before.width).toBe(233);
 
     const res = JSON.parse(
       await executeAITool("update_state_card", {
@@ -244,7 +244,7 @@ describe("AIAgent", () => {
     expect(res.status).toBe("success");
 
     const after = useCanvasStore.getState().elements.find((e) => e.id === id)!;
-    expect(after.width).toBe(376);
+    expect(after.width).toBe(392);
   });
 
   it("reports element_not_found when updating a missing card", async () => {
