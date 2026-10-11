@@ -343,8 +343,14 @@ function executeUpdateElement(updateName: string, args: any): string {
     ? definition.computeSize(nextData)
     : { width: existing.width, height: existing.height };
 
-  // Keep the card's position and width; only the content-driven height changes.
-  state.updateElement(existing.id, { data: nextData, height: size.height });
+  // Keep the card's position. Height is always content-driven; width only ever
+  // grows, so wide query items (event types / tag badges) still fit after an AI
+  // edit without undoing a deliberately narrower card.
+  state.updateElement(existing.id, {
+    data: nextData,
+    height: size.height,
+    width: Math.max(existing.width, size.width),
+  });
 
   return JSON.stringify({ status: "success", updatedId: existing.id, type: existing.type });
 }

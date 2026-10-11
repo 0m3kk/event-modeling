@@ -47,7 +47,13 @@ export function StateCardOptions({ element }: StateCardOptionsProps) {
 
   const commit = (data: StateCardData) => {
     const size = computeStateCardSize(data);
-    useCanvasStore.getState().updateElement(element.id, { height: size.height, data });
+    // Never shrink below the width the user currently has, but grow to fit a
+    // long event type or tag badge in a query item.
+    useCanvasStore.getState().updateElement(element.id, {
+      width: Math.max(element.width, size.width),
+      height: size.height,
+      data,
+    });
   };
 
   const handleAddParam = () => {

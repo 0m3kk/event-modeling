@@ -40,6 +40,8 @@ describe("stateCardTool multi-section (params, query, states)", () => {
   it("computes height accurately for 3 sections", () => {
     // 32 + (22 + 2*28) + (22 + 1*28) + (22 + 1*28) = 210
     expect(computeStateCardSize(card.data).height).toBe(210);
+    // The tag badge `#course:{Course ID}` is wide enough to widen the card.
+    expect(computeStateCardSize(card.data).width).toBe(254);
   });
 
   it("sub-selects rows across all three sections", () => {
@@ -196,6 +198,49 @@ describe("stateCardTool multi-section (params, query, states)", () => {
       stateCardTool,
     );
     expect(up).toMatchObject({ sectionIndex: 1, sectionId: "query", fieldIndex: 0 });
+  });
+});
+
+describe("stateCardTool query width auto-grow", () => {
+  const base: StateCardData = {
+    name: "WideState",
+    params: [{ name: "courseId", type: "string" }],
+    queryItems: [],
+    states: [],
+  };
+
+  it("keeps the default width for short query content", () => {
+    const data: StateCardData = {
+      ...base,
+      queryItems: [{ types: ["CourseDefined"], tags: [] }],
+    };
+    expect(computeStateCardSize(data).width).toBe(220);
+  });
+
+  it("widens the card to fit a long event type", () => {
+    const data: StateCardData = {
+      ...base,
+      queryItems: [{ types: ["abcdefghijklmnopqrstuvwxyz"], tags: [] }],
+    };
+    // 26 display chars at 11px * 0.6 = 171.6px; two columns + 4*8 padding.
+    expect(computeStateCardSize(data).width).toBe(376);
+  });
+
+  it("widens the card to fit a long tag badge", () => {
+    const data: StateCardData = {
+      ...base,
+      queryItems: [{ types: [], tags: [{ tag: "abcdefghij", field: "klmnopqrst" }] }],
+    };
+    // `#abcdefghij:{Klmnopqrst}` -> 137.6px badge, two columns + 4*8 -> 308.
+    expect(computeStateCardSize(data).width).toBe(308);
+  });
+
+  it("never shrinks below the requested width", () => {
+    const data: StateCardData = {
+      ...base,
+      queryItems: [{ types: ["abcdefghijklmnopqrstuvwxyz"], tags: [] }],
+    };
+    expect(computeStateCardSize(data, 500).width).toBe(500);
   });
 });
 

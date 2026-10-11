@@ -6,6 +6,7 @@ import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point, SelectedField } from "@/types";
 import { useCanvasStore } from "@/store";
 import { collectBoardTagCatalog, fieldTypeKey } from "@/utils/eventTags";
+import { measureMonospaceText } from "@/utils/textWrap";
 import {
   isSameIdentifier,
   toCamelIdentifier,
@@ -42,6 +43,14 @@ export const VIEW_DEFAULT_WIDTH = 220;
 export const VIEW_QUERY_LINE_HEIGHT = 18;
 /** Vertical padding above/below the lines of a query item. */
 export const VIEW_QUERY_ITEM_PADDING_Y = 5;
+/** Font size of an event-type line in a query item. */
+export const VIEW_QUERY_TYPE_FONT_SIZE = 11;
+/** Font size of a tag badge label in a query item. */
+export const VIEW_QUERY_TAG_FONT_SIZE = 9;
+/** Horizontal padding inside a tag badge (badge width = label width + this). */
+export const VIEW_QUERY_TAG_PADDING_X = 8;
+/** Horizontal padding on each side of a query column's centered content. */
+export const VIEW_QUERY_COLUMN_PADDING = 8;
 
 export type { ViewCardData, ViewField, ViewQueryItem, ViewQueryTag } from "./rules";
 export { getViewParams, getViewItems, getViewStates } from "./rules";
@@ -67,6 +76,45 @@ interface ViewLayout {
 export function queryItemHeight(item: ViewQueryItem): number {
   const lines = Math.max(1, item.types?.length ?? 0, item.tags?.length ?? 0);
   return VIEW_QUERY_ITEM_PADDING_Y * 2 + lines * VIEW_QUERY_LINE_HEIGHT;
+}
+
+/** Display label of a query item's tag badge (kept in sync with the renderer). */
+export function queryTagLabel(tag: string | undefined, field: string | undefined): string {
+  return `#${toCamelIdentifier(tag || "")}:{${toDisplayName(field || "")}}`;
+}
+
+/** Width of a query item's tag badge, including its horizontal padding. */
+export function queryTagBadgeWidth(tag: string | undefined, field: string | undefined): number {
+  return measureMonospaceText(queryTagLabel(tag, field), VIEW_QUERY_TAG_FONT_SIZE) + VIEW_QUERY_TAG_PADDING_X;
+}
+
+/**
+ * Minimum card width that keeps every query item's two columns fully inside the
+ * card with breathing room. Event types fill the left half and tag badges the
+ * right half, both centered, so a column's content (plus its padding on both
+ * sides) needs the card to be twice as wide. The card grows to this width
+ * instead of clipping a long event type or tag.
+ */
+export function computeQueryContentWidth(items: ViewQueryItem[]): number {
+  let required = 0;
+  // Column width = content + padding on both sides; the card holds two columns.
+  const padding = VIEW_QUERY_COLUMN_PADDING * 4;
+
+  for (const item of items) {
+    const types = Array.isArray(item.types) ? item.types.filter(Boolean) : [];
+    for (const type of types) {
+      const textWidth = measureMonospaceText(toDisplayName(type), VIEW_QUERY_TYPE_FONT_SIZE);
+      required = Math.max(required, textWidth * 2 + padding);
+    }
+
+    const tags = Array.isArray(item.tags) ? item.tags : [];
+    for (const ref of tags) {
+      const badgeWidth = queryTagBadgeWidth(ref.tag, ref.field);
+      required = Math.max(required, badgeWidth * 2 + padding);
+    }
+  }
+
+  return required;
 }
 
 /** Cumulative vertical offsets of each query item within the query section. */
@@ -123,13 +171,17 @@ export function computeViewCardSize(
 ): { width: number; height: number } {
   const paramsCount = Math.max(1, getViewParams(data).length);
   const statesCount = Math.max(1, getViewStates(data).length);
-  const queryItemsHeight = computeQuerySectionHeight(getViewItems(data));
+  const queryItems = getViewItems(data);
+  const queryItemsHeight = computeQuerySectionHeight(queryItems);
   const height =
     VIEW_HEADER_HEIGHT +
     (VIEW_SECTION_HEADER_HEIGHT + paramsCount * VIEW_ROW_HEIGHT) +
     (VIEW_SECTION_HEADER_HEIGHT + queryItemsHeight) +
     (VIEW_SECTION_HEADER_HEIGHT + statesCount * VIEW_ROW_HEIGHT);
-  return { width: customWidth, height };
+  // Widen past the requested width when a query item's event type or tag badge
+  // would otherwise be clipped.
+  const width = Math.max(customWidth, Math.ceil(computeQueryContentWidth(queryItems)));
+  return { width, height };
 }
 
 /**
@@ -355,7 +407,7 @@ function renderViewQueryItemRow(
         const text = new Text({
           text: toDisplayName(type),
           style: {
-            fontSize: 11,
+            fontSize: VIEW_QUERY_TYPE_FONT_SIZE,
             fontWeight: isSelectedRow ? "bold" : "normal",
             fontFamily: '"Geist Mono", monospace',
             fill: typesColor,
@@ -392,9 +444,9 @@ function renderViewQueryItemRow(
       const valid = Boolean(allowed && paramField && allowed.has(fieldTypeKey(paramField)));
 
       const label = new Text({
-        text: `#${tag}:{${toDisplayName(fieldName)}}`,
+        text: queryTagLabel(ref.tag, ref.field),
         style: {
-          fontSize: 9,
+          fontSize: VIEW_QUERY_TAG_FONT_SIZE,
           fontWeight: "bold",
           fontFamily: '"Geist Mono", monospace',
           fill: valid ? (isDark ? 0xfbbf24 : 0xd97706) : isDark ? 0xf87171 : 0xdc2626,
@@ -402,7 +454,7 @@ function renderViewQueryItemRow(
         resolution: textResolution,
       });
 
-      const badgeW = label.width + 8;
+      const badgeW = label.width + VIEW_QUERY_TAG_PADDING_X;
       const badgeH = 15;
       const lineY = lineTop + tagsOffset + i * VIEW_QUERY_LINE_HEIGHT;
       // Center in the right column, but never spill past the ⓘ gutter.
@@ -847,8 +899,8 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
       queryItems: nextItems,
       states: nextStates,
     };
-    const nextSize = computeViewCardSize(nextData);
-    return { height: nextSize.height, data: nextData };
+    const nextSize = computeViewCardSize(nextData, element.width);
+    return { width: nextSize.width, height: nextSize.height, data: nextData };
   },
 
   onUpdateSubSelectType: (element, field, type) => {

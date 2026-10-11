@@ -213,6 +213,40 @@ describe("AIAgent", () => {
     expect(elements[0].data.fields).toHaveLength(2);
   });
 
+  it("widens a state card when an AI update adds a long event type", async () => {
+    await executeAITool("create_event_card", { name: "CourseDefined", fields: [] });
+    await executeAITool("create_event_card", {
+      name: "abcdefghijklmnopqrstuvwxyz",
+      fields: [],
+    });
+
+    const created = JSON.parse(
+      await executeAITool("create_state_card", {
+        name: "CourseState",
+        params: [{ name: "courseId", type: "string" }],
+        queryItems: [{ types: ["CourseDefined"] }],
+        states: [{ name: "exists", type: "boolean" }],
+      }),
+    );
+    const id = created.createdId;
+    const before = useCanvasStore.getState().elements.find((e) => e.id === id)!;
+    expect(before.width).toBe(220);
+
+    const res = JSON.parse(
+      await executeAITool("update_state_card", {
+        target: "CourseState",
+        name: "CourseState",
+        params: [{ name: "courseId", type: "string" }],
+        queryItems: [{ types: ["abcdefghijklmnopqrstuvwxyz"] }],
+        states: [{ name: "exists", type: "boolean" }],
+      }),
+    );
+    expect(res.status).toBe("success");
+
+    const after = useCanvasStore.getState().elements.find((e) => e.id === id)!;
+    expect(after.width).toBe(376);
+  });
+
   it("reports element_not_found when updating a missing card", async () => {
     const res = JSON.parse(
       await executeAITool("update_event_card", {
