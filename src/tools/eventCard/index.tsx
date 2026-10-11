@@ -49,11 +49,13 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     color: "#f97316",
   }),
 
-  defaultSize: { width: 220, height: 120 },
+  defaultSize: { width: 220, height: 96 },
 
   computeSize: (data) => {
     const fieldsCount = data.fields?.length || 0;
-    const height = Math.max(90, 52 + fieldsCount * 24 + 12);
+    const contentCount = Math.max(1, fieldsCount);
+    // Header (32px) + top padding (10px) + fields (count * 22px) + bottom padding (10px)
+    const height = 52 + contentCount * 22;
     return { width: 220, height };
   },
 
@@ -69,22 +71,24 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     const headerColor = element.data.color || eventCardTool.color;
 
     const g = new Graphics();
-    // Background
+
+    // 1. Fill entire card background
     g.roundRect(0, 0, element.width, element.height, 8);
     g.fill({ color: cardBg });
+
+    // 2. Fill top header banner (rounded top corners, straight bottom)
+    g.roundRect(0, 0, element.width, 32, 8);
+    g.fill({ color: headerColor });
+    g.rect(0, 20, element.width, 12);
+    g.fill({ color: headerColor });
+
+    // 3. Draw single uniform border stroke around entire card (after fills so border is consistent)
+    g.roundRect(0, 0, element.width, element.height, 8);
     g.stroke({ color: borderCol, width: isSelected ? 2 : 1 });
-
-    // Dynamic Top Header Bar
-    g.roundRect(0, 0, element.width, 36, 8);
-    g.fill({ color: headerColor });
-
-    // Cut off bottom round corners of header
-    g.rect(0, 24, element.width, 12);
-    g.fill({ color: headerColor });
 
     container.addChild(g);
 
-    // Header Title (contrast-aware text)
+    // Header Title (contrast-aware text, vertically centered in 32px header)
     const title = new Text({
       text: element.data.name || "Event",
       style: {
@@ -96,11 +100,11 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
       resolution: context.textResolution,
     });
     title.x = 12;
-    title.y = 9;
+    title.y = 8;
     container.addChild(title);
 
-    // Fields list
-    let currentY = 46;
+    // Fields list (symmetric 10px padding from header bottom and card bottom)
+    let currentY = 42;
     if (element.data.fields && element.data.fields.length > 0) {
       for (const field of element.data.fields) {
         const fieldName = new Text({
@@ -129,7 +133,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
         typeLabel.y = currentY + 1;
         container.addChild(typeLabel);
 
-        currentY += 24;
+        currentY += 22;
       }
     } else {
       const emptyHint = new Text({

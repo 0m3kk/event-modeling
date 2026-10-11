@@ -86,7 +86,7 @@ describe("OptionsBar data workflows & undo/redo", () => {
       x: 100,
       y: 100,
       width: 220,
-      height: 120,
+      height: 96,
       data: eventCardTool.createDefaultData(),
     };
 
