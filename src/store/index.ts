@@ -6,8 +6,12 @@ import {
 } from "@/utils/naming";
 import {
   createReferenceCopy as makeReferenceCopy,
+  createMethodReferenceCopy,
   syncReferenceUpdates,
   syncBatchReferenceUpdates,
+  syncServiceMethodCopies,
+  syncBatchServiceMethodCopies,
+  detachOrphanedMethodCopies,
   pruneDanglingReferences,
 } from "@/utils/reference";
 import { toolRegistry } from "@/tools/registry";
@@ -67,6 +71,7 @@ export interface CanvasStoreState {
   addElement: (element: CanvasElement) => void;
   addElements: (elements: CanvasElement[]) => void;
   createReferenceCopy: (id: string) => CanvasElement | null;
+  createMethodCopy: (sourceId: string, methodId: string) => CanvasElement | null;
   updateElement: (id: string, patch: Partial<CanvasElement>) => void;
   updateElements: (patches: Array<{ id: string } & Partial<CanvasElement>>) => void;
   deleteElements: (ids: string[]) => void;
@@ -209,6 +214,40 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     return copy;
   },
 
+  createMethodCopy: (sourceId, methodId) => {
+    const current = get().elements;
+    const source = current.find((el) => el.id === sourceId);
+    if (!source || source.type !== "serviceCard") return null;
+
+    // When the picked element is itself an execution copy, link the new copy to
+    // the real source service so every execution shares one live link.
+    const existingRef = source.data?.methodRef as
+      | { serviceId: string; methodId: string }
+      | undefined;
+    const rootId = existingRef?.serviceId ?? sourceId;
+    const rootMethodId = existingRef?.methodId ?? methodId;
+    const root = current.find((el) => el.id === rootId) ?? source;
+
+    const method = (root.data?.methods ?? []).find(
+      (m: { id: string }) => m.id === rootMethodId,
+    );
+    if (!method) return null;
+
+    const copy = createMethodReferenceCopy(root, method);
+    copy.x = source.x + 30;
+    copy.y = source.y + 30;
+
+    set((state) => ({
+      undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
+      redoStack: [],
+      elements: [...state.elements, copy],
+      selectedIds: [copy.id],
+      selectedField: null,
+      inlineEdit: null,
+    }));
+    return copy;
+  },
+
   updateElement: (id, patch) => {
     const current = get().elements;
     const target = current.find((el) => el.id === id);
@@ -218,7 +257,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
       ? { ...patch, data: resolveUniqueDataOnUpdate(target, patch.data, current) }
       : patch;
 
-    const updatedElements = syncReferenceUpdates(current, id, finalPatch);
+    const withReferences = syncReferenceUpdates(current, id, finalPatch);
+    const updatedElements = syncServiceMethodCopies(withReferences, id, finalPatch);
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
@@ -237,7 +277,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
       };
     });
 
-    const updatedElements = syncBatchReferenceUpdates(current, finalPatches);
+    const withReferences = syncBatchReferenceUpdates(current, finalPatches);
+    const updatedElements = syncBatchServiceMethodCopies(withReferences, finalPatches);
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
@@ -250,7 +291,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     const idSet = new Set(ids);
     const current = get().elements;
     const remaining = current.filter((el) => !idSet.has(el.id));
-    const cleaned = pruneDanglingReferences(remaining);
+    const cleaned = detachOrphanedMethodCopies(pruneDanglingReferences(remaining));
 
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],

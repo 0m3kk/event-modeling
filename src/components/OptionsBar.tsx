@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets, Asterisk } from "lucide-react";
+import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets, Asterisk, Diamond, Play } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
@@ -378,26 +378,37 @@ export function OptionsBar() {
 
         <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
 
-        {/* Linked Reference status indicator (Original ❖ vs Ref Copy 🔗) */}
+        {/* Linked Reference status indicator (Original ❖ vs Ref Copy 🔗, icon-only) */}
         {isSingle && singleElement?.referenceId && (
           <>
             {isElementOriginal(singleElement, elements) ? (
               <div
-                className="flex items-center gap-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200/80 dark:border-purple-800/80 px-2.5 py-1 text-xs font-medium text-purple-600 dark:text-purple-400"
+                className="flex items-center justify-center rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200/80 dark:border-purple-800/80 px-2 py-1 text-purple-600 dark:text-purple-400"
                 title="Original (Master): content edits automatically synchronize to all reference copies."
               >
-                <span className="text-[13px] leading-none">❖</span>
-                <span>Original</span>
+                <Diamond size={14} className="fill-purple-500/30 stroke-[2.5]" />
               </div>
             ) : (
               <div
-                className="flex items-center gap-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800/80 px-2.5 py-1 text-xs font-medium text-sky-600 dark:text-sky-400"
+                className="flex items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800/80 px-2 py-1 text-sky-600 dark:text-sky-400"
                 title="Reference Copy: linked to original entity. Content edits stay synchronized."
               >
-                <Link2 size={13} className="stroke-[2.5]" />
-                <span>Ref Copy</span>
+                <Link2 size={14} className="stroke-[2.5]" />
               </div>
             )}
+            <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
+          </>
+        )}
+
+        {/* Method-execution copy indicator (Service) — icon-only, distinct from ref badges */}
+        {isSingle && singleElement?.data?.methodRef && (
+          <>
+            <div
+              className="flex items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 px-2 py-1 text-emerald-600 dark:text-emerald-400"
+              title="Method Copy: live-linked to a method on its source service."
+            >
+              <Play size={13} className="fill-emerald-500/30 stroke-[2.5]" />
+            </div>
             <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
           </>
         )}

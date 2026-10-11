@@ -4,7 +4,7 @@ import { toolRegistry, renderFallbackElement } from "@/tools";
 import type { RenderContext } from "@/tools/types";
 import { computeTextResolution } from "../textResolution";
 import { useCanvasStore } from "@/store";
-import { drawReferenceIndicator } from "./linkBadge";
+import { drawReferenceIndicator, drawMethodCopyBadge } from "./linkBadge";
 import { isElementOriginal } from "@/utils/reference";
 import { clearDescZones } from "@/tools/common/descZones";
 
@@ -67,8 +67,18 @@ export class ElementLayer extends Container {
           renderFallbackElement(container, element, context);
         }
 
-        // Reference indicator badge — marks Original (Master ❖) vs Reference Copy (Link 🔗)
-        if (element.referenceId) {
+        // Reference indicator badge — marks Original (Master ❖) vs Reference Copy (Link 🔗).
+        // Method-execution copies (Service) get their own play badge instead.
+        const methodRef = (element.data as { methodRef?: unknown } | undefined)?.methodRef;
+        if (methodRef) {
+          const badgeGraphics = new Graphics();
+          badgeGraphics.eventMode = "none";
+          drawMethodCopyBadge(badgeGraphics, element, {
+            theme,
+            radius: 9,
+          });
+          container.addChild(badgeGraphics);
+        } else if (element.referenceId) {
           const badgeGraphics = new Graphics();
           badgeGraphics.eventMode = "none";
           drawReferenceIndicator(badgeGraphics, element, isOriginal, {

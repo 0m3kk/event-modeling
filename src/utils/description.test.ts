@@ -157,3 +157,100 @@ describe("description utility", () => {
     });
   });
 });
+
+function service(): CanvasElement {
+  return {
+    id: "svc-1",
+    type: "serviceCard",
+    x: 0,
+    y: 0,
+    width: 240,
+    height: 140,
+    data: {
+      name: "OrderService",
+      description: "Handles orders",
+      methods: [
+        {
+          id: "m1",
+          name: "placeOrder",
+          description: "Places an order",
+          params: [{ name: "orderId", type: "string", description: "Param id" }],
+          returns: [{ name: "ok", type: "boolean" }],
+        },
+        { id: "m2", name: "cancelOrder", params: [], returns: [] },
+      ],
+    },
+  };
+}
+
+describe("description utility — Service cards", () => {
+  it("flattens every method into a params band then a returns band", () => {
+    expect(getFieldSections(service()).map((s) => `${s.methodIndex}:${s.kind}`)).toEqual([
+      "0:params",
+      "0:returns",
+      "1:params",
+      "1:returns",
+    ]);
+  });
+
+  it("reads method-level and row descriptions", () => {
+    expect(
+      findDescriptionText(service(), {
+        elementId: "svc-1",
+        sectionId: "method",
+        sectionIndex: 0,
+        fieldIndex: -1,
+      }),
+    ).toBe("Places an order");
+    expect(
+      findDescriptionText(service(), {
+        elementId: "svc-1",
+        sectionId: "params",
+        sectionIndex: 0,
+        fieldIndex: 0,
+      }),
+    ).toBe("Param id");
+    expect(
+      findDescriptionText(service(), {
+        elementId: "svc-1",
+        sectionId: "returns",
+        sectionIndex: 1,
+        fieldIndex: 0,
+      }),
+    ).toBeUndefined();
+    expect(
+      findRowName(service(), {
+        elementId: "svc-1",
+        sectionId: "method",
+        sectionIndex: 0,
+        fieldIndex: -1,
+      }),
+    ).toBe("placeOrder");
+  });
+
+  it("writes method and row descriptions back under data.methods", () => {
+    const methodPatch = applyDescription(
+      service(),
+      { elementId: "svc-1", sectionId: "method", sectionIndex: 1, fieldIndex: -1 },
+      "Cancels an order",
+    );
+    expect((methodPatch?.data as any).methods[1].description).toBe("Cancels an order");
+
+    const rowPatch = applyDescription(
+      service(),
+      { elementId: "svc-1", sectionId: "params", sectionIndex: 0, fieldIndex: 0 },
+      "New id",
+    );
+    expect((rowPatch?.data as any).methods[0].params[0].description).toBe("New id");
+    expect((rowPatch?.data as any).methods[1]).toEqual(service().data.methods[1]);
+  });
+
+  it("removes a method description", () => {
+    const patch = applyDescription(
+      service(),
+      { elementId: "svc-1", sectionId: "method", sectionIndex: 0, fieldIndex: -1 },
+      "",
+    );
+    expect("description" in (patch?.data as any).methods[0]).toBe(false);
+  });
+});
