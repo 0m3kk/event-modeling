@@ -3,6 +3,7 @@ import { Header } from "@/components/Header";
 import { PixiCanvas } from "@/components/PixiCanvas";
 import { Toolbar } from "@/components/Toolbar";
 import { OptionsBar } from "@/components/OptionsBar";
+import { DescTooltip } from "@/components/DescTooltip";
 import { InlineTextEditor } from "@/components/InlineTextEditor";
 import { AIPanel } from "@/components/AIPanel";
 import { GoogleDriveModal } from "@/components/GoogleDriveModal";
@@ -41,6 +42,7 @@ export function App() {
         <PixiCanvas />
         <Toolbar />
         <OptionsBar />
+        <DescTooltip />
         <InlineTextEditor />
         <AIPanel />
         <GoogleDriveModal />

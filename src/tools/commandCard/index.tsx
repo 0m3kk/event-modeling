@@ -1,6 +1,6 @@
 import { Terminal } from "lucide-react";
 import { z } from "zod";
-import { Graphics, Text } from "pixi.js";
+import { Graphics, Text, Container } from "pixi.js";
 import { nanoid } from "nanoid";
 import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point, SelectedField } from "@/types";
@@ -8,8 +8,13 @@ import { useCanvasStore } from "@/store";
 import { CommandCardOptions } from "./CommandCardOptions";
 import {
   renderStandardCardTitle,
+  renderHeaderDescBadge,
+  drawInfoBadge,
   CARD_CORNER_RADIUS,
+  DESC_HIT_HALF,
+  DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
+import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { navigateSubSelect } from "@/utils/subSelection";
 
 export const COMMAND_HEADER_HEIGHT = 32;
@@ -20,6 +25,7 @@ export const COMMAND_DEFAULT_WIDTH = 220;
 export interface CommandField {
   name: string;
   type: string;
+  description?: string;
 }
 
 export interface CommandCardData {
@@ -27,6 +33,7 @@ export interface CommandCardData {
   inputs?: CommandField[];
   responses?: CommandField[];
   color?: string;
+  description?: string;
   // Backward compatibility
   fields?: CommandField[];
 }
@@ -59,6 +66,49 @@ export function computeCommandCardSize(
   return { width: customWidth, height };
 }
 
+/**
+ * Draws a Command row's ⓘ badge just left of its type label and records the
+ * hover hit box (only when the row carries a description).
+ */
+function renderCommandRowDescBadge(
+  container: Container,
+  elementId: string,
+  field: CommandField,
+  sectionIndex: number,
+  fieldIndex: number,
+  typeLabelX: number,
+  rowY: number,
+  textResolution: number,
+): void {
+  const badgeCx = typeLabelX - DESC_ROW_BADGE_GAP;
+  const badgeCy = rowY + COMMAND_ROW_HEIGHT / 2;
+  const badgeG = new Graphics();
+  drawInfoBadge(badgeG, container, badgeCx, badgeCy, {
+    radius: 6,
+    stroke: 0x94a3b8,
+    fill: 0x64748b,
+    fontSize: 7,
+    alpha: field.description ? 1 : 0.5,
+    textResolution,
+  });
+  container.addChild(badgeG);
+
+  if (field.description) {
+    addDescZone(elementId, {
+      elementId,
+      fieldIndex,
+      sectionIndex,
+      text: field.description,
+      iconBounds: {
+        x: badgeCx - DESC_HIT_HALF,
+        y: badgeCy - DESC_HIT_HALF,
+        width: DESC_HIT_HALF * 2,
+        height: DESC_HIT_HALF * 2,
+      },
+    });
+  }
+}
+
 export const CommandCardSchema = z.object({
   name: z.string().default("CommandName"),
   inputs: z
@@ -66,6 +116,7 @@ export const CommandCardSchema = z.object({
       z.object({
         name: z.string(),
         type: z.string(),
+        description: z.string().optional(),
       }),
     )
     .default([]),
@@ -74,10 +125,12 @@ export const CommandCardSchema = z.object({
       z.object({
         name: z.string(),
         type: z.string(),
+        description: z.string().optional(),
       }),
     )
     .default([]),
   color: z.string().optional(),
+  description: z.string().optional(),
 });
 
 export const commandCardTool: ToolDefinition<CommandCardData> = {
@@ -105,6 +158,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
 
   render: (container, element, context) => {
     container.removeChildren();
+    beginDescZones(element.id);
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
@@ -201,6 +255,18 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
       context.textResolution,
     );
 
+    // 7b. Header ⓘ description badge (shows when present or selected)
+    renderHeaderDescBadge(container, {
+      elementId: element.id,
+      width: w,
+      isDark,
+      isSelected,
+      hasDescription: Boolean(element.data.description),
+      hasReference: Boolean(element.referenceId),
+      text: element.data.description,
+      textResolution: context.textResolution,
+    });
+
     if (typeof document !== "undefined") {
       // 8. Render Input Section Header Label
       const inputSectionLabel = new Text({
@@ -252,9 +318,23 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
             },
             resolution: context.textResolution,
           });
+          const showDescBadge = Boolean(field.description) || isFieldSelected;
           typeLabel.x = w - typeLabel.width - 12;
           typeLabel.y = rowY + 8;
           container.addChild(typeLabel);
+
+          if (showDescBadge) {
+            renderCommandRowDescBadge(
+              container,
+              element.id,
+              field,
+              0,
+              idx,
+              typeLabel.x,
+              rowY,
+              context.textResolution,
+            );
+          }
         });
       } else {
         const emptyInputs = new Text({
@@ -321,9 +401,23 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
             },
             resolution: context.textResolution,
           });
+          const showDescBadge = Boolean(field.description) || isFieldSelected;
           typeLabel.x = w - typeLabel.width - 12;
           typeLabel.y = rowY + 8;
           container.addChild(typeLabel);
+
+          if (showDescBadge) {
+            renderCommandRowDescBadge(
+              container,
+              element.id,
+              field,
+              1,
+              idx,
+              typeLabel.x,
+              rowY,
+              context.textResolution,
+            );
+          }
         });
       } else {
         const emptyResponses = new Text({
@@ -341,6 +435,8 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
       }
     }
   },
+
+  getDescHoverTarget: (element, localPoint) => hitDescZone(element.id, localPoint),
 
   onSubSelect: (element, localPoint): SelectedField | null => {
     const inputs = getCommandInputs(element.data);
@@ -608,6 +704,10 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
         .optional()
         .describe("Legacy flat fields list (treated as inputs)"),
       color: z.string().optional().describe("Optional header color hex code"),
+      description: z
+        .string()
+        .optional()
+        .describe("Optional plain-language description of the command"),
     }),
     onCreate: (params, center: Point): CanvasElement<CommandCardData> => {
       const inputs = params.inputs || params.fields || [];
@@ -617,6 +717,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
         inputs,
         responses,
         color: params.color || commandCardTool.color,
+        ...(params.description ? { description: params.description } : {}),
       };
       const size = commandCardTool.computeSize!(data);
       return {

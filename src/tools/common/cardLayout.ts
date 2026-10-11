@@ -1,18 +1,165 @@
 import { Container, Graphics, Text } from "pixi.js";
-import type { CanvasElement, Point, SelectedField, InlineEditState } from "@/types";
+import type {
+  CanvasElement,
+  Point,
+  SelectedField,
+  InlineEditState,
+} from "@/types";
 import { getContrastTextColor } from "@/utils/color";
 import { useCanvasStore } from "@/store";
+import { addDescZone } from "./descZones";
 
 export const CARD_HEADER_HEIGHT = 32;
 export const CARD_ROW_HEIGHT = 28;
 export const CARD_CORNER_RADIUS = 8;
 export const CARD_DEFAULT_WIDTH = 220;
 
+/** Radius of the header ⓘ badge (its center sits at the header mid-line). */
+export const DESC_HEADER_BADGE_RADIUS = 7;
+/** Radius of a field-row ⓘ badge. */
+export const DESC_ROW_BADGE_RADIUS = 6;
+/**
+ * Distance from the card's right edge to the center of a header ⓘ badge.
+ * Reference-copy cards host the ❖/🔗 badge at the corner, so the ⓘ is nudged
+ * further left to avoid overlapping it.
+ */
+export const DESC_HEADER_BADGE_RIGHT = 17;
+export const DESC_HEADER_BADGE_RIGHT_WITH_REF = 40;
+/** Gap between a row ⓘ badge center and the left edge of the type label. */
+export const DESC_ROW_BADGE_GAP = 12;
+/** Half-size of the square hover hit box around a ⓘ badge. */
+export const DESC_HIT_HALF = 9;
+
 export interface CardFieldItem {
   name: string;
   type: string;
   isTag?: boolean;
   tag?: string;
+  description?: string;
+}
+
+export interface InfoBadgeStyle {
+  radius: number;
+  stroke: number;
+  strokeWidth?: number;
+  fill: number;
+  fontSize: number;
+  bold?: boolean;
+  /** Badges dim when the target has no description yet (an "add info" cue). */
+  alpha?: number;
+  glyph?: string;
+  textResolution?: number;
+}
+
+/**
+ * Draws a small circular badge (circle + centered glyph) used for the ⓘ
+ * description indicator. The glyph is anchored at its own center so it stays
+ * optically centered regardless of font metrics.
+ */
+export function drawInfoBadge(
+  g: Graphics,
+  container: Container,
+  cx: number,
+  cy: number,
+  {
+    radius,
+    stroke,
+    strokeWidth = 1,
+    fill,
+    fontSize,
+    bold = false,
+    alpha = 1,
+    glyph = "i",
+    textResolution,
+  }: InfoBadgeStyle,
+): void {
+  g.circle(cx, cy, radius).stroke({ color: stroke, width: strokeWidth, alpha });
+
+  const glyphText = new Text({
+    text: glyph,
+    style: {
+      fontSize,
+      fontFamily: '"Geist Mono", monospace',
+      fontWeight: bold ? "bold" : "normal",
+      fill,
+    },
+    resolution: textResolution,
+  });
+  glyphText.anchor.set(0.5);
+  glyphText.x = cx;
+  glyphText.y = cy;
+  glyphText.alpha = alpha;
+  container.addChild(glyphText);
+}
+
+/** Screen-space center of a card header's ⓘ badge. */
+export function getHeaderDescBadgeCenter(
+  width: number,
+  hasReference: boolean,
+): { x: number; y: number } {
+  return {
+    x: width - (hasReference ? DESC_HEADER_BADGE_RIGHT_WITH_REF : DESC_HEADER_BADGE_RIGHT),
+    y: CARD_HEADER_HEIGHT / 2,
+  };
+}
+
+export interface HeaderDescBadgeOptions {
+  elementId: string;
+  width: number;
+  isDark: boolean;
+  isSelected: boolean;
+  hasDescription: boolean;
+  hasReference: boolean;
+  /** Description text; a hover zone is only registered when present. */
+  text?: string;
+  textResolution: number;
+}
+
+/**
+ * Renders the header ⓘ badge for a card. It shows whenever the card has a
+ * description or is selected (dimmed as an "add info" affordance), mirroring
+ * the reference implementation. Returns the badge hit box in element-local
+ * coordinates, or null when nothing was drawn.
+ */
+export function renderHeaderDescBadge(
+  container: Container,
+  options: HeaderDescBadgeOptions,
+): { x: number; y: number; width: number; height: number } | null {
+  if (typeof document === "undefined") return null;
+
+  const { elementId, width, isDark, isSelected, hasDescription, hasReference, text, textResolution } =
+    options;
+  if (!hasDescription && !isSelected) return null;
+
+  const center = getHeaderDescBadgeCenter(width, hasReference);
+  const g = new Graphics();
+  drawInfoBadge(g, container, center.x, center.y, {
+    radius: DESC_HEADER_BADGE_RADIUS,
+    stroke: isDark ? 0xe4e4e7 : 0xffffff,
+    strokeWidth: 1.2,
+    fill: isDark ? 0xe4e4e7 : 0xffffff,
+    fontSize: 9,
+    bold: true,
+    alpha: hasDescription ? 1 : 0.5,
+    textResolution,
+  });
+  container.addChild(g);
+
+  if (hasDescription && text) {
+    addDescZone(elementId, {
+      elementId,
+      text,
+      iconBounds: {
+        x: center.x - DESC_HIT_HALF,
+        y: center.y - DESC_HIT_HALF,
+        width: DESC_HIT_HALF * 2,
+        height: DESC_HIT_HALF * 2,
+      },
+    });
+  }
+
+  const r = DESC_HEADER_BADGE_RADIUS;
+  return { x: center.x - r, y: center.y - r, width: r * 2, height: r * 2 };
 }
 
 export interface StandardCardFrameOptions {
@@ -26,6 +173,7 @@ export interface StandardCardFrameOptions {
 }
 
 export interface RenderStandardCardFieldsOptions {
+  elementId: string;
   fields?: CardFieldItem[];
   selectedFieldIndex: number;
   width: number;
@@ -160,6 +308,7 @@ export function renderStandardCardFields(
   if (typeof document === "undefined") return;
 
   const {
+    elementId,
     fields,
     selectedFieldIndex,
     width,
@@ -202,9 +351,43 @@ export function renderStandardCardFields(
         },
         resolution: textResolution,
       });
+
+      // Row ⓘ badge sits just left of the type label when the row has a
+      // description or is selected (dimmed as an "add info" affordance).
+      const showDescBadge = Boolean(field.description) || isFieldSelected;
       typeLabel.x = width - typeLabel.width - 12;
       typeLabel.y = currentY + 8;
       container.addChild(typeLabel);
+
+      if (showDescBadge) {
+        const badgeCx = typeLabel.x - DESC_ROW_BADGE_GAP;
+        const badgeCy = currentY + CARD_ROW_HEIGHT / 2;
+        const badgeG = new Graphics();
+        drawInfoBadge(badgeG, container, badgeCx, badgeCy, {
+          radius: DESC_ROW_BADGE_RADIUS,
+          stroke: 0x94a3b8,
+          fill: 0x64748b,
+          fontSize: 7,
+          alpha: field.description ? 1 : 0.5,
+          textResolution,
+        });
+        container.addChild(badgeG);
+
+        if (field.description) {
+          addDescZone(elementId, {
+            elementId,
+            fieldIndex: idx,
+            sectionIndex: 0,
+            text: field.description,
+            iconBounds: {
+              x: badgeCx - DESC_HIT_HALF,
+              y: badgeCy - DESC_HIT_HALF,
+              width: DESC_HIT_HALF * 2,
+              height: DESC_HIT_HALF * 2,
+            },
+          });
+        }
+      }
 
       // Render #tag badge if field is tagged
       if (field.isTag || field.tag) {

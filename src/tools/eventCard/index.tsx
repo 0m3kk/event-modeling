@@ -10,23 +10,27 @@ import {
   drawStandardCardFrame,
   renderStandardCardTitle,
   renderStandardCardFields,
+  renderHeaderDescBadge,
   getStandardCardSubSelect,
   navigateStandardCardSubSelect,
   getStandardCardInlineEditTarget,
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
+import { beginDescZones, hitDescZone } from "../common/descZones";
 
 export interface EventField {
   name: string;
   type: string;
   isTag?: boolean;
   tag?: string;
+  description?: string;
 }
 
 export interface EventCardData {
   name: string;
   fields: EventField[];
   color?: string;
+  description?: string;
 }
 
 export const EventCardSchema = z.object({
@@ -38,10 +42,12 @@ export const EventCardSchema = z.object({
         type: z.string(),
         isTag: z.boolean().optional(),
         tag: z.string().optional(),
+        description: z.string().optional(),
       }),
     )
     .default([]),
   color: z.string().optional(),
+  description: z.string().optional(),
 });
 
 export const eventCardTool: ToolDefinition<EventCardData> = {
@@ -67,6 +73,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
 
   render: (container, element, context) => {
     container.removeChildren();
+    beginDescZones(element.id);
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
@@ -106,16 +113,31 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
 
     // 3. Render Field rows (Geist Mono, edge-to-edge layout)
     renderStandardCardFields(container, {
+      elementId: element.id,
       fields: element.data.fields,
       selectedFieldIndex,
       width: element.width,
       isDark,
       textResolution: context.textResolution,
     });
+
+    // 4. Header ⓘ description badge (shows when present or selected)
+    renderHeaderDescBadge(container, {
+      elementId: element.id,
+      width: element.width,
+      isDark,
+      isSelected,
+      hasDescription: Boolean(element.data.description),
+      hasReference: Boolean(element.referenceId),
+      text: element.data.description,
+      textResolution: context.textResolution,
+    });
   },
 
   onSubSelect: (element, localPoint) =>
     getStandardCardSubSelect(localPoint, element.data.fields?.length || 0),
+
+  getDescHoverTarget: (element, localPoint) => hitDescZone(element.id, localPoint),
 
   onDeleteSubSelect: (element, fieldIndex) => {
     if (!element.data.fields || fieldIndex < 0 || fieldIndex >= element.data.fields.length) {
@@ -234,6 +256,10 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
         .optional()
         .describe("Payload fields carried by the event"),
       color: z.string().optional().describe("Optional header color hex code"),
+      description: z
+        .string()
+        .optional()
+        .describe("Optional plain-language description of the event"),
     }),
     onCreate: (params, center: Point): CanvasElement<EventCardData> => {
       const fields = params.fields || [];
@@ -241,6 +267,7 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
         name: params.name || "Event",
         fields,
         color: params.color || eventCardTool.color,
+        ...(params.description ? { description: params.description } : {}),
       };
       const size = eventCardTool.computeSize!(data);
       return {

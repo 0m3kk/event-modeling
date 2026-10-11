@@ -1,12 +1,14 @@
-import { useState, useMemo } from "react";
-import { Trash2, Copy, Palette, Link2, ChevronDown, Tag } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Trash2, Copy, Palette, Link2, ChevronDown, Tag, Info } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import { FieldTypePopover } from "./FieldTypePopover";
 import { FieldTagPopover } from "./FieldTagPopover";
+import { DescriptionPopover } from "./DescriptionPopover";
 import type { CanvasElement } from "@/types";
 import { isElementOriginal } from "@/utils/reference";
+import { findDescriptionText } from "@/utils/description";
 
 export function OptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
@@ -26,6 +28,7 @@ export function OptionsBar() {
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [isTypePickerOpen, setIsTypePickerOpen] = useState(false);
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
 
   // Collect all unique tags across events in the board for smart suggestions
   const existingTags = useMemo(() => {
@@ -77,6 +80,12 @@ export function OptionsBar() {
       },
     };
   }, [selectedIds, elements]);
+
+  // Close the description panel when the element selection changes so it never
+  // lingers on a different card.
+  useEffect(() => {
+    setIsDescriptionOpen(false);
+  }, [selectedIds]);
 
   if (isDragging || !bounds || selectedElements.length === 0) return null;
 
@@ -168,6 +177,15 @@ export function OptionsBar() {
   };
 
   const ToolCustomOptions = toolDef?.optionsBar;
+
+  // Description scope: a selected field row (if any) or the card itself.
+  const descriptionScopeField =
+    isSingle && singleElement && isFieldSelected ? selectedField : null;
+  const hasDescription = Boolean(
+    isSingle && singleElement
+      ? findDescriptionText(singleElement, descriptionScopeField)?.trim()
+      : false,
+  );
 
   return (
     <div
@@ -290,6 +308,31 @@ export function OptionsBar() {
               }
             />
           </>
+        )}
+
+        {/* DESCRIPTION (ⓘ) — edits the card, or the selected field row */}
+        {isSingle && singleElement && (
+          <div className="relative">
+            <button
+              onClick={() => setIsDescriptionOpen(!isDescriptionOpen)}
+              title={hasDescription ? "Edit Description" : "Add Description"}
+              className={`flex items-center justify-center rounded-xl border p-1.5 transition-colors cursor-pointer ${
+                hasDescription
+                  ? "border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/40"
+                  : "border-transparent hover:bg-gray-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <Info size={16} className="text-sky-600 dark:text-sky-400" />
+            </button>
+
+            {isDescriptionOpen && (
+              <DescriptionPopover
+                element={singleElement}
+                onClose={() => setIsDescriptionOpen(false)}
+                placement={popoverPlacement}
+              />
+            )}
+          </div>
         )}
 
         <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />

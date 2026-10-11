@@ -8,7 +8,7 @@ import { InteractionManager } from "./interactions/InteractionManager";
 import type { InteractionContext } from "./interactions/types";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
-import type { Point, ResolvedTheme } from "@/types";
+import type { Point, ResolvedTheme, DescHoverTarget } from "@/types";
 
 let activeEngine: PixiEngine | null = null;
 export const getActiveEngine = () => activeEngine;
@@ -206,6 +206,9 @@ export class PixiEngine {
 
   private handlePointerLeave = () => {
     this.previewLayer.hidePreview();
+    if (useCanvasStore.getState().descHover) {
+      useCanvasStore.getState().setDescHover(null);
+    }
   };
 
   private handleDblClick = (e: MouseEvent) => {
@@ -236,6 +239,9 @@ export class PixiEngine {
 
   private handlePointerDown = (e: PointerEvent) => {
     if (e.button !== 0 && e.button !== 1) return;
+    if (useCanvasStore.getState().descHover) {
+      useCanvasStore.getState().setDescHover(null);
+    }
     const rect = this.container.getBoundingClientRect();
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
@@ -251,7 +257,48 @@ export class PixiEngine {
     const worldPoint = this.screenToWorld(screenX, screenY);
 
     this.interactionManager.handlePointerMove(e, worldPoint);
+    this.updateDescHover(e, worldPoint);
   };
+
+  /**
+   * Tracks the hovered description ⓘ badge (set by tool hit-testing) so the
+   * React tooltip can anchor to it. Only active in select mode, when no drag /
+   * pan is in progress, and while the pointer is over the canvas.
+   */
+  private updateDescHover(e: PointerEvent, worldPoint: Point): void {
+    const state = useCanvasStore.getState();
+    let next: DescHoverTarget | null = null;
+
+    const canHover =
+      !this.interactionManager.isActive &&
+      !this.isSpaceHeld &&
+      state.tool === "select" &&
+      this.container.contains(e.target as Node);
+
+    if (canHover) {
+      const hitId = this.spatialIndex.hitTest(worldPoint);
+      const element = hitId ? state.elements.find((el) => el.id === hitId) : undefined;
+      const tool = element ? toolRegistry.get(element.type) : null;
+      if (element && tool?.getDescHoverTarget) {
+        const localPoint: Point = {
+          x: worldPoint.x - element.x,
+          y: worldPoint.y - element.y,
+        };
+        next = tool.getDescHoverTarget(element, localPoint);
+      }
+    }
+
+    const current = state.descHover;
+    const same =
+      current && next
+        ? current.elementId === next.elementId &&
+          current.fieldIndex === next.fieldIndex &&
+          current.sectionIndex === next.sectionIndex
+        : current === null && next === null;
+    if (!same) {
+      useCanvasStore.getState().setDescHover(next);
+    }
+  }
 
   private handlePointerUp = (e: PointerEvent) => {
     const rect = this.container.getBoundingClientRect();

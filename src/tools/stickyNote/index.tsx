@@ -5,17 +5,26 @@ import { nanoid } from "nanoid";
 import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point } from "@/types";
 import { getContrastTextColor } from "@/utils/color";
+import {
+  drawInfoBadge,
+  getHeaderDescBadgeCenter,
+  DESC_HEADER_BADGE_RADIUS,
+  DESC_HIT_HALF,
+} from "../common/cardLayout";
+import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { StickyNoteOptions } from "./StickyNoteOptions";
 import { useCanvasStore } from "@/store";
 
 export interface StickyNoteData {
   text: string;
   color?: string;
+  description?: string;
 }
 
 export const StickyNoteSchema = z.object({
   text: z.string().default("Sticky Note"),
   color: z.string().optional(),
+  description: z.string().optional(),
 });
 
 export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
@@ -38,6 +47,7 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
 
   render: (container, element, context) => {
     container.removeChildren();
+    beginDescZones(element.id);
 
     const isSelected = context.isSelected;
     const isDark = context.theme === "dark";
@@ -69,7 +79,39 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
     text.x = 12;
     text.y = 12;
     container.addChild(text);
+
+    // ⓘ description badge (top-right). Sticky notes are light, so it uses a
+    // slate glyph instead of the white banner badge.
+    if (element.data.description || isSelected) {
+      const center = getHeaderDescBadgeCenter(element.width, Boolean(element.referenceId));
+      const badgeG = new Graphics();
+      drawInfoBadge(badgeG, container, center.x, center.y, {
+        radius: DESC_HEADER_BADGE_RADIUS,
+        stroke: isDark ? 0x52525b : 0x94a3b8,
+        fill: isDark ? 0xd4d4d8 : 0x475569,
+        fontSize: 9,
+        bold: true,
+        alpha: element.data.description ? 1 : 0.5,
+        textResolution: context.textResolution,
+      });
+      container.addChild(badgeG);
+
+      if (element.data.description) {
+        addDescZone(element.id, {
+          elementId: element.id,
+          text: element.data.description,
+          iconBounds: {
+            x: center.x - DESC_HIT_HALF,
+            y: center.y - DESC_HIT_HALF,
+            width: DESC_HIT_HALF * 2,
+            height: DESC_HIT_HALF * 2,
+          },
+        });
+      }
+    }
   },
+
+  getDescHoverTarget: (element, localPoint) => hitDescZone(element.id, localPoint),
 
   getInlineEditTarget: (element) => {
     return {
@@ -96,6 +138,10 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
     parameters: z.object({
       text: z.string().describe("Content of the note"),
       color: z.string().optional().describe("Optional hex color code"),
+      description: z
+        .string()
+        .optional()
+        .describe("Optional longer description shown on the ⓘ badge"),
     }),
     onCreate: (params, center: Point): CanvasElement<StickyNoteData> => {
       return {
@@ -108,6 +154,7 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
         data: {
           text: params.text || "Note",
           color: params.color || "#fef08a",
+          ...(params.description ? { description: params.description } : {}),
         },
       };
     },

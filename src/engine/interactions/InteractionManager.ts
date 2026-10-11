@@ -19,6 +19,10 @@ export class InteractionManager {
     this.ctx = ctx;
   }
 
+  get isActive(): boolean {
+    return this.activeInteraction !== null;
+  }
+
   handlePointerDown(e: PointerEvent, worldPoint: Point): boolean {
     this.activeInteraction = null;
 

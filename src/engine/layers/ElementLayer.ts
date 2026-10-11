@@ -6,6 +6,7 @@ import { computeTextResolution } from "../textResolution";
 import { useCanvasStore } from "@/store";
 import { drawReferenceIndicator } from "./linkBadge";
 import { isElementOriginal } from "@/utils/reference";
+import { clearDescZones } from "@/tools/common/descZones";
 
 interface CacheableContainer extends Container {
   _drawKey?: string;
@@ -85,14 +86,16 @@ export class ElementLayer extends Container {
         this.removeChild(container);
         container.destroy({ children: true });
         this.elementContainers.delete(id);
+        clearDescZones(id);
       }
     }
   }
 
   clear() {
-    for (const container of this.elementContainers.values()) {
+    for (const [id, container] of this.elementContainers.entries()) {
       this.removeChild(container);
       container.destroy({ children: true });
+      clearDescZones(id);
     }
     this.elementContainers.clear();
   }

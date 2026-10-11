@@ -9,7 +9,9 @@ import {
   drawStandardCardFrame,
   renderStandardCardTitle,
   renderStandardCardFields,
+  renderHeaderDescBadge,
   getStandardCardSubSelect,
+  getHeaderDescBadgeCenter,
   navigateStandardCardSubSelect,
   getStandardCardInlineEditTarget,
 } from "./cardLayout";
@@ -156,6 +158,7 @@ describe("cardLayout helpers", () => {
       expect(() => {
         renderStandardCardTitle(container, "OrderPlaced", "#f97316", 1);
         renderStandardCardFields(container, {
+          elementId: "card-1",
           fields: [
             { name: "orderId", type: "string" },
             { name: "amount", type: "number" },
@@ -166,6 +169,44 @@ describe("cardLayout helpers", () => {
           textResolution: 1,
         });
       }).not.toThrow();
+    });
+  });
+
+  describe("description badges", () => {
+    const card: CanvasElement<{ description?: string; fields?: { name: string; type: string; description?: string }[] }> = {
+      id: "card-1",
+      type: "eventCard",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 88,
+      data: {
+        description: "Card level note",
+        fields: [
+          { name: "orderId", type: "string", description: "Row note" },
+          { name: "amount", type: "number" },
+        ],
+      },
+    };
+
+    it("computes the header badge center, offset for reference cards", () => {
+      expect(getHeaderDescBadgeCenter(220, false)).toEqual({ x: 203, y: 16 });
+      expect(getHeaderDescBadgeCenter(220, true)).toEqual({ x: 180, y: 16 });
+    });
+
+    it("renders the header badge without throwing (DOM-free)", () => {
+      const container = new Container();
+      expect(() =>
+        renderHeaderDescBadge(container, {
+          elementId: card.id,
+          width: 220,
+          isDark: false,
+          isSelected: true,
+          hasDescription: false,
+          hasReference: false,
+          textResolution: 1,
+        }),
+      ).not.toThrow();
     });
   });
 });

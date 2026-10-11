@@ -49,5 +49,15 @@
     "newBoardDesc": "Mọi thay đổi chưa lưu sẽ bị xóa. Bạn có chắc chắn muốn tiếp tục?",
     "confirm": "Đồng ý tạo mới",
     "cancel": "Hủy bỏ"
+  },
+  "description": {
+    "title": "Mô tả",
+    "field": "Trường: {{name}}",
+    "placeholder": "Thêm mô tả...",
+    "characters": "{{count}} ký tự"
+  },
+  "common": {
+    "close": "Đóng",
+    "delete": "Xóa"
   }
 }

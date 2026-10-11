@@ -1,7 +1,14 @@
 import type { ComponentType } from "react";
 import type { Container } from "pixi.js";
 import { z } from "zod";
-import type { CanvasElement, Point, ResolvedTheme, SelectedField, InlineEditState } from "@/types";
+import type {
+  CanvasElement,
+  Point,
+  ResolvedTheme,
+  SelectedField,
+  InlineEditState,
+  DescHoverTarget,
+} from "@/types";
 
 export interface RenderContext {
   theme: ResolvedTheme;
@@ -77,6 +84,13 @@ export interface ToolDefinition<TData = any> {
 
   // Optional: provides inline edit target on double click (e.g. edit name, field name)
   getInlineEditTarget?: (element: CanvasElement<TData>, localPoint: Point) => InlineEditState | null;
+
+  // Optional: resolves a description ⓘ hover target (header or field row) from
+  // a local pointer position. Drives the ⓘ tooltip without selecting anything.
+  getDescHoverTarget?: (
+    element: CanvasElement<TData>,
+    localPoint: Point,
+  ) => DescHoverTarget | null;
 
   ai?: ToolAIOperation<TData>;
 }

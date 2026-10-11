@@ -49,5 +49,15 @@
     "newBoardDesc": "All unsaved changes will be lost. Do you want to proceed?",
     "confirm": "Yes, Clear Board",
     "cancel": "Cancel"
+  },
+  "description": {
+    "title": "Description",
+    "field": "Field: {{name}}",
+    "placeholder": "Add a description...",
+    "characters": "{{count}} characters"
+  },
+  "common": {
+    "close": "Close",
+    "delete": "Delete"
   }
 }
