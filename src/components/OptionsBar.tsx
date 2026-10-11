@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Trash2, Copy, Palette, Link2, ChevronDown } from "lucide-react";
+import { Trash2, Copy, Palette, Link2, ChevronDown, Tag } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
@@ -18,6 +18,7 @@ export function OptionsBar() {
   const selectedField = useCanvasStore((s) => s.selectedField);
   const deleteSelectedField = useCanvasStore((s) => s.deleteSelectedField);
   const updateSelectedFieldType = useCanvasStore((s) => s.updateSelectedFieldType);
+  const toggleSelectedFieldTag = useCanvasStore((s) => s.toggleSelectedFieldTag);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -98,10 +99,29 @@ export function OptionsBar() {
   const isFieldSelected = Boolean(selectedField && selectedIds.includes(selectedField.elementId));
 
   // Active selected field (if any)
-  const currentField =
-    isSingle && singleElement && isFieldSelected && selectedField && Array.isArray(singleElement.data?.fields)
-      ? ((singleElement.data.fields[selectedField.fieldIndex] as { name: string; type: string } | undefined) ?? null)
-      : null;
+  const currentField = (() => {
+    if (!isSingle || !singleElement || !isFieldSelected || !selectedField) return null;
+    if (toolDef?.getSelectedFieldItem) {
+      return toolDef.getSelectedFieldItem(singleElement, selectedField);
+    }
+    if (singleElement.type === "commandCard") {
+      const section =
+        selectedField.sectionIndex === 1
+          ? singleElement.data?.responses
+          : singleElement.data?.inputs;
+      if (Array.isArray(section) && section[selectedField.fieldIndex]) {
+        return section[selectedField.fieldIndex];
+      }
+    }
+    if (Array.isArray(singleElement.data?.fields)) {
+      return (
+        (singleElement.data.fields[selectedField.fieldIndex] as
+          | { name: string; type: string; isTag?: boolean; tag?: string }
+          | undefined) ?? null
+      );
+    }
+    return null;
+  })();
 
   const handleCopyReference = () => {
     if (isSingle && singleElement) {
@@ -156,7 +176,7 @@ export function OptionsBar() {
           />
         </div>
 
-        {/* 2. FIELD TYPE SELECTOR (When a field is actively selected) */}
+        {/* 2. FIELD TYPE SELECTOR & TAG TOGGLE (When a field is actively selected) */}
         {currentField && (
           <>
             <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
@@ -179,6 +199,22 @@ export function OptionsBar() {
                 placement={popoverPlacement}
               />
             </div>
+
+            {/* Event Card Field Tag toggle (DCB consistency boundary) */}
+            {(singleElement?.type === "eventCard" || Boolean(toolDef?.onToggleSubSelectTag)) && (
+              <button
+                onClick={() => toggleSelectedFieldTag()}
+                title={currentField.isTag ? "Remove Tag from Field" : "Tag Field (Dynamic Consistency Boundary)"}
+                className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono font-medium transition-colors cursor-pointer border ${
+                  currentField.isTag
+                    ? "border-amber-400 bg-amber-500/15 text-amber-600 dark:border-amber-500 dark:bg-amber-950/50 dark:text-amber-400"
+                    : "border-gray-200/80 text-gray-600 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                }`}
+              >
+                <Tag size={13} className={currentField.isTag ? "fill-amber-500 text-amber-500" : ""} />
+                <span>tag</span>
+              </button>
+            )}
           </>
         )}
 

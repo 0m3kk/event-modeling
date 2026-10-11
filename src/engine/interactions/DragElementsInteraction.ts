@@ -51,12 +51,16 @@ export class DragElementsInteraction implements CanvasInteraction {
           x: worldPoint.x - hitElement.x,
           y: worldPoint.y - hitElement.y,
         };
-        const subIndex = tool.onSubSelect(hitElement, localPoint);
-        if (subIndex !== null && subIndex !== undefined) {
-          useCanvasStore.getState().setSelectedField({
-            elementId: hitId,
-            fieldIndex: subIndex,
-          });
+        const subResult = tool.onSubSelect(hitElement, localPoint);
+        if (subResult !== null && subResult !== undefined) {
+          if (typeof subResult === "object") {
+            useCanvasStore.getState().setSelectedField(subResult);
+          } else {
+            useCanvasStore.getState().setSelectedField({
+              elementId: hitId,
+              fieldIndex: subResult,
+            });
+          }
         } else {
           useCanvasStore.getState().setSelectedField(null);
         }

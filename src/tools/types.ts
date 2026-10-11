@@ -51,10 +51,19 @@ export interface ToolDefinition<TData = any> {
   getSubSelectSections?: (element: CanvasElement<TData>) => SubSelectSection[];
 
   // Optional: handles sub-element selection on pointer down (e.g. select field)
-  onSubSelect?: (element: CanvasElement<TData>, localPoint: Point) => number | null;
+  onSubSelect?: (element: CanvasElement<TData>, localPoint: Point) => number | SelectedField | null;
 
   // Optional: handles sub-element deletion (e.g. delete field)
-  onDeleteSubSelect?: (element: CanvasElement<TData>, subIndex: number) => Partial<CanvasElement<TData>> | null;
+  onDeleteSubSelect?: (element: CanvasElement<TData>, subIndex: number, sectionIndex?: number) => Partial<CanvasElement<TData>> | null;
+
+  // Optional: handles sub-element type updates (e.g. change field type)
+  onUpdateSubSelectType?: (element: CanvasElement<TData>, field: SelectedField, type: string) => Partial<CanvasElement<TData>> | null;
+
+  // Optional: handles toggling tag status on sub-element (e.g. DCB tag on event field)
+  onToggleSubSelectTag?: (element: CanvasElement<TData>, field: SelectedField) => Partial<CanvasElement<TData>> | null;
+
+  // Optional: resolves selected item data for UI (e.g. OptionsBar)
+  getSelectedFieldItem?: (element: CanvasElement<TData>, field: SelectedField) => { name: string; type: string; isTag?: boolean; tag?: string } | null;
 
   // Optional: handles custom navigation between sub-elements / sections
   onNavigateSubSelect?: (

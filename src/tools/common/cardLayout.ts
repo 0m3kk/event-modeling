@@ -11,6 +11,8 @@ export const CARD_DEFAULT_WIDTH = 220;
 export interface CardFieldItem {
   name: string;
   type: string;
+  isTag?: boolean;
+  tag?: string;
 }
 
 export interface StandardCardFrameOptions {
@@ -149,7 +151,7 @@ export function renderStandardCardTitle(
 }
 
 /**
- * Renders the field rows with Geist Mono typography and selection awareness.
+ * Renders the field rows with Geist Mono typography, optional #tag badge, and selection awareness.
  */
 export function renderStandardCardFields(
   container: Container,
@@ -203,6 +205,37 @@ export function renderStandardCardFields(
       typeLabel.x = width - typeLabel.width - 12;
       typeLabel.y = currentY + 8;
       container.addChild(typeLabel);
+
+      // Render #tag badge if field is tagged
+      if (field.isTag || field.tag) {
+        const tagText = new Text({
+          text: field.tag ? `#${field.tag}` : "#tag",
+          style: {
+            fontSize: 9,
+            fontWeight: "bold",
+            fontFamily: '"Geist Mono", monospace',
+            fill: isDark ? 0xfbbf24 : 0xd97706,
+          },
+          resolution: textResolution,
+        });
+
+        const badgeW = tagText.width + 8;
+        const badgeH = 15;
+        const badgeX = fieldName.x + fieldName.width + 6;
+        const badgeY = currentY + 6.5;
+
+        if (badgeX + badgeW < typeLabel.x - 4) {
+          const tagBadge = new Graphics();
+          tagBadge.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
+          tagBadge.fill({ color: isDark ? 0x451a03 : 0xfef3c7, alpha: 0.9 });
+          tagBadge.stroke({ color: isDark ? 0xb45309 : 0xf59e0b, width: 1, alpha: 0.8 });
+          container.addChild(tagBadge);
+
+          tagText.x = badgeX + 4;
+          tagText.y = badgeY + 1.5;
+          container.addChild(tagText);
+        }
+      }
 
       currentY += CARD_ROW_HEIGHT;
     });

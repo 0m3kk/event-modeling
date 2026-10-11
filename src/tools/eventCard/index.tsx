@@ -19,6 +19,8 @@ import {
 export interface EventField {
   name: string;
   type: string;
+  isTag?: boolean;
+  tag?: string;
 }
 
 export interface EventCardData {
@@ -34,6 +36,8 @@ export const EventCardSchema = z.object({
       z.object({
         name: z.string(),
         type: z.string(),
+        isTag: z.boolean().optional(),
+        tag: z.string().optional(),
       }),
     )
     .default([]),
@@ -124,6 +128,40 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
       height: nextSize ? nextSize.height : element.height,
       data: nextData,
     };
+  },
+
+  onUpdateSubSelectType: (element, field, type) => {
+    const fields = element.data.fields;
+    if (!fields || field.fieldIndex < 0 || field.fieldIndex >= fields.length) {
+      return null;
+    }
+    const trimmed = type.trim();
+    if (!trimmed) return null;
+    const nextFields = [...fields];
+    nextFields[field.fieldIndex] = { ...fields[field.fieldIndex], type: trimmed };
+    return {
+      data: { ...element.data, fields: nextFields },
+    };
+  },
+
+  onToggleSubSelectTag: (element, field) => {
+    const fields = element.data.fields;
+    if (!fields || field.fieldIndex < 0 || field.fieldIndex >= fields.length) {
+      return null;
+    }
+    const nextFields = [...fields];
+    const cur = nextFields[field.fieldIndex];
+    nextFields[field.fieldIndex] = {
+      ...cur,
+      isTag: !cur.isTag,
+    };
+    return {
+      data: { ...element.data, fields: nextFields },
+    };
+  },
+
+  getSelectedFieldItem: (element, field) => {
+    return element.data.fields?.[field.fieldIndex] ?? null;
   },
 
   getSubSelectSections: (element) => [

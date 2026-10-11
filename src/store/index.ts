@@ -70,6 +70,7 @@ export interface CanvasStoreState {
   deleteElements: (ids: string[]) => void;
   deleteSelectedField: () => void;
   updateSelectedFieldType: (type: string) => void;
+  toggleSelectedFieldTag: () => void;
   navigateSelectedField: (direction: "up" | "down") => void;
   clearBoard: () => void;
   loadProject: (project: ProjectFileV2) => void;
@@ -271,7 +272,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     let patch: Partial<CanvasElement> | null = null;
 
     if (tool?.onDeleteSubSelect) {
-      patch = tool.onDeleteSubSelect(element, selectedField.fieldIndex);
+      patch = tool.onDeleteSubSelect(element, selectedField.fieldIndex, selectedField.sectionIndex);
     } else if (Array.isArray(element.data?.fields)) {
       const nextFields = element.data.fields.filter(
         (_: unknown, i: number) => i !== selectedField.fieldIndex,
@@ -299,7 +300,18 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     if (!selectedField) return;
 
     const element = elements.find((el) => el.id === selectedField.elementId);
-    if (!element || !Array.isArray(element.data?.fields)) return;
+    if (!element) return;
+
+    const tool = toolRegistry.get(element.type);
+    if (tool?.onUpdateSubSelectType) {
+      const patch = tool.onUpdateSubSelectType(element, selectedField, type);
+      if (patch) {
+        get().updateElement(element.id, patch);
+      }
+      return;
+    }
+
+    if (!Array.isArray(element.data?.fields)) return;
 
     const fields = element.data.fields;
     const index = selectedField.fieldIndex;
@@ -310,6 +322,37 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
     const nextFields = [...fields];
     nextFields[index] = { ...fields[index], type: trimmedType };
+
+    get().updateElement(element.id, {
+      data: { ...element.data, fields: nextFields },
+    });
+  },
+
+  toggleSelectedFieldTag: () => {
+    const { selectedField, elements } = get();
+    if (!selectedField) return;
+
+    const element = elements.find((el) => el.id === selectedField.elementId);
+    if (!element) return;
+
+    const tool = toolRegistry.get(element.type);
+    if (tool?.onToggleSubSelectTag) {
+      const patch = tool.onToggleSubSelectTag(element, selectedField);
+      if (patch) {
+        get().updateElement(element.id, patch);
+      }
+      return;
+    }
+
+    if (!Array.isArray(element.data?.fields)) return;
+
+    const fields = element.data.fields;
+    const index = selectedField.fieldIndex;
+    if (index < 0 || index >= fields.length) return;
+
+    const nextFields = [...fields];
+    const cur = nextFields[index];
+    nextFields[index] = { ...cur, isTag: !cur.isTag };
 
     get().updateElement(element.id, {
       data: { ...element.data, fields: nextFields },

@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { commandCardTool, type CommandCardData } from "./index";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
+import { navigateSubSelect } from "@/utils/subSelection";
 
-describe("commandCardTool sub-selection & inline edit targets", () => {
+describe("commandCardTool multi-section (inputs & responses)", () => {
   beforeEach(() => {
     useCanvasStore.getState().clearBoard();
   });
@@ -14,12 +15,15 @@ describe("commandCardTool sub-selection & inline edit targets", () => {
     x: 100,
     y: 100,
     width: 220,
-    height: 88,
+    height: 160,
     data: {
       name: "PlaceOrder",
-      fields: [
+      inputs: [
         { name: "orderId", type: "string" },
         { name: "totalAmount", type: "number" },
+      ],
+      responses: [
+        { name: "trackingCode", type: "string" },
       ],
       color: "#2563eb",
     },
@@ -30,21 +34,55 @@ describe("commandCardTool sub-selection & inline edit targets", () => {
     expect(commandCardTool.name).toBe("Command");
     expect(commandCardTool.color).toBe("#2563eb");
     expect(commandCardTool.category).toBe("modeling");
-    expect(commandCardTool.defaultSize).toEqual({ width: 220, height: 60 });
+    expect(commandCardTool.defaultSize).toEqual({ width: 220, height: 132 });
   });
 
-  it("sub-selects fields correctly", () => {
-    // Header area (y <= 32) is not a field
+  it("computes height accurately for 2 sections", () => {
+    // 32 (header) + 22 (input header) + 2*28 (inputs) + 22 (resp header) + 1*28 (responses) = 160
+    const size = commandCardTool.computeSize!(card.data);
+    expect(size.width).toBe(220);
+    expect(size.height).toBe(160);
+  });
+
+  it("sub-selects fields correctly across both sections", () => {
+    // Header area (y <= 32)
     expect(commandCardTool.onSubSelect!(card, { x: 50, y: 15 })).toBeNull();
 
-    // Field 0: y in [32, 60] -> e.g. y = 45
-    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 45 })).toBe(0);
+    // Input section banner (32 <= y < 54)
+    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 40 })).toBeNull();
 
-    // Field 1: y in [60, 88] -> e.g. y = 75
-    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 75 })).toBe(1);
+    // Input 0: y in [54, 82) -> e.g. y = 65
+    const in0 = commandCardTool.onSubSelect!(card, { x: 50, y: 65 });
+    expect(in0).toEqual({
+      elementId: "cmd-1",
+      sectionIndex: 0,
+      sectionId: "inputs",
+      fieldIndex: 0,
+    });
 
-    // Below card fields -> null
+    // Input 1: y in [82, 110) -> e.g. y = 95
+    const in1 = commandCardTool.onSubSelect!(card, { x: 50, y: 95 });
+    expect(in1).toEqual({
+      elementId: "cmd-1",
+      sectionIndex: 0,
+      sectionId: "inputs",
+      fieldIndex: 1,
+    });
+
+    // Response section banner (110 <= y < 132) -> e.g. y = 120
     expect(commandCardTool.onSubSelect!(card, { x: 50, y: 120 })).toBeNull();
+
+    // Response 0: y in [132, 160) -> e.g. y = 145
+    const res0 = commandCardTool.onSubSelect!(card, { x: 50, y: 145 });
+    expect(res0).toEqual({
+      elementId: "cmd-1",
+      sectionIndex: 1,
+      sectionId: "responses",
+      fieldIndex: 0,
+    });
+
+    // Below card -> null
+    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 180 })).toBeNull();
   });
 
   it("returns inline edit target for header (Command Name)", () => {
@@ -67,11 +105,11 @@ describe("commandCardTool sub-selection & inline edit targets", () => {
     expect(reverted?.data.name).toBe("PlaceOrder");
   });
 
-  it("returns inline edit target for Field Name", () => {
+  it("returns inline edit target for Input Field Name", () => {
     useCanvasStore.getState().addElement(card);
 
-    // Double click on field 0 (orderId)
-    const target = commandCardTool.getInlineEditTarget!(card, { x: 30, y: 45 });
+    // Double click on input 0 (orderId) at y = 65
+    const target = commandCardTool.getInlineEditTarget!(card, { x: 30, y: 65 });
     expect(target).not.toBeNull();
     expect(target?.initialValue).toBe("orderId");
 
@@ -79,37 +117,120 @@ describe("commandCardTool sub-selection & inline edit targets", () => {
     target?.onCommit("cartId");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "cmd-1");
-    expect(updated?.data.fields[0].name).toBe("cartId");
-    expect(updated?.data.fields[0].type).toBe("string");
+    expect(updated?.data.inputs?.[0].name).toBe("cartId");
+    expect(updated?.data.inputs?.[0].type).toBe("string");
 
     // Selected field state was updated
     expect(useCanvasStore.getState().selectedField).toEqual({
       elementId: "cmd-1",
+      sectionIndex: 0,
+      sectionId: "inputs",
       fieldIndex: 0,
     });
   });
 
-  it("deletes sub-selected field and updates card height", () => {
-    const patch = commandCardTool.onDeleteSubSelect!(card, 0);
-    expect(patch).not.toBeNull();
-    expect(patch?.data?.fields.length).toBe(1);
-    expect(patch?.data?.fields[0].name).toBe("totalAmount");
-    expect(patch?.height).toBe(32 + 28);
+  it("returns inline edit target for Response Field Name", () => {
+    useCanvasStore.getState().addElement(card);
+
+    // Double click on response 0 (trackingCode) at y = 145
+    const target = commandCardTool.getInlineEditTarget!(card, { x: 30, y: 145 });
+    expect(target).not.toBeNull();
+    expect(target?.initialValue).toBe("trackingCode");
+
+    // Commit change
+    target?.onCommit("shipmentId");
+
+    const updated = useCanvasStore.getState().elements.find((e) => e.id === "cmd-1");
+    expect(updated?.data.responses?.[0].name).toBe("shipmentId");
+    expect(updated?.data.responses?.[0].type).toBe("string");
+
+    // Selected field state was updated
+    expect(useCanvasStore.getState().selectedField).toEqual({
+      elementId: "cmd-1",
+      sectionIndex: 1,
+      sectionId: "responses",
+      fieldIndex: 0,
+    });
   });
 
-  it("navigates fields via arrow keys", () => {
-    const down = commandCardTool.onNavigateSubSelect!(
-      card,
-      { elementId: "cmd-1", fieldIndex: 0 },
-      "down",
-    );
-    expect(down?.fieldIndex).toBe(1);
+  it("deletes sub-selected field from section 0 (inputs)", () => {
+    const patch = commandCardTool.onDeleteSubSelect!(card, 0, 0);
+    expect(patch).not.toBeNull();
+    expect(patch?.data?.inputs?.length).toBe(1);
+    expect(patch?.data?.inputs?.[0].name).toBe("totalAmount");
+    expect(patch?.data?.responses?.length).toBe(1);
+    // Height updated: 32 + 22 + 1*28 + 22 + 1*28 = 132
+    expect(patch?.height).toBe(132);
+  });
 
-    const up = commandCardTool.onNavigateSubSelect!(
+  it("deletes sub-selected field from section 1 (responses)", () => {
+    const patch = commandCardTool.onDeleteSubSelect!(card, 0, 1);
+    expect(patch).not.toBeNull();
+    expect(patch?.data?.inputs?.length).toBe(2);
+    expect(patch?.data?.responses?.length).toBe(0);
+    // Height: 32 + 22 + 2*28 + 22 + 1*28 (min 1 row for empty response) = 160
+    expect(patch?.height).toBe(160);
+  });
+
+  it("updates field type for input and response", () => {
+    // Update input type
+    const inputPatch = commandCardTool.onUpdateSubSelectType!(
       card,
-      { elementId: "cmd-1", fieldIndex: 1 },
-      "up",
+      { elementId: "cmd-1", sectionIndex: 0, fieldIndex: 0 },
+      "uuid",
     );
-    expect(up?.fieldIndex).toBe(0);
+    expect(inputPatch?.data?.inputs?.[0].type).toBe("uuid");
+
+    // Update response type
+    const respPatch = commandCardTool.onUpdateSubSelectType!(
+      card,
+      { elementId: "cmd-1", sectionIndex: 1, fieldIndex: 0 },
+      "object",
+    );
+    expect(respPatch?.data?.responses?.[0].type).toBe("object");
+  });
+
+  it("navigates across sections via arrow keys", () => {
+    // Inside inputs: 0 -> 1
+    const next1 = navigateSubSelect(
+      card,
+      { elementId: "cmd-1", sectionIndex: 0, fieldIndex: 0 },
+      "down",
+      commandCardTool,
+    );
+    expect(next1).toEqual({
+      elementId: "cmd-1",
+      sectionIndex: 0,
+      sectionId: "inputs",
+      fieldIndex: 1,
+    });
+
+    // From last input (section 0, index 1) down -> jumps to first response (section 1, index 0)!
+    const jumpToResp = navigateSubSelect(
+      card,
+      { elementId: "cmd-1", sectionIndex: 0, fieldIndex: 1 },
+      "down",
+      commandCardTool,
+    );
+    expect(jumpToResp).toEqual({
+      elementId: "cmd-1",
+      sectionIndex: 1,
+      sectionId: "responses",
+      fieldIndex: 0,
+    });
+
+    // From first response (section 1, index 0) up -> jumps back to last input (section 0, index 1)!
+    const jumpToInput = navigateSubSelect(
+      card,
+      { elementId: "cmd-1", sectionIndex: 1, fieldIndex: 0 },
+      "up",
+      commandCardTool,
+    );
+    expect(jumpToInput).toEqual({
+      elementId: "cmd-1",
+      sectionIndex: 0,
+      sectionId: "inputs",
+      fieldIndex: 1,
+    });
   });
 });
