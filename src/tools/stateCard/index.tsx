@@ -2,8 +2,7 @@ import { Database } from "lucide-react";
 import { z } from "zod";
 import { Graphics, Text, Container } from "pixi.js";
 import { nanoid } from "nanoid";
-import type { ToolDefinition, ValidationIssue } from "../types";
-import { ToolValidationError } from "../types";
+import type { ToolDefinition } from "../types";
 import type { CanvasElement, Point, SelectedField } from "@/types";
 import { useCanvasStore } from "@/store";
 import { collectBoardTagCatalog, fieldTypeKey } from "@/utils/eventTags";
@@ -1159,15 +1158,6 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
         color: params.color || stateCardTool.color,
         ...(params.description ? { description: params.description } : {}),
       };
-
-      // Enforce the DCB rules: reject the whole card if any tag is unknown or
-      // its param field type mismatches. The AI bridge reports the issues back.
-      const { issues } = validateStateCardData(data, {
-        elements: useCanvasStore.getState().elements,
-      });
-      if (issues.length > 0) {
-        throw new ToolValidationError(issues as ValidationIssue[]);
-      }
 
       const size = computeStateCardSize(data);
       return {

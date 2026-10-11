@@ -1,6 +1,9 @@
 import type { CanvasElement } from "@/types";
 import type { ValidationIssue } from "../types";
 import { collectBoardTagCatalog, fieldTypeKey } from "@/utils/eventTags";
+import { collectEventTypeNames } from "@/utils/typeCatalog";
+import { nameKey } from "@/utils/naming";
+import { validateFieldTypes } from "../common/typeValidation";
 
 /** A typed field row used by both the `params` and `states` sections. */
 export interface StateField {
@@ -61,27 +64,65 @@ export interface StateValidationContext {
 }
 
 /**
- * Enforces the State card DCB invariants:
+ * Enforces the State card invariants:
+ * - every field type (params/states) must be a primitive or a defined type;
+ * - every query event type must match an Event card on the board;
  * - every query tag must reference a tag that exists on an event field;
  * - that tag must map to a param field on this card;
  * - the param field type must match the tagged event field type.
  *
- * Returns a normalized copy of the data with invalid tag references dropped,
- * plus the list of issues found. Callers decide whether to repair (store) or
- * reject (AI) based on this result.
+ * Returns a normalized copy of the data with invalid event types and tag
+ * references dropped, plus the list of issues found. Callers decide whether to
+ * repair (store) or reject (AI) based on this result.
  */
 export function validateStateCardData(
   data: StateCardData,
   ctx: StateValidationContext,
 ): { data: StateCardData; issues: ValidationIssue[] } {
   const issues: ValidationIssue[] = [];
-  const catalog = collectBoardTagCatalog(ctx.elements ?? []);
+  const elements = ctx.elements ?? [];
+  const catalog = collectBoardTagCatalog(elements);
+  const eventTypes = collectEventTypeNames(elements);
+
+  // Field types must be primitive or defined on the board.
+  issues.push(...validateFieldTypes(getStateParams(data), "params", elements));
+  issues.push(...validateFieldTypes(getStateFields(data), "states", elements));
 
   const params = getStateParams(data);
   const paramByName = new Map(params.map((p) => [p.name, p]));
   const queryItems = getQueryItems(data);
 
   const nextItems = queryItems.map((item, itemIndex) => {
+    // 1. Every event type in the item must exist on the board.
+    const inputTypes = Array.isArray(item.types) ? item.types : [];
+    const validTypes: string[] = [];
+
+    inputTypes.forEach((raw, typeIndex) => {
+      const name = typeof raw === "string" ? raw.trim() : "";
+      const path = `queryItems[${itemIndex}].types[${typeIndex}]`;
+
+      if (!name) {
+        issues.push({
+          path,
+          code: "event_type_not_found",
+          message: "Query event type name is empty.",
+        });
+        return;
+      }
+
+      if (!eventTypes.has(nameKey(name))) {
+        issues.push({
+          path,
+          code: "event_type_not_found",
+          message: `Event "${name}" does not exist on the board.`,
+        });
+        return;
+      }
+
+      validTypes.push(name);
+    });
+
+    // 2. Every tag must exist and map to a param field of the same type.
     const inputTags = Array.isArray(item.tags) ? item.tags : [];
     const validTags: QueryTag[] = [];
 
@@ -139,7 +180,7 @@ export function validateStateCardData(
       validTags.push({ tag, field: fieldName });
     });
 
-    return { ...item, tags: validTags };
+    return { ...item, types: validTypes, tags: validTags };
   });
 
   return { data: { ...data, queryItems: nextItems }, issues };

@@ -15,6 +15,8 @@ import {
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
 import { beginDescZones, hitDescZone } from "../common/descZones";
+import { validateTypeValue } from "../common/typeValidation";
+import { collectDefinedTypeNames } from "@/utils/typeCatalog";
 
 /**
  * An Alias: a named domain type that wraps a single existing type
@@ -58,6 +60,15 @@ export const aliasCardTool: ToolDefinition<AliasCardData> = {
   computeSize: () => computeStandardCardSize(0),
 
   optionsBar: AliasCardOptions,
+
+  validateData: (data, context) => ({
+    data,
+    issues: validateTypeValue(
+      data.aliasedType,
+      "aliasedType",
+      collectDefinedTypeNames(context.elements ?? []),
+    ),
+  }),
 
   render: (container, element, context) => {
     container.removeChildren();

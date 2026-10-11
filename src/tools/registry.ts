@@ -25,6 +25,14 @@ class ToolRegistryImpl {
     }
     return list;
   }
+
+  /** Finds the tool definition backing an AI operation (by tool name). */
+  getByAIToolName(toolName: string): ToolDefinition | undefined {
+    for (const tool of this.tools.values()) {
+      if (tool.ai?.toolName === toolName) return tool;
+    }
+    return undefined;
+  }
 }
 
 export const toolRegistry = new ToolRegistryImpl();

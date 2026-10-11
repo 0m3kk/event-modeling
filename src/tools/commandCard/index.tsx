@@ -16,6 +16,7 @@ import {
 } from "../common/cardLayout";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { navigateSubSelect } from "@/utils/subSelection";
+import { validateFieldTypes } from "../common/typeValidation";
 
 export const COMMAND_HEADER_HEIGHT = 32;
 export const COMMAND_SECTION_HEADER_HEIGHT = 22;
@@ -161,6 +162,14 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
   computeSize: (data) => computeCommandCardSize(data),
 
   optionsBar: CommandCardOptions,
+
+  validateData: (data, context) => ({
+    data,
+    issues: [
+      ...validateFieldTypes(getCommandInputs(data), "inputs", context.elements ?? []),
+      ...validateFieldTypes(getCommandResponses(data), "responses", context.elements ?? []),
+    ],
+  }),
 
   render: (container, element, context) => {
     container.removeChildren();

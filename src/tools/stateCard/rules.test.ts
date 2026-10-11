@@ -74,4 +74,55 @@ describe("validateStateCardData", () => {
     const { issues } = validateStateCardData(data, { elements: board });
     expect(issues.map((i) => i.code)).toEqual(["type_mismatch"]);
   });
+
+  it("flags a query event type that is not on the board", () => {
+    const data: StateCardData = {
+      ...base,
+      queryItems: [{ types: ["GhostEvent"], tags: [] }],
+    };
+    const { issues, data: normalized } = validateStateCardData(data, { elements: board });
+    expect(issues.map((i) => i.code)).toEqual(["event_type_not_found"]);
+    expect(normalized.queryItems?.[0].types).toHaveLength(0);
+  });
+
+  it("accepts an event type that exists on the board", () => {
+    const data: StateCardData = {
+      ...base,
+      queryItems: [{ types: ["UserRegistered"], tags: [] }],
+    };
+    const { issues } = validateStateCardData(data, { elements: board });
+    expect(issues).toHaveLength(0);
+  });
+
+  it("flags a param/state type that is neither primitive nor defined", () => {
+    const data: StateCardData = {
+      name: "User",
+      params: [{ name: "userId", type: "Ghost" }],
+      states: [{ name: "exists", type: "" }],
+    };
+    const { issues } = validateStateCardData(data, { elements: board });
+    expect(issues.map((i) => i.code)).toEqual(["type_unknown", "type_missing"]);
+  });
+
+  it("accepts a defined Object type on a param", () => {
+    const withObject = [
+      ...board,
+      {
+        id: "obj-1",
+        type: "objectCard",
+        x: 0,
+        y: 0,
+        width: 220,
+        height: 100,
+        data: { name: "Address", fields: [] },
+      } as CanvasElement,
+    ];
+    const data: StateCardData = {
+      name: "User",
+      params: [{ name: "address", type: "Address" }],
+      states: [{ name: "exists", type: "boolean" }],
+    };
+    const { issues } = validateStateCardData(data, { elements: withObject });
+    expect(issues).toHaveLength(0);
+  });
 });

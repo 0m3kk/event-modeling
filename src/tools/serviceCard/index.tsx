@@ -15,6 +15,7 @@ import {
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
+import { validateFieldTypes } from "../common/typeValidation";
 import {
   SERVICE_DEFAULT_WIDTH,
   SERVICE_HEADER_HEIGHT,
@@ -266,6 +267,15 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
   computeSize: (data) => computeServiceCardSize(data),
 
   optionsBar: ServiceCardOptions,
+
+  validateData: (data, context) => {
+    const elements = context.elements ?? [];
+    const issues = (data.methods ?? []).flatMap((method, methodIndex) => [
+      ...validateFieldTypes(method.params, `methods[${methodIndex}].params`, elements),
+      ...validateFieldTypes(method.returns, `methods[${methodIndex}].returns`, elements),
+    ]);
+    return { data, issues };
+  },
 
   render: (container, element, context) => {
     container.removeChildren();
@@ -783,8 +793,36 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
         .array(
           z.object({
             name: z.string().describe("Method name in camelCase (e.g. placeOrder)"),
-            params: z.array(z.any()).optional().describe("Param fields of the method"),
-            returns: z.array(z.any()).optional().describe("Return fields of the method"),
+            params: z
+              .array(
+                z.object({
+                  name: z.string().describe("Param field name in camelCase"),
+                  type: z
+                    .string()
+                    .describe(
+                      "Field data type (e.g. string, number, boolean, or a defined Object/Enum/Alias name)",
+                    ),
+                  isArray: z.boolean().optional().describe("True when the field is an array of the type"),
+                  isRequired: z.boolean().optional().describe("True when the field is required"),
+                }),
+              )
+              .optional()
+              .describe("Param fields of the method"),
+            returns: z
+              .array(
+                z.object({
+                  name: z.string().describe("Return field name in camelCase"),
+                  type: z
+                    .string()
+                    .describe(
+                      "Field data type (e.g. string, number, boolean, or a defined Object/Enum/Alias name)",
+                    ),
+                  isArray: z.boolean().optional().describe("True when the field is an array of the type"),
+                  isRequired: z.boolean().optional().describe("True when the field is required"),
+                }),
+              )
+              .optional()
+              .describe("Return fields of the method"),
             description: z.string().optional().describe("Optional method description"),
           }),
         )

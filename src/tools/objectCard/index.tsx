@@ -17,6 +17,7 @@ import {
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
 import { beginDescZones, hitDescZone } from "../common/descZones";
+import { validateFieldTypes } from "../common/typeValidation";
 
 export interface ObjectField {
   name: string;
@@ -71,6 +72,11 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
   computeSize: (data) => computeStandardCardSize(data.fields?.length || 0),
 
   optionsBar: ObjectCardOptions,
+
+  validateData: (data, context) => ({
+    data,
+    issues: validateFieldTypes(data.fields, "fields", context.elements ?? []),
+  }),
 
   render: (container, element, context) => {
     container.removeChildren();

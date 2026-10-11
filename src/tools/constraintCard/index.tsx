@@ -2,8 +2,7 @@ import { ShieldCheck } from "lucide-react";
 import { z } from "zod";
 import { Graphics, Text, Container } from "pixi.js";
 import { nanoid } from "nanoid";
-import type { ToolDefinition, ValidationIssue } from "../types";
-import { ToolValidationError } from "../types";
+import type { ToolDefinition } from "../types";
 import type { CanvasElement, InlineEditState, Point, SelectedField } from "@/types";
 import { useCanvasStore } from "@/store";
 import { nameKey } from "@/utils/naming";
@@ -575,15 +574,6 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
         color: params.color || constraintCardTool.color,
         ...(params.description ? { description: params.description } : {}),
       };
-
-      // Reject the whole card if any state reference is unknown so the model can
-      // fix the data (e.g. create the State first) and retry.
-      const { issues } = validateConstraintCardData(data, {
-        elements: useCanvasStore.getState().elements,
-      });
-      if (issues.length > 0) {
-        throw new ToolValidationError(issues as ValidationIssue[]);
-      }
 
       const size = computeConstraintCardSize(data);
       return {

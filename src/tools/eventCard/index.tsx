@@ -17,6 +17,7 @@ import {
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
 import { beginDescZones, hitDescZone } from "../common/descZones";
+import { validateEventCardData } from "./rules";
 
 export interface EventField {
   name: string;
@@ -74,6 +75,8 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
   computeSize: (data) => computeStandardCardSize(data.fields?.length || 0),
 
   optionsBar: EventCardOptions,
+
+  validateData: (data, context) => validateEventCardData(data, context),
 
   render: (container, element, context) => {
     container.removeChildren();
@@ -280,9 +283,15 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
         .array(
           z.object({
             name: z.string().describe("Field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean)"),
+            type: z.string().describe("Field data type (e.g. string, number, boolean, or a defined Object/Enum/Alias name)"),
             isArray: z.boolean().optional().describe("True when the field is an array of the type"),
             isRequired: z.boolean().optional().describe("True when the field is required"),
+            tag: z
+              .string()
+              .optional()
+              .describe(
+                "Optional DCB tag for this field (consistency boundary). All events reusing a tag MUST use the same field type.",
+              ),
           }),
         )
         .optional()

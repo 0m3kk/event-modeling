@@ -15,6 +15,7 @@ import {
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
+import { validateFieldTypes } from "../common/typeValidation";
 
 export const QUERY_HEADER_HEIGHT = 32;
 export const QUERY_SECTION_HEADER_HEIGHT = 22;
@@ -157,6 +158,14 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
   computeSize: (data) => computeQueryCardSize(data),
 
   optionsBar: QueryCardOptions,
+
+  validateData: (data, context) => ({
+    data,
+    issues: [
+      ...validateFieldTypes(getQueryParams(data), "params", context.elements ?? []),
+      ...validateFieldTypes(getQueryResponses(data), "responses", context.elements ?? []),
+    ],
+  }),
 
   render: (container, element, context) => {
     container.removeChildren();

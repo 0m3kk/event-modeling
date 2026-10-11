@@ -178,18 +178,16 @@ describe("constraintCardTool validation + AI", () => {
     expect(normalized.rules?.[0]).toBe("AccountStatus.status must be active");
   });
 
-  it("rejects AI creation when the referenced state is unknown", () => {
-    useCanvasStore.getState().clearBoard();
-    expect(() =>
-      constraintCardTool.ai!.onCreate(
-        {
-          name: "AccountMustBeActive",
-          states: ["AccountStatus"],
-          rules: ["AccountStatus.status must be active"],
-        },
-        { x: 0, y: 0 },
-      ),
-    ).toThrow();
+  it("validateData rejects a state that is not on the board", () => {
+    const { issues } = constraintCardTool.validateData!(
+      {
+        name: "AccountMustBeActive",
+        states: [{ name: "AccountStatus" }],
+        rules: ["AccountStatus.status must be active"],
+      },
+      { elements: [] },
+    );
+    expect(issues.map((i) => i.code)).toEqual(["state_not_found"]);
   });
 
   it("creates the constraint once the state exists on the board", () => {

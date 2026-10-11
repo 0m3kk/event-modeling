@@ -245,19 +245,18 @@ describe("stateCardTool DCB rule enforcement", () => {
     expect(normalized.queryItems?.[1].tags).toHaveLength(1);
   });
 
-  it("AI creation is rejected with issues when a tag is unknown", () => {
+  it("validateData rejects a tag that is unknown", () => {
     useCanvasStore.getState().clearBoard();
-    expect(() =>
-      stateCardTool.ai!.onCreate(
-        {
-          name: "Course",
-          params: [{ name: "courseId", type: "string" }],
-          queryItems: [{ types: ["CourseDefined"], tags: [{ tag: "course", field: "courseId" }] }],
-          states: [],
-        },
-        { x: 0, y: 0 },
-      ),
-    ).toThrow();
+    const { issues } = stateCardTool.validateData!(
+      {
+        name: "Course",
+        params: [{ name: "courseId", type: "string" }],
+        queryItems: [{ types: ["CourseDefined"], tags: [{ tag: "course", field: "courseId" }] }],
+        states: [],
+      },
+      { elements: [] },
+    );
+    expect(issues.some((i) => i.code === "tag_not_found")).toBe(true);
   });
 
   it("AI creation succeeds once the tag exists on the board", () => {
