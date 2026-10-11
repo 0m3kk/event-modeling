@@ -1,11 +1,13 @@
 import { toolRegistry } from "./registry";
-import { stickyNoteTool } from "./stickyNote";
+import { commandCardTool } from "./commandCard";
 import { eventCardTool } from "./eventCard";
+import { stickyNoteTool } from "./stickyNote";
 
 // Register default decoupled tools
-toolRegistry.register(stickyNoteTool);
+toolRegistry.register(commandCardTool);
 toolRegistry.register(eventCardTool);
+toolRegistry.register(stickyNoteTool);
 
 export * from "./types";
 export * from "./registry";
-export { stickyNoteTool, eventCardTool };
+export { commandCardTool, eventCardTool, stickyNoteTool };
