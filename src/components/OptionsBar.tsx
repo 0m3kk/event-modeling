@@ -4,6 +4,7 @@ import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import { FieldTypePopover } from "./FieldTypePopover";
+import { FieldTagPopover } from "./FieldTagPopover";
 import type { CanvasElement } from "@/types";
 import { isElementOriginal } from "@/utils/reference";
 
@@ -19,10 +20,27 @@ export function OptionsBar() {
   const deleteSelectedField = useCanvasStore((s) => s.deleteSelectedField);
   const updateSelectedFieldType = useCanvasStore((s) => s.updateSelectedFieldType);
   const toggleSelectedFieldTag = useCanvasStore((s) => s.toggleSelectedFieldTag);
+  const updateSelectedFieldTag = useCanvasStore((s) => s.updateSelectedFieldTag);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [isTypePickerOpen, setIsTypePickerOpen] = useState(false);
+  const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
+
+  // Collect all unique tags across events in the board for smart suggestions
+  const existingTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const el of elements) {
+      if (el.type === "eventCard" && Array.isArray(el.data?.fields)) {
+        for (const f of el.data.fields) {
+          if (f.tag && typeof f.tag === "string") {
+            tagSet.add(f.tag);
+          }
+        }
+      }
+    }
+    return Array.from(tagSet);
+  }, [elements]);
 
   // Compute selected items and bounding rect
   const { selectedElements, bounds } = useMemo(() => {
@@ -200,20 +218,44 @@ export function OptionsBar() {
               />
             </div>
 
-            {/* Event Card Field Tag toggle (DCB consistency boundary) */}
+            {/* Event Card Field Tag Popover (DCB consistency boundary) */}
             {(singleElement?.type === "eventCard" || Boolean(toolDef?.onToggleSubSelectTag)) && (
-              <button
-                onClick={() => toggleSelectedFieldTag()}
-                title={currentField.isTag ? "Remove Tag from Field" : "Tag Field (Dynamic Consistency Boundary)"}
-                className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono font-medium transition-colors cursor-pointer border ${
-                  currentField.isTag
-                    ? "border-amber-400 bg-amber-500/15 text-amber-600 dark:border-amber-500 dark:bg-amber-950/50 dark:text-amber-400"
-                    : "border-gray-200/80 text-gray-600 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                }`}
-              >
-                <Tag size={13} className={currentField.isTag ? "fill-amber-500 text-amber-500" : ""} />
-                <span>tag</span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setIsTagPickerOpen(!isTagPickerOpen)}
+                  title={
+                    currentField.tag
+                      ? `DCB Consistency Boundary Tag: #${currentField.tag} (Click to change)`
+                      : "Attach DCB Consistency Boundary Tag"
+                  }
+                  className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-mono font-medium transition-colors cursor-pointer border ${
+                    currentField.tag || currentField.isTag
+                      ? "border-amber-400 bg-amber-500/15 text-amber-600 dark:border-amber-500 dark:bg-amber-950/50 dark:text-amber-400"
+                      : "border-gray-200/80 text-gray-600 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  <Tag
+                    size={13}
+                    className={
+                      currentField.tag || currentField.isTag
+                        ? "fill-amber-500 text-amber-500"
+                        : "text-gray-400 dark:text-zinc-500"
+                    }
+                  />
+                  <span>{currentField.tag ? `#${currentField.tag}` : "+ tag"}</span>
+                  <ChevronDown size={13} className="text-gray-400" />
+                </button>
+
+                <FieldTagPopover
+                  currentTag={currentField.tag}
+                  fieldName={currentField.name}
+                  suggestedTags={existingTags}
+                  isOpen={isTagPickerOpen}
+                  onClose={() => setIsTagPickerOpen(false)}
+                  onSelectTag={(newTag) => updateSelectedFieldTag(newTag)}
+                  placement={popoverPlacement}
+                />
+              </div>
             )}
           </>
         )}

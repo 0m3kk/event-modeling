@@ -1,0 +1,179 @@
+import { useEffect, useRef, useState } from "react";
+import { Tag, Check, Trash2, Hash } from "lucide-react";
+
+interface FieldTagPopoverProps {
+  currentTag?: string;
+  fieldName?: string;
+  suggestedTags?: string[];
+  onSelectTag: (tag: string | null) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  placement?: "top" | "bottom";
+}
+
+export function FieldTagPopover({
+  currentTag,
+  fieldName,
+  suggestedTags = [],
+  onSelectTag,
+  isOpen,
+  onClose,
+  placement = "top",
+}: FieldTagPopoverProps) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [tagInput, setTagInput] = useState(currentTag || "");
+
+  useEffect(() => {
+    if (isOpen) {
+      setTagInput(currentTag || "");
+      // Focus input after render
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 50);
+    }
+  }, [isOpen, currentTag]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleOutside = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const positionClasses =
+    placement === "bottom" ? "top-full mt-2" : "bottom-full mb-2";
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = tagInput.trim();
+    if (trimmed) {
+      const cleanTag = trimmed.startsWith("#") ? trimmed.slice(1).trim() : trimmed;
+      onSelectTag(cleanTag);
+    } else {
+      onSelectTag(null);
+    }
+    onClose();
+  };
+
+  // Generate intelligent suggestions based on fieldName and current conventions
+  const suggestions: string[] = [];
+  if (fieldName) {
+    const clean = fieldName.trim();
+    if (clean.toLowerCase() === "id") {
+      suggestions.push("user", "order");
+    } else if (clean.toLowerCase().endsWith("id")) {
+      const prefix = clean.slice(0, -2);
+      if (prefix) suggestions.push(prefix);
+    } else {
+      suggestions.push(clean);
+    }
+  }
+
+  for (const st of suggestedTags) {
+    if (st && !suggestions.includes(st)) {
+      suggestions.push(st);
+    }
+  }
+
+  return (
+    <div
+      ref={popoverRef}
+      className={`absolute left-0 ${positionClasses} w-[236px] rounded-2xl border border-gray-200/90 bg-white/95 p-3 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-900/95 z-50 select-none`}
+    >
+      <div className="mb-2 flex items-center justify-between px-0.5 text-xs font-semibold text-gray-500 dark:text-zinc-400">
+        <span className="flex items-center gap-1.5">
+          <Tag size={13} className="text-amber-500 fill-amber-500" />
+          <span>Field Tag (DCB)</span>
+        </span>
+        {currentTag ? (
+          <span className="font-mono text-xs text-amber-600 dark:text-amber-400 font-bold">
+            #{currentTag}
+          </span>
+        ) : (
+          <span className="text-[11px] text-gray-400 dark:text-zinc-500 font-normal">
+            none
+          </span>
+        )}
+      </div>
+
+      <div className="mb-2.5 text-[11px] text-gray-400 dark:text-zinc-500 leading-tight">
+        Consistency boundary partition key
+      </div>
+
+      {/* Tag Input Form */}
+      <form onSubmit={handleSubmit} className="flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500 font-mono text-xs">
+            #
+          </span>
+          <input
+            ref={inputRef}
+            type="text"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            placeholder="e.g. user, email..."
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 pl-6 pr-2.5 py-1.5 text-xs font-mono text-gray-800 placeholder-gray-400 focus:border-amber-500 focus:bg-white focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:placeholder-zinc-500"
+          />
+        </div>
+        <button
+          type="submit"
+          title="Apply Tag"
+          className="rounded-lg bg-amber-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-600 cursor-pointer transition-colors shadow-xs"
+        >
+          <Check size={14} className="stroke-[2.5]" />
+        </button>
+      </form>
+
+      {/* Suggestions */}
+      {suggestions.length > 0 && (
+        <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800">
+          <div className="mb-1.5 text-[10px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
+            Suggestions
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {suggestions.slice(0, 4).map((sug) => (
+              <button
+                key={sug}
+                type="button"
+                onClick={() => {
+                  onSelectTag(sug);
+                  onClose();
+                }}
+                className="flex items-center gap-0.5 rounded-md border border-amber-200/80 bg-amber-50/60 px-2 py-0.5 text-[11px] font-mono font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-400 dark:hover:bg-amber-950 cursor-pointer transition-colors"
+              >
+                <Hash size={10} className="text-amber-500" />
+                <span>{sug}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Remove Tag Button */}
+      {currentTag && (
+        <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800">
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTag(null);
+              onClose();
+            }}
+            className="flex items-center justify-center gap-1.5 w-full rounded-lg py-1 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer transition-colors"
+          >
+            <Trash2 size={12} />
+            <span>Remove tag</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

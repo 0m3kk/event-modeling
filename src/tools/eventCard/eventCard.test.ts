@@ -124,4 +124,58 @@ describe("EventCardTool sub-selection & inline edit targets", () => {
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
     expect(updated?.data.fields[1].type).toBe("decimal");
   });
+
+  it("customizes field tag names (e.g. user on id, email on email)", () => {
+    const userEvent: CanvasElement<EventCardData> = {
+      id: "event-user",
+      type: "eventCard",
+      x: 100,
+      y: 100,
+      width: 220,
+      height: 88,
+      data: {
+        name: "UserRegistered",
+        fields: [
+          { name: "id", type: "uuid" },
+          { name: "email", type: "string" },
+        ],
+        color: "#f97316",
+      },
+    };
+
+    useCanvasStore.getState().addElement(userEvent);
+
+    // 1. Tag field 0 (id) with "user"
+    useCanvasStore.getState().setSelectedField({
+      elementId: "event-user",
+      fieldIndex: 0,
+    });
+    useCanvasStore.getState().updateSelectedFieldTag("user");
+
+    let el = useCanvasStore.getState().elements.find((e) => e.id === "event-user");
+    expect(el?.data.fields[0].tag).toBe("user");
+    expect(el?.data.fields[0].isTag).toBe(true);
+
+    // 2. Tag field 1 (email) with "email" (strips leading # if user entered "#email")
+    useCanvasStore.getState().setSelectedField({
+      elementId: "event-user",
+      fieldIndex: 1,
+    });
+    useCanvasStore.getState().updateSelectedFieldTag("#email");
+
+    el = useCanvasStore.getState().elements.find((e) => e.id === "event-user");
+    expect(el?.data.fields[1].tag).toBe("email");
+    expect(el?.data.fields[1].isTag).toBe(true);
+
+    // 3. Clear tag on field 1 with null
+    useCanvasStore.getState().updateSelectedFieldTag(null);
+    el = useCanvasStore.getState().elements.find((e) => e.id === "event-user");
+    expect(el?.data.fields[1].tag).toBeUndefined();
+    expect(el?.data.fields[1].isTag).toBe(false);
+
+    // 4. Undo restores email tag
+    useCanvasStore.getState().undo();
+    el = useCanvasStore.getState().elements.find((e) => e.id === "event-user");
+    expect(el?.data.fields[1].tag).toBe("email");
+  });
 });

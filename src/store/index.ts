@@ -71,6 +71,7 @@ export interface CanvasStoreState {
   deleteSelectedField: () => void;
   updateSelectedFieldType: (type: string) => void;
   toggleSelectedFieldTag: () => void;
+  updateSelectedFieldTag: (tag: string | null) => void;
   navigateSelectedField: (direction: "up" | "down") => void;
   clearBoard: () => void;
   loadProject: (project: ProjectFileV2) => void;
@@ -352,7 +353,48 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
     const nextFields = [...fields];
     const cur = nextFields[index];
-    nextFields[index] = { ...cur, isTag: !cur.isTag };
+    if (cur.tag || cur.isTag) {
+      nextFields[index] = { ...cur, tag: undefined, isTag: false };
+    } else {
+      nextFields[index] = { ...cur, tag: cur.name || "tag", isTag: true };
+    }
+
+    get().updateElement(element.id, {
+      data: { ...element.data, fields: nextFields },
+    });
+  },
+
+  updateSelectedFieldTag: (tag: string | null) => {
+    const { selectedField, elements } = get();
+    if (!selectedField) return;
+
+    const element = elements.find((el) => el.id === selectedField.elementId);
+    if (!element) return;
+
+    const tool = toolRegistry.get(element.type);
+    if (tool?.onUpdateSubSelectTag) {
+      const patch = tool.onUpdateSubSelectTag(element, selectedField, tag);
+      if (patch) {
+        get().updateElement(element.id, patch);
+      }
+      return;
+    }
+
+    if (!Array.isArray(element.data?.fields)) return;
+
+    const fields = element.data.fields;
+    const index = selectedField.fieldIndex;
+    if (index < 0 || index >= fields.length) return;
+
+    const nextFields = [...fields];
+    const cur = nextFields[index];
+    const trimmed = tag?.trim();
+    if (trimmed) {
+      const cleanTag = trimmed.startsWith("#") ? trimmed.slice(1).trim() : trimmed;
+      nextFields[index] = { ...cur, tag: cleanTag, isTag: true };
+    } else {
+      nextFields[index] = { ...cur, tag: undefined, isTag: false };
+    }
 
     get().updateElement(element.id, {
       data: { ...element.data, fields: nextFields },

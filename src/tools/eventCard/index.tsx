@@ -151,10 +151,46 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     }
     const nextFields = [...fields];
     const cur = nextFields[field.fieldIndex];
-    nextFields[field.fieldIndex] = {
-      ...cur,
-      isTag: !cur.isTag,
+    if (cur.tag || cur.isTag) {
+      nextFields[field.fieldIndex] = {
+        ...cur,
+        tag: undefined,
+        isTag: false,
+      };
+    } else {
+      nextFields[field.fieldIndex] = {
+        ...cur,
+        tag: cur.name || "tag",
+        isTag: true,
+      };
+    }
+    return {
+      data: { ...element.data, fields: nextFields },
     };
+  },
+
+  onUpdateSubSelectTag: (element, field, tag) => {
+    const fields = element.data.fields;
+    if (!fields || field.fieldIndex < 0 || field.fieldIndex >= fields.length) {
+      return null;
+    }
+    const nextFields = [...fields];
+    const cur = nextFields[field.fieldIndex];
+    const trimmed = tag?.trim();
+    if (trimmed) {
+      const cleanTag = trimmed.startsWith("#") ? trimmed.slice(1).trim() : trimmed;
+      nextFields[field.fieldIndex] = {
+        ...cur,
+        tag: cleanTag,
+        isTag: true,
+      };
+    } else {
+      nextFields[field.fieldIndex] = {
+        ...cur,
+        tag: undefined,
+        isTag: false,
+      };
+    }
     return {
       data: { ...element.data, fields: nextFields },
     };
