@@ -92,7 +92,7 @@ export function queryTypeBadgeWidth(type: string | undefined): number {
 
 /** Display label of a query item's tag badge (kept in sync with the renderer). */
 export function queryTagLabel(tag: string | undefined, field: string | undefined): string {
-  return `#${toCamelIdentifier(tag || "")}:{${toDisplayName(field || "")}}`;
+  return `#${toDisplayName(tag || "")}:{${toDisplayName(field || "")}}`;
 }
 
 /** Width of a query item's tag badge, including its horizontal padding. */

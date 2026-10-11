@@ -3,6 +3,7 @@ import { Hash, Tag as TagIcon, Trash2, X } from "lucide-react";
 import type { BoardTagInfo } from "@/utils/eventTags";
 import { fieldTypeKey } from "@/utils/eventTags";
 import type { QueryTag, StateField } from "./rules";
+import { toDisplayName } from "@/utils/naming";
 
 interface QueryTagsPopoverProps {
   /** Current tag references of the query item. */
@@ -101,7 +102,7 @@ export function QueryTagsPopover({
               key={`${t.tag}:${t.field}`}
               className="flex items-center gap-1 rounded-md border border-amber-200/80 bg-amber-50/70 px-2 py-0.5 text-[11px] font-mono text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-400"
             >
-              #{t.tag}:{"{"}{t.field}{"}"}
+              #{toDisplayName(t.tag)}:{"{"}{toDisplayName(t.field)}{"}"}
               <button
                 type="button"
                 onClick={() => removeTag(i)}
@@ -143,7 +144,7 @@ export function QueryTagsPopover({
                 }`}
               >
                 <Hash size={10} className="text-amber-500" />
-                <span>{b.tag}</span>
+                <span>{toDisplayName(b.tag)}</span>
                 <span className="ml-1 text-[9px] text-amber-600/70 dark:text-amber-400/60">
                   {b.types.join("|")}
                 </span>
@@ -166,7 +167,7 @@ export function QueryTagsPopover({
                       onClick={() => addTag(selectedBoardTag.tag, p.name)}
                       className="rounded-md border border-gray-200 bg-gray-50/60 px-2 py-0.5 text-[11px] font-mono text-gray-600 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
                     >
-                      {p.name}
+                      {toDisplayName(p.name)}
                     </button>
                   ))}
                 </div>
