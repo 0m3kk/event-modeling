@@ -130,3 +130,34 @@ export function ensureUniqueElement(
 
   return setElementName(element, uniqueName);
 }
+
+/**
+ * Resolves a unique data payload when an element is being updated.
+ * If patchData specifies a new name that collides with an element of the same type
+ * (ignoring itself and reference siblings), adjusts the name to be unique.
+ */
+export function resolveUniqueDataOnUpdate<T extends Record<string, any>>(
+  target: CanvasElement,
+  patchData: T,
+  elements: CanvasElement[],
+): T {
+  const currentName = getElementName(target);
+  const nextName = getElementName({ ...target, data: patchData });
+  if (!nextName || nextName === currentName) {
+    return patchData;
+  }
+
+  const candidates = elements.filter((el) => {
+    if (el.id === target.id) return false;
+    if (el.type !== target.type) return false;
+    if (target.referenceId && el.referenceId === target.referenceId) return false;
+    return true;
+  });
+  const takenNames = candidates.map(getElementName).filter((n): n is string => Boolean(n));
+  const uniqueName = makeUniqueName(nextName, takenNames);
+  if (uniqueName !== nextName) {
+    return setElementName({ ...target, data: patchData }, uniqueName).data as T;
+  }
+  return patchData;
+}
+

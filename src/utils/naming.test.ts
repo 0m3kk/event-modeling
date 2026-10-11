@@ -5,6 +5,7 @@ import {
   getElementName,
   setElementName,
   ensureUniqueElement,
+  resolveUniqueDataOnUpdate,
 } from "./naming";
 import type { CanvasElement } from "@/types";
 
@@ -170,4 +171,78 @@ describe("Naming utility", () => {
       expect(result.data.name).toBe("OrderPlaced");
     });
   });
+
+  describe("resolveUniqueDataOnUpdate", () => {
+    it("returns patchData unmodified if name did not change or collide", () => {
+      const target: CanvasElement = {
+        id: "1",
+        type: "eventCard",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        data: { name: "OrderCreated" },
+      };
+      const elements = [target];
+
+      const patchData = { name: "OrderModified" };
+      const resolved = resolveUniqueDataOnUpdate(target, patchData, elements);
+      expect(resolved.name).toBe("OrderModified");
+    });
+
+    it("renames when updated name collides with another element of the same type", () => {
+      const el1: CanvasElement = {
+        id: "1",
+        type: "eventCard",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        data: { name: "OrderCreated" },
+      };
+      const el2: CanvasElement = {
+        id: "2",
+        type: "eventCard",
+        x: 50,
+        y: 50,
+        width: 100,
+        height: 100,
+        data: { name: "OrderPlaced" },
+      };
+      const elements = [el1, el2];
+
+      const patchData = { name: "OrderPlaced" };
+      const resolved = resolveUniqueDataOnUpdate(el1, patchData, elements);
+      expect(resolved.name).toBe("OrderPlaced 2");
+    });
+
+    it("ignores reference siblings when checking for collisions", () => {
+      const el1: CanvasElement = {
+        id: "1",
+        type: "eventCard",
+        referenceId: "ref-1",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        data: { name: "OrderPlaced" },
+      };
+      const el2: CanvasElement = {
+        id: "2",
+        type: "eventCard",
+        referenceId: "ref-1",
+        x: 50,
+        y: 50,
+        width: 100,
+        height: 100,
+        data: { name: "OrderPlaced" },
+      };
+      const elements = [el1, el2];
+
+      const patchData = { name: "OrderPlaced" };
+      const resolved = resolveUniqueDataOnUpdate(el1, patchData, elements);
+      expect(resolved.name).toBe("OrderPlaced");
+    });
+  });
 });
+

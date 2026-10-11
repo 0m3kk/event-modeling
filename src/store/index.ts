@@ -2,9 +2,7 @@ import { create } from "zustand";
 import type { CanvasElement, Viewport, ProjectFileV2, ThemeMode, SelectedField, InlineEditState } from "@/types";
 import {
   ensureUniqueElement,
-  getElementName,
-  setElementName,
-  makeUniqueName,
+  resolveUniqueDataOnUpdate,
 } from "@/utils/naming";
 import {
   createReferenceCopy as makeReferenceCopy,
@@ -207,24 +205,9 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     const target = current.find((el) => el.id === id);
     if (!target) return;
 
-    let finalPatch = { ...patch };
-    if (patch.data) {
-      const currentName = getElementName(target);
-      const nextName = getElementName({ ...target, data: patch.data });
-      if (nextName && nextName !== currentName) {
-        const candidates = current.filter((el) => {
-          if (el.id === target.id) return false;
-          if (el.type !== target.type) return false;
-          if (target.referenceId && el.referenceId === target.referenceId) return false;
-          return true;
-        });
-        const takenNames = candidates.map(getElementName).filter((n): n is string => Boolean(n));
-        const uniqueName = makeUniqueName(nextName, takenNames);
-        if (uniqueName !== nextName) {
-          finalPatch.data = setElementName({ ...target, data: patch.data }, uniqueName).data;
-        }
-      }
-    }
+    const finalPatch = patch.data
+      ? { ...patch, data: resolveUniqueDataOnUpdate(target, patch.data, current) }
+      : patch;
 
     const updatedElements = syncReferenceUpdates(current, id, finalPatch);
     set((state) => ({
@@ -239,26 +222,10 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     const finalPatches = patches.map((patch) => {
       const target = current.find((el) => el.id === patch.id);
       if (!target || !patch.data) return patch;
-
-      const currentName = getElementName(target);
-      const nextName = getElementName({ ...target, data: patch.data });
-      if (nextName && nextName !== currentName) {
-        const candidates = current.filter((el) => {
-          if (el.id === target.id) return false;
-          if (el.type !== target.type) return false;
-          if (target.referenceId && el.referenceId === target.referenceId) return false;
-          return true;
-        });
-        const takenNames = candidates.map(getElementName).filter((n): n is string => Boolean(n));
-        const uniqueName = makeUniqueName(nextName, takenNames);
-        if (uniqueName !== nextName) {
-          return {
-            ...patch,
-            data: setElementName({ ...target, data: patch.data }, uniqueName).data,
-          };
-        }
-      }
-      return patch;
+      return {
+        ...patch,
+        data: resolveUniqueDataOnUpdate(target, patch.data, current),
+      };
     });
 
     const updatedElements = syncBatchReferenceUpdates(current, finalPatches);
@@ -306,7 +273,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
       patch = tool.onDeleteSubSelect(element, selectedField.fieldIndex);
     } else if (Array.isArray(element.data?.fields)) {
       const nextFields = element.data.fields.filter(
-        (_: any, i: number) => i !== selectedField.fieldIndex,
+        (_: unknown, i: number) => i !== selectedField.fieldIndex,
       );
       const nextData = { ...element.data, fields: nextFields };
       const nextSize = tool?.computeSize ? tool.computeSize(nextData) : null;

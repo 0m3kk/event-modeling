@@ -1,8 +1,8 @@
-import { Container, Graphics } from "pixi.js";
+import { Container, Graphics, type DestroyOptions } from "pixi.js";
 import type { CanvasElement, Point, ResolvedTheme } from "@/types";
 import { toolRegistry } from "@/tools";
 import { computeTextResolution } from "../textResolution";
-import type { RenderContext } from "@/tools/types";
+import type { RenderContext, ToolDefinition } from "@/tools/types";
 import { useCanvasStore } from "@/store";
 import { ensureUniqueElement, getElementName } from "@/utils/naming";
 
@@ -91,8 +91,8 @@ export class PreviewLayer extends Container {
   }
 
   private renderGhostCard(
-    toolDef: any,
-    data: any,
+    toolDef: ToolDefinition,
+    data: Record<string, unknown>,
     size: { width: number; height: number },
     theme: ResolvedTheme,
     zoom: number,
@@ -143,7 +143,7 @@ export class PreviewLayer extends Container {
     }
   }
 
-  override destroy(options?: any) {
+  override destroy(options?: DestroyOptions) {
     this.ghostCardContainer.removeChildren();
     this.borderAndShadow.clear();
     super.destroy(options ?? { children: true });
