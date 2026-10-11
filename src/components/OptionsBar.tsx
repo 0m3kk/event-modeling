@@ -13,6 +13,8 @@ export function OptionsBar() {
   const updateElements = useCanvasStore((s) => s.updateElements);
   const createReferenceCopy = useCanvasStore((s) => s.createReferenceCopy);
   const deleteElements = useCanvasStore((s) => s.deleteElements);
+  const selectedField = useCanvasStore((s) => s.selectedField);
+  const deleteSelectedField = useCanvasStore((s) => s.deleteSelectedField);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
 
@@ -90,6 +92,8 @@ export function OptionsBar() {
     }
   };
 
+  const isFieldSelected = Boolean(selectedField && selectedIds.includes(selectedField.elementId));
+
   const handleCopyReference = () => {
     if (isSingle && singleElement) {
       createReferenceCopy(singleElement.id);
@@ -97,7 +101,11 @@ export function OptionsBar() {
   };
 
   const handleDelete = () => {
-    deleteElements(selectedIds);
+    if (isFieldSelected) {
+      deleteSelectedField();
+    } else {
+      deleteElements(selectedIds);
+    }
   };
 
   const ToolCustomOptions = toolDef?.optionsBar;
@@ -157,7 +165,7 @@ export function OptionsBar() {
         <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
 
         {/* 3. COMMON ACTIONS: COPY REFERENCE & DELETE */}
-        {isSingle && (
+        {isSingle && !isFieldSelected && (
           <button
             onClick={handleCopyReference}
             title="Copy Reference"
@@ -169,7 +177,7 @@ export function OptionsBar() {
 
         <button
           onClick={handleDelete}
-          title="Delete"
+          title={isFieldSelected ? "Delete Field" : "Delete"}
           className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer transition-colors"
         >
           <Trash2 size={15} />

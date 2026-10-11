@@ -9,12 +9,17 @@ export function Toolbar() {
   const setTool = useCanvasStore((s) => s.setTool);
   const selectedCount = useCanvasStore((s) => s.selectedIds.length);
   const deleteElements = useCanvasStore((s) => s.deleteElements);
+  const deleteSelectedField = useCanvasStore((s) => s.deleteSelectedField);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
+  const selectedField = useCanvasStore((s) => s.selectedField);
 
   const registeredTools = toolRegistry.getAll();
+  const isFieldSelected = Boolean(selectedField && selectedIds.includes(selectedField.elementId));
 
   const handleDelete = () => {
-    if (selectedIds.length > 0) {
+    if (isFieldSelected) {
+      deleteSelectedField();
+    } else if (selectedIds.length > 0) {
       deleteElements(selectedIds);
     }
   };

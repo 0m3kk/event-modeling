@@ -89,22 +89,8 @@ export function PixiCanvas() {
         const selectedField = useCanvasStore.getState().selectedField;
         if (selectedField) {
           e.preventDefault();
-          const elements = useCanvasStore.getState().elements;
-          const el = elements.find((item) => item.id === selectedField.elementId);
-          if (el && el.data.fields && el.data.fields.length > selectedField.fieldIndex) {
-            const nextFields = el.data.fields.filter(
-              (_: any, i: number) => i !== selectedField.fieldIndex,
-            );
-            const tool = toolRegistry.get(el.type);
-            const nextData = { ...el.data, fields: nextFields };
-            const nextSize = tool?.computeSize ? tool.computeSize(nextData) : null;
-            useCanvasStore.getState().updateElement(el.id, {
-              height: nextSize ? nextSize.height : el.height,
-              data: nextData,
-            });
-            useCanvasStore.getState().setSelectedField(null);
-            return;
-          }
+          useCanvasStore.getState().deleteSelectedField();
+          return;
         }
 
         const selectedIds = useCanvasStore.getState().selectedIds;

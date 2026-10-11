@@ -44,6 +44,9 @@ export interface ToolDefinition<TData = any> {
   // Optional: handles sub-element selection on pointer down (e.g. select field)
   onSubSelect?: (element: CanvasElement<TData>, localPoint: Point) => number | null;
 
+  // Optional: handles sub-element deletion (e.g. delete field)
+  onDeleteSubSelect?: (element: CanvasElement<TData>, subIndex: number) => Partial<CanvasElement<TData>> | null;
+
   // Optional: provides inline edit target on double click (e.g. edit name, field name)
   getInlineEditTarget?: (element: CanvasElement<TData>, localPoint: Point) => InlineEditState | null;
 

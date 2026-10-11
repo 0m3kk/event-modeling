@@ -213,6 +213,19 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     return null;
   },
 
+  onDeleteSubSelect: (element, fieldIndex) => {
+    if (!element.data.fields || fieldIndex < 0 || fieldIndex >= element.data.fields.length) {
+      return null;
+    }
+    const nextFields = element.data.fields.filter((_, i) => i !== fieldIndex);
+    const nextData = { ...element.data, fields: nextFields };
+    const nextSize = eventCardTool.computeSize ? eventCardTool.computeSize(nextData) : null;
+    return {
+      height: nextSize ? nextSize.height : element.height,
+      data: nextData,
+    };
+  },
+
   getInlineEditTarget: (element, localPoint) => {
     // 1. Double click on Header -> Edit Event Name
     if (localPoint.y <= 32) {

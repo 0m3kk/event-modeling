@@ -12,6 +12,7 @@ import {
   syncBatchReferenceUpdates,
   pruneDanglingReferences,
 } from "@/utils/reference";
+import { toolRegistry } from "@/tools/registry";
 
 interface HistoryEntry {
   elements: CanvasElement[];
@@ -65,6 +66,7 @@ export interface CanvasStoreState {
   updateElement: (id: string, patch: Partial<CanvasElement>) => void;
   updateElements: (patches: Array<{ id: string } & Partial<CanvasElement>>) => void;
   deleteElements: (ids: string[]) => void;
+  deleteSelectedField: () => void;
   clearBoard: () => void;
   loadProject: (project: ProjectFileV2) => void;
 
@@ -277,6 +279,36 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
           ? null
           : state.inlineEdit,
     }));
+  },
+
+  deleteSelectedField: () => {
+    const { selectedField, elements } = get();
+    if (!selectedField) return;
+
+    const element = elements.find((el) => el.id === selectedField.elementId);
+    if (!element) return;
+
+    const tool = toolRegistry.get(element.type);
+    let patch: Partial<CanvasElement> | null = null;
+
+    if (tool?.onDeleteSubSelect) {
+      patch = tool.onDeleteSubSelect(element, selectedField.fieldIndex);
+    } else if (Array.isArray(element.data?.fields)) {
+      const nextFields = element.data.fields.filter(
+        (_: any, i: number) => i !== selectedField.fieldIndex,
+      );
+      const nextData = { ...element.data, fields: nextFields };
+      const nextSize = tool?.computeSize ? tool.computeSize(nextData) : null;
+      patch = {
+        height: nextSize ? nextSize.height : element.height,
+        data: nextData,
+      };
+    }
+
+    if (patch) {
+      get().updateElement(element.id, patch);
+      set({ selectedField: null });
+    }
   },
 
   clearBoard: () => {

@@ -1,3 +1,4 @@
+import "@/tools";
 import { describe, it, expect, beforeEach } from "vitest";
 import { useCanvasStore } from "./index";
 import { eventCardTool, type EventCardData } from "@/tools/eventCard";
@@ -106,5 +107,89 @@ describe("OptionsBar data workflows & undo/redo", () => {
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
     expect(updated?.height).toBeGreaterThan(initialHeight);
     expect(updated?.data.fields).toHaveLength(3);
+  });
+
+  it("deletes selected field and shrinks card height using deleteSelectedField", () => {
+    const card: CanvasElement<EventCardData> = {
+      id: "card-1",
+      type: "eventCard",
+      x: 100,
+      y: 100,
+      width: 220,
+      height: 88,
+      data: {
+        name: "OrderPlaced",
+        fields: [
+          { name: "orderId", type: "string" },
+          { name: "amount", type: "number" },
+        ],
+      },
+    };
+
+    useCanvasStore.getState().addElement(card);
+    useCanvasStore.getState().setSelectedIds(["card-1"]);
+    useCanvasStore.getState().setSelectedField({
+      elementId: "card-1",
+      fieldIndex: 0,
+    });
+
+    // Delete the field
+    useCanvasStore.getState().deleteSelectedField();
+
+    const updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
+    expect(updated?.data.fields).toHaveLength(1);
+    expect(updated?.data.fields[0].name).toBe("amount");
+    expect(updated?.height).toBe(60); // 32 header + 1 field * 28 = 60
+    expect(useCanvasStore.getState().selectedField).toBeNull();
+    // Card itself is NOT deleted!
+    expect(useCanvasStore.getState().elements).toHaveLength(1);
+
+    // Undo restores the field and height
+    useCanvasStore.getState().undo();
+    const reverted = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
+    expect(reverted?.data.fields).toHaveLength(2);
+    expect(reverted?.height).toBe(88);
+  });
+
+  it("syncs field deletion across reference copies", () => {
+    const card: CanvasElement<EventCardData> = {
+      id: "card-1",
+      type: "eventCard",
+      x: 100,
+      y: 100,
+      width: 220,
+      height: 88,
+      data: {
+        name: "OrderPlaced",
+        fields: [
+          { name: "orderId", type: "string" },
+          { name: "amount", type: "number" },
+        ],
+      },
+    };
+
+    useCanvasStore.getState().addElement(card);
+    const copy = useCanvasStore.getState().createReferenceCopy("card-1")!;
+
+    // Select and delete field on the copy
+    useCanvasStore.getState().setSelectedIds([copy.id]);
+    useCanvasStore.getState().setSelectedField({
+      elementId: copy.id,
+      fieldIndex: 1,
+    });
+
+    useCanvasStore.getState().deleteSelectedField();
+
+    const original = useCanvasStore.getState().elements.find((e) => e.id === "card-1")!;
+    const refCopy = useCanvasStore.getState().elements.find((e) => e.id === copy.id)!;
+
+    // Both cards should have the field removed and synced height
+    expect(original.data.fields).toHaveLength(1);
+    expect(original.data.fields[0].name).toBe("orderId");
+    expect(original.height).toBe(60);
+
+    expect(refCopy.data.fields).toHaveLength(1);
+    expect(refCopy.data.fields[0].name).toBe("orderId");
+    expect(refCopy.height).toBe(60);
   });
 });
