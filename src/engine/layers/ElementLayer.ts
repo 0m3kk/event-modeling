@@ -51,15 +51,21 @@ export class ElementLayer extends Container {
 
     let renderIndex = 0;
 
-    // A slice's visuals depend on its cards (lane type + count). Hash that
-    // membership so the slice redraws when a lane's contents change even if the
-    // slice's own size happens to stay the same.
+    // A container's visuals depend on its children (lane type + count for
+    // slices; membership for domains). Hash that so a container redraws when its
+    // contents change even if its own size happens to stay the same.
     const childSigs = new Map<string, string[]>();
     for (const el of elements) {
-      if (!el.sliceId) continue;
-      const list = childSigs.get(el.sliceId) ?? [];
-      list.push(`${el.laneId ?? ""}:${el.type}`);
-      childSigs.set(el.sliceId, list);
+      if (el.sliceId) {
+        const list = childSigs.get(el.sliceId) ?? [];
+        list.push(`lane:${el.laneId ?? ""}:${el.type}`);
+        childSigs.set(el.sliceId, list);
+      }
+      if (el.domainId) {
+        const list = childSigs.get(el.domainId) ?? [];
+        list.push(`domain:${el.type}`);
+        childSigs.set(el.domainId, list);
+      }
     }
 
     for (const element of orderForRender(elements)) {

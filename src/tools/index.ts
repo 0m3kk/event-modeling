@@ -2,6 +2,7 @@ import { toolRegistry } from "./registry";
 import { aliasCardTool } from "./aliasCard";
 import { commandCardTool } from "./commandCard";
 import { constraintCardTool } from "./constraintCard";
+import { domainCardTool } from "./domainCard";
 import { queryCardTool } from "./queryCard";
 import { stateCardTool } from "./stateCard";
 import { viewCardTool } from "./viewCard";
@@ -21,6 +22,7 @@ toolRegistry.register(viewCardTool);
 toolRegistry.register(constraintCardTool);
 toolRegistry.register(serviceCardTool);
 toolRegistry.register(sliceCardTool);
+toolRegistry.register(domainCardTool);
 toolRegistry.register(objectCardTool);
 toolRegistry.register(enumCardTool);
 toolRegistry.register(aliasCardTool);
@@ -32,6 +34,7 @@ export {
   aliasCardTool,
   commandCardTool,
   constraintCardTool,
+  domainCardTool,
   queryCardTool,
   stateCardTool,
   viewCardTool,

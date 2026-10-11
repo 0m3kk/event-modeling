@@ -16,6 +16,7 @@ import {
 } from "@/utils/reference";
 import { toolRegistry } from "@/tools/registry";
 import { reflowSlices } from "@/tools/sliceCard/layout";
+import { reflowDomains } from "@/tools/domainCard/layout";
 import {
   navigateSubSelect,
   getAdjacentSubSelectAfterDeletion,
@@ -116,6 +117,15 @@ function snapshotState(elements: CanvasElement[]): HistoryEntry {
   };
 }
 
+/**
+ * Applies container layout after any structural change: slices first (size and
+ * lane their cards), then domains (fit a dashed frame around their children,
+ * which may include slices).
+ */
+function applyContainerLayout(elements: CanvasElement[]): CanvasElement[] {
+  return reflowDomains(reflowSlices(elements));
+}
+
 export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   projectName: "Untitled Board",
   googleDriveFileId: null,
@@ -177,7 +187,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: reflowSlices([...state.elements, uniqueElement]),
+      elements: applyContainerLayout([...state.elements, uniqueElement]),
       selectedIds: [uniqueElement.id],
       selectedField: null,
       inlineEdit: null,
@@ -196,7 +206,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: reflowSlices([...state.elements, ...processed]),
+      elements: applyContainerLayout([...state.elements, ...processed]),
       selectedIds: processed.map((e) => e.id),
       selectedField: null,
       inlineEdit: null,
@@ -278,7 +288,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: reflowSlices(updatedElements),
+      elements: applyContainerLayout(updatedElements),
     }));
   },
 
@@ -298,7 +308,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: reflowSlices(updatedElements),
+      elements: applyContainerLayout(updatedElements),
     }));
   },
 
@@ -312,7 +322,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: reflowSlices(cleaned),
+      elements: applyContainerLayout(cleaned),
       selectedIds: state.selectedIds.filter((id) => !idSet.has(id)),
       selectedField:
         state.selectedField && idSet.has(state.selectedField.elementId)
@@ -555,7 +565,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     const normalized = project.elements.map((el) => normalizeElementData(el, project.elements));
     set({
       projectName: project.name,
-      elements: reflowSlices(normalized),
+      elements: applyContainerLayout(normalized),
       selectedIds: [],
       viewport: {
         x: project.viewport.x,

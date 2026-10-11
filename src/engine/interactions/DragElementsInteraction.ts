@@ -3,6 +3,7 @@ import type { Point, CanvasElement } from "@/types";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { findSliceDropTarget, SLICE_TYPE } from "@/tools/sliceCard/layout";
+import { DOMAIN_TYPE, findDomainDropTarget, findDomainFreeSpot } from "@/tools/domainCard/layout";
 
 export class DragElementsInteraction implements CanvasInteraction {
   readonly id = "dragElements";
@@ -73,15 +74,28 @@ export class DragElementsInteraction implements CanvasInteraction {
       }
     }
 
-    // Capture initial positions of all items to drag. Dragging a Slice also
-    // carries every card it contains.
+    // Capture initial positions of all items to drag. Dragging a container
+    // (Slice or Domain) also carries everything it contains, recursively.
     const finalSelected = useCanvasStore.getState().selectedIds;
     const dragIds = new Set<string>(finalSelected);
-    for (const id of finalSelected) {
+    const queue = [...finalSelected];
+    while (queue.length > 0) {
+      const id = queue.pop()!;
       const el = elements.find((item) => item.id === id);
-      if (el?.type === SLICE_TYPE) {
+      if (!el) continue;
+      if (el.type === SLICE_TYPE) {
         for (const child of elements) {
-          if (child.sliceId === id) dragIds.add(child.id);
+          if (child.sliceId === id && !dragIds.has(child.id)) {
+            dragIds.add(child.id);
+            queue.push(child.id);
+          }
+        }
+      } else if (el.type === DOMAIN_TYPE) {
+        for (const child of elements) {
+          if (child.domainId === id && !dragIds.has(child.id)) {
+            dragIds.add(child.id);
+            queue.push(child.id);
+          }
         }
       }
     }
@@ -140,21 +154,73 @@ export class DragElementsInteraction implements CanvasInteraction {
     this.updateDropTarget(worldPoint, ctx);
   }
 
-  /** Shows/clears the lane highlight for a single non-slice card drag. */
+  /** Shows/clears the drop highlight for a single dragged card/slice. */
   private updateDropTarget(worldPoint: Point, ctx: InteractionContext): void {
-    if (!this.hasMoved || !this.singleDragged || this.singleDragged.type === SLICE_TYPE) {
+    if (!this.hasMoved || !this.singleDragged || this.singleDragged.type === DOMAIN_TYPE) {
       ctx.gizmoLayer.drawDropTarget(null);
       return;
     }
 
     const elements = useCanvasStore.getState().elements;
-    const target = findSliceDropTarget(
+
+    // Cards prefer a slice lane; a lane of the wrong type shows no highlight.
+    if (this.singleDragged.type !== SLICE_TYPE) {
+      const lane = findSliceDropTarget(
+        elements,
+        worldPoint,
+        this.singleDragged.id,
+        this.singleDragged.type,
+      );
+      if (lane) {
+        ctx.gizmoLayer.drawDropTarget(lane.allowed ? lane.rect : null);
+        return;
+      }
+    }
+
+    const domain = findDomainDropTarget(
       elements,
       worldPoint,
       this.singleDragged.id,
       this.singleDragged.type,
     );
-    ctx.gizmoLayer.drawDropTarget(target ? target.rect : null);
+    ctx.gizmoLayer.drawDropTarget(domain ? domain.rect : null);
+  }
+
+  /**
+   * Attaches a dragged element to a domain. When the element first enters the
+   * domain it is auto-placed in a free spot so cards never overlap; moving
+   * within the same domain keeps the position the user dropped it at.
+   */
+  private placeInDomain(
+    updates: Array<{ id: string } & Partial<CanvasElement>>,
+    index: number,
+    elements: CanvasElement[],
+    dragged: CanvasElement,
+    domainId: string,
+  ): void {
+    let x = updates[index].x as number;
+    let y = updates[index].y as number;
+
+    if (dragged.domainId !== domainId) {
+      const children = elements.filter((el) => el.domainId === domainId && el.id !== dragged.id);
+      const spot = findDomainFreeSpot(children, {
+        x,
+        y,
+        width: dragged.width,
+        height: dragged.height,
+      });
+      x = spot.x;
+      y = spot.y;
+    }
+
+    updates[index] = {
+      ...updates[index],
+      x,
+      y,
+      domainId,
+      sliceId: undefined,
+      laneId: undefined,
+    };
   }
 
   onPointerUp(_e: PointerEvent, worldPoint: Point, ctx: InteractionContext): void {
@@ -181,36 +247,46 @@ export class DragElementsInteraction implements CanvasInteraction {
       }
 
       const single = this.singleDragged;
-      if (single && single.type !== SLICE_TYPE) {
+      if (single && single.type !== DOMAIN_TYPE) {
         const elements = useCanvasStore.getState().elements;
         const dragged = elements.find((el) => el.id === single.id);
         const index = updates.findIndex((u) => u.id === single.id);
 
         if (dragged && index >= 0) {
-          const target = findSliceDropTarget(
-            elements,
-            worldPoint,
-            single.id,
-            single.type,
-          );
-
-          if (target && target.allowed) {
-            // Join (or move within) the lane; the store reflows the position.
-            updates[index] = {
-              ...updates[index],
-              sliceId: target.sliceId,
-              laneId: target.laneId,
-            };
-          } else if (target && !target.allowed) {
-            // Invalid lane type: snap back to where it was.
-            updates.splice(index, 1);
+          if (single.type === SLICE_TYPE) {
+            // Slices never join a lane, but may join/leave a Domain.
+            const domain = findDomainDropTarget(elements, worldPoint, single.id, single.type);
+            if (domain) {
+              this.placeInDomain(updates, index, elements, dragged, domain.domainId);
+            } else {
+              updates[index] = { ...updates[index], domainId: undefined };
+            }
           } else {
-            // Dropped outside any slice: detach from its lane.
-            updates[index] = {
-              ...updates[index],
-              sliceId: undefined,
-              laneId: undefined,
-            };
+            const lane = findSliceDropTarget(elements, worldPoint, single.id, single.type);
+            if (lane && !lane.allowed) {
+              // Invalid lane type: snap back to where it was.
+              updates.splice(index, 1);
+            } else if (lane && lane.allowed) {
+              updates[index] = {
+                ...updates[index],
+                sliceId: lane.sliceId,
+                laneId: lane.laneId,
+                domainId: undefined,
+              };
+            } else {
+              // Not over a lane: maybe a Domain, otherwise detach from everything.
+              const domain = findDomainDropTarget(elements, worldPoint, single.id, single.type);
+              if (domain) {
+                this.placeInDomain(updates, index, elements, dragged, domain.domainId);
+              } else {
+                updates[index] = {
+                  ...updates[index],
+                  domainId: undefined,
+                  sliceId: undefined,
+                  laneId: undefined,
+                };
+              }
+            }
           }
         }
       }

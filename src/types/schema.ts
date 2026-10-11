@@ -28,6 +28,8 @@ export interface CanvasElement<TData = any> {
   sliceId?: string;
   /** Id of the lane within {@link sliceId} that holds this card. */
   laneId?: string;
+  /** Id of the Domain frame that groups this card. */
+  domainId?: string;
   data: TData;
 }
 
@@ -59,6 +61,7 @@ export const CanvasElementSchema = z.object({
   groupId: z.string().optional(),
   sliceId: z.string().optional(),
   laneId: z.string().optional(),
+  domainId: z.string().optional(),
   data: z.record(z.unknown()).default({}),
 });
 

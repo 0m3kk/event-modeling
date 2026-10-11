@@ -4,6 +4,7 @@ import { stickyNoteTool } from "./stickyNote";
 import { eventCardTool } from "./eventCard";
 import { commandCardTool } from "./commandCard";
 import { constraintCardTool } from "./constraintCard";
+import { domainCardTool } from "./domainCard";
 import { queryCardTool } from "./queryCard";
 import { stateCardTool } from "./stateCard";
 import { viewCardTool } from "./viewCard";
@@ -25,6 +26,7 @@ describe("toolRegistry", () => {
     expect(toolRegistry.get("aliasCard")).toBe(aliasCardTool);
     expect(toolRegistry.get("serviceCard")).toBe(serviceCardTool);
     expect(toolRegistry.get("sliceCard")).toBe(sliceCardTool);
+    expect(toolRegistry.get("domainCard")).toBe(domainCardTool);
     expect(toolRegistry.get("nonexistent")).toBeUndefined();
   });
 
@@ -39,6 +41,7 @@ describe("toolRegistry", () => {
     expect(all.some((t) => t.type === "eventCard")).toBe(true);
     expect(all.some((t) => t.type === "serviceCard")).toBe(true);
     expect(all.some((t) => t.type === "sliceCard")).toBe(true);
+    expect(all.some((t) => t.type === "domainCard")).toBe(true);
   });
 
   it("extracts AI tools from registered tools", () => {
