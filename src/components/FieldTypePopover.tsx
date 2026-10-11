@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Box, Check, Code2, List, Shapes, Type } from "lucide-react";
 import { useCanvasStore } from "@/store";
-import { getElementName } from "@/utils/naming";
+import { getElementName, toDisplayName } from "@/utils/naming";
 
 export interface FieldTypePreset {
   type: string;
   label: string;
-  description: string;
 }
 
 export const COMMON_FIELD_TYPES: FieldTypePreset[] = [
-  { type: "string", label: "string", description: "Text" },
-  { type: "number", label: "number", description: "Numeric" },
-  { type: "boolean", label: "boolean", description: "True/False" },
-  { type: "date", label: "date", description: "YYYY-MM-DD" },
-  { type: "datetime", label: "datetime", description: "Timestamp" },
-  { type: "uuid", label: "uuid", description: "ID" },
+  { type: "string", label: "string" },
+  { type: "integer", label: "integer" },
+  { type: "float", label: "float" },
+  { type: "boolean", label: "boolean" },
+  { type: "date", label: "date" },
+  { type: "datetime", label: "datetime" },
+  { type: "uuid", label: "uuid" },
 ];
 
 type ReusableKind = "object" | "enum" | "alias";
@@ -86,7 +86,9 @@ export function FieldTypePopover({
       const name = getElementName(el);
       if (name) entries.set(`${kind}:${name}`, { name, kind });
     }
-    return Array.from(entries.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(entries.values()).sort((a, b) =>
+      toDisplayName(a.name).localeCompare(toDisplayName(b.name)),
+    );
   }, [elements]);
 
   useEffect(() => {
@@ -120,7 +122,7 @@ export function FieldTypePopover({
           <span>Field Type</span>
         </span>
         <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-medium">
-          {currentType}
+          {toDisplayName(currentType)}
         </span>
       </div>
 
@@ -143,12 +145,7 @@ export function FieldTypePopover({
                   : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-[13px] font-medium">{preset.label}</span>
-                <span className="text-[11px] text-gray-400 dark:text-zinc-500">
-                  {preset.description}
-                </span>
-              </div>
+              <span className="font-mono text-[13px] font-medium">{toDisplayName(preset.label)}</span>
               {isSelected && <Check size={14} className="stroke-[2.5]" />}
             </button>
           );
@@ -185,7 +182,7 @@ export function FieldTypePopover({
                 >
                   <span className="flex items-center gap-2">
                     <Icon size={13} className={isSelected ? undefined : meta.iconClass} />
-                    <span className="font-mono text-[13px] font-medium">{name}</span>
+                    <span className="font-mono text-[13px] font-medium">{toDisplayName(name)}</span>
                   </span>
                   {isSelected && <Check size={14} className="stroke-[2.5]" />}
                 </button>

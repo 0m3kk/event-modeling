@@ -3,6 +3,7 @@ import { Brackets, Type } from "lucide-react";
 import type { CanvasElement } from "@/types";
 import type { AliasCardData } from "./index";
 import { FieldTypePopover } from "@/components/FieldTypePopover";
+import { toDisplayType } from "@/utils/naming";
 
 interface AliasCardOptionsProps {
   element: CanvasElement<AliasCardData>;
@@ -18,7 +19,7 @@ export function AliasCardOptions({ element, onUpdate }: AliasCardOptionsProps) {
       <div className="relative">
         <button
           onClick={() => setIsTypePickerOpen(!isTypePickerOpen)}
-          title={`Wrapped Type (${element.data.aliasedType})`}
+          title={`Wrapped Type (${toDisplayType(element.data.aliasedType, element.data.isArray)})`}
           className="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
         >
           <Type size={16} />

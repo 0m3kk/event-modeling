@@ -9,6 +9,7 @@ import { DescriptionPopover } from "./DescriptionPopover";
 import type { CanvasElement } from "@/types";
 import { isElementOriginal } from "@/utils/reference";
 import { findDescriptionText } from "@/utils/description";
+import { toDisplayType } from "@/utils/naming";
 
 export function OptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
@@ -251,7 +252,7 @@ export function OptionsBar() {
                       exposes the action — an icon-only button that opens the picker. */}
                   <button
                     onClick={() => setIsTypePickerOpen(!isTypePickerOpen)}
-                    title={`Change Field Type (${currentField.type})`}
+                    title={`Change Field Type (${toDisplayType(currentField.type, currentField.isArray)})`}
                     className="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
                   >
                     <Braces size={16} />
