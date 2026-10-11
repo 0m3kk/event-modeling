@@ -64,25 +64,10 @@ export function FieldTagPopover({
     onClose();
   };
 
-  // Generate intelligent suggestions based on fieldName and current conventions
-  const suggestions: string[] = [];
-  if (fieldName) {
-    const clean = fieldName.trim();
-    if (clean.toLowerCase() === "id") {
-      suggestions.push("user", "order");
-    } else if (clean.toLowerCase().endsWith("id")) {
-      const prefix = clean.slice(0, -2);
-      if (prefix) suggestions.push(prefix);
-    } else {
-      suggestions.push(clean);
-    }
-  }
-
-  for (const st of suggestedTags) {
-    if (st && !suggestions.includes(st)) {
-      suggestions.push(st);
-    }
-  }
+  // Only show tags that already exist on the board
+  const suggestions = suggestedTags.filter(
+    (st) => Boolean(st?.trim()) && st !== currentTag,
+  );
 
   return (
     <div
@@ -133,14 +118,14 @@ export function FieldTagPopover({
         </button>
       </form>
 
-      {/* Suggestions */}
+      {/* Existing Tags Suggestions */}
       {suggestions.length > 0 && (
         <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800">
           <div className="mb-1.5 text-[10px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
-            Suggestions
+            Existing Tags
           </div>
           <div className="flex flex-wrap gap-1">
-            {suggestions.slice(0, 4).map((sug) => (
+            {suggestions.slice(0, 8).map((sug) => (
               <button
                 key={sug}
                 type="button"
