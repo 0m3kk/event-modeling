@@ -9,7 +9,7 @@ export interface DescribableField {
   description?: string;
 }
 
-export type FieldSectionKey = "fields" | "inputs" | "params" | "responses" | "returns";
+export type FieldSectionKey = "fields" | "inputs" | "params" | "responses" | "returns" | "queryItems" | "states";
 
 export interface FieldSection {
   /** Key on `element.data` that holds this section's array. */
@@ -58,6 +58,21 @@ export function getFieldSections(element: CanvasElement): FieldSection[] {
     return [
       { key: inputsKey, fields: inputs },
       { key: "responses", fields: responses },
+    ];
+  }
+
+  if (element.type === "stateCard") {
+    // State cards expose params, then query items, then states - matching the
+    // `sectionIndex` produced by the State card's sub-selection.
+    const params = Array.isArray(data.params) ? (data.params as DescribableField[]) : [];
+    const queryItems = Array.isArray(data.queryItems)
+      ? (data.queryItems as DescribableField[])
+      : [];
+    const states = Array.isArray(data.states) ? (data.states as DescribableField[]) : [];
+    return [
+      { key: "params", fields: params },
+      { key: "queryItems", fields: queryItems },
+      { key: "states", fields: states },
     ];
   }
 
@@ -132,7 +147,18 @@ export function findRowName(
   }
 
   const section = getFieldSections(element)[field.sectionIndex ?? 0];
-  return section?.fields?.[field.fieldIndex]?.name;
+  const row = section?.fields?.[field.fieldIndex];
+  if (!row) return undefined;
+  if (row.name) return row.name;
+
+  // Query items have no name; label them by their event types.
+  if (section.key === "queryItems") {
+    const types = (row as { types?: string[] }).types;
+    if (Array.isArray(types) && types.length > 0) return types.join(" | ");
+    return "Query item";
+  }
+
+  return row.name;
 }
 
 /**

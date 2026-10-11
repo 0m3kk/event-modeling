@@ -1,5 +1,6 @@
-import { toolRegistry } from "@/tools";
+import { toolRegistry, ToolValidationError } from "@/tools";
 import { useCanvasStore } from "@/store";
+import { collectBoardTags } from "@/utils/eventTags";
 import { sendChatMessage, type AISettings, type ChatMessage } from "./client";
 import type { Point } from "@/types";
 
@@ -17,6 +18,70 @@ function getViewportCenter(): Point {
   };
 }
 
+function isZodOptional(schema: any): boolean {
+  const typeName = schema?._def?.typeName;
+  return typeName === "ZodOptional" || typeName === "ZodDefault";
+}
+
+/**
+ * Recursively converts a Zod schema into a JSON Schema object understood by the
+ * OpenAI tools API. Unlike a flat shape dump, this preserves nested arrays and
+ * objects (e.g. `queryItems[].tags[] = { tag, field }`) so the model knows the
+ * exact structure it must produce.
+ */
+export function zodToJsonSchema(schema: any): any {
+  if (!schema) return { type: "object" };
+
+  const def = schema._def;
+  const typeName = def?.typeName;
+  const description: string | undefined = schema.description;
+  const withDesc = (obj: any) => (description ? { ...obj, description } : obj);
+
+  switch (typeName) {
+    case "ZodString":
+      return withDesc({ type: "string" });
+    case "ZodNumber":
+      return withDesc({ type: "number" });
+    case "ZodBoolean":
+      return withDesc({ type: "boolean" });
+    case "ZodBigInt":
+      return withDesc({ type: "integer" });
+    case "ZodEnum":
+      return withDesc({ type: "string", enum: def.values });
+    case "ZodNativeEnum":
+      return withDesc({ type: "string", enum: Object.values(def.values) });
+    case "ZodLiteral":
+      return withDesc({ type: typeof def.value, enum: [def.value] });
+    case "ZodArray":
+      return withDesc({ type: "array", items: zodToJsonSchema(def.type) });
+    case "ZodObject": {
+      const shape = typeof def.shape === "function" ? def.shape() : def.shape;
+      const properties: Record<string, any> = {};
+      const required: string[] = [];
+      for (const [key, value] of Object.entries<any>(shape)) {
+        properties[key] = zodToJsonSchema(value);
+        if (!isZodOptional(value)) required.push(key);
+      }
+      return withDesc({
+        type: "object",
+        properties,
+        ...(required.length > 0 ? { required } : {}),
+      });
+    }
+    case "ZodOptional":
+    case "ZodDefault":
+      return withDesc(zodToJsonSchema(def.innerType));
+    case "ZodEffects":
+      return withDesc(zodToJsonSchema(def.schema));
+    case "ZodRecord":
+    case "ZodAny":
+    case "ZodUnknown":
+      return withDesc({ type: "object" });
+    default:
+      return withDesc({ type: "object" });
+  }
+}
+
 export function buildOpenAITools(): any[] {
   const aiTools = toolRegistry.getAITools();
   const tools: any[] = [];
@@ -26,7 +91,10 @@ export function buildOpenAITools(): any[] {
     type: "function",
     function: {
       name: "get_canvas_overview",
-      description: "Read all current elements on the canvas, including their IDs, types, and summary data.",
+      description:
+        "Read all current elements on the canvas, including their IDs, types, and summary data. " +
+        "Also returns `eventTypes` and `tagCatalog` (every DCB tag currently attached to an event field, " +
+        "with its type and source events) so you can build valid State card query tags.",
       parameters: {
         type: "object",
         properties: {},
@@ -49,39 +117,12 @@ export function buildOpenAITools(): any[] {
 
   // 3. Dynamic decoupled tools from registry!
   for (const t of aiTools) {
-    // Generate JSON Schema parameters from Zod definition
-    const shape = (t.parameters as any).shape || {};
-    const properties: Record<string, any> = {};
-    const required: string[] = [];
-
-    for (const [key, val] of Object.entries<any>(shape)) {
-      const typeName = val._def?.typeName;
-      let propType = "string";
-      if (typeName === "ZodNumber") propType = "number";
-      else if (typeName === "ZodBoolean") propType = "boolean";
-      else if (typeName === "ZodArray") propType = "array";
-      else if (typeName === "ZodObject") propType = "object";
-
-      properties[key] = {
-        type: propType,
-        description: val.description || key,
-      };
-
-      if (!val.isOptional?.()) {
-        required.push(key);
-      }
-    }
-
     tools.push({
       type: "function",
       function: {
         name: t.toolName,
         description: t.description,
-        parameters: {
-          type: "object",
-          properties,
-          required: required.length > 0 ? required : undefined,
-        },
+        parameters: zodToJsonSchema(t.parameters),
       },
     });
   }
@@ -100,7 +141,17 @@ export async function executeAITool(name: string, args: any): Promise<string> {
       y: el.y,
       data: el.data,
     }));
-    return JSON.stringify({ count: summary.length, elements: summary });
+    const eventTypes = state.elements
+      .filter((el) => el.type === "eventCard")
+      .map((el) => el.data?.name)
+      .filter((n): n is string => typeof n === "string" && n.trim().length > 0);
+    const tagCatalog = collectBoardTags(state.elements);
+    return JSON.stringify({
+      count: summary.length,
+      elements: summary,
+      eventTypes,
+      tagCatalog,
+    });
   }
 
   if (name === "clear_canvas") {
@@ -118,14 +169,36 @@ export async function executeAITool(name: string, args: any): Promise<string> {
     const offset = (state.elements.length % 5) * 30;
     const spawnPoint = { x: center.x + offset, y: center.y + offset };
 
-    const element = matchedTool.onCreate(args, spawnPoint);
-    state.addElement(element);
+    try {
+      const element = matchedTool.onCreate(args, spawnPoint);
+      state.addElement(element);
 
-    return JSON.stringify({
-      status: "success",
-      createdId: element.id,
-      type: element.type,
-    });
+      return JSON.stringify({
+        status: "success",
+        createdId: element.id,
+        type: element.type,
+      });
+    } catch (error) {
+      if (error instanceof ToolValidationError) {
+        // Refuse to create the card and tell the model exactly what broke so it
+        // can fix the data (e.g. create the missing event/tag first) and retry.
+        const latest = useCanvasStore.getState();
+        const tagCatalog = collectBoardTags(latest.elements);
+        const eventTypes = latest.elements
+          .filter((el) => el.type === "eventCard")
+          .map((el) => el.data?.name)
+          .filter((n): n is string => typeof n === "string" && n.trim().length > 0);
+        return JSON.stringify({
+          status: "error",
+          error: "validation_failed",
+          message: "The card was NOT created because its data breaks domain rules.",
+          issues: error.issues,
+          tagCatalog,
+          eventTypes,
+        });
+      }
+      throw error;
+    }
   }
 
   return JSON.stringify({ error: `Unknown tool: ${name}` });
@@ -138,8 +211,9 @@ export async function runAgentConversation(
 ): Promise<string> {
   const systemPrompt = `You are the AI Event Modeling Architect.
 You help software architects and developers design domain events, business models, and reactive systems on an infinite canvas.
-You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), and clear the board.
+You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create state (projection/decision-model) cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), and clear the board.
 When the user asks to add or create something, always call the appropriate creation tool!
+For State cards: call get_canvas_overview first to discover existing event types and DCB tags. Every query tag is a { tag, field } pair where "tag" already exists on an event field and "field" is one of the card's params with the SAME type. If a creation tool returns status "error" with issues, fix them (e.g. create the missing event/tag first) and try again.
 Be concise, clear, and professional. Reply in the same language the user uses (Vietnamese or English).`;
 
   const wireMessages: any[] = [{ role: "system", content: systemPrompt }];

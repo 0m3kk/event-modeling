@@ -33,6 +33,38 @@ export interface SubSelectSection {
   count: number;
 }
 
+/** Context available when validating/normalizing an element's data. */
+export interface ToolDataContext {
+  /** All current elements on the board. */
+  elements: CanvasElement[];
+}
+
+/** A single rule violation reported by a tool's data validation. */
+export interface ValidationIssue {
+  /** Dotted path to the offending value (e.g. `queryItems[0].tags[1]`). */
+  path: string;
+  /** Machine-readable code (e.g. `tag_not_found`, `type_mismatch`). */
+  code: string;
+  /** Human-readable explanation. */
+  message: string;
+}
+
+/**
+ * Thrown when a tool refuses to create an element because the supplied data
+ * violates its domain rules (e.g. an AI-created State card referencing an
+ * unknown tag). The AI bridge catches this and reports the issues back to the
+ * model as tool feedback.
+ */
+export class ToolValidationError extends Error {
+  readonly issues: ValidationIssue[];
+
+  constructor(issues: ValidationIssue[]) {
+    super(issues.length > 0 ? issues.map((i) => i.message).join(" ") : "Validation failed");
+    this.name = "ToolValidationError";
+    this.issues = issues;
+  }
+}
+
 export interface ToolDefinition<TData = any> {
   type: string;
   name: string;
@@ -53,6 +85,22 @@ export interface ToolDefinition<TData = any> {
     element: CanvasElement<TData>;
     onUpdate: (partial: Partial<TData>) => void;
   }>;
+
+  /**
+   * Repairs data that enters the canvas from any source (AI, paste, import).
+   * Called by the store on add/load. Must be pure and idempotent; it should
+   * drop/normalize invalid references rather than throw.
+   */
+  normalizeData?: (data: TData, context: ToolDataContext) => TData;
+
+  /**
+   * Validates data against the tool's domain rules, returning a normalized
+   * copy and any issues. Used by the AI path to reject invalid creations.
+   */
+  validateData?: (
+    data: TData,
+    context: ToolDataContext,
+  ) => { data: TData; issues: ValidationIssue[] };
 
   // Optional: returns sections for sub-element navigation (e.g. Header, Fields, Relations)
   getSubSelectSections?: (element: CanvasElement<TData>) => SubSelectSection[];

@@ -44,5 +44,47 @@ describe("AIAgent", () => {
 
     expect(parsed.count).toBe(1);
     expect(parsed.elements[0].type).toBe("stickyNote");
+    expect(Array.isArray(parsed.tagCatalog)).toBe(true);
+    expect(Array.isArray(parsed.eventTypes)).toBe(true);
+  });
+
+  it("emits a nested JSON schema for state cards", () => {
+    const tools = buildOpenAITools();
+    const stateTool = tools.find((t) => t.function.name === "create_state_card");
+    expect(stateTool).toBeTruthy();
+    const props = stateTool.function.parameters.properties;
+    expect(props.queryItems.type).toBe("array");
+    expect(props.queryItems.items.properties.tags.items.properties.tag.type).toBe("string");
+    expect(props.queryItems.items.properties.tags.items.properties.field.type).toBe("string");
+  });
+
+  it("rejects an AI state card that references an unknown tag, then accepts it", async () => {
+    const failed = JSON.parse(
+      await executeAITool("create_state_card", {
+        name: "Course",
+        params: [{ name: "courseId", type: "string" }],
+        queryItems: [{ types: ["CourseDefined"], tags: [{ tag: "course", field: "courseId" }] }],
+      }),
+    );
+    expect(failed.status).toBe("error");
+    expect(failed.issues.length).toBeGreaterThan(0);
+    expect(useCanvasStore.getState().elements).toHaveLength(0);
+
+    // Create the event that carries the tag, then retry.
+    await executeAITool("create_event_card", {
+      name: "CourseDefined",
+      fields: [{ name: "courseId", type: "string", tag: "course" }],
+    });
+
+    const ok = JSON.parse(
+      await executeAITool("create_state_card", {
+        name: "Course",
+        params: [{ name: "courseId", type: "string" }],
+        queryItems: [{ types: ["CourseDefined"], tags: [{ tag: "course", field: "courseId" }] }],
+        states: [{ name: "exists", type: "boolean" }],
+      }),
+    );
+    expect(ok.status).toBe("success");
+    expect(ok.type).toBe("stateCard");
   });
 });

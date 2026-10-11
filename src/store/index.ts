@@ -94,6 +94,21 @@ export interface CanvasStoreState {
 
 const MAX_HISTORY = 50;
 
+/**
+ * Repairs an element's data through its tool's normalizer (if any) before it
+ * enters the canvas. Guards against rule-breaking data from AI/import/paste
+ * paths that bypass the interactive UI.
+ */
+function normalizeElementData(
+  element: CanvasElement,
+  elements: CanvasElement[],
+): CanvasElement {
+  const tool = toolRegistry.get(element.type);
+  if (!tool?.normalizeData) return element;
+  const nextData = tool.normalizeData(element.data, { elements });
+  return nextData === element.data ? element : { ...element, data: nextData };
+}
+
 function snapshotState(elements: CanvasElement[]): HistoryEntry {
   return {
     elements: JSON.parse(JSON.stringify(elements)),
@@ -157,7 +172,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
   addElement: (element) => {
     const current = get().elements;
-    const uniqueElement = ensureUniqueElement(element, current);
+    const uniqueElement = ensureUniqueElement(normalizeElementData(element, current), current);
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
@@ -173,7 +188,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     const processed: CanvasElement[] = [];
     let running = [...current];
     for (const el of elements) {
-      const uniqueEl = ensureUniqueElement(el, running);
+      const uniqueEl = ensureUniqueElement(normalizeElementData(el, running), running);
       processed.push(uniqueEl);
       running.push(uniqueEl);
     }
@@ -536,9 +551,10 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   },
 
   loadProject: (project) => {
+    const normalized = project.elements.map((el) => normalizeElementData(el, project.elements));
     set({
       projectName: project.name,
-      elements: project.elements,
+      elements: normalized,
       selectedIds: [],
       viewport: {
         x: project.viewport.x,

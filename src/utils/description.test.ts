@@ -254,3 +254,54 @@ describe("description utility — Service cards", () => {
     expect("description" in (patch?.data as any).methods[0]).toBe(false);
   });
 });
+
+describe("description utility — State cards", () => {
+  function state(): CanvasElement {
+    return {
+      id: "state-1",
+      type: "stateCard",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 182,
+      data: {
+        name: "CourseState",
+        params: [{ name: "courseId", type: "string", description: "Param id" }],
+        queryItems: [{ types: ["CourseDefined"], tags: [], description: "The query" }],
+        states: [{ name: "exists", type: "boolean", description: "Whether it exists" }],
+      },
+    };
+  }
+
+  it("returns params, queryItems and states bands", () => {
+    expect(getFieldSections(state()).map((s) => s.key)).toEqual(["params", "queryItems", "states"]);
+  });
+
+  it("reads descriptions per section", () => {
+    expect(
+      findDescriptionText(state(), { elementId: "state-1", sectionIndex: 0, fieldIndex: 0 }),
+    ).toBe("Param id");
+    expect(
+      findDescriptionText(state(), { elementId: "state-1", sectionIndex: 1, fieldIndex: 0 }),
+    ).toBe("The query");
+    expect(
+      findDescriptionText(state(), { elementId: "state-1", sectionIndex: 2, fieldIndex: 0 }),
+    ).toBe("Whether it exists");
+  });
+
+  it("labels a query item by its event types", () => {
+    expect(
+      findRowName(state(), { elementId: "state-1", sectionIndex: 1, fieldIndex: 0 }),
+    ).toBe("CourseDefined");
+  });
+
+  it("writes a query item description under queryItems", () => {
+    const patch = applyDescription(
+      state(),
+      { elementId: "state-1", sectionIndex: 1, fieldIndex: 0 },
+      "Updated query",
+    );
+    expect((patch?.data as any).queryItems[0].description).toBe("Updated query");
+    expect((patch?.data as any).states).toEqual(state().data.states);
+  });
+});
