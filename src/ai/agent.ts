@@ -7,9 +7,19 @@ import {
   listDefinedTypeNames,
   PRIMITIVE_FIELD_TYPES,
 } from "@/utils/typeCatalog";
+import {
+  isSliceEligibleChild,
+  SLICE_TYPE,
+  type SliceElement,
+  type SliceLane,
+} from "@/tools/sliceCard/layout";
 import { z } from "zod";
 import { sendChatMessage, createSessionId, type AISettings, type ChatMessage } from "./client";
 import type { CanvasElement, Point } from "@/types";
+import { findFreeSpot } from "@/utils/placement";
+
+/** Breathing room kept between free-standing AI-created cards. */
+const AI_PLACEMENT_GAP = 40;
 
 export interface AgentStepCallback {
   onToolCall?: (toolName: string, args: any) => void;
@@ -103,6 +113,28 @@ function toCreateToolName(updateToolName: string): string {
     : updateToolName;
 }
 
+/**
+ * Extra JSON-schema properties injected into every lane-eligible card tool so
+ * the model can place the card it creates (or moves) into a Slice lane in the
+ * same call. Resolved by {@link resolveSliceMembership}.
+ */
+const SLICE_PLACEMENT_PROPS: Record<string, any> = {
+  slice: {
+    type: "string",
+    description:
+      "Optional: name of an existing Slice to place this card inside one of its lanes. " +
+      "Set this right after create_slice so AI-made slices are not left empty.",
+  },
+  lane: {
+    type: "string",
+    description:
+      "Optional lane inside `slice`, when the card's type alone is ambiguous or the lane " +
+      "should be chosen explicitly. Accepts the lane's card type (e.g. eventCard, queryCard, " +
+      "stateCard, viewCard) or its 1-based position from the top. Defaults to the lane whose " +
+      "reserved type matches this card.",
+  },
+};
+
 export function buildOpenAITools(): any[] {
   const aiTools = toolRegistry.getAITools();
   const tools: any[] = [];
@@ -114,8 +146,9 @@ export function buildOpenAITools(): any[] {
       name: "get_canvas_overview",
       description:
         "Read all current elements on the canvas, including their IDs, types, and summary data. " +
-        "Also returns `eventTypes` and `tagCatalog` (every DCB tag currently attached to an event field, " +
-        "with its type and source events) so you can build valid State card query tags.",
+        "Also returns `eventTypes`, `tagCatalog` (every DCB tag currently attached to an event field, " +
+        "with its type and source events) and `slices` (each Slice with its lanes and the cards already " +
+        "placed in them) so you can build valid State card query tags and target slice lanes.",
       parameters: {
         type: "object",
         properties: {},
@@ -163,16 +196,33 @@ export function buildOpenAITools(): any[] {
 
   // 4. Dynamic decoupled tools from registry: each create tool also gets a
   //    matching update tool that reuses the same payload schema plus a
-  //    `target` locator (the card's current name).
+  //    `target` locator (the card's current name). Lane-eligible card tools
+  //    also accept `slice` / `lane` so the model can drop the card straight
+  //    into a Slice lane instead of leaving AI-made slices empty.
   for (const t of aiTools) {
+    const eligibleForLane = isSliceEligibleChild(
+      toolRegistry.getByAIToolName(t.toolName)?.type ?? "",
+    );
+    const createParams = zodToJsonSchema(t.parameters);
+    if (eligibleForLane) Object.assign(createParams.properties, SLICE_PLACEMENT_PROPS);
+
     tools.push({
       type: "function",
       function: {
         name: t.toolName,
         description: t.description,
-        parameters: zodToJsonSchema(t.parameters),
+        parameters: createParams,
       },
     });
+
+    const updateParams = zodToJsonSchema(
+      (t.parameters as z.ZodObject<any>).extend({
+        target: z
+          .string()
+          .describe("Current name of the element to update (must exist on the board)"),
+      }),
+    );
+    if (eligibleForLane) Object.assign(updateParams.properties, SLICE_PLACEMENT_PROPS);
 
     tools.push({
       type: "function",
@@ -183,13 +233,7 @@ export function buildOpenAITools(): any[] {
           "Send the COMPLETE corrected definition: the payload replaces the existing data " +
           "(array sections like fields/params are replaced wholesale). " +
           t.description,
-        parameters: zodToJsonSchema(
-          (t.parameters as z.ZodObject<any>).extend({
-            target: z
-              .string()
-              .describe("Current name of the element to update (must exist on the board)"),
-          }),
-        ),
+        parameters: updateParams,
       },
     });
   }
@@ -230,6 +274,128 @@ function findElementByName(
   return elements.find(
     (el) => (!type || el.type === type) && nameKey(getElementName(el) ?? "") === key,
   );
+}
+
+interface SlicePlacement {
+  /** True only when the call actually carried a `slice` argument. */
+  requested: boolean;
+  sliceId?: string;
+  laneId?: string;
+  error?: { message: string; issues: ValidationIssue[] };
+}
+
+const NOT_REQUESTED: SlicePlacement = { requested: false };
+
+/**
+ * Turns the optional `slice` / `lane` arguments of a create/update call into
+ * concrete `sliceId` / `laneId` membership for a card.
+ *
+ * `slice` is the slice's name; `lane` (optional) is the lane's card type
+ * (e.g. "eventCard" or its display name "Event") or its 1-based position from
+ * the top. Without `lane`, the card's own type picks the lane, which is enough
+ * for the typed lanes create_slice produces. An explicit empty `slice` detaches
+ * the card from any slice/lane.
+ */
+function resolveSliceMembership(
+  elements: CanvasElement[],
+  cardType: string,
+  args: any,
+): SlicePlacement {
+  if (!args || typeof args !== "object" || !("slice" in args)) return NOT_REQUESTED;
+
+  const sliceName = typeof args.slice === "string" ? args.slice.trim() : "";
+  if (!sliceName) return { requested: true, sliceId: undefined, laneId: undefined };
+
+  const issue = (code: string, message: string, path = "slice"): SlicePlacement => ({
+    requested: true,
+    error: { message, issues: [{ path, code, message }] },
+  });
+
+  if (!isSliceEligibleChild(cardType)) {
+    return issue(
+      "slice_ineligible_card",
+      `${cardType} cards cannot be placed in a slice lane (Enum, Object, Alias and Slice cards stay outside slices).`,
+    );
+  }
+
+  const slice = findElementByName(elements, sliceName, SLICE_TYPE) as
+    | SliceElement
+    | undefined;
+  if (!slice) {
+    return issue(
+      "slice_not_found",
+      `No Slice named "${sliceName}" exists on the board. Create it first or use get_canvas_overview to list slices.`,
+    );
+  }
+
+  const lanes: SliceLane[] = slice.data?.lanes ?? [];
+  if (lanes.length === 0) {
+    return issue("lane_not_found", `Slice "${sliceName}" has no lanes.`, "lane");
+  }
+
+  const laneLabel = (lane: SliceLane): string =>
+    lane.childType ? toolRegistry.get(lane.childType)?.name ?? lane.childType : "(empty lane)";
+
+  const laneRef = typeof args.lane === "string" ? args.lane.trim() : "";
+  let lane: SliceLane | undefined;
+
+  if (laneRef) {
+    const asIndex = Number(laneRef);
+    if (Number.isInteger(asIndex) && asIndex >= 1 && asIndex <= lanes.length) {
+      lane = lanes[asIndex - 1];
+    } else {
+      const ref = nameKey(laneRef);
+      lane = lanes.find((l) => {
+        if (!l.childType) return false;
+        const typeKey = nameKey(l.childType);
+        const nameK = nameKey(toolRegistry.get(l.childType)?.name ?? "");
+        return ref === typeKey || (nameK.length > 0 && ref === nameK);
+      });
+    }
+  } else {
+    lane = lanes.find((l) => l.childType === cardType);
+  }
+
+  if (!lane) {
+    const available = lanes
+      .map((l, i) => `${i + 1}:${l.childType ?? "empty"}`)
+      .join(", ");
+    return issue(
+      "lane_not_found",
+      `Slice "${sliceName}" has no lane for "${laneRef || cardType}". Available lanes: ${available}.`,
+      "lane",
+    );
+  }
+
+  if (lane.childType && lane.childType !== cardType) {
+    return issue(
+      "lane_type_mismatch",
+      `Lane "${laneLabel(lane)}" only accepts ${lane.childType} cards, not ${cardType}.`,
+      "lane",
+    );
+  }
+
+  return { requested: true, sliceId: slice.id, laneId: lane.id };
+}
+
+/** Compact slice + lane summary for the model (identifies lanes by type/index). */
+function summarizeSlices(elements: CanvasElement[]): any[] {
+  return elements
+    .filter((el) => el.type === SLICE_TYPE)
+    .map((el) => {
+      const lanes: SliceLane[] = (el.data as any)?.lanes ?? [];
+      return {
+        id: el.id,
+        name: getElementName(el) ?? "Slice",
+        lanes: lanes.map((lane, index) => ({
+          index: index + 1,
+          type: lane.childType ?? null,
+          cards: elements.filter(
+            (child) => child.sliceId === el.id && child.laneId === lane.id,
+          ).map((child) => getElementName(child) ?? child.id),
+        })),
+      };
+    });
 }
 
 /** Deletes a single element located by name (and optional type). */
@@ -343,6 +509,20 @@ function executeUpdateElement(updateName: string, args: any): string {
     ? definition.computeSize(nextData)
     : { width: existing.width, height: existing.height };
 
+  // Optional slice/lane placement carried by the update.
+  const placement = resolveSliceMembership(state.elements, definition.type, args);
+  if (placement.error) {
+    return JSON.stringify({
+      status: "error",
+      error: "slice_placement_failed",
+      message: placement.error.message,
+      issues: placement.error.issues,
+    });
+  }
+  const membership: Partial<CanvasElement> = placement.requested
+    ? { sliceId: placement.sliceId, laneId: placement.laneId }
+    : {};
+
   // Keep the card's position. Height is always content-driven; width only ever
   // grows, so wide query items (event types / tag badges) still fit after an AI
   // edit without undoing a deliberately narrower card.
@@ -350,6 +530,7 @@ function executeUpdateElement(updateName: string, args: any): string {
     data: nextData,
     height: size.height,
     width: Math.max(existing.width, size.width),
+    ...membership,
   });
 
   return JSON.stringify({ status: "success", updatedId: existing.id, type: existing.type });
@@ -379,6 +560,7 @@ export async function executeAITool(name: string, args: any): Promise<string> {
       tagCatalog,
       definedTypes,
       primitiveTypes: Array.from(PRIMITIVE_FIELD_TYPES),
+      slices: summarizeSlices(state.elements),
     });
   }
 
@@ -401,17 +583,14 @@ export async function executeAITool(name: string, args: any): Promise<string> {
   const toolDefinition = toolRegistry.getByAIToolName(name);
 
   if (matchedTool) {
-    const center = getViewportCenter();
-    // Offset slightly if multiple items exist
-    const offset = (state.elements.length % 5) * 30;
-    const spawnPoint = { x: center.x + offset, y: center.y + offset };
+    const spawnPoint = getViewportCenter();
 
     try {
       const created = matchedTool.onCreate(args, spawnPoint);
       // Normalize identifiers before validating so any casing the model used
       // still resolves (e.g. a type written as "Customer Id" -> "customerId").
       const normalizedData = normalizeIdentifierNames(created.data, created.type);
-      const element =
+      let element =
         normalizedData === created.data ? created : { ...created, data: normalizedData };
 
       // Reject before touching the canvas if the built data breaks domain
@@ -423,6 +602,30 @@ export async function executeAITool(name: string, args: any): Promise<string> {
         if (issues.length > 0) {
           return buildValidationError(issues);
         }
+      }
+
+      // Optional slice/lane placement carried by the create call.
+      const placement = resolveSliceMembership(state.elements, element.type, args);
+      if (placement.error) {
+        return JSON.stringify({
+          status: "error",
+          error: "slice_placement_failed",
+          message: placement.error.message,
+          issues: placement.error.issues,
+          slices: summarizeSlices(state.elements),
+        });
+      }
+      if (placement.requested && placement.sliceId) {
+        element = { ...element, sliceId: placement.sliceId, laneId: placement.laneId };
+      } else {
+        // Free-standing card: nudge it to the nearest free slot so a batch of
+        // AI-created cards spreads out instead of stacking on the same spot.
+        const spot = findFreeSpot(
+          state.elements,
+          { x: element.x, y: element.y, width: element.width, height: element.height },
+          AI_PLACEMENT_GAP,
+        );
+        element = { ...element, x: spot.x, y: spot.y };
       }
 
       state.addElement(element);
@@ -453,13 +656,18 @@ export async function runAgentConversation(
 You help software architects and developers design domain events, business models, and reactive systems on an infinite canvas.
 You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create state (projection/decision-model) cards, create view (persisted read-model) cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), create constraint cards (assert rules like "AccountStatus.status must be active" over State card fields), create slices (a slice stacks lanes top-to-bottom, each lane holding cards of ONE type), and clear the board.
 When the user asks to add or create something, always call the appropriate creation tool!
+FLOW SEMANTICS (IMPORTANT): a "flow" in Event Modeling is ONE slice, not the whole command→event→read-model chain. There are two kinds:
+- Write slice: a Command that emits one or more Events. Lanes top-to-bottom: commandCard, then eventCard. Add a stateCard lane only when the command reads a decision model, and a constraintCard lane for invariants.
+- Read slice: a Query that reads Events into a read model. Lanes top-to-bottom: queryCard, then either viewCard (a persisted, queryable read model for search/sort/filter) or stateCard (an in-memory projection/decision model).
+When the user asks to "draw/build a flow" (e.g. "vẽ flow") without naming the kind, produce exactly ONE write slice OR ONE read slice that matches their description — never both, and never the full command→event→view chain. Ask only when the kind is genuinely ambiguous. A write slice stops at the emitted events (no query/view); a read slice starts at the query (no command).
 To change an existing card, prefer its matching update tool (e.g. update_event_card) over deleting and recreating it: pass "target" = the card's current name and send the COMPLETE corrected definition. This preserves the card's id, position and links. Use delete_element (by "target" name) to remove a card.
 Data types: every field "type" MUST be either a primitive (${Array.from(PRIMITIVE_FIELD_TYPES).join(", ")}) or the exact name of an Object, Enum or Alias card that already exists on the board. Any other type is rejected — create the Object/Enum/Alias card first, then reference it by name.
 For Event cards: a DCB tag identifies ONE field type across the whole board. Reusing a tag with a different field type is rejected, so keep the type identical whenever you reuse a tag.
 For State cards: call get_canvas_overview first to discover existing event types, DCB tags and defined types. Every query item's "types" must be names of Event cards on the board. Every query tag is a { tag, field } pair where "tag" already exists on an event field and "field" is one of the card's params with the SAME type. If a creation tool returns status "error" with issues, fix them (e.g. create the missing event/tag/type first) and try again.
 For View cards: same shape and rules as State cards (params, query items, states), but a View represents a persisted read model stored in a database for sorting, searching and filtering. Use create_view_card when the user wants a queryable read model rather than an in-memory decision state.
 For Constraint cards: call get_canvas_overview first to discover existing State cards. List the State cards the constraint uses in "states" (by name); those must exist on the board. "rules" is a list of free-text assertions (e.g. "AccountStatus.status must be active").
-For Slices: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom), each lane with a "type". A lane type must be one of commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote — Enum/Object/Alias cards and nested Slices are NOT allowed in lanes. Give at least one lane and do not repeat the same lane type twice. A lane is a placeholder for that card type; the actual cards are placed into it later.
+For Slices: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom), each lane with a "type". A lane type must be one of commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote — Enum/Object/Alias cards and nested Slices are NOT allowed in lanes. Give at least one lane and do not repeat the same lane type twice.
+Filling lanes: after create_slice, create the card(s) each lane needs and place each one into its lane by passing "slice" = the slice's name (and "lane" only when the card's type alone is ambiguous: give the lane's card type or its 1-based position). An AI-made slice must not be left empty — a slice with no cards is not a finished flow.
 Be concise, clear, and professional. Reply in the same language the user uses (Vietnamese or English).`;
 
   const wireMessages: any[] = [{ role: "system", content: systemPrompt }];

@@ -409,4 +409,149 @@ describe("AIAgent", () => {
     expect(res.issues.map((i: any) => i.code)).toContain("duplicate_lane_type");
     expect(useCanvasStore.getState().elements).toHaveLength(0);
   });
+
+  it("exposes slice/lane placement params on lane-eligible card tools only", () => {
+    const tools = buildOpenAITools();
+    const command = tools.find((t) => t.function.name === "create_command_card");
+    expect(command.function.parameters.properties.slice.type).toBe("string");
+    expect(command.function.parameters.properties.lane.type).toBe("string");
+
+    const update = tools.find((t) => t.function.name === "update_event_card");
+    expect(update.function.parameters.properties.slice.type).toBe("string");
+
+    // Enum cards cannot live in a lane, so they must not advertise the params.
+    const enumTool = tools.find((t) => t.function.name === "create_enum_card");
+    expect(enumTool.function.parameters.properties.slice).toBeUndefined();
+  });
+
+  it("places a card into the lane matching its type when `slice` is passed", async () => {
+    const sliceRes = JSON.parse(
+      await executeAITool("create_slice", {
+        name: "PlaceOrderSlice",
+        lanes: [{ type: "commandCard" }, { type: "eventCard" }],
+      }),
+    );
+    expect(sliceRes.status).toBe("success");
+
+    const slice = useCanvasStore.getState().elements.find((e) => e.type === "sliceCard")!;
+    const [commandLane, eventLane] = (slice.data as any).lanes;
+
+    const cmdRes = JSON.parse(
+      await executeAITool("create_command_card", {
+        name: "PlaceOrder",
+        slice: "PlaceOrderSlice",
+      }),
+    );
+    expect(cmdRes.status).toBe("success");
+
+    const evtRes = JSON.parse(
+      await executeAITool("create_event_card", {
+        name: "OrderPlaced",
+        slice: "PlaceOrderSlice",
+      }),
+    );
+    expect(evtRes.status).toBe("success");
+
+    const elements = useCanvasStore.getState().elements;
+    const command = elements.find((e) => e.type === "commandCard")!;
+    const event = elements.find((e) => e.type === "eventCard")!;
+    expect(command.sliceId).toBe(slice.id);
+    expect(command.laneId).toBe(commandLane.id);
+    expect(event.sliceId).toBe(slice.id);
+    expect(event.laneId).toBe(eventLane.id);
+  });
+
+  it("selects an explicit lane by type or 1-based position", async () => {
+    await executeAITool("create_slice", {
+      name: "ReadSlice",
+      lanes: [{ type: "queryCard" }, { type: "viewCard" }],
+    });
+
+    const byType = JSON.parse(
+      await executeAITool("create_query_card", { name: "FindOrders", slice: "ReadSlice", lane: "queryCard" }),
+    );
+    expect(byType.status).toBe("success");
+
+    const byIndex = JSON.parse(
+      await executeAITool("create_view_card", { name: "OrderList", slice: "ReadSlice", lane: "2" }),
+    );
+    expect(byIndex.status).toBe("success");
+
+    const overview = JSON.parse(await executeAITool("get_canvas_overview", {}));
+    const sliceInfo = overview.slices.find((s: any) => s.name.toLowerCase() === "readslice");
+    expect(sliceInfo.lanes[0].cards).toContain("findOrders");
+    expect(sliceInfo.lanes[1].cards).toContain("orderList");
+  });
+
+  it("reports slice/lane placement failures without creating the card", async () => {
+    const missing = JSON.parse(
+      await executeAITool("create_event_card", { name: "Ghost", slice: "NoSlice" }),
+    );
+    expect(missing.status).toBe("error");
+    expect(missing.error).toBe("slice_placement_failed");
+    expect(missing.issues.map((i: any) => i.code)).toContain("slice_not_found");
+
+    await executeAITool("create_slice", { name: "WriteSlice", lanes: [{ type: "eventCard" }] });
+    const mismatch = JSON.parse(
+      await executeAITool("create_command_card", { name: "PlaceOrder", slice: "WriteSlice" }),
+    );
+    expect(mismatch.status).toBe("error");
+    expect(mismatch.issues.map((i: any) => i.code)).toContain("lane_not_found");
+
+    expect(useCanvasStore.getState().elements.filter((e) => e.type === "commandCard")).toHaveLength(0);
+  });
+
+  it("spreads free-standing AI cards instead of stacking them", async () => {
+    for (let i = 0; i < 5; i++) {
+      await executeAITool("create_sticky_note", { text: `Note ${i}` });
+    }
+
+    const elements = useCanvasStore.getState().elements;
+    expect(elements).toHaveLength(5);
+    for (let i = 0; i < elements.length; i++) {
+      for (let j = i + 1; j < elements.length; j++) {
+        const a = elements[i];
+        const b = elements[j];
+        const overlap =
+          a.x < b.x + b.width &&
+          a.x + a.width > b.x &&
+          a.y < b.y + b.height &&
+          a.y + a.height > b.y;
+        expect(overlap).toBe(false);
+      }
+    }
+  });
+
+  it("moves an existing card into a lane via update, and detaches it again", async () => {
+    await executeAITool("create_slice", { name: "WriteSlice", lanes: [{ type: "eventCard" }] });
+    const created = JSON.parse(
+      await executeAITool("create_event_card", { name: "OrderPlaced", fields: [] }),
+    );
+
+    const moved = JSON.parse(
+      await executeAITool("update_event_card", {
+        target: "OrderPlaced",
+        name: "OrderPlaced",
+        fields: [],
+        slice: "WriteSlice",
+      }),
+    );
+    expect(moved.status).toBe("success");
+    const slice = useCanvasStore.getState().elements.find((e) => e.type === "sliceCard")!;
+    let event = useCanvasStore.getState().elements.find((e) => e.id === created.createdId)!;
+    expect(event.sliceId).toBe(slice.id);
+
+    const detached = JSON.parse(
+      await executeAITool("update_event_card", {
+        target: "OrderPlaced",
+        name: "OrderPlaced",
+        fields: [],
+        slice: "",
+      }),
+    );
+    expect(detached.status).toBe("success");
+    event = useCanvasStore.getState().elements.find((e) => e.id === created.createdId)!;
+    expect(event.sliceId).toBeUndefined();
+    expect(event.laneId).toBeUndefined();
+  });
 });
