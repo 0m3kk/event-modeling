@@ -6,6 +6,7 @@ import { toolRegistry } from "@/tools";
 export class DragElementsInteraction implements CanvasInteraction {
   readonly id = "dragElements";
   private active = false;
+  private hasMoved = false;
   private dragStartWorld: Point = { x: 0, y: 0 };
   private initialPositions = new Map<string, Point>();
   private hitElementId: string | null = null;
@@ -23,6 +24,7 @@ export class DragElementsInteraction implements CanvasInteraction {
     if (!hitId) return false;
 
     this.active = true;
+    this.hasMoved = false;
     this.hitElementId = hitId;
     this.dragStartWorld = worldPoint;
     this.initialPositions.clear();
@@ -81,6 +83,11 @@ export class DragElementsInteraction implements CanvasInteraction {
     const dx = worldPoint.x - this.dragStartWorld.x;
     const dy = worldPoint.y - this.dragStartWorld.y;
 
+    if (!this.hasMoved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
+      this.hasMoved = true;
+      useCanvasStore.getState().setIsDragging(true);
+    }
+
     const state = useCanvasStore.getState();
     const nextElements = state.elements.map((el) => {
       const initial = this.initialPositions.get(el.id);
@@ -110,6 +117,11 @@ export class DragElementsInteraction implements CanvasInteraction {
     if (!this.active) return;
     this.active = false;
 
+    if (this.hasMoved) {
+      this.hasMoved = false;
+      useCanvasStore.getState().setIsDragging(false);
+    }
+
     const dx = worldPoint.x - this.dragStartWorld.x;
     const dy = worldPoint.y - this.dragStartWorld.y;
 
@@ -130,6 +142,10 @@ export class DragElementsInteraction implements CanvasInteraction {
   }
 
   onCancel(_ctx: InteractionContext): void {
+    if (this.hasMoved) {
+      this.hasMoved = false;
+      useCanvasStore.getState().setIsDragging(false);
+    }
     this.active = false;
     this.initialPositions.clear();
     this.hitElementId = null;

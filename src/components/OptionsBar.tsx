@@ -53,7 +53,9 @@ export function OptionsBar() {
     };
   }, [selectedIds, elements]);
 
-  if (!bounds || selectedElements.length === 0) return null;
+  const isDragging = useCanvasStore((s) => s.isDragging);
+
+  if (isDragging || !bounds || selectedElements.length === 0) return null;
 
   const isSingle = selectedElements.length === 1;
   const singleElement = isSingle ? selectedElements[0] : null;

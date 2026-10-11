@@ -15,6 +15,7 @@ export interface CanvasStoreState {
   selectedIds: string[];
   selectedField: SelectedField | null;
   inlineEdit: InlineEditState | null;
+  isDragging: boolean;
   tool: string; // "select" or tool type
   viewport: Viewport;
 
@@ -37,6 +38,7 @@ export interface CanvasStoreState {
   setSelectedIds: (ids: string[]) => void;
   setSelectedField: (field: SelectedField | null) => void;
   setInlineEdit: (edit: InlineEditState | null) => void;
+  setIsDragging: (isDragging: boolean) => void;
   selectAll: () => void;
   clearSelection: () => void;
 
@@ -76,6 +78,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   selectedIds: [],
   selectedField: null,
   inlineEdit: null,
+  isDragging: false,
   tool: "select",
   viewport: {
     x: 0,
@@ -110,9 +113,10 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     })),
   setSelectedField: (field) => set({ selectedField: field }),
   setInlineEdit: (edit) => set({ inlineEdit: edit }),
+  setIsDragging: (isDragging) => set({ isDragging }),
   selectAll: () =>
     set((state) => ({ selectedIds: state.elements.map((e) => e.id) })),
-  clearSelection: () => set({ selectedIds: [], selectedField: null, inlineEdit: null }),
+  clearSelection: () => set({ selectedIds: [], selectedField: null, inlineEdit: null, isDragging: false }),
 
   setSearchOpen: (open) => set({ isSearchOpen: open }),
   setGoogleDriveModalOpen: (open, tab = "save") =>

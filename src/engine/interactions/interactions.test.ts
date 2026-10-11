@@ -122,5 +122,34 @@ describe("Interaction System", () => {
       const handled = manager.handlePointerDown(emptyDragEvent, { x: 10, y: 10 });
       expect(handled).toBe(true);
     });
+
+    it("sets isDragging to true during element drag and resets on pointer up", () => {
+      const element: CanvasElement = {
+        id: "el-1",
+        type: "stickyNote",
+        x: 50,
+        y: 50,
+        width: 100,
+        height: 100,
+        data: {},
+      };
+      useCanvasStore.setState({ elements: [element] });
+      spatialIndex.rebuild([element]);
+
+      const drag = new DragElementsInteraction();
+      const hitEvent = { button: 0, clientX: 60, clientY: 60 } as PointerEvent;
+      expect(drag.onPointerDown(hitEvent, { x: 60, y: 60 }, ctx)).toBe(true);
+      expect(useCanvasStore.getState().isDragging).toBe(false);
+
+      // Drag 30px
+      drag.onPointerMove({} as PointerEvent, { x: 90, y: 90 }, ctx);
+      expect(useCanvasStore.getState().isDragging).toBe(true);
+
+      // Pointer up
+      drag.onPointerUp({} as PointerEvent, { x: 90, y: 90 }, ctx);
+      expect(useCanvasStore.getState().isDragging).toBe(false);
+      expect(useCanvasStore.getState().elements[0].x).toBe(80);
+      expect(useCanvasStore.getState().elements[0].y).toBe(80);
+    });
   });
 });
