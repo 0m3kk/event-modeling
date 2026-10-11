@@ -189,5 +189,28 @@ describe("Interaction System", () => {
 
       expect(hidePreviewSpy).toHaveBeenCalled();
     });
+
+    it("computes and displays unique name for preview card when duplicate exists", () => {
+      useCanvasStore.setState({
+        elements: [
+          {
+            id: "card-1",
+            type: "eventCard",
+            x: 0,
+            y: 0,
+            width: 220,
+            height: 88,
+            data: { name: "NewEvent", fields: [] },
+          },
+        ],
+        tool: "eventCard",
+      });
+
+      const manager = new InteractionManager(ctx);
+      const moveEvent = { clientX: 200, clientY: 150 } as PointerEvent;
+      manager.handlePointerMove(moveEvent, { x: 200, y: 150 });
+
+      expect((previewLayer as any).currentName).toBe("NewEvent 2");
+    });
   });
 });

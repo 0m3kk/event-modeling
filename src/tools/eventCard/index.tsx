@@ -72,16 +72,30 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     const headerColor = element.data.color || eventCardTool.color;
 
     const g = new Graphics();
+    const r = 8;
+    const w = element.width;
+    const h = element.height;
+    const headerH = 32;
 
-    // 1. Fill entire card background
-    g.roundRect(0, 0, element.width, element.height, 8);
+    // 1. Fill top header banner (rounded top corners, flat bottom) - single uniform fill!
+    g.moveTo(0, r);
+    g.arcTo(0, 0, r, 0, r);
+    g.lineTo(w - r, 0);
+    g.arcTo(w, 0, w, r, r);
+    g.lineTo(w, headerH);
+    g.lineTo(0, headerH);
+    g.closePath();
+    g.fill({ color: headerColor });
+
+    // 2. Fill card body background (flat top, rounded bottom corners)
+    g.moveTo(0, headerH);
+    g.lineTo(w, headerH);
+    g.lineTo(w, h - r);
+    g.arcTo(w, h, w - r, h, r);
+    g.lineTo(r, h);
+    g.arcTo(0, h, 0, h - r, r);
+    g.closePath();
     g.fill({ color: cardBg });
-
-    // 2. Fill top header banner (rounded top corners, straight bottom)
-    g.roundRect(0, 0, element.width, 32, 8);
-    g.fill({ color: headerColor });
-    g.rect(0, 20, element.width, 12);
-    g.fill({ color: headerColor });
 
     // 3. Highlight selected field: FULL-WIDTH edge-to-edge, NO side padding
     const selectedFieldIndex =
@@ -92,25 +106,28 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     const fieldsCount = element.data.fields?.length || 0;
     if (selectedFieldIndex >= 0 && selectedFieldIndex < fieldsCount) {
       const isLast = selectedFieldIndex === fieldsCount - 1;
-      const highlightY = 32 + selectedFieldIndex * 28;
+      const highlightY = headerH + selectedFieldIndex * 28;
       const sunkenColor = isDark ? 0x121214 : 0xf1f5f9;
 
       if (isLast) {
-        // Last row matches card bottom rounded corners (radius 8)
-        g.roundRect(0, highlightY, element.width, 28, 8);
-        g.fill({ color: sunkenColor });
-        // Straighten top part of highlight
-        g.rect(0, highlightY, element.width, 14);
+        // Flat top, rounded bottom corners (radius 8)
+        g.moveTo(0, highlightY);
+        g.lineTo(w, highlightY);
+        g.lineTo(w, h - r);
+        g.arcTo(w, h, w - r, h, r);
+        g.lineTo(r, h);
+        g.arcTo(0, h, 0, h - r, r);
+        g.closePath();
         g.fill({ color: sunkenColor });
       } else {
         // Full width rectangle spanning from x=0 to element.width
-        g.rect(0, highlightY, element.width, 28);
+        g.rect(0, highlightY, w, 28);
         g.fill({ color: sunkenColor });
       }
     }
 
     // 4. Draw single uniform border stroke around entire card (after all fills)
-    g.roundRect(0, 0, element.width, element.height, 8);
+    g.roundRect(0, 0, w, h, r);
     g.stroke({ color: borderCol, width: isSelected ? 2 : 1 });
 
     container.addChild(g);

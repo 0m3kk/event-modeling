@@ -3,6 +3,8 @@ import type { CanvasElement, Point, ResolvedTheme } from "@/types";
 import { toolRegistry } from "@/tools";
 import { computeTextResolution } from "../textResolution";
 import type { RenderContext } from "@/tools/types";
+import { useCanvasStore } from "@/store";
+import { ensureUniqueElement, getElementName } from "@/utils/naming";
 
 export class PreviewLayer extends Container {
   private ghostCardContainer = new Container();
@@ -11,6 +13,7 @@ export class PreviewLayer extends Container {
   private currentTool: string | null = null;
   private currentTheme: ResolvedTheme | null = null;
   private currentResolution: number = 1;
+  private currentName: string | null = null;
 
   constructor() {
     super();
@@ -37,8 +40,22 @@ export class PreviewLayer extends Container {
       return;
     }
 
-    const data = toolDef.createDefaultData();
+    // Compute unique name matching the exact name that will be created
+    const existingElements = useCanvasStore.getState().elements;
+    const defaultData = toolDef.createDefaultData();
+    const candidateElement: CanvasElement = {
+      id: "__ghost_preview__",
+      type: toolType,
+      x: 0,
+      y: 0,
+      width: toolDef.defaultSize.width,
+      height: toolDef.defaultSize.height,
+      data: defaultData,
+    };
+    const uniqueGhost = ensureUniqueElement(candidateElement, existingElements);
+    const data = uniqueGhost.data;
     const size = toolDef.computeSize ? toolDef.computeSize(data) : toolDef.defaultSize;
+    const candidateName = getElementName(uniqueGhost) || "";
 
     const x = Math.round(worldPoint.x - size.width / 2);
     const y = Math.round(worldPoint.y - size.height / 2);
@@ -47,15 +64,17 @@ export class PreviewLayer extends Container {
 
     const textResolution = computeTextResolution(zoom);
 
-    // Re-render ghost card content only if tool, theme, or text resolution changed
+    // Re-render ghost card content if tool, theme, resolution, or unique name changed
     if (
       this.currentTool !== toolType ||
       this.currentTheme !== theme ||
-      this.currentResolution !== textResolution
+      this.currentResolution !== textResolution ||
+      this.currentName !== candidateName
     ) {
       this.currentTool = toolType;
       this.currentTheme = theme;
       this.currentResolution = textResolution;
+      this.currentName = candidateName;
 
       this.renderGhostCard(toolDef, data, size, theme, zoom, textResolution);
     }
@@ -66,6 +85,7 @@ export class PreviewLayer extends Container {
   hidePreview() {
     this.visible = false;
     this.currentTool = null;
+    this.currentName = null;
     this.ghostCardContainer.removeChildren();
     this.borderAndShadow.clear();
   }
@@ -81,23 +101,24 @@ export class PreviewLayer extends Container {
     this.ghostCardContainer.removeChildren();
     this.borderAndShadow.clear();
 
-    const isDark = theme === "dark";
-
-    // 1. Soft drop shadow under the ghost card (offset y + 4)
-    const shadowColor = isDark ? 0x000000 : 0x0f172a;
-    this.borderAndShadow.roundRect(0, 4, size.width, size.height, 8);
-    this.borderAndShadow.fill({ color: shadowColor, alpha: isDark ? 0.35 : 0.1 });
-
-    // 2. Translucent preview accent border
-    const accentColor = 0x3b82f6; // vibrant blue outline
+    // 1. Crisp outline around the ghost preview card (vibrant blue)
+    const accentColor = 0x3b82f6;
     this.borderAndShadow.roundRect(0, 0, size.width, size.height, 8);
     this.borderAndShadow.stroke({
       color: accentColor,
-      width: 1.5,
-      alpha: 0.75,
+      width: 2,
+      alpha: 0.85,
     });
 
-    // 3. Render ghost card content via tool plugin with 55% opacity (guarded for browser)
+    // 2. Subtle outer glow ring (2px offset)
+    this.borderAndShadow.roundRect(-2, -2, size.width + 4, size.height + 4, 10);
+    this.borderAndShadow.stroke({
+      color: accentColor,
+      width: 1,
+      alpha: 0.25,
+    });
+
+    // 3. Render ghost card content via tool plugin with 65% opacity (no underlying dark fill)
     if (typeof document !== "undefined") {
       const ghostElement: CanvasElement = {
         id: "__ghost_preview__",
@@ -118,7 +139,7 @@ export class PreviewLayer extends Container {
       };
 
       toolDef.render(this.ghostCardContainer, ghostElement, context);
-      this.ghostCardContainer.alpha = 0.55;
+      this.ghostCardContainer.alpha = 0.65;
     }
   }
 
