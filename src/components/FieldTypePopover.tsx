@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, Code2, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Box, Check, Code2, Sparkles } from "lucide-react";
+import { useCanvasStore } from "@/store";
+import { getElementName } from "@/utils/naming";
 
 export interface FieldTypePreset {
   type: string;
@@ -34,6 +36,18 @@ export function FieldTypePopover({
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [customValue, setCustomValue] = useState("");
+
+  // Objects defined on the board (Object cards) can be reused as a field type.
+  const elements = useCanvasStore((s) => s.elements);
+  const objectTypes = useMemo(() => {
+    const names = new Set<string>();
+    for (const el of elements) {
+      if (el.type !== "objectCard") continue;
+      const name = getElementName(el);
+      if (name) names.add(name);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [elements]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -112,6 +126,40 @@ export function FieldTypePopover({
           );
         })}
       </div>
+
+      {/* Defined Objects (Object cards) — reusable as a field type */}
+      {objectTypes.length > 0 && (
+        <div className="mt-2.5 border-t border-gray-100 pt-2 dark:border-zinc-800">
+          <div className="mb-1 flex items-center gap-1.5 px-1.5 text-xs font-semibold text-gray-500 dark:text-zinc-400">
+            <Box size={13} />
+            <span>Objects</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {objectTypes.map((objectName) => {
+              const isSelected = currentType.toLowerCase() === objectName.toLowerCase();
+
+              return (
+                <button
+                  key={objectName}
+                  type="button"
+                  onClick={() => {
+                    onSelectType(objectName);
+                    onClose();
+                  }}
+                  className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-left transition-colors cursor-pointer ${
+                    isSelected
+                      ? "bg-violet-50 text-violet-600 font-semibold dark:bg-violet-950/60 dark:text-violet-400"
+                      : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  <span className="font-mono text-[13px] font-medium">{objectName}</span>
+                  {isSelected && <Check size={14} className="stroke-[2.5]" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Custom Type Input Form */}
       <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800">
