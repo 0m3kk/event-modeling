@@ -15,6 +15,7 @@ import {
   detachOrphanedMethodCopies,
   pruneDanglingReferences,
 } from "@/utils/reference";
+import { applyRenameMappings, collectRenameMappings } from "@/utils/rename";
 import { toolRegistry } from "@/tools/registry";
 import { reflowSlices } from "@/tools/sliceCard/layout";
 import { reflowDomains } from "@/tools/domainCard/layout";
@@ -319,11 +320,16 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
       : patch;
 
     const withReferences = syncReferenceUpdates(current, id, finalPatch);
-    const updatedElements = syncServiceMethodCopies(withReferences, id, finalPatch);
+    const withMethodCopies = syncServiceMethodCopies(withReferences, id, finalPatch);
+    // Propagate any rename (Object/Enum/Alias, Event, State, DCB tag, param)
+    // to the elements that reference it by name.
+    const renamed = finalPatch.data
+      ? applyRenameMappings(withMethodCopies, collectRenameMappings(target, finalPatch.data))
+      : withMethodCopies;
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: applyContainerLayout(updatedElements),
+      elements: applyContainerLayout(renamed),
     }));
   },
 
@@ -343,7 +349,13 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     });
 
     const withReferences = syncBatchReferenceUpdates(current, finalPatches);
-    const updatedElements = syncBatchServiceMethodCopies(withReferences, finalPatches);
+    const withMethodCopies = syncBatchServiceMethodCopies(withReferences, finalPatches);
+    // Propagate every rename in the batch to the elements that reference it.
+    const renameMappings = finalPatches.flatMap((patch) => {
+      const target = patch.data ? current.find((el) => el.id === patch.id) : undefined;
+      return target && patch.data ? collectRenameMappings(target, patch.data) : [];
+    });
+    const updatedElements = applyRenameMappings(withMethodCopies, renameMappings);
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
