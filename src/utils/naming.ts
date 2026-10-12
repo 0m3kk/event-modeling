@@ -137,6 +137,21 @@ export function toCamelIdentifier(input: string | undefined | null): string {
 }
 
 /**
+ * Converts any user/AI-provided name into a PascalCase label. Unlike
+ * {@link toDisplayName} this keeps no word separators — it is used for action
+ * tokens and permissions, which read as identifiers rather than prose.
+ *
+ * E.g. "placeOrder" -> "PlaceOrder", "Place Order" -> "PlaceOrder",
+ * "userId" -> "UserId", "inventory:restockItem" segments -> "Inventory", "RestockItem".
+ * Idempotent: applying it to an already-PascalCase value returns it unchanged.
+ */
+export function toPascalIdentifier(input: string | undefined | null): string {
+  const camel = toCamelIdentifier(input);
+  if (!camel) return "";
+  return camel.charAt(0).toUpperCase() + camel.slice(1);
+}
+
+/**
  * Identifier-valued string keys inside element data. `name` covers card titles,
  * fields, params, responses, methods and constraint state references; `field`
  * is a query-tag field reference; `tag` is a DCB tag; `type`/`aliasedType` are
@@ -263,20 +278,19 @@ export function toDisplayType(type: string | undefined | null, isArray?: boolean
 }
 
 /**
- * Converts an RBAC action token or permission pattern into a human-readable
- * display label. The `:` namespace separator and the `*` wildcard are
- * preserved, and each literal segment runs through the same transform as
- * {@link toDisplayName}.
+ * Converts an RBAC action token or permission pattern into a PascalCase display
+ * label. The `:` namespace separator and the `*` wildcard are preserved, and each
+ * literal segment runs through {@link toPascalIdentifier}.
  *
- * Display-only: the stored token keeps its canonical form.
- * E.g. "sales:placeOrder" -> "Sales:Place Order", "sales:*" -> "Sales:*",
- * "*:getOrder" -> "*:Get Order". Idempotent.
+ * Display-only: the stored token keeps its canonical camelCase form.
+ * E.g. "sales:placeOrder" -> "Sales:PlaceOrder", "sales:*" -> "Sales:*",
+ * "*:getOrder" -> "*:GetOrder". Idempotent.
  */
 export function toDisplayAction(input: string | undefined | null): string {
   if (!input || !input.trim()) return "";
   return input
     .split(":")
-    .map((part) => (part.trim() === "*" ? "*" : toDisplayName(part)))
+    .map((part) => (part.trim() === "*" ? "*" : toPascalIdentifier(part)))
     .join(":");
 }
 

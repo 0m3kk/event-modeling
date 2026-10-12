@@ -4,6 +4,7 @@ import {
   toDisplayName,
   toDisplayType,
   toDisplayAction,
+  toPascalIdentifier,
   toCanonicalAction,
   toCamelIdentifier,
   normalizeIdentifierNames,
@@ -122,17 +123,33 @@ describe("Naming utility", () => {
   });
 
   describe("toDisplayAction", () => {
-    it("humanizes each segment while preserving ':' and '*'", () => {
-      expect(toDisplayAction("sales:placeOrder")).toBe("Sales:Place Order");
+    it("PascalCases each segment while preserving ':' and '*'", () => {
+      expect(toDisplayAction("sales:placeOrder")).toBe("Sales:PlaceOrder");
       expect(toDisplayAction("sales:*")).toBe("Sales:*");
-      expect(toDisplayAction("*:getOrder")).toBe("*:Get Order");
-      expect(toDisplayAction("inventory:restockItem")).toBe("Inventory:Restock Item");
+      expect(toDisplayAction("*:getOrder")).toBe("*:GetOrder");
+      expect(toDisplayAction("inventory:restockItem")).toBe("Inventory:RestockItem");
     });
 
     it("is idempotent and handles empty input", () => {
-      expect(toDisplayAction("Sales:Place Order")).toBe("Sales:Place Order");
+      expect(toDisplayAction("Sales:PlaceOrder")).toBe("Sales:PlaceOrder");
+      expect(toDisplayAction("Sales:Place Order")).toBe("Sales:PlaceOrder");
       expect(toDisplayAction("")).toBe("");
       expect(toDisplayAction(undefined)).toBe("");
+    });
+  });
+
+  describe("toPascalIdentifier", () => {
+    it("joins identifier words without separators", () => {
+      expect(toPascalIdentifier("placeOrder")).toBe("PlaceOrder");
+      expect(toPascalIdentifier("Place Order")).toBe("PlaceOrder");
+      expect(toPascalIdentifier("place_order")).toBe("PlaceOrder");
+      expect(toPascalIdentifier("userId")).toBe("UserId");
+    });
+
+    it("is idempotent and handles empty input", () => {
+      expect(toPascalIdentifier("PlaceOrder")).toBe("PlaceOrder");
+      expect(toPascalIdentifier("")).toBe("");
+      expect(toPascalIdentifier(undefined)).toBe("");
     });
   });
 

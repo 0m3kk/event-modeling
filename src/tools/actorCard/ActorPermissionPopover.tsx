@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link2, ShieldHalf } from "lucide-react";
 import type { BoardAction } from "@/utils/rbac";
+import { toDisplayAction } from "@/utils/naming";
 
 interface ActorPermissionPopoverProps {
   /** Actions declared by Command/Query cards on the board. */
@@ -153,7 +154,7 @@ export function ActorPermissionPopover({
               <div key={ns || "__default"} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between px-0.5">
                   <span className="font-mono text-[10px] uppercase tracking-wide text-gray-400 dark:text-zinc-500">
-                    {ns || "(no namespace)"}
+                    {ns ? toDisplayAction(ns) : "(no namespace)"}
                   </span>
                   {ns && (
                     <button
@@ -169,7 +170,7 @@ export function ActorPermissionPopover({
                       }`}
                       title={`Grant every action in "${ns}"`}
                     >
-                      {wildcard}
+                      {toDisplayAction(wildcard)}
                     </button>
                   )}
                 </div>
@@ -194,7 +195,7 @@ export function ActorPermissionPopover({
                     >
                       <span className="flex items-center gap-1.5 font-mono">
                         <Link2 size={12} className="text-violet-500" />
-                        {entry.action}
+                        {toDisplayAction(entry.action)}
                       </span>
                       <span className="text-[10px] text-gray-400 dark:text-zinc-500">
                         {entry.cardName}

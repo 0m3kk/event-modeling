@@ -117,11 +117,11 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
 
     // Action row occupies y in [32, 60); e.g. y = 45.
     const target = commandCardTool.getInlineEditTarget!(withAction, { x: 30, y: 45 });
-    expect(target?.initialValue).toBe("Sales:Place Order");
+    expect(target?.initialValue).toBe("Sales:PlaceOrder");
 
     const undoBefore = useCanvasStore.getState().undoStack.length;
     // Committing the untouched display form is a no-op (no spurious undo step).
-    target?.onCommit("Sales:Place Order");
+    target?.onCommit("Sales:PlaceOrder");
     expect(useCanvasStore.getState().undoStack.length).toBe(undoBefore);
 
     // A genuine edit is stored in canonical form.

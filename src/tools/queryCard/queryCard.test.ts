@@ -106,7 +106,7 @@ describe("queryCardTool multi-section (params & responses)", () => {
     expect(reverted?.data.name).toBe("getOrder");
   });
 
-  it("shows the action token human-readable while storing its canonical form", () => {
+  it("shows the action token in PascalCase while storing its canonical form", () => {
     const withAction: CanvasElement<QueryCardData> = {
       ...card,
       data: { ...card.data, action: "sales:getOrder" },
@@ -115,13 +115,13 @@ describe("queryCardTool multi-section (params & responses)", () => {
 
     // Action row occupies y in [32, 60); e.g. y = 45.
     const target = queryCardTool.getInlineEditTarget!(withAction, { x: 30, y: 45 });
-    expect(target?.initialValue).toBe("Sales:Get Order");
+    expect(target?.initialValue).toBe("Sales:GetOrder");
 
     const undoBefore = useCanvasStore.getState().undoStack.length;
-    target?.onCommit("Sales:Get Order");
+    target?.onCommit("Sales:GetOrder");
     expect(useCanvasStore.getState().undoStack.length).toBe(undoBefore);
 
-    target?.onCommit("Sales:Find Order");
+    target?.onCommit("Sales:FindOrder");
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "qry-1");
     expect(updated?.data.action).toBe("sales:findOrder");
   });

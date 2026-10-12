@@ -110,7 +110,7 @@ describe("actorCardTool", () => {
     });
   });
 
-  it("shows a permission human-readable while storing its canonical form", () => {
+  it("shows a permission in PascalCase while storing its canonical form", () => {
     const el: CanvasElement<ActorCardData> = {
       id: "actor-1",
       type: "actorCard",
@@ -125,10 +125,10 @@ describe("actorCardTool", () => {
 
     // Row 0 occupies y in [54, 82); e.g. y = 60.
     const target = actorCardTool.getInlineEditTarget!(el, { x: 10, y: 60 });
-    expect(target?.initialValue).toBe("Sales:Place Order");
+    expect(target?.initialValue).toBe("Sales:PlaceOrder");
 
     const undoBefore = useCanvasStore.getState().undoStack.length;
-    target?.onCommit("Sales:Place Order");
+    target?.onCommit("Sales:PlaceOrder");
     expect(useCanvasStore.getState().undoStack.length).toBe(undoBefore);
 
     target?.onCommit("Sales:*");

@@ -15,8 +15,6 @@ import {
 import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 import {
-  actionKey,
-  boardActionsByKey,
   collectBoardActions,
   isWildcard,
   matchesAction,
@@ -52,7 +50,6 @@ function renderPermissionRow(
     isSelectedRow: boolean;
     overlaps: boolean;
     matchedCount: number;
-    resolvedName: string | null;
     textResolution: number;
   },
 ): void {
@@ -64,7 +61,6 @@ function renderPermissionRow(
     isSelectedRow,
     overlaps,
     matchedCount,
-    resolvedName,
     textResolution,
   } = opts;
 
@@ -88,7 +84,9 @@ function renderPermissionRow(
   actionText.y = rowY + 7;
   container.addChild(actionText);
 
-  let statusText: string;
+  // Trailing status hint: overlap warning, wildcard reach, or a missing exact
+  // action. A resolved exact permission shows nothing beyond the token itself.
+  let statusText: string | null;
   let statusColor: number;
   if (overlaps) {
     statusText = "overlap";
@@ -96,13 +94,15 @@ function renderPermissionRow(
   } else if (isWildcard(permission.action)) {
     statusText = `${matchedCount} action${matchedCount === 1 ? "" : "s"}`;
     statusColor = isDark ? 0x71717a : 0xa1a1aa;
-  } else if (resolvedName) {
-    statusText = resolvedName;
-    statusColor = isDark ? 0x71717a : 0xa1a1aa;
-  } else {
+  } else if (matchedCount === 0) {
     statusText = "missing";
     statusColor = isDark ? 0xf87171 : 0xdc2626;
+  } else {
+    statusText = null;
+    statusColor = isDark ? 0x71717a : 0xa1a1aa;
   }
+
+  if (!statusText) return;
 
   const status = new Text({
     text: statusText,
@@ -174,7 +174,6 @@ export const actorCardTool: ToolDefinition<ActorCardData> = {
     const elements = useCanvasStore.getState().elements;
     const boardActions = collectBoardActions(elements);
     const boardKeys = boardActions.map((a) => a.key);
-    const byKey = boardActionsByKey(elements);
 
     const layout = computeActorCardLayout(element.data);
     const { permissions, rowsStartY } = layout;
@@ -295,9 +294,6 @@ export const actorCardTool: ToolDefinition<ActorCardData> = {
 
     permissions.forEach((permission, index) => {
       const matched = boardKeys.filter((k) => matchesAction(permission.action, k)).length;
-      const resolved = !isWildcard(permission.action)
-        ? byKey.get(actionKey(permission.action))
-        : undefined;
       renderPermissionRow(container, {
         permission,
         rowY: rowsStartY + index * ACTOR_ROW_HEIGHT,
@@ -306,7 +302,6 @@ export const actorCardTool: ToolDefinition<ActorCardData> = {
         isSelectedRow: activeFieldIndex === index,
         overlaps: overlapping.has(index),
         matchedCount: matched,
-        resolvedName: resolved && resolved.length > 0 ? toDisplayName(resolved[0].cardName) : null,
         textResolution: context.textResolution,
       });
     });
