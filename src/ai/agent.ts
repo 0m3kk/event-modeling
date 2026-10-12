@@ -22,6 +22,7 @@ import {
   GROUP_TYPE,
   isGroupEligibleChild,
 } from "@/tools/groupCard/layout";
+import type { ServiceMethod } from "@/tools/serviceCard/layout";
 import { z } from "zod";
 import { sendChatMessage, createSessionId, type AISettings, type ChatMessage } from "./client";
 import type { CanvasElement, Point } from "@/types";
@@ -221,7 +222,67 @@ export function buildOpenAITools(): any[] {
     },
   });
 
-  // 4. Dynamic decoupled tools from registry: each create tool also gets a
+  // 4. Create a live reference copy of an existing card
+  tools.push({
+    type: "function",
+    function: {
+      name: "create_reference_copy",
+      description:
+        "Create a LIVE reference copy of an existing card (linked to the original; edits stay in " +
+        "sync across the set). Locate the original by `target` name, optionally narrowed by `type`. " +
+        "The copy shares the original's name, so use get_canvas_overview to see them together. " +
+        "Optionally place the copy with `slice`/`lane`, `group` or `domain`.",
+      parameters: {
+        type: "object",
+        properties: {
+          target: {
+            type: "string",
+            description: "Current name of the card to copy",
+          },
+          type: {
+            type: "string",
+            description: "Optional element type to disambiguate (e.g. eventCard, stateCard)",
+          },
+          ...SLICE_PLACEMENT_PROPS,
+          ...GROUP_PLACEMENT_PROPS,
+          ...DOMAIN_PLACEMENT_PROPS,
+        },
+        required: ["target"],
+      },
+    },
+  });
+
+  // 5. Create a live method-execution copy of a Service method
+  tools.push({
+    type: "function",
+    function: {
+      name: "create_service_method_execution",
+      description:
+        "Create a method-execution copy: a live Service card that renders ONE method of a source " +
+        "Service and stays linked to it (edits to the method propagate). Use it as the serviceCard " +
+        "lane of a write slice to show which service method the flow executes. Give the source " +
+        "Service name in `service` and the method name in `method`.",
+      parameters: {
+        type: "object",
+        properties: {
+          service: {
+            type: "string",
+            description: "Name of the source Service that owns the method",
+          },
+          method: {
+            type: "string",
+            description: "Name of the method to execute (from that Service)",
+          },
+          ...SLICE_PLACEMENT_PROPS,
+          ...GROUP_PLACEMENT_PROPS,
+          ...DOMAIN_PLACEMENT_PROPS,
+        },
+        required: ["service", "method"],
+      },
+    },
+  });
+
+  // 6. Dynamic decoupled tools from registry: each create tool also gets a
   //    matching update tool that reuses the same payload schema plus a
   //    `target` locator (the card's current name). Lane-eligible card tools
   //    also accept `slice` / `lane` so the model can drop the card straight
@@ -842,6 +903,276 @@ function executeUpdateElement(updateName: string, args: any): string {
   return JSON.stringify({ status: "success", updatedId: existing.id, type: existing.type });
 }
 
+/** Result of resolving where a freshly-created element should sit. */
+type CreatedPlacement = { error: string } | { delta: Partial<CanvasElement> };
+
+/**
+ * Resolves the optional `slice`/`lane`, `group` and `domain` placement carried
+ * by a create/copy tool into a concrete position/membership delta, or a JSON
+ * error string to hand back to the model when the request is invalid.
+ *
+ * Mirrors the placement rules used for ordinary AI-created cards: a Slice lane
+ * wins over a Group, which wins over the Domain it may sit in; otherwise the
+ * card is nudged to the nearest free slot. The element's own id is ignored when
+ * looking for a free spot so an already-added copy does not collide with itself.
+ */
+function resolveCreatedPlacement(
+  element: CanvasElement,
+  args: any,
+): CreatedPlacement {
+  const state = useCanvasStore.getState();
+  const others = state.elements.filter((el) => el.id !== element.id);
+  const rect = {
+    x: element.x,
+    y: element.y,
+    width: element.width,
+    height: element.height,
+  };
+
+  // Optional Slice/lane placement carried by the call.
+  const placement = resolveSliceMembership(state.elements, element.type, args);
+  if (placement.error) {
+    return {
+      error: JSON.stringify({
+        status: "error",
+        error: "slice_placement_failed",
+        message: placement.error.message,
+        issues: placement.error.issues,
+        slices: summarizeSlices(state.elements),
+      }),
+    };
+  }
+  if (placement.requested && placement.sliceId) {
+    // Lane membership: the card sits inside its slice lane and leaves any
+    // Group/Domain it used to belong to.
+    return {
+      delta: {
+        sliceId: placement.sliceId,
+        laneId: placement.laneId,
+        groupId: undefined,
+        domainId: undefined,
+      },
+    };
+  }
+
+  // Optional Group / Domain placement. Lanes take precedence; a Group is more
+  // specific than the Domain it sits in, so it wins over a Domain.
+  const groupPlacement = resolveGroupMembership(state.elements, element.type, args);
+  if (groupPlacement.error) {
+    return {
+      error: JSON.stringify({
+        status: "error",
+        error: "group_placement_failed",
+        message: groupPlacement.error.message,
+        issues: groupPlacement.error.issues,
+        groups: summarizeGroups(state.elements),
+      }),
+    };
+  }
+  if (groupPlacement.requested && groupPlacement.groupId) {
+    // Land beside the group's existing children so a batch spreads out instead
+    // of stacking, and so the card sits inside the frame.
+    const groupChildren = state.elements.filter(
+      (el) => el.groupId === groupPlacement.groupId,
+    );
+    const spot = findFreeSpot(groupChildren, rect, AI_PLACEMENT_GAP);
+    return {
+      delta: {
+        x: spot.x,
+        y: spot.y,
+        groupId: groupPlacement.groupId,
+        domainId: undefined,
+      },
+    };
+  }
+
+  const domainPlacement = resolveDomainMembership(state.elements, element.type, args);
+  if (domainPlacement.error) {
+    return {
+      error: JSON.stringify({
+        status: "error",
+        error: "domain_placement_failed",
+        message: domainPlacement.error.message,
+        issues: domainPlacement.error.issues,
+        domains: summarizeDomains(state.elements),
+      }),
+    };
+  }
+  if (domainPlacement.requested && domainPlacement.domainId) {
+    // Land beside the domain's existing children so a batch spreads out instead
+    // of stacking, and so the card sits inside the frame.
+    const domainChildren = state.elements.filter(
+      (el) => el.domainId === domainPlacement.domainId,
+    );
+    const spot = findFreeSpot(domainChildren, rect, AI_PLACEMENT_GAP);
+    return {
+      delta: {
+        x: spot.x,
+        y: spot.y,
+        domainId: domainPlacement.domainId,
+        groupId: undefined,
+      },
+    };
+  }
+
+  // Free-standing card: nudge it to the nearest free slot so a batch of cards
+  // spreads out instead of stacking on the same spot.
+  const spot = findFreeSpot(others, rect, AI_PLACEMENT_GAP);
+  return { delta: { x: spot.x, y: spot.y } };
+}
+
+/**
+ * Applies a resolved placement to an element that a copy tool just added to the
+ * board. Skips the store write when nothing actually changes, so a copy that
+ * already sits in a free spot does not add a redundant undo step. Returns a JSON
+ * error string when the requested placement is invalid, otherwise null.
+ */
+function applyCreatedPlacement(id: string, args: any): string | null {
+  const state = useCanvasStore.getState();
+  const element = state.elements.find((el) => el.id === id);
+  if (!element) return null;
+
+  const placed = resolveCreatedPlacement(element, args);
+  if ("error" in placed) return placed.error;
+
+  const changed = Object.entries(placed.delta).some(
+    ([key, value]) => (element as any)[key] !== value,
+  );
+  if (changed) state.updateElement(id, placed.delta);
+  return null;
+}
+
+/**
+ * Creates a live reference copy of an existing card, linked to the original via
+ * a shared `referenceId`. Both cards mirror each other's data and size until
+ * unlinked. Locates the original by name (optionally narrowed by `type`).
+ */
+function executeCreateReferenceCopy(args: any): string {
+  const state = useCanvasStore.getState();
+  const targetName = typeof args?.target === "string" ? args.target.trim() : "";
+  const type = typeof args?.type === "string" ? args.type.trim() : "";
+
+  if (!targetName) {
+    return JSON.stringify({
+      status: "error",
+      error: "validation_failed",
+      message: "`target` (the card name to copy) is required.",
+      issues: [{ path: "target", code: "target_missing", message: "Card name is required." }],
+    });
+  }
+
+  const source = findElementByName(state.elements, targetName, type || undefined);
+  if (!source) {
+    return JSON.stringify({
+      status: "error",
+      error: "element_not_found",
+      message: `No ${type || "element"} named "${targetName}" exists on the board. Use get_canvas_overview to find the exact name.`,
+      name: targetName,
+    });
+  }
+
+  const copy = state.createReferenceCopy(source.id);
+  if (!copy) {
+    return JSON.stringify({
+      status: "error",
+      error: "reference_copy_failed",
+      message: `Could not create a reference copy of "${targetName}".`,
+    });
+  }
+
+  const placementError = applyCreatedPlacement(copy.id, args);
+  if (placementError) return placementError;
+
+  return JSON.stringify({
+    status: "success",
+    createdId: copy.id,
+    type: copy.type,
+    referenceId: copy.referenceId,
+    sourceId: source.id,
+    note: `Reference copy of "${getElementName(source) ?? targetName}" created; it stays in sync with the original.`,
+  });
+}
+
+/**
+ * Creates a method-execution copy of a Service method: a live Service card that
+ * renders just that one method and stays linked to the source service. Locates
+ * the source Service by name (ignoring existing execution copies, which share
+ * the name) and the method by its name.
+ */
+function executeCreateServiceMethodExecution(args: any): string {
+  const state = useCanvasStore.getState();
+  const serviceName = typeof args?.service === "string" ? args.service.trim() : "";
+  const methodName = typeof args?.method === "string" ? args.method.trim() : "";
+
+  if (!serviceName || !methodName) {
+    return JSON.stringify({
+      status: "error",
+      error: "validation_failed",
+      message: "Both `service` and `method` are required.",
+      issues: [
+        ...(serviceName
+          ? []
+          : [{ path: "service", code: "service_missing", message: "Service name is required." }]),
+        ...(methodName
+          ? []
+          : [{ path: "method", code: "method_missing", message: "Method name is required." }]),
+      ],
+    });
+  }
+
+  // Prefer a real Service over an execution copy, which shares its name but
+  // renders a single method.
+  const service =
+    state.elements.find(
+      (el) =>
+        el.type === "serviceCard" &&
+        !(el.data as { methodRef?: unknown } | undefined)?.methodRef &&
+        nameKey(getElementName(el) ?? "") === nameKey(serviceName),
+    ) ?? findElementByName(state.elements, serviceName, "serviceCard");
+  if (!service) {
+    return JSON.stringify({
+      status: "error",
+      error: "element_not_found",
+      message: `No Service named "${serviceName}" exists on the board. Create it first with create_service_card or use get_canvas_overview to list services.`,
+      name: serviceName,
+    });
+  }
+
+  const methods =
+    ((service.data as { methods?: ServiceMethod[] } | undefined)?.methods ?? []) as ServiceMethod[];
+  const method = methods.find((m) => nameKey(m.name) === nameKey(methodName));
+  if (!method) {
+    return JSON.stringify({
+      status: "error",
+      error: "method_not_found",
+      message: `Service "${getElementName(service) ?? serviceName}" has no method named "${methodName}".`,
+      availableMethods: methods.map((m) => m.name),
+    });
+  }
+
+  const copy = state.createMethodCopy(service.id, method.id);
+  if (!copy) {
+    return JSON.stringify({
+      status: "error",
+      error: "method_copy_failed",
+      message: `Could not create an execution copy of "${methodName}" from "${serviceName}".`,
+    });
+  }
+
+  const placementError = applyCreatedPlacement(copy.id, args);
+  if (placementError) return placementError;
+
+  const serviceLabel = getElementName(service) ?? serviceName;
+  return JSON.stringify({
+    status: "success",
+    createdId: copy.id,
+    type: copy.type,
+    service: serviceLabel,
+    method: method.name,
+    note: `Execution copy of "${method.name}" created; it stays linked to "${serviceLabel}".`,
+  });
+}
+
 export async function executeAITool(name: string, args: any): Promise<string> {
   const state = useCanvasStore.getState();
 
@@ -875,6 +1206,14 @@ export async function executeAITool(name: string, args: any): Promise<string> {
     return executeDeleteElement(args);
   }
 
+  if (name === "create_reference_copy") {
+    return executeCreateReferenceCopy(args);
+  }
+
+  if (name === "create_service_method_execution") {
+    return executeCreateServiceMethodExecution(args);
+  }
+
   if (name.startsWith("update_")) {
     return executeUpdateElement(name, args);
   }
@@ -906,95 +1245,13 @@ export async function executeAITool(name: string, args: any): Promise<string> {
         }
       }
 
-      // Optional slice/lane placement carried by the create call.
-      const placement = resolveSliceMembership(state.elements, element.type, args);
-      if (placement.error) {
-        return JSON.stringify({
-          status: "error",
-          error: "slice_placement_failed",
-          message: placement.error.message,
-          issues: placement.error.issues,
-          slices: summarizeSlices(state.elements),
-        });
+      // Optional slice/lane, group and domain placement carried by the create
+      // call, plus a nudge to the nearest free slot when the card stands alone.
+      const placed = resolveCreatedPlacement(element, args);
+      if ("error" in placed) {
+        return placed.error;
       }
-
-      if (placement.requested && placement.sliceId) {
-        // Lane membership: the card sits inside its slice lane.
-        element = { ...element, sliceId: placement.sliceId, laneId: placement.laneId };
-      } else {
-        // Optional Group / Domain placement carried by the create call. A card
-        // in a Slice lane cannot belong to a Group or Domain, so lanes take
-        // precedence; a Group is more specific than the Domain it sits in, so
-        // it wins over a Domain.
-        const groupPlacement = resolveGroupMembership(state.elements, element.type, args);
-        if (groupPlacement.error) {
-          return JSON.stringify({
-            status: "error",
-            error: "group_placement_failed",
-            message: groupPlacement.error.message,
-            issues: groupPlacement.error.issues,
-            groups: summarizeGroups(state.elements),
-          });
-        }
-
-        if (groupPlacement.requested && groupPlacement.groupId) {
-          // Land beside the group's existing children so a batch spreads out
-          // instead of stacking, and so the card sits inside the frame.
-          const groupChildren = state.elements.filter(
-            (el) => el.groupId === groupPlacement.groupId,
-          );
-          const spot = findFreeSpot(
-            groupChildren,
-            { x: element.x, y: element.y, width: element.width, height: element.height },
-            AI_PLACEMENT_GAP,
-          );
-          element = {
-            ...element,
-            x: spot.x,
-            y: spot.y,
-            groupId: groupPlacement.groupId,
-          };
-        } else {
-          const domainPlacement = resolveDomainMembership(state.elements, element.type, args);
-          if (domainPlacement.error) {
-            return JSON.stringify({
-              status: "error",
-              error: "domain_placement_failed",
-              message: domainPlacement.error.message,
-              issues: domainPlacement.error.issues,
-              domains: summarizeDomains(state.elements),
-            });
-          }
-
-          if (domainPlacement.requested && domainPlacement.domainId) {
-            // Land beside the domain's existing children so a batch spreads out
-            // instead of stacking, and so the card sits inside the frame.
-            const domainChildren = state.elements.filter(
-              (el) => el.domainId === domainPlacement.domainId,
-            );
-            const spot = findFreeSpot(
-              domainChildren,
-              { x: element.x, y: element.y, width: element.width, height: element.height },
-              AI_PLACEMENT_GAP,
-            );
-            element = {
-              ...element,
-              x: spot.x,
-              y: spot.y,
-              domainId: domainPlacement.domainId,
-            };
-          } else {
-            // Free-standing card: nudge it to the nearest free slot so a batch of
-            // AI-created cards spreads out instead of stacking on the same spot.
-            const spot = findFreeSpot(
-              state.elements,
-              { x: element.x, y: element.y, width: element.width, height: element.height },
-              AI_PLACEMENT_GAP,
-            );
-            element = { ...element, x: spot.x, y: spot.y };
-          }
-        }
-      }
+      element = { ...element, ...placed.delta };
 
       state.addElement(element);
 
@@ -1031,7 +1288,8 @@ export async function runAgentConversation(
   const languageName = LANGUAGE_NAMES[language.slice(0, 2)] || "English";
   const languageInstruction = `OUTPUT LANGUAGE (IMPORTANT): the user is working in the ${languageName} language on this system. Write ALL of your output in ${languageName} — your chat replies, every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other human-readable text you put on the canvas — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form. Never answer in a language other than the one selected in the app.`;
   const systemPrompt = `You are the AI Event Modeling Architect, helping architects design domain events, business models and reactive systems on an infinite canvas.
-Tools: read the canvas; create sticky notes, Events, Commands, Queries, States (projection/decision models), Views (persisted read models), Objects, Enums, Aliases, Services (methods with params + returns), Constraint cards, Domain frames, Groups and Slices; clear the board. When the user asks to add or create something, always call the matching creation tool.
+Tools: read the canvas; create sticky notes, Events, Commands, Queries, States (projection/decision models), Views (persisted read models), Objects, Enums, Aliases, Services (methods with params + returns), Constraint cards, Domain frames, Groups and Slices; make live reference copies of a card (create_reference_copy) or method-execution copies of a Service method (create_service_method_execution); clear the board. When the user asks to add or create something, always call the matching creation tool.
+COPIES: create_reference_copy makes a linked duplicate of an existing card (locate it by "target", optionally "type") — both share one name and stay in sync. create_service_method_execution makes a live Service card that runs ONE method of a source Service (give "service" and "method"); use it for the serviceCard lane of a write slice, placing it via "slice"/"lane". Both accept the optional "slice"/"lane", "group" and "domain" placement.
 DOMAINS (bounded contexts): call get_canvas_overview first and check its "domains".
 - If a Domain exists, put each new card/Slice into the most relevant one via "domain" = its name (this also moves it on update); prefer an existing Domain.
 - If none exists, first create one with create_domain_card and a meaningful name (e.g. Ordering, Billing), then place the new cards/Slices in it. For reusable definitions shared across contexts, use a Domain named "Shared" instead.
@@ -1040,7 +1298,7 @@ GROUPS: a Group clusters reusable definitions. Inside a Domain the standard layo
 - Reuse existing groups; create missing ones with create_group_card using that Domain-prefixed name.
 - Every new Object/Enum/Alias/Service/State card goes into the matching group via "group" = its name; do not leave these free-standing. Only these types can join a Group, and not when in a Slice lane. Wrap all of the Domain's State cards in its "<Domain> States" group. A Group lives in the Domain (pass its own "domain"); its cards then do NOT need "domain" again.
 FLOW SEMANTICS: a "flow" is ONE slice, not the whole command→event→read-model chain.
-- Write slice: a Command emitting one or more Events — usual lanes top-to-bottom: commandCard, constraintCard, eventCard. Add a queryCard lane when the command must read data first, and a serviceCard lane only when the flow executes a service method.
+- Write slice: a Command emitting one or more Events — usual lanes top-to-bottom: commandCard, constraintCard, eventCard. Add a queryCard lane when the command must read data first, and a serviceCard lane only when the flow executes a service method — fill it with create_service_method_execution (not create_service_card).
 - Read slice: a Query reading Events into a read model — usual lanes: queryCard then viewCard (or stateCard when the projection is specific to that one flow). A constraintCard lane is optional — add it only when a rule must be checked.
 When the user asks to "draw/build a flow" (e.g. "vẽ flow") without naming the kind, produce exactly ONE write slice OR ONE read slice that matches their description — never both, never the full chain. Ask only if genuinely ambiguous. A write slice stops at the emitted events; a read slice starts at the query.
 To change an existing card, prefer its update tool (e.g. update_event_card) over deleting and recreating: pass "target" = the card's current name and the COMPLETE corrected definition (preserves id, position and links). Use delete_element (by "target") to remove a card. get_canvas_overview omits field descriptions; you may omit them on update too — existing text is kept.

@@ -977,4 +977,133 @@ describe("AIAgent", () => {
     object = useCanvasStore.getState().elements.find((e) => e.id === created.createdId)!;
     expect(object.groupId).toBeUndefined();
   });
+
+  it("exposes reference and method-execution copy tools with placement props", () => {
+    const tools = buildOpenAITools();
+    const names = tools.map((t) => t.function.name);
+    expect(names).toContain("create_reference_copy");
+    expect(names).toContain("create_service_method_execution");
+
+    const refTool = tools.find((t) => t.function.name === "create_reference_copy")!;
+    expect(refTool.function.parameters.required).toContain("target");
+    expect(refTool.function.parameters.properties.slice.type).toBe("string");
+    expect(refTool.function.parameters.properties.domain.type).toBe("string");
+
+    const execTool = tools.find((t) => t.function.name === "create_service_method_execution")!;
+    expect(execTool.function.parameters.required).toEqual(
+      expect.arrayContaining(["service", "method"]),
+    );
+    expect(execTool.function.parameters.properties.lane.type).toBe("string");
+  });
+
+  it("creates a live reference copy linked to the original", async () => {
+    const created = JSON.parse(
+      await executeAITool("create_event_card", { name: "OrderPlaced", fields: [] }),
+    );
+    const res = JSON.parse(
+      await executeAITool("create_reference_copy", { target: "OrderPlaced" }),
+    );
+    expect(res.status).toBe("success");
+    expect(res.type).toBe("eventCard");
+
+    const elements = useCanvasStore.getState().elements;
+    expect(elements).toHaveLength(2);
+    const source = elements.find((e) => e.id === created.createdId)!;
+    const copy = elements.find((e) => e.id === res.createdId)!;
+    expect(copy.referenceId).toBeDefined();
+    expect(copy.referenceId).toBe(source.referenceId);
+    expect(copy.referenceId).toBe(res.referenceId);
+    expect(source.isOriginal).toBe(true);
+    expect(copy.isOriginal).toBe(false);
+  });
+
+  it("reports element_not_found when copying a missing card", async () => {
+    const res = JSON.parse(
+      await executeAITool("create_reference_copy", { target: "GhostCard" }),
+    );
+    expect(res.status).toBe("error");
+    expect(res.error).toBe("element_not_found");
+    expect(useCanvasStore.getState().elements).toHaveLength(0);
+  });
+
+  it("creates a service method-execution copy linked to its source method", async () => {
+    await executeAITool("create_service_card", {
+      name: "PaymentService",
+      methods: [
+        { name: "charge", params: [{ name: "amount", type: "number" }], returns: [] },
+      ],
+    });
+
+    const res = JSON.parse(
+      await executeAITool("create_service_method_execution", {
+        service: "PaymentService",
+        method: "charge",
+      }),
+    );
+    expect(res.status).toBe("success");
+    expect(res.type).toBe("serviceCard");
+
+    const elements = useCanvasStore.getState().elements;
+    const service = elements.find(
+      (e) => e.type === "serviceCard" && !(e.data as any).methodRef,
+    )!;
+    const copy = elements.find((e) => e.id === res.createdId)!;
+    expect((copy.data as any).methodRef).toEqual({
+      serviceId: service.id,
+      methodId: (service.data as any).methods[0].id,
+    });
+    expect((copy.data as any).methods).toHaveLength(1);
+  });
+
+  it("reports method_not_found with the available methods", async () => {
+    await executeAITool("create_service_card", {
+      name: "PaymentService",
+      methods: [{ name: "charge", params: [], returns: [] }],
+    });
+
+    const res = JSON.parse(
+      await executeAITool("create_service_method_execution", {
+        service: "PaymentService",
+        method: "refund",
+      }),
+    );
+    expect(res.status).toBe("error");
+    expect(res.error).toBe("method_not_found");
+    expect(res.availableMethods).toContain("charge");
+
+    const missing = JSON.parse(
+      await executeAITool("create_service_method_execution", {
+        service: "GhostService",
+        method: "charge",
+      }),
+    );
+    expect(missing.status).toBe("error");
+    expect(missing.error).toBe("element_not_found");
+  });
+
+  it("places a method-execution copy into a service lane of a slice", async () => {
+    await executeAITool("create_service_card", {
+      name: "PaymentService",
+      methods: [{ name: "charge", params: [], returns: [] }],
+    });
+    await executeAITool("create_slice", {
+      name: "PlaceOrder",
+      lanes: [{ type: "serviceCard" }],
+    });
+
+    const res = JSON.parse(
+      await executeAITool("create_service_method_execution", {
+        service: "PaymentService",
+        method: "charge",
+        slice: "PlaceOrder",
+      }),
+    );
+    expect(res.status).toBe("success");
+
+    const slice = useCanvasStore.getState().elements.find((e) => e.type === "sliceCard")!;
+    const lane = (slice.data as any).lanes[0];
+    const copy = useCanvasStore.getState().elements.find((e) => e.id === res.createdId)!;
+    expect(copy.sliceId).toBe(slice.id);
+    expect(copy.laneId).toBe(lane.id);
+  });
 });
