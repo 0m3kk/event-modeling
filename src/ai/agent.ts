@@ -185,14 +185,34 @@ export function buildOpenAITools(): any[] {
     function: {
       name: "get_canvas_overview",
       description:
-        "Read a compact summary of every element (type, name, fields, tags, plus its board " +
-        "position `x`/`y` and `width`/`height`), alongside `eventTypes`, `tagCatalog`, `slices` " +
-        "(with lanes and their cards), `groups` and `domains`, so you can build valid State query " +
-        "tags, target slice lanes, and place new items in the right Domain. Descriptions are " +
-        "omitted; updates keep existing ones when you leave them out.",
+        "Read the board. With no arguments you get a compact list of every element plus the " +
+        "board-wide catalogs (`eventTypes`, `tagCatalog`, `definedTypes`, `slices` with lanes and " +
+        "their cards, `groups`, `domains`, `actions`, `actors`) so you can build valid State query " +
+        "tags, target slice lanes, and place new items in the right Domain. Each element is " +
+        "`{ type, name }` only; pass `detail: true` to include its full data (fields, params, query " +
+        "items). Narrow the read with `type` (element type, e.g. eventCard) and/or `name` " +
+        "(case-insensitive substring); a filtered read returns just the matching elements. " +
+        "Descriptions and board coordinates are always omitted; updates keep existing descriptions " +
+        "when you leave them out. Calling it again with the same filters and no board changes " +
+        "returns `{ unchanged: true }`.",
       parameters: {
         type: "object",
-        properties: {},
+        properties: {
+          type: {
+            type: "string",
+            description:
+              "Optional element type to filter by (e.g. eventCard, commandCard, stateCard, sliceCard).",
+          },
+          name: {
+            type: "string",
+            description: "Optional case-insensitive name substring to filter by.",
+          },
+          detail: {
+            type: "boolean",
+            description:
+              "Include each element's full data (fields, params, query items). Defaults to false (type + name only).",
+          },
+        },
       },
     },
   });
@@ -591,20 +611,101 @@ function stripOverviewValue(value: any): any {
 }
 
 /**
- * Compact, id-free projection of one canvas element for the model. Includes the
- * card's board position and size so the model's overview reflects what the user
- * actually sees on the canvas.
+ * Compact, id-free projection of one canvas element for the model: its type
+ * plus its semantic data. Board position and size are deliberately omitted —
+ * the model reasons about the domain model, not pixel layout.
  */
 function summarizeElement(el: CanvasElement): any {
   const data = stripOverviewValue(el.data) ?? {};
   return {
     type: el.type,
-    x: Math.round(el.x),
-    y: Math.round(el.y),
-    width: Math.round(el.width),
-    height: Math.round(el.height),
     ...data,
   };
+}
+
+/** Name-only projection used by the default (non-`detail`) overview. */
+function summarizeElementCompact(el: CanvasElement): any {
+  const name = getElementName(el);
+  return name ? { type: el.type, name } : { type: el.type };
+}
+
+interface OverviewFilters {
+  type?: string;
+  name?: string;
+  detail?: boolean;
+}
+
+/** Reads the filter/detail arguments the model passed to get_canvas_overview. */
+function readOverviewFilters(args: any): OverviewFilters {
+  const asString = (v: unknown): string | undefined =>
+    typeof v === "string" && v.trim().length > 0 ? v.trim() : undefined;
+  return {
+    type: asString(args?.type),
+    name: asString(args?.name),
+    detail: args?.detail === true,
+  };
+}
+
+/**
+ * Builds the canvas overview. Per-card detail is opt-in (`detail`): by default
+ * each element is reduced to `{ type, name }`, which keeps the tool result
+ * small. `type`/`name` narrow the element list; the board-wide catalogs
+ * (eventTypes, tagCatalog, slices, groups, domains, actions, actors) are only
+ * attached for an unfiltered read, since a filtered read is a targeted lookup.
+ */
+function buildCanvasOverview(elements: CanvasElement[], filters: OverviewFilters): string {
+  const needle = filters.name?.toLowerCase();
+  const matches = elements.filter((el) => {
+    if (filters.type && el.type !== filters.type) return false;
+    if (needle) {
+      const name = (getElementName(el) ?? "").toLowerCase();
+      if (!name.includes(needle)) return false;
+    }
+    return true;
+  });
+
+  const summary = matches.map((el) =>
+    filters.detail ? summarizeElement(el) : summarizeElementCompact(el),
+  );
+
+  if (filters.type || filters.name) {
+    return JSON.stringify({ count: summary.length, elements: summary });
+  }
+
+  const eventTypes = elements
+    .filter((el) => el.type === "eventCard")
+    .map((el) => el.data?.name)
+    .filter((n): n is string => typeof n === "string" && n.trim().length > 0);
+
+  return JSON.stringify({
+    count: summary.length,
+    elements: summary,
+    eventTypes,
+    tagCatalog: collectBoardTags(elements),
+    definedTypes: listDefinedTypeNames(elements),
+    primitiveTypes: Array.from(PRIMITIVE_FIELD_TYPES),
+    slices: summarizeSlices(elements),
+    groups: summarizeGroups(elements),
+    domains: summarizeDomains(elements),
+    actions: summarizeActions(elements),
+    actors: summarizeActors(elements),
+  });
+}
+
+/**
+ * Within a single agent turn the model often asks for the overview more than
+ * once. When the board is unchanged and the same filters are requested, we
+ * answer with a tiny `unchanged` marker instead of re-sending the whole board,
+ * since the earlier result is already in the conversation. The cache is keyed
+ * by the store's `elements` array identity, which zustand replaces on every
+ * mutation.
+ */
+let overviewCache: { elementsRef: CanvasElement[]; filterKey: string; payload: string } | null =
+  null;
+
+/** Clears the within-turn overview cache so a fresh turn never sees a stale hit. */
+export function resetOverviewCache(): void {
+  overviewCache = null;
 }
 
 /**
@@ -1268,26 +1369,24 @@ export async function executeAITool(name: string, args: any): Promise<string> {
   const state = useCanvasStore.getState();
 
   if (name === "get_canvas_overview") {
-    const summary = state.elements.map(summarizeElement);
-    const eventTypes = state.elements
-      .filter((el) => el.type === "eventCard")
-      .map((el) => el.data?.name)
-      .filter((n): n is string => typeof n === "string" && n.trim().length > 0);
-    const tagCatalog = collectBoardTags(state.elements);
-    const definedTypes = listDefinedTypeNames(state.elements);
-    return JSON.stringify({
-      count: summary.length,
-      elements: summary,
-      eventTypes,
-      tagCatalog,
-      definedTypes,
-      primitiveTypes: Array.from(PRIMITIVE_FIELD_TYPES),
-      slices: summarizeSlices(state.elements),
-      groups: summarizeGroups(state.elements),
-      domains: summarizeDomains(state.elements),
-      actions: summarizeActions(state.elements),
-      actors: summarizeActors(state.elements),
-    });
+    const filters = readOverviewFilters(args);
+    const filterKey = JSON.stringify(filters);
+    const elementsRef = state.elements;
+
+    if (
+      overviewCache &&
+      overviewCache.elementsRef === elementsRef &&
+      overviewCache.filterKey === filterKey
+    ) {
+      return JSON.stringify({
+        unchanged: true,
+        note: "The board has not changed since your last get_canvas_overview call; the overview you already received is still current.",
+      });
+    }
+
+    const payload = buildCanvasOverview(elementsRef, filters);
+    overviewCache = { elementsRef, filterKey, payload };
+    return payload;
   }
 
   if (name === "clear_canvas") {
@@ -1379,14 +1478,18 @@ export async function runAgentConversation(
   language: string = "vi",
   signal?: AbortSignal,
 ): Promise<AgentResult> {
+  // Dedupe get_canvas_overview only within this turn; a later turn must not
+  // answer "unchanged" because prior tool results are not replayed to the model.
+  resetOverviewCache();
   const languageName = LANGUAGE_NAMES[language.slice(0, 2)] || "English";
   const languageInstruction = `OUTPUT LANGUAGE (IMPORTANT) — two separate rules:
 1. CANVAS CONTENT (cards and everything you model): write ALL human-readable text you put on the canvas in the system's app language, which is ${languageName} — every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other text on a card — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form.
 2. CHAT REPLIES (your feedback, questions and explanations shown in the chat panel): always use the SAME language the user is currently writing in, detected from their latest message — NOT the app language. If the user writes in English, reply in English; if they write in Vietnamese, reply in Vietnamese; if they switch language, switch with them. The canvas content language (rule 1) never changes based on this.`;
   const systemPrompt = `You are the AI Event Modeling Architect, helping architects design domain events, business models and reactive systems on an infinite canvas.
 Tools: read the canvas; create sticky notes, Events, Commands, Queries, States (projection/decision models), Views (persisted read models), Objects, Enums, Aliases, Services (methods with params + returns), Constraint cards, Actors (RBAC), Domain frames, Groups and Slices; make live reference copies of a card (create_reference_copy) or method-execution copies of a Service method (create_service_method_execution); clear the board. When the user asks to add or create something, always call the matching creation tool.
+BOARD READING: call get_canvas_overview to see the board. Call it once at the start when you need existing domains, groups, slices, event types, DCB tags, actions, actors or card fields; its per-card output is name-only by default, so pass "detail": true when you need a card's fields/params/query items (e.g. to source State params from a Command's inputs). Narrow a read with "type"/"name". Re-calling with the same filters and an unchanged board returns {"unchanged": true} — do not poll; call again only after you changed the board.
 COPIES: create_reference_copy makes a linked duplicate of an existing card (locate it by "target", optionally "type") — both share one name and stay in sync. create_service_method_execution makes a live Service card that runs ONE method of a source Service (give "service" and "method"); use it for the serviceCard lane of a write slice, placing it via "slice"/"lane". Both accept the optional "slice"/"lane", "group" and "domain" placement.
-DOMAINS (bounded contexts): call get_canvas_overview first and check its "domains".
+DOMAINS (bounded contexts): check the board's "domains" (see BOARD READING).
 - If a Domain exists, put each new card/Slice into the most relevant one via "domain" = its name (this also moves it on update); prefer an existing Domain.
 - If none exists, first create one with create_domain_card and a meaningful name (e.g. Ordering, Billing), then place the new cards/Slices in it. For reusable definitions shared across contexts, use a Domain named "Shared" instead.
 - A card in a Slice lane cannot also be in a Domain, so put the Slice itself in the Domain, not its lane cards. Tell the user which Domain you used.
@@ -1403,12 +1506,12 @@ Data types: every field "type" must be a primitive (${Array.from(PRIMITIVE_FIELD
 Event tags (DCB): a tag names the domain entity (aggregate) and fixes ONE field type across the whole board. Tag with the entity noun, never an id field: "accountId"→"account", "userId"→"user", "orderId"→"order". Reusing a tag with a different field type is rejected.
 Field descriptions: for EVERY field you create (Event fields, Command inputs/responses, Query params/responses, Object fields, State/View params/states, Service method params/returns, Enum values) add a "description" explaining it, and give each card its own "description" too. These definitions are reused across the model, so each must be self-explanatory.
 Field validation: a Command input, Query param, Object field or Alias may carry a "validation" object when the user describes constraints. Structured keys: string → minLength, maxLength, pattern (regex) and format (one of: email, url, uuid, date, datetime, time, ipv4, ipv6); number → min, max; array → minItems, maxItems. Add "rule" for anything else as a short plain-language check. For an Alias the validation applies to its wrapped type. Generic field validation belongs here, NOT in a Constraint card.
-STATE cards: call get_canvas_overview first to discover event types, DCB tags and defined types. Every query item's "types" must name existing Event cards; every query tag is a { tag, field } pair where "tag" already exists on an event field and "field" is one of the card's params with the SAME type. If a creation returns status "error", fix the issues (create the missing event/tag/type) and retry. A State is a REUSABLE projection/decision model shared by many flows, so it usually lives OUTSIDE any slice (referenced by Constraint cards); place it in a slice lane only when the projection belongs to that single flow. When free-standing, put it in the Domain's "<Domain> States" group via "group".
+STATE cards: discover existing event types, DCB tags and defined types from the board overview (pass detail:true when you need Command/Query fields to source a param). Every query item's "types" must name existing Event cards; every query tag is a { tag, field } pair where "tag" already exists on an event field and "field" is one of the card's params with the SAME type. If a creation returns status "error", fix the issues (create the missing event/tag/type) and retry. A State is a REUSABLE projection/decision model shared by many flows, so it usually lives OUTSIDE any slice (referenced by Constraint cards); place it in a slice lane only when the projection belongs to that single flow. When free-standing, put it in the Domain's "<Domain> States" group via "group".
 STATE PARAM PROVENANCE: a State/View param is an INPUT, so its value must come from somewhere — never invent a field with no source. Each param must trace to (a) a Command input or Query param of the same name that drives the flow — the usual case: reuse that field's EXACT name; (b) a DCB tag binding written { tag, field } in a query item; (c) an Enum-typed field; or (d) a system value (now/timeNow/today). An unsourced param is rejected with 'param_source_unknown'. A State is ONE object: a name already in 'params' must NOT repeat in 'states' (rejected with 'state_echoes_param').
 VIEW cards: same shape and rules as State cards (params, query items, states), but a View is a persisted read model stored in a database for sorting/searching/filtering — use create_view_card for a queryable read model rather than an in-memory decision state.
-CONSTRAINT cards: call get_canvas_overview first to find existing State cards. List the State cards it uses in "states" (by name; they must exist). "rules" are free-text business invariants in plain human language (e.g. "The account must be active", "An order can only be paid once") — NOT field-name notation like "accountStatus.status == 'active'". The Constraint is the bridge between the flow's Command/Query and its State: the state params a rule compares must be supplied by that Command's inputs or Query's params, so make sure those fields exist (add them if missing).
+CONSTRAINT cards: find existing State cards from the board overview (detail:true if you need their params). List the State cards it uses in "states" (by name; they must exist). "rules" are free-text business invariants in plain human language (e.g. "The account must be active", "An order can only be paid once") — NOT field-name notation like "accountStatus.status == 'active'". The Constraint is the bridge between the flow's Command/Query and its State: the state params a rule compares must be supplied by that Command's inputs or Query's params, so make sure those fields exist (add them if missing).
 CONSTRAINT RULE SEMANTICS: a rule expresses a business INVARIANT over the referenced State — a domain truth that must hold before the flow may proceed, gating whether the event is emitted. Every rule must be checkable from the command/query inputs plus the referenced State. A rule must NEVER describe data storage or the event payload (an OUTPUT concern): "The password must be hashed before storage" is WRONG — rewrite it as an input-side invariant, e.g. "An account can only be debited when its balance covers the amount". A rule is NOT data validation: never write required/type/format/empty checks such as "The password must be non-empty" or "email must be a valid address" — generic field validation is a separate concern, not a Constraint. Ask: "does this state a domain invariant that could block the command before any event is written?" If not, it is not a Constraint. Keep each rule SHORT and to the point — one plain-language sentence stating a single invariant; never a long, multi-clause paragraph or one padded with explanations and examples.
-ACTORS & ACTIONS (RBAC): a Command or Query declares an "action" — a canonical, EXPLICIT permission token in the form "domain:verb" (camelCase verb), e.g. sales:placeOrder, sales:getOrder; never a wildcard. The action is unique across the board and is the join key for permissions, so give every Command/Query a meaningful "action" (defaults to the card name if omitted). An Actor card grants permissions by referencing those actions in "permissions": each entry is "{ action }" where "action" is either an exact token (sales:placeOrder) or a * wildcard (sales:* grants the whole namespace, *:getOrder grants that verb in any namespace). Rules the tool enforces: a bare match-all ("*", "*:*") is REJECTED; a pattern that matches no existing action is REJECTED; two overlapping permissions in one actor are REJECTED. ALWAYS create the Command/Query cards (with their actions) BEFORE the Actor that references them, and call get_canvas_overview to read the existing "actions" and "actors" before creating or updating an Actor.
+ACTORS & ACTIONS (RBAC): a Command or Query declares an "action" — a canonical, EXPLICIT permission token in the form "domain:verb" (camelCase verb), e.g. sales:placeOrder, sales:getOrder; never a wildcard. The action is unique across the board and is the join key for permissions, so give every Command/Query a meaningful "action" (defaults to the card name if omitted). An Actor card grants permissions by referencing those actions in "permissions": each entry is "{ action }" where "action" is either an exact token (sales:placeOrder) or a * wildcard (sales:* grants the whole namespace, *:getOrder grants that verb in any namespace). Rules the tool enforces: a bare match-all ("*", "*:*") is REJECTED; a pattern that matches no existing action is REJECTED; two overlapping permissions in one actor are REJECTED. ALWAYS create the Command/Query cards (with their actions) BEFORE the Actor that references them, and read the existing "actions" and "actors" (board overview) before creating or updating an Actor.
 SLICES: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom), each lane with a "type" from commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote. Enum/Object/Alias cards and nested Slices are NOT allowed in lanes. Give at least one lane and do not repeat a lane type.
 SLICE NAME: give a slice a plain PascalCase business name describing the flow (e.g. PlaceOrder, HandlePayment, ViewOrderHistory). Do NOT include the word "Slice" (never "PlaceOrderSlice") — "slice" is an internal concept most users do not know, so do not name lanes or cards after it either.
 FILLING LANES: after create_slice, create each lane's card(s) and place each one via "slice" = the slice's name (and "lane" only when the card type is ambiguous: give the lane's card type or 1-based position). Never leave an AI-made slice empty.

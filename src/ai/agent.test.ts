@@ -50,13 +50,21 @@ describe("AIAgent", () => {
     expect(Array.isArray(parsed.eventTypes)).toBe(true);
   });
 
-  it("omits cosmetic fields and descriptions from the canvas overview", async () => {
+  it("returns a name-only overview by default and full data with detail", async () => {
     await executeAITool("create_event_card", {
       name: "OrderPlaced",
       description: "Raised when an order is placed",
       fields: [{ name: "orderId", type: "string", tag: "order", description: "The order id" }],
     });
-    const res = await executeAITool("get_canvas_overview", {});
+
+    // Default: just { type, name } per element.
+    const compact = JSON.parse(await executeAITool("get_canvas_overview", {}));
+    const compactEvent = compact.elements.find((e: any) => e.name === "orderPlaced");
+    expect(compactEvent).toEqual({ type: "eventCard", name: "orderPlaced" });
+    expect(compactEvent.fields).toBeUndefined();
+
+    // detail: true restores the semantic fields.
+    const res = await executeAITool("get_canvas_overview", { detail: true });
     const parsed = JSON.parse(res);
     const event = parsed.elements.find((e: any) => e.name === "orderPlaced");
 
@@ -64,13 +72,44 @@ describe("AIAgent", () => {
     expect(event.id).toBeUndefined();
     expect(event.data).toBeUndefined();
     expect(event.description).toBeUndefined();
-    // Position and size are included so the model can reason about layout.
-    expect(typeof event.x).toBe("number");
-    expect(typeof event.y).toBe("number");
-    expect(typeof event.width).toBe("number");
-    expect(typeof event.height).toBe("number");
+    // Position and size are omitted now that the model no longer needs layout.
+    expect(event.x).toBeUndefined();
+    expect(event.y).toBeUndefined();
+    expect(event.width).toBeUndefined();
+    expect(event.height).toBeUndefined();
     expect(res).not.toContain('"description"');
     expect(event.fields[0]).toEqual({ name: "orderId", type: "string", tag: "order" });
+  });
+
+  it("filters the overview by type and name", async () => {
+    await executeAITool("create_event_card", { name: "OrderPlaced", fields: [] });
+    await executeAITool("create_command_card", { name: "PlaceOrder" });
+
+    const byType = JSON.parse(await executeAITool("get_canvas_overview", { type: "eventCard" }));
+    expect(byType.elements).toEqual([{ type: "eventCard", name: "orderPlaced" }]);
+    // A filtered read drops the board-wide catalogs.
+    expect(byType.tagCatalog).toBeUndefined();
+    expect(byType.eventTypes).toBeUndefined();
+
+    const byName = JSON.parse(await executeAITool("get_canvas_overview", { name: "place" }));
+    expect(byName.count).toBe(2);
+    expect(byName.elements.map((e: any) => e.type).sort()).toEqual(["commandCard", "eventCard"]);
+  });
+
+  it("returns unchanged when called again on an unchanged board", async () => {
+    await executeAITool("create_sticky_note", { text: "Note 1" });
+
+    const first = JSON.parse(await executeAITool("get_canvas_overview", {}));
+    expect(first.count).toBe(1);
+
+    const second = JSON.parse(await executeAITool("get_canvas_overview", {}));
+    expect(second.unchanged).toBe(true);
+
+    // A change to the board serves the full payload again.
+    await executeAITool("create_sticky_note", { text: "Note 2" });
+    const third = JSON.parse(await executeAITool("get_canvas_overview", {}));
+    expect(third.unchanged).toBeUndefined();
+    expect(third.count).toBe(2);
   });
 
   it("preserves existing field descriptions when an update omits them", async () => {
