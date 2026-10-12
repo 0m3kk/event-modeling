@@ -8,7 +8,7 @@ import { ElementLayer } from "@/engine/layers/ElementLayer";
 import { PreviewLayer } from "@/engine/layers/PreviewLayer";
 import { DragElementsInteraction } from "@/engine/interactions/DragElementsInteraction";
 import type { InteractionContext } from "@/engine/interactions/types";
-import { DOMAIN_PADDING, DOMAIN_TYPE } from "./layout";
+import { DOMAIN_TYPE } from "./layout";
 import {
   groupKindRank,
   orderGroups,
@@ -123,27 +123,89 @@ describe("planDomainArrange", () => {
         data?: { sliceOrder: string[] };
       };
 
-    // Types group comes first (left column top), services below it.
-    const typesPatch = at("g-types");
-    const servicesPatch = at("g-services");
-    expect(typesPatch.x).toBe(DOMAIN_PADDING);
-    expect(servicesPatch.x).toBe(DOMAIN_PADDING);
-    expect(servicesPatch.y).toBeGreaterThan(typesPatch.y);
+    // Its object is laid inside the group's content box (indented from the frame).
+    expect(at("o1").x).toBeGreaterThan(at("g-types").x);
+    expect(at("o1").y).toBeGreaterThan(at("g-types").y);
 
-    // Its object is laid inside the group's content box.
-    expect(at("o1").x).toBeGreaterThan(typesPatch.x);
+    // Every group starts left of every slice.
+    for (const gid of ["g-types", "g-services"]) {
+      expect(at(gid).x).toBeLessThan(at("s1").x);
+      expect(at(gid).x).toBeLessThan(at("s2").x);
+    }
 
-    // Slices sit in a single row, left to right, starting right of the group
-    // column and above the (lower) group column bottom.
-    const s1Patch = at("s1");
-    const s2Patch = at("s2");
-    expect(s1Patch.x).toBeGreaterThan(servicesPatch.x);
-    expect(s1Patch.y).toBe(s2Patch.y);
-    expect(s2Patch.x).toBeGreaterThan(s1Patch.x);
+    // Slices sit in a single row, left to right.
+    expect(at("s1").y).toBe(at("s2").y);
+    expect(at("s2").x).toBeGreaterThan(at("s1").x);
 
     // The Slice order is persisted on the domain patch.
-    const dPatch = at("d1");
-    expect((dPatch.data as { sliceOrder: string[] }).sliceOrder).toEqual(["s1", "s2"]);
+    expect(at("d1").data!.sliceOrder).toEqual(["s1", "s2"]);
+  });
+
+  it("packs a group's cards into a grid instead of one tall column", () => {
+    const d1 = domain("d1");
+    const gTypes = group("g-types", "Sales Types", 0, { domainId: "d1" });
+    const objects = Array.from({ length: 4 }, (_, i) => ({
+      id: `o${i}`,
+      type: "objectCard",
+      x: 900,
+      y: 900,
+      width: 200,
+      height: 90,
+      data: {},
+      groupId: "g-types",
+    })) as CanvasElement[];
+
+    const patches = planDomainArrange([d1, gTypes, ...objects], "d1")!;
+    const xs = objects.map((o) => patches.find((p) => p.id === o.id)!.x);
+    // Four 200px cards become a 2-column grid, not four stacked rows.
+    expect(new Set(xs).size).toBe(2);
+
+    const ys = objects.map((o) => patches.find((p) => p.id === o.id)!.y);
+    expect(new Set(ys).size).toBe(2);
+  });
+
+  it("wraps the group column so a tall group does not stretch the domain", () => {
+    const d1 = domain("d1");
+    // Three ~400px-tall groups; as one column they would reach ~1250px.
+    const tallGroup = (id: string, name: string, childType: string): CanvasElement[] => [
+      group(id, name, 0, { domainId: "d1" }),
+      {
+        id: `${id}-kid`,
+        type: childType,
+        x: 0,
+        y: 0,
+        width: 150,
+        height: 350,
+        data: {},
+        groupId: id,
+      } as CanvasElement,
+    ];
+    const s1 = slice("s1", 0, "d1");
+    const s2 = slice("s2", 0, "d1");
+
+    const elements = [
+      d1,
+      ...tallGroup("g-types", "Sales Types", "objectCard"),
+      ...tallGroup("g-states", "Sales States", "stateCard"),
+      ...tallGroup("g-services", "Sales Services", "serviceCard"),
+      s1,
+      s2,
+    ];
+
+    const patches = planDomainArrange(elements, "d1")!;
+    const groupXs = ["g-types", "g-states", "g-services"].map(
+      (id) => patches.find((p) => p.id === id)!.x!,
+    );
+    // The groups split into more than one column.
+    expect(new Set(groupXs).size).toBeGreaterThan(1);
+
+    // The group region's bottom stays far below the naive 3-row stack.
+    const kidBottoms = ["g-types-kid", "g-states-kid", "g-services-kid"].map((id) => {
+      const kid = patches.find((p) => p.id === id)!;
+      return kid.y! + 350;
+    });
+    const groupRegionHeight = Math.max(...kidBottoms) - Math.min(...kidBottoms) + 350;
+    expect(groupRegionHeight).toBeLessThan(900);
   });
 
   it("gives loose cards their own row below the slice row", () => {
