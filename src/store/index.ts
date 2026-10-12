@@ -20,6 +20,7 @@ import { cleanValidation, type FieldValidation } from "@/utils/fieldValidation";
 import { toolRegistry } from "@/tools/registry";
 import { reflowSlices } from "@/tools/sliceCard/layout";
 import { reflowDomains } from "@/tools/domainCard/layout";
+import { planDomainArrange } from "@/tools/domainCard/arrange";
 import { reflowGroups } from "@/tools/groupCard/layout";
 import {
   navigateSubSelect,
@@ -84,6 +85,8 @@ export interface CanvasStoreState {
   createMethodCopy: (sourceId: string, methodId: string) => CanvasElement | null;
   updateElement: (id: string, patch: Partial<CanvasElement>) => void;
   updateElements: (patches: Array<{ id: string } & Partial<CanvasElement>>) => void;
+  /** Auto-arranges a Domain: Groups stacked left, Slices in a row beside them. */
+  arrangeDomain: (domainId: string) => void;
   deleteElements: (ids: string[]) => void;
   deleteSelectedField: () => void;
   updateSelectedFieldType: (type: string) => void;
@@ -410,6 +413,31 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         finalPatches.some((p) => p.data) ? fitElementsToContent(updatedElements) : updatedElements,
       ),
     }));
+  },
+
+  arrangeDomain: (domainId) => {
+    const current = get().elements;
+    const patches = planDomainArrange(current, domainId);
+    if (!patches) return;
+
+    // Keep only patches that actually change something, so pressing "Arrange"
+    // twice does not stack identical undo entries.
+    const byId = new Map(current.map((el) => [el.id, el]));
+    const effective = patches.filter((patch) => {
+      const el = byId.get(patch.id);
+      if (!el) return false;
+      const moved =
+        (patch.x !== undefined && patch.x !== el.x) ||
+        (patch.y !== undefined && patch.y !== el.y);
+      const dataChanged =
+        patch.data !== undefined &&
+        JSON.stringify(patch.data) !== JSON.stringify(el.data);
+      return moved || dataChanged;
+    });
+
+    if (effective.length > 0) {
+      get().updateElements(effective);
+    }
   },
 
   deleteElements: (ids) => {

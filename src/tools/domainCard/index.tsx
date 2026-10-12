@@ -6,6 +6,7 @@ import type { ToolDefinition } from "../types";
 import type { CanvasElement, InlineEditState, Point } from "@/types";
 import { useCanvasStore } from "@/store";
 import { isSameIdentifier, toDisplayName } from "@/utils/naming";
+import { DomainOptions } from "./DomainOptions";
 import {
   DOMAIN_DEFAULT_HEIGHT,
   DOMAIN_DEFAULT_WIDTH,
@@ -20,6 +21,7 @@ export type { DomainData } from "./layout";
 export const DomainCardSchema = z.object({
   name: z.string().default("Domain"),
   color: z.string().optional(),
+  sliceOrder: z.array(z.string()).optional(),
 });
 
 /** Draws a dashed rectangle by emitting straight dash segments per edge. */
@@ -68,6 +70,8 @@ export const domainCardTool: ToolDefinition<DomainData> = {
   createDefaultData: () => ({ name: "Domain", color: "#7c3aed" }),
 
   defaultSize: { width: DOMAIN_DEFAULT_WIDTH, height: DOMAIN_DEFAULT_HEIGHT },
+
+  optionsBar: DomainOptions,
 
   render: (container: Container, element, context) => {
     container.removeChildren();

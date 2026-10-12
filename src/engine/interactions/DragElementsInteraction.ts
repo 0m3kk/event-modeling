@@ -3,7 +3,13 @@ import type { Point, CanvasElement } from "@/types";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { findSliceDropTarget, SLICE_TYPE } from "@/tools/sliceCard/layout";
-import { DOMAIN_TYPE, findDomainDropTarget, findDomainFreeSpot } from "@/tools/domainCard/layout";
+import {
+  DOMAIN_TYPE,
+  findDomainDropTarget,
+  findDomainFreeSpot,
+  isDomainArranged,
+} from "@/tools/domainCard/layout";
+import { planDomainArrange, reorderSlices } from "@/tools/domainCard/arrange";
 import { GROUP_TYPE, findGroupDropTarget, findGroupFreeSpot } from "@/tools/groupCard/layout";
 
 export class DragElementsInteraction implements CanvasInteraction {
@@ -381,7 +387,33 @@ export class DragElementsInteraction implements CanvasInteraction {
             // a Domain.
             const domain = findDomainDropTarget(elements, worldPoint, single.id, single.type);
             if (domain) {
-              this.placeInDomain(updates, index, elements, dragged, domain.domainId);
+              const domainEl = elements.find((el) => el.id === domain.domainId);
+              // Inside an already-arranged Domain, dropping a Slice picks its new
+              // slot in the row by drop position and re-arranges the Domain,
+              // instead of leaving it wherever it was released.
+              const reorderable =
+                single.type === SLICE_TYPE &&
+                dragged.domainId === domain.domainId &&
+                isDomainArranged(domainEl);
+              const arrangement = reorderable
+                ? planDomainArrange(elements, domain.domainId, {
+                    sliceOrder: reorderSlices(
+                      elements,
+                      domain.domainId,
+                      single.id,
+                      worldPoint.x,
+                    ),
+                  })
+                : null;
+
+              if (arrangement) {
+                // The plan owns the Slice's position, so drop the free-form
+                // position captured at drag start and let it place the row.
+                updates.splice(index, 1);
+                updates.push(...arrangement);
+              } else {
+                this.placeInDomain(updates, index, elements, dragged, domain.domainId);
+              }
             } else {
               updates[index] = { ...updates[index], domainId: undefined };
             }

@@ -26,12 +26,25 @@ export const DOMAIN_DEFAULT_HEIGHT = 160;
 export interface DomainData {
   name: string;
   color?: string;
+  /**
+   * Ordered ids of the Slices directly inside this Domain, written by
+   * {@link import("./arrange").planDomainArrange}. Its presence marks the Domain
+   * as "arranged": a Slice dropped inside one is reordered by drop position
+   * instead of parked in a free spot. Missing means the Domain was never
+   * arranged, so Slices keep the position they were dragged to.
+   */
+  sliceOrder?: string[];
 }
 
 export type DomainElement = CanvasElement<DomainData>;
 
 export function isDomainElement(element: CanvasElement | null | undefined): element is DomainElement {
   return Boolean(element && element.type === DOMAIN_TYPE);
+}
+
+/** True when a Domain has been arranged, so its Slice row is order-managed. */
+export function isDomainArranged(element: CanvasElement | null | undefined): boolean {
+  return isDomainElement(element) && Array.isArray(element.data?.sliceOrder);
 }
 
 /** Shared empty result so a missing container does not allocate each call. */
