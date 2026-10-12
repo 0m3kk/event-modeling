@@ -14,7 +14,7 @@ import {
   DESC_HIT_HALF,
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
-import { resolveHeaderColor } from "@/utils/color";
+import { hexToNumber, resolveHeaderColor } from "@/utils/color";
 import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { validateFieldTypes } from "../common/typeValidation";
@@ -299,7 +299,11 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
     const sectionHeaderBg = isDark ? 0x27272a : 0xf4f4f5;
     const groupLabelBg = isDark ? 0x1f1f23 : 0xfafafa;
     const borderCol = isSelected ? 0x3b82f6 : isDark ? 0x3f3f46 : 0xe4e4e7;
+    const dividerCol = isDark ? 0x3f3f46 : 0xe4e4e7;
     const sunkenColor = isDark ? 0x121214 : 0xf1f5f9;
+    // Accent used to make method headers read as distinct sections and to tint
+    // the active method. It follows the service's own color.
+    const accentColor = hexToNumber(headerColor);
 
     const g = new Graphics();
 
@@ -333,13 +337,19 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
       g.fill({ color: groupLabelBg });
     });
 
-    // 4. Sunken highlight for the active sub-selection
+    // 4. Selection highlight for the active sub-selection. A selected method
+    //    header gets a colored accent tint (clearly "chosen"), while rows keep
+    //    the standard sunken fill.
+    let selectedMethodIndex: number | null = null;
+    let selectedRowTop: number | null = null;
+
     if (selectedField) {
       if (selectedField.sectionId === "method" && selectedField.fieldIndex < 0) {
         const layout = layouts[selectedField.sectionIndex ?? 0];
         if (layout) {
+          selectedMethodIndex = selectedField.sectionIndex ?? 0;
           g.rect(0, layout.headerTop, w, SERVICE_METHOD_HEADER_HEIGHT);
-          g.fill({ color: sunkenColor });
+          g.fill({ color: accentColor, alpha: isDark ? 0.36 : 0.22 });
         }
       } else if (selectedField.fieldIndex >= 0) {
         const mi = bandToMethodIndex(selectedField.sectionIndex ?? 0);
@@ -366,16 +376,37 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
             g.rect(0, rowY, w, SERVICE_ROW_HEIGHT);
             g.fill({ color: sunkenColor });
           }
+          selectedRowTop = rowY;
         }
       }
     }
 
-    // 5. Border stroke
+    // 5. Method accents: a colored left stripe marks each method header, a
+    //    divider separates stacked methods, and the active method's stripe (or
+    //    its selected row's stripe) is drawn full-strength on top.
+    layouts.forEach((layout) => {
+      const isMethodSelected = layout.methodIndex === selectedMethodIndex;
+      g.rect(0, layout.headerTop, isMethodSelected ? 5 : 3, SERVICE_METHOD_HEADER_HEIGHT);
+      g.fill({ color: accentColor, alpha: isMethodSelected ? 1 : 0.55 });
+
+      if (layout.methodIndex > 0) {
+        g.moveTo(0, layout.headerTop);
+        g.lineTo(w, layout.headerTop);
+        g.stroke({ color: dividerCol, width: 1 });
+      }
+    });
+
+    if (selectedRowTop !== null) {
+      g.rect(0, selectedRowTop, 3, SERVICE_ROW_HEIGHT);
+      g.fill({ color: accentColor, alpha: 0.9 });
+    }
+
+    // 6. Border stroke
     g.roundRect(0, 0, w, h, r);
     g.stroke({ color: borderCol, width: isSelected ? 2 : 1 });
     container.addChild(g);
 
-    // 6. Header title + ⓘ badge
+    // 7. Header title + ⓘ badge
     renderStandardCardTitle(
       container,
       element.data.name || "Service",
@@ -395,7 +426,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
 
     if (typeof document === "undefined") return;
 
-    // 7. Empty hint
+    // 8. Empty hint
     if (methods.length === 0) {
       const empty = new Text({
         text: "(no methods)",
@@ -412,7 +443,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
       return;
     }
 
-    // 8. Methods
+    // 9. Methods
     layouts.forEach((layout) => {
       const { method, methodIndex } = layout;
       const isMethodSelected = Boolean(
