@@ -82,6 +82,7 @@ export async function sendChatMessage(
   messages: Array<{ role: string; content: string; tool_calls?: any; tool_call_id?: string }>,
   tools: any[],
   sessionId: string,
+  signal?: AbortSignal,
 ): Promise<{
   content: string;
   toolCalls: Array<{ id: string; name: string; arguments: any }>;
@@ -110,6 +111,7 @@ export async function sendChatMessage(
       "x-opencode-session": sessionId,
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) {

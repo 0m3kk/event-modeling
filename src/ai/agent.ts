@@ -1550,9 +1550,12 @@ export async function runAgentConversation(
   callbacks?: AgentStepCallback,
   sessionId: string = createSessionId(),
   language: string = "vi",
+  signal?: AbortSignal,
 ): Promise<string> {
   const languageName = LANGUAGE_NAMES[language.slice(0, 2)] || "English";
-  const languageInstruction = `OUTPUT LANGUAGE (IMPORTANT): the user is working in the ${languageName} language on this system. Write ALL of your output in ${languageName} — your chat replies, every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other human-readable text you put on the canvas — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form. Never answer in a language other than the one selected in the app.`;
+  const languageInstruction = `OUTPUT LANGUAGE (IMPORTANT) — two separate rules:
+1. CANVAS CONTENT (cards and everything you model): write ALL human-readable text you put on the canvas in the system's app language, which is ${languageName} — every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other text on a card — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form.
+2. CHAT REPLIES (your feedback, questions and explanations shown in the chat panel): always use the SAME language the user is currently writing in, detected from their latest message — NOT the app language. If the user writes in English, reply in English; if they write in Vietnamese, reply in Vietnamese; if they switch language, switch with them. The canvas content language (rule 1) never changes based on this.`;
   const systemPrompt = `You are the AI Event Modeling Architect, helping architects design domain events, business models and reactive systems on an infinite canvas.
 Tools: read the canvas; create sticky notes, Events, Commands, Queries, States (projection/decision models), Views (persisted read models), Objects, Enums, Aliases, Services (methods with params + returns), Constraint cards, Actors (RBAC), Domain frames, Groups and Slices; make live reference copies of a card (create_reference_copy) or method-execution copies of a Service method (create_service_method_execution); move existing components to chosen positions (position_elements); clear the board. When the user asks to add or create something, always call the matching creation tool.
 COPIES: create_reference_copy makes a linked duplicate of an existing card (locate it by "target", optionally "type") — both share one name and stay in sync. create_service_method_execution makes a live Service card that runs ONE method of a source Service (give "service" and "method"); use it for the serviceCard lane of a write slice, placing it via "slice"/"lane". Both accept the optional "slice"/"lane", "group" and "domain" placement.
@@ -1583,7 +1586,7 @@ SLICES: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom),
 SLICE NAME: give a slice a plain PascalCase business name describing the flow (e.g. PlaceOrder, HandlePayment, ViewOrderHistory). Do NOT include the word "Slice" (never "PlaceOrderSlice") — "slice" is an internal concept most users do not know, so do not name lanes or cards after it either.
 FILLING LANES: after create_slice, create each lane's card(s) and place each one via "slice" = the slice's name (and "lane" only when the card type is ambiguous: give the lane's card type or 1-based position). Never leave an AI-made slice empty.
 TIDYING (position_elements): when the user asks to rearrange, clean up or neaten the board (e.g. "sắp xếp lại"), first call get_canvas_overview to read every card's "x"/"y"/"width"/"height" and container membership, then decide a clean layout yourself and place components with position_elements (give each a "target" name and the new top-left "x"/"y"). Aim for a readable arrangement: aligned rows/columns, related cards near each other, comfortable gaps (about 40px) and no overlaps. Membership is never changed — you cannot move a card into or out of a Domain/Group/Slice this way (use the create/update tools for that). Moving a Domain or Group moves its whole frame and contents in one entry. Cards inside a Slice lane are laid out by the Slice, so move the Slice instead of its lane cards.
-Be concise, clear, and professional.
+FINAL REPLY (IMPORTANT): after you finish the tool calls, your closing message must be SHORT — a brief summary of the main points only, not a verbose report. State what you changed and any decision that matters to the user, then stop. Prefer 1–3 short sentences or a terse bullet list (a few words per bullet). Do NOT re-list every card you created, recite field descriptions or counts, dump the board structure, or explain your reasoning process. If nothing noteworthy needs saying, a single short line is enough. Write this reply in the same language the user is writing in (rule 2 above), NOT the app language. Be concise, clear, and professional.
 ${languageInstruction}`;
 
   const wireMessages: any[] = [{ role: "system", content: systemPrompt }];
@@ -1614,7 +1617,8 @@ ${languageInstruction}`;
 
   while (maxTurns > 0) {
     maxTurns--;
-    const response = await sendChatMessage(settings, wireMessages, tools, sessionId);
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const response = await sendChatMessage(settings, wireMessages, tools, sessionId, signal);
 
     if (response.toolCalls.length > 0) {
       // Record assistant call
@@ -1630,6 +1634,7 @@ ${languageInstruction}`;
 
       // Execute each tool
       for (const tc of response.toolCalls) {
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
         callbacks?.onToolCall?.(tc.name, tc.arguments);
         const resultString = await executeAITool(tc.name, tc.arguments);
 

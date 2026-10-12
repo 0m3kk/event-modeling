@@ -10,6 +10,7 @@ import {
   MessageSquarePlus,
   AArrowDown,
   AArrowUp,
+  Square,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
@@ -109,6 +110,10 @@ export function AIPanel() {
   // captured id no longer matches are discarded instead of polluting the new chat.
   const sessionIdRef = useRef(0);
 
+  // Lets the user abort the in-flight request. A fresh controller is created for
+  // every turn and cleared once it settles.
+  const abortRef = useRef<AbortController | null>(null);
+
   // Stable id sent to the opencode gateway as `x-opencode-session`, shared by
   // every turn of the current chat and refreshed when a new chat starts.
   const opencodeSessionRef = useRef<string>(createSessionId());
@@ -130,6 +135,8 @@ export function AIPanel() {
 
   // Start a fresh chat session, dropping any pending reply from the old one.
   const handleNewSession = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     sessionIdRef.current += 1;
     opencodeSessionRef.current = createSessionId();
     lastTurnRef.current = null;
@@ -226,6 +233,8 @@ export function AIPanel() {
 
   const executeTurn = async (history: ChatMessage[]) => {
     const sessionId = sessionIdRef.current;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setIsLoading(true);
     try {
       const assistantId = `assistant-${Date.now()}`;
@@ -249,6 +258,7 @@ export function AIPanel() {
         callbacks,
         opencodeSessionRef.current,
         i18n.language,
+        controller.signal,
       );
 
       if (sessionIdRef.current !== sessionId) return;
@@ -262,6 +272,18 @@ export function AIPanel() {
       ]);
     } catch (err: any) {
       if (sessionIdRef.current !== sessionId) return;
+      // A user-initiated stop is not an error; surface a neutral note instead.
+      if (err?.name === "AbortError") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `stopped-${Date.now()}`,
+            role: "assistant",
+            content: `🛑 ${t("ai.stopped")}`,
+          },
+        ]);
+        return;
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -271,8 +293,14 @@ export function AIPanel() {
         },
       ]);
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       if (sessionIdRef.current === sessionId) setIsLoading(false);
     }
+  };
+
+  // Abort the in-flight turn at the user's request.
+  const handleStop = () => {
+    abortRef.current?.abort();
   };
 
   const handleSend = async () => {
@@ -526,13 +554,25 @@ export function AIPanel() {
             >
               <RotateCcw size={15} />
             </button>
-            <button
-              type="submit"
-              disabled={!input.trim() || isLoading}
-              className="rounded-xl bg-purple-600 p-2 text-white hover:bg-purple-700 disabled:opacity-40 cursor-pointer"
-            >
-              <Send size={15} />
-            </button>
+            {isLoading ? (
+              <button
+                type="button"
+                onClick={handleStop}
+                title={t("ai.stop")}
+                aria-label={t("ai.stop")}
+                className="rounded-xl bg-red-600 p-2 text-white hover:bg-red-700 cursor-pointer"
+              >
+                <Square size={15} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                className="rounded-xl bg-purple-600 p-2 text-white hover:bg-purple-700 disabled:opacity-40 cursor-pointer"
+              >
+                <Send size={15} />
+              </button>
+            )}
           </form>
         </div>
       )}

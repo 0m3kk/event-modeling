@@ -37,6 +37,8 @@
     "model": "Model",
     "saveSettings": "Save Settings",
     "retry": "Retry with last prompt",
+    "stop": "Stop",
+    "stopped": "Stopped.",
     "newChat": "New chat (⌘/Ctrl+Alt+N)",
     "increaseFont": "Increase font size",
     "decreaseFont": "Decrease font size",
