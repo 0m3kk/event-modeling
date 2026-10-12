@@ -75,16 +75,28 @@ export interface ChatMessage {
   }>;
   toolName?: string;
   toolCallId?: string;
+  // Some "thinking" models return a separate reasoning stream alongside the
+  // answer. Gateways validate it, so it must be echoed back verbatim on later
+  // turns of the same conversation (see the assistant message handling below).
+  reasoningContent?: string;
 }
 
 export async function sendChatMessage(
   settings: AISettings,
-  messages: Array<{ role: string; content: string; tool_calls?: any; tool_call_id?: string }>,
+  messages: Array<{
+    role: string;
+    content: string | null;
+    tool_calls?: any;
+    tool_call_id?: string;
+    name?: string;
+    reasoning_content?: string;
+  }>,
   tools: any[],
   sessionId: string,
   signal?: AbortSignal,
 ): Promise<{
   content: string;
+  reasoningContent: string;
   toolCalls: Array<{ id: string; name: string; arguments: any }>;
 }> {
   if (!settings.apiKey) {
@@ -142,6 +154,9 @@ export async function sendChatMessage(
 
   return {
     content: msg?.content || "",
+    // Happy-eyeballs across providers: OpenAI-compatible gateways use either
+    // `reasoning_content` (DeepSeek/opencode-zen style) or `reasoning` (others).
+    reasoningContent: msg?.reasoning_content ?? msg?.reasoning ?? "",
     toolCalls,
   };
 }

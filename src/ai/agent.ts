@@ -42,6 +42,12 @@ export interface AgentStepCallback {
   onAssistantMessage?: (content: string) => void;
 }
 
+/** Result of one agent conversation run, including the thinking trace. */
+export interface AgentResult {
+  content: string;
+  reasoningContent: string;
+}
+
 function getViewportCenter(): Point {
   const vp = useCanvasStore.getState().viewport;
   const zoom = vp.zoom || 1;
@@ -1372,7 +1378,7 @@ export async function runAgentConversation(
   sessionId: string = createSessionId(),
   language: string = "vi",
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<AgentResult> {
   const languageName = LANGUAGE_NAMES[language.slice(0, 2)] || "English";
   const languageInstruction = `OUTPUT LANGUAGE (IMPORTANT) — two separate rules:
 1. CANVAS CONTENT (cards and everything you model): write ALL human-readable text you put on the canvas in the system's app language, which is ${languageName} — every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other text on a card — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form.
@@ -1412,23 +1418,36 @@ ${languageInstruction}`;
   const wireMessages: any[] = [{ role: "system", content: systemPrompt }];
 
   for (const m of conversationHistory) {
+    // Skip UI-only placeholders ("Executing <tool>..."); they never came from
+    // the API and would look like bogus assistant text on the wire.
+    if (m.toolName && !m.toolCalls) continue;
+
     if (m.role === "tool") {
-      wireMessages.push({
+      const toolMsg: any = {
         role: "tool",
         content: m.content,
         tool_call_id: m.toolCallId,
-      });
+      };
+      if (m.toolName) toolMsg.name = m.toolName;
+      wireMessages.push(toolMsg);
     } else if (m.role === "assistant" && m.toolCalls) {
-      wireMessages.push({
+      const assistantMsg: any = {
         role: "assistant",
         content: m.content || null,
         tool_calls: m.toolCalls,
-      });
+      };
+      // Thinking-mode gateways reject a replay that drops the reasoning trace.
+      if (m.reasoningContent) assistantMsg.reasoning_content = m.reasoningContent;
+      wireMessages.push(assistantMsg);
     } else {
-      wireMessages.push({
+      const msg: any = {
         role: m.role,
         content: m.content,
-      });
+      };
+      if (m.role === "assistant" && m.reasoningContent) {
+        msg.reasoning_content = m.reasoningContent;
+      }
+      wireMessages.push(msg);
     }
   }
 
@@ -1441,8 +1460,9 @@ ${languageInstruction}`;
     const response = await sendChatMessage(settings, wireMessages, tools, sessionId, signal);
 
     if (response.toolCalls.length > 0) {
-      // Record assistant call
-      wireMessages.push({
+      // Record assistant call, echoing the reasoning trace so the next request
+      // in the same turn passes thinking-mode validation.
+      const assistantMsg: any = {
         role: "assistant",
         content: response.content || null,
         tool_calls: response.toolCalls.map((tc) => ({
@@ -1450,7 +1470,9 @@ ${languageInstruction}`;
           type: "function",
           function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
         })),
-      });
+      };
+      if (response.reasoningContent) assistantMsg.reasoning_content = response.reasoningContent;
+      wireMessages.push(assistantMsg);
 
       // Execute each tool
       for (const tc of response.toolCalls) {
@@ -1468,9 +1490,12 @@ ${languageInstruction}`;
     } else {
       // Final message from assistant
       callbacks?.onAssistantMessage?.(response.content);
-      return response.content;
+      return {
+        content: response.content,
+        reasoningContent: response.reasoningContent,
+      };
     }
   }
 
-  return "Task completed.";
+  return { content: "Task completed.", reasoningContent: "" };
 }

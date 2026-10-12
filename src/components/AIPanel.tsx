@@ -230,7 +230,9 @@ export function AIPanel() {
         {
           id: assistantId,
           role: "assistant",
-          content: finalReply,
+          content: finalReply.content,
+          // Keep the thinking trace so it can be replayed on the next turn.
+          reasoningContent: finalReply.reasoningContent || undefined,
         },
       ]);
     } catch (err: any) {
