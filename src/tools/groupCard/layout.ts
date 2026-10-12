@@ -5,10 +5,10 @@ import { findFreeSpot } from "@/utils/placement";
  * Pure geometry + data helpers for the Group tool.
  *
  * A Group is a *light* container: a solid rounded frame with a name chip that
- * clusters related definition cards — Objects, Enums, Aliases — or Services.
- * It is deliberately narrower than a Domain (which holds anything) and a Slice
- * (which stacks typed lanes of behavior cards). A Group usually lives inside a
- * Domain, but it can also stand on its own.
+ * clusters related reusable cards — Objects, Enums, Aliases, Services or
+ * States. It is deliberately narrower than a Domain (which holds anything) and
+ * a Slice (which stacks typed lanes of behavior cards). A Group usually lives
+ * inside a Domain, but it can also stand on its own.
  *
  * Membership is stored on the child as `groupId`. This module keeps the math
  * free of React / Pixi / store imports so the store, the renderer and the drag
@@ -32,15 +32,19 @@ export interface GroupData {
 export type GroupElement = CanvasElement<GroupData>;
 
 /**
- * Card types a Group may cluster. Definition cards (Object/Enum/Alias) and
- * Services are the reusable building blocks that read best pulled together;
+ * Card types a Group may cluster. Definition cards (Object/Enum/Alias), Services
+ * and States are the reusable building blocks that read best pulled together;
  * behavior cards (events, commands, …) belong to a Slice lane instead.
+ *
+ * A domain usually has one Group for its type definitions, one for its Services
+ * and one wrapping its States.
  */
 export const GROUP_ELIGIBLE_CHILD_TYPES: ReadonlySet<string> = new Set([
   "objectCard",
   "enumCard",
   "aliasCard",
   "serviceCard",
+  "stateCard",
 ]);
 
 /** Whether a card type is allowed inside a Group. */

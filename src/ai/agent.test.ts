@@ -871,11 +871,13 @@ describe("AIAgent", () => {
     expect(groupTool.function.parameters.properties.group).toBeUndefined();
     expect(groupTool.function.parameters.properties.domain.type).toBe("string");
 
-    // Definition/service cards can join a Group.
+    // Definition/service/state cards can join a Group.
     const objectTool = tools.find((t) => t.function.name === "create_object_card")!;
     expect(objectTool.function.parameters.properties.group.type).toBe("string");
     const serviceTool = tools.find((t) => t.function.name === "create_service_card")!;
     expect(serviceTool.function.parameters.properties.group.type).toBe("string");
+    const stateTool = tools.find((t) => t.function.name === "create_state_card")!;
+    expect(stateTool.function.parameters.properties.group.type).toBe("string");
 
     // Behavior cards cannot.
     const eventTool = tools.find((t) => t.function.name === "create_event_card")!;
@@ -911,6 +913,19 @@ describe("AIAgent", () => {
     const overview = JSON.parse(await executeAITool("get_canvas_overview", {}));
     const info = overview.groups.find((g: any) => g.name.toLowerCase() === "moneytypes");
     expect(info.cards).toContain("money");
+  });
+
+  it("places a state card inside a group", async () => {
+    await executeAITool("create_group_card", { name: "States" });
+    const res = JSON.parse(
+      await executeAITool("create_state_card", { name: "OrderState", group: "States" }),
+    );
+    expect(res.status).toBe("success");
+
+    const elements = useCanvasStore.getState().elements;
+    const group = elements.find((e) => e.type === "groupCard")!;
+    const state = elements.find((e) => e.type === "stateCard")!;
+    expect(state.groupId).toBe(group.id);
   });
 
   it("reports group_placement_failed for a missing group or an ineligible card", async () => {

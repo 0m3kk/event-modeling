@@ -150,7 +150,7 @@ function snapshotState(elements: CanvasElement[]): HistoryEntry {
 /**
  * Applies container layout after any structural change: slices first (size and
  * lane their cards), then groups (fit a frame around their definition/service
- * cards), then domains (fit a dashed frame around their children, which may
+ * /state cards), then domains (fit a dashed frame around their children, which may
  * include slices and groups).
  */
 function applyContainerLayout(elements: CanvasElement[]): CanvasElement[] {

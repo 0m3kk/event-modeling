@@ -78,6 +78,14 @@ describe("reflowGroups", () => {
     expect(result.find((el) => el.id === "e1")!.groupId).toBeUndefined();
   });
 
+  it("keeps a state card as a group child", () => {
+    const group = makeGroup("g1", 0, 0, { name: "States" });
+    const state = makeCard("s1", "stateCard", 0, 0, { groupId: "g1" });
+
+    const result = reflowGroups([group, state]);
+    expect(result.find((el) => el.id === "s1")!.groupId).toBe("g1");
+  });
+
   it("drops group membership from slice-lane members (exclusive)", () => {
     const group = makeGroup("g1", 0, 0, { name: "Types" });
     const card = makeCard("c1", "serviceCard", 0, 0, {
@@ -96,6 +104,8 @@ describe("findGroupDropTarget", () => {
     const group = makeGroup("g1", 0, 0, { name: "Types" });
     const hit = findGroupDropTarget([group], { x: 10, y: 10 }, "drag", "objectCard");
     expect(hit?.groupId).toBe("g1");
+    const stateHit = findGroupDropTarget([group], { x: 10, y: 10 }, "drag", "stateCard");
+    expect(stateHit?.groupId).toBe("g1");
   });
 
   it("refuses an ineligible card type", () => {

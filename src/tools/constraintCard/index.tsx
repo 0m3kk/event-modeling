@@ -538,12 +538,13 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
   ai: {
     toolName: "create_constraint_card",
     description:
-      "Create a Constraint card declaring business rules over one or more State cards. Sections: `states` " +
-      "(existing State card names it reads) and `rules` (plain-language rules, e.g. 'The account must be " +
+      "Create a Constraint card declaring business invariants over one or more State cards. Sections: `states` " +
+      "(existing State card names it reads) and `rules` (plain-language invariants, e.g. 'The account must be " +
       "active' — never field-name notation). A rule is an INPUT gate: it must be checkable from the " +
       "Command/Query inputs plus the referenced State, and must not describe data storage or the event " +
-      "payload. The State params a rule compares must be supplied by that Command's inputs / Query's " +
-      "params. Call get_canvas_overview first; unknown state names are rejected.",
+      "payload. A rule is NOT data validation — do not write required/type/format/empty checks like 'field " +
+      "must not be empty'. The State params a rule compares must be supplied by that Command's inputs / " +
+      "Query's params. Call get_canvas_overview first; unknown state names are rejected.",
     parameters: z.object({
       name: z.string().describe("PascalCase constraint name (e.g. AccountMustBeActive)"),
       states: z
@@ -554,9 +555,9 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
         .array(z.string())
         .optional()
         .describe(
-          "Plain-language INPUT preconditions (one per entry), e.g. 'The account must be active'. Each " +
+          "Plain-language business invariants (one per entry), e.g. 'The account must be active'. Each " +
             "must be checkable from the Command/Query inputs plus the referenced State; never describe " +
-            "storage or the event payload.",
+            "storage or the event payload, and never write data validation like required/empty/format checks.",
         ),
       color: z.string().optional().describe("Optional hex color"),
       description: z.string().optional().describe("Description of the constraint"),

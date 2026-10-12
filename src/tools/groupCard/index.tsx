@@ -44,7 +44,7 @@ export const groupCardTool: ToolDefinition<GroupData> = {
   type: GROUP_TYPE,
   name: "Group",
   description:
-    "A Group is a compact frame that clusters related Object, Enum, Alias or Service cards (usually inside a Domain)",
+    "A Group is a compact frame that clusters related Object, Enum, Alias, Service or State cards (usually inside a Domain)",
   icon: Boxes,
   color: "#0d9488",
   category: "modeling",
@@ -102,7 +102,7 @@ export const groupCardTool: ToolDefinition<GroupData> = {
 
     if (children.length === 0) {
       const hint = new Text({
-        text: "Drop objects, enums, aliases or services here",
+        text: "Drop objects, enums, aliases, services or states here",
         style: {
           fontSize: 11,
           fontFamily: '"Geist Mono", monospace',
@@ -158,13 +158,14 @@ export const groupCardTool: ToolDefinition<GroupData> = {
   ai: {
     toolName: "create_group_card",
     description:
-      "Create a Group — a compact frame clustering reusable definitions (Object/Enum/Alias and/or Services) inside a Domain. " +
+      "Create a Group — a compact frame clustering reusable definitions (Object/Enum/Alias), Services and/or States inside a Domain. " +
+      "Name it after its Domain (e.g. Account Types, Account States, Account Services) so names stay unique across Domains. " +
       "After creating it, place eligible cards in it via `group`.",
     parameters: z.object({
       name: z
         .string()
         .describe(
-          "PascalCase group name (e.g. MoneyTypes, PaymentServices)",
+          "Domain-prefixed PascalCase group name (e.g. Account Types, Account States, Account Services)",
         ),
       color: z.string().optional().describe("Optional hex color"),
       description: z

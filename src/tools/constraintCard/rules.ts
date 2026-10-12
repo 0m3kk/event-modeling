@@ -3,14 +3,16 @@ import type { ValidationIssue } from "../types";
 import { nameKey } from "@/utils/naming";
 
 /**
- * A Constraint card declares business rules that must hold over one or more
+ * A Constraint card declares business invariants that must hold over one or more
  * State cards. It has two sections:
  * - `states`: the State cards this constraint reads from (picked from the board);
- * - `rules`: free-text INPUT preconditions, one per row, written in plain language
+ * - `rules`: free-text INVARIANTS, one per row, written in plain language
  *   (e.g. "The account must be active"). A rule gates the command/query and decides
- *   whether the event is emitted, so it describes an input check — not how data is
- *   stored or what the event payload contains. Rules are intentionally unstructured
- *   so they stay readable; each row is edited inline.
+ *   whether the event is emitted, so it describes a domain truth checked from the
+ *   flow's inputs — not how data is stored, what the event payload contains, or
+ *   generic data validation (required/format/empty checks); those are separate
+ *   concerns. Rules are intentionally unstructured so they stay readable; each row
+ *   is edited inline.
  */
 
 /** A State card referenced by the constraint (kept by name, like DCB tags). */

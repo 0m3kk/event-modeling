@@ -23,7 +23,7 @@ export interface CanvasElement<TData = any> {
   height: number;
   zIndex?: number;
   locked?: boolean;
-  /** Id of the Group frame that clusters this card (objects, enums, aliases, services). */
+  /** Id of the Group frame that clusters this card (objects, enums, aliases, services, states). */
   groupId?: string;
   /** Id of the Slice this card belongs to (when it lives inside a lane). */
   sliceId?: string;
