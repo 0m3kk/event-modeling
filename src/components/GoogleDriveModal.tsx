@@ -51,6 +51,29 @@ export function GoogleDriveModal() {
     }
   }, [auth.accessToken, tab]);
 
+  // When the modal opens without a valid session, try to restore it silently
+  // (no popup) using a previously granted consent, so a returning visitor does
+  // not have to sign in again while the Google session is still alive.
+  useEffect(() => {
+    if (!isOpen || auth.accessToken) return;
+    const storedClientId = getStoredGoogleClientId();
+    if (!storedClientId) return;
+    let cancelled = false;
+    signInWithGoogle(storedClientId, { silent: true })
+      .then((res) => {
+        if (!cancelled && res.accessToken) {
+          setAuth(res);
+          setIsConfiguringClientId(false);
+        }
+      })
+      .catch(() => {
+        // Silent refresh needs a live Google session; fall back to manual sign-in.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, auth.accessToken]);
+
   const loadFilesList = async () => {
     if (!auth.accessToken) return;
     setIsLoading(true);

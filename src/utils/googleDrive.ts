@@ -51,6 +51,51 @@ export interface GoogleDriveAuthState {
 const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
 const CLIENT_ID_STORAGE_KEY = "event_modeling_gdrive_client_id";
 const DRIVE_FILE_STORAGE_KEY = "event_modeling_gdrive_last_file";
+const AUTH_STORAGE_KEY = "event_modeling_gdrive_auth";
+
+/**
+ * Cached Google OAuth session. Google Identity Services only issues
+ * short-lived access tokens (no refresh token in the browser flow), so we keep
+ * the token plus its expiry and reuse it until it lapses. This is what lets a
+ * returning visitor skip the sign-in prompt while the token is still valid.
+ */
+interface StoredDriveAuth {
+  accessToken: string;
+  expiresAt: number;
+  user: GoogleUserProfile | null;
+}
+
+function readStoredAuth(): StoredDriveAuth | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.accessToken === "string" && parsed.accessToken) {
+      return {
+        accessToken: parsed.accessToken,
+        expiresAt: typeof parsed.expiresAt === "number" ? parsed.expiresAt : 0,
+        user: parsed.user ?? null,
+      };
+    }
+  } catch {
+    // Ignore malformed or inaccessible storage.
+  }
+  return null;
+}
+
+function writeStoredAuth(auth: StoredDriveAuth | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (!auth) {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  } catch {
+    // Persistence is best-effort; ignore quota/security errors.
+  }
+}
 
 export function getStoredGoogleClientId(): string {
   if (typeof window === "undefined") return "";
@@ -112,20 +157,65 @@ declare global {
 
 let activeToken: string | null = null;
 let activeUser: GoogleUserProfile | null = null;
+let activeExpiresAt = 0;
+let authRestored = false;
+
+/**
+ * Lazily pull the cached session from localStorage the first time auth state is
+ * read, dropping it if the token has already expired.
+ */
+function restoreStoredAuth() {
+  if (authRestored) return;
+  authRestored = true;
+  const stored = readStoredAuth();
+  if (!stored) return;
+  if (stored.expiresAt > Date.now()) {
+    activeToken = stored.accessToken;
+    activeExpiresAt = stored.expiresAt;
+    activeUser = stored.user;
+  } else {
+    writeStoredAuth(null);
+  }
+}
 
 export function getActiveGoogleAuth(): GoogleDriveAuthState {
+  restoreStoredAuth();
+  if (activeToken && activeExpiresAt <= Date.now()) {
+    activeToken = null;
+    activeUser = null;
+    activeExpiresAt = 0;
+    writeStoredAuth(null);
+  }
   return { accessToken: activeToken, user: activeUser };
 }
 
 export function signOutGoogle() {
+  const token = activeToken;
   activeToken = null;
   activeUser = null;
+  activeExpiresAt = 0;
+  writeStoredAuth(null);
+  // Best-effort: revoke the token so it can't be reused.
+  if (token) {
+    try {
+      window.google?.accounts?.oauth2?.revoke?.(token, () => {});
+    } catch {
+      // Ignore revoke failures; local sign-out already succeeded.
+    }
+  }
 }
 
 /**
- * Trigger web Google Identity Services OAuth popup
+ * Trigger web Google Identity Services OAuth popup.
+ *
+ * With `silent: true` no UI is shown: GIS returns a fresh token if the browser
+ * still has a Google session and consent was granted before. Used to restore a
+ * session automatically when the cached token has expired.
  */
-export async function signInWithGoogle(clientId: string): Promise<GoogleDriveAuthState> {
+export async function signInWithGoogle(
+  clientId: string,
+  options: { silent?: boolean } = {},
+): Promise<GoogleDriveAuthState> {
   if (!clientId.trim()) {
     throw new Error("Google Client ID is missing");
   }
@@ -149,20 +239,29 @@ export async function signInWithGoogle(clientId: string): Promise<GoogleDriveAut
             return;
           }
 
+          const expiresIn = typeof resp.expires_in === "number" ? resp.expires_in : 3600;
           activeToken = resp.access_token;
+          activeExpiresAt = Date.now() + expiresIn * 1000;
+
           try {
             activeUser = await fetchGoogleUserProfile(resp.access_token);
-            resolve({ accessToken: activeToken, user: activeUser });
           } catch {
-            resolve({ accessToken: activeToken, user: null });
+            activeUser = null;
           }
+
+          writeStoredAuth({
+            accessToken: resp.access_token,
+            expiresAt: activeExpiresAt,
+            user: activeUser,
+          });
+          resolve({ accessToken: activeToken, user: activeUser });
         },
         error_callback: (err: any) => {
           reject(new Error(err?.message || "Google sign-in popup failed or was closed"));
         },
       });
 
-      client.requestAccessToken({ prompt: "consent" });
+      client.requestAccessToken({ prompt: options.silent ? "" : "consent" });
     } catch (err) {
       reject(err);
     }
