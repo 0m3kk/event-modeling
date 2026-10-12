@@ -91,7 +91,9 @@
     "copied": "Đã sao chép",
     "download": "Tải xuống",
     "decreaseFont": "Giảm cỡ chữ",
-    "increaseFont": "Tăng cỡ chữ"
+    "increaseFont": "Tăng cỡ chữ",
+    "expandAll": "Mở rộng tất cả",
+    "collapseAll": "Thu gọn tất cả"
   },
   "common": {
     "close": "Đóng",

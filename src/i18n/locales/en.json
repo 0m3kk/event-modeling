@@ -91,7 +91,9 @@
     "copied": "Copied",
     "download": "Download",
     "decreaseFont": "Decrease font size",
-    "increaseFont": "Increase font size"
+    "increaseFont": "Increase font size",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all"
   },
   "common": {
     "close": "Close",
