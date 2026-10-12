@@ -16,6 +16,12 @@ export class DragElementsInteraction implements CanvasInteraction {
   /** The single element being dragged, when exactly one is selected. */
   private singleDragged: { id: string; type: string } | null = null;
 
+  // Drag rendering is coalesced to one pass per animation frame. Pointer events
+  // can fire several times per frame; redrawing for each is wasted work.
+  private ctx: InteractionContext | null = null;
+  private pendingPoint: Point | null = null;
+  private rafId: number | null = null;
+
   isActive(): boolean {
     return this.active;
   }
@@ -34,6 +40,9 @@ export class DragElementsInteraction implements CanvasInteraction {
     this.singleDragged = null;
     this.dragStartWorld = worldPoint;
     this.initialPositions.clear();
+    this.ctx = null;
+    this.pendingPoint = null;
+    this.cancelFrame();
 
     const { selectedIds, elements } = useCanvasStore.getState();
     const isAlreadySelected = selectedIds.includes(hitId);
@@ -125,6 +134,11 @@ export class DragElementsInteraction implements CanvasInteraction {
   onPointerMove(_e: PointerEvent, worldPoint: Point, ctx: InteractionContext): void {
     if (!this.active) return;
 
+    // Keep the latest pointer position; the frame loop renders it. Movement is
+    // detected immediately (before the frame) so the drag cursor/UI reacts now.
+    this.ctx = ctx;
+    this.pendingPoint = worldPoint;
+
     const dx = worldPoint.x - this.dragStartWorld.x;
     const dy = worldPoint.y - this.dragStartWorld.y;
 
@@ -132,6 +146,43 @@ export class DragElementsInteraction implements CanvasInteraction {
       this.hasMoved = true;
       useCanvasStore.getState().setIsDragging(true);
     }
+
+    this.scheduleFrame();
+  }
+
+  /** Schedules one drag render for the next animation frame (deduplicated). */
+  private scheduleFrame(): void {
+    if (this.rafId !== null) return;
+
+    // Environments without rAF (tests, SSR) render synchronously.
+    if (typeof requestAnimationFrame !== "function") {
+      this.renderFrame();
+      return;
+    }
+
+    this.rafId = requestAnimationFrame(() => {
+      this.rafId = null;
+      this.renderFrame();
+    });
+  }
+
+  /** Cancels a scheduled frame without rendering. */
+  private cancelFrame(): void {
+    if (this.rafId !== null && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(this.rafId);
+    }
+    this.rafId = null;
+  }
+
+  private renderFrame(): void {
+    if (!this.active || !this.pendingPoint || !this.ctx) return;
+    this.drawDrag(this.pendingPoint, this.ctx);
+  }
+
+  /** Moves every dragged element to `worldPoint` and refreshes the overlays. */
+  private drawDrag(worldPoint: Point, ctx: InteractionContext): void {
+    const dx = worldPoint.x - this.dragStartWorld.x;
+    const dy = worldPoint.y - this.dragStartWorld.y;
 
     const state = useCanvasStore.getState();
     const nextElements = state.elements.map((el) => {
@@ -288,7 +339,16 @@ export class DragElementsInteraction implements CanvasInteraction {
 
   onPointerUp(_e: PointerEvent, worldPoint: Point, ctx: InteractionContext): void {
     if (!this.active) return;
+    this.cancelFrame();
     this.active = false;
+
+    // Flush the final preview at the exact release point. The last scheduled
+    // frame may never have run, and the commit below only re-renders when the
+    // pointer moved more than a pixel.
+    if (this.hasMoved) {
+      this.drawDrag(worldPoint, ctx);
+    }
+
     ctx.gizmoLayer.drawDropTarget(null);
 
     if (this.hasMoved) {
@@ -371,9 +431,12 @@ export class DragElementsInteraction implements CanvasInteraction {
     this.initialPositions.clear();
     this.singleDragged = null;
     this.hitElementId = null;
+    this.ctx = null;
+    this.pendingPoint = null;
   }
 
   onCancel(ctx: InteractionContext): void {
+    this.cancelFrame();
     if (this.hasMoved) {
       this.hasMoved = false;
       useCanvasStore.getState().setIsDragging(false);
@@ -383,5 +446,7 @@ export class DragElementsInteraction implements CanvasInteraction {
     this.initialPositions.clear();
     this.singleDragged = null;
     this.hitElementId = null;
+    this.ctx = null;
+    this.pendingPoint = null;
   }
 }

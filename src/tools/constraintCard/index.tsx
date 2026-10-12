@@ -16,6 +16,7 @@ import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 import {
   collectBoardStateCards,
+  boardStateCardsByName,
   getConstraintStates,
   getConstraintRules,
   validateConstraintCardData,
@@ -209,12 +210,7 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
     const layout = computeConstraintLayout(element.data, w);
     const { states, ruleRows, rulesCount, statesStartY, rulesHeaderY, rulesStartY } = layout;
 
-    const boardByName = new Map(
-      collectBoardStateCards(useCanvasStore.getState().elements).map((card) => [
-        nameKey(card.name),
-        card,
-      ]),
-    );
+    const boardByName = boardStateCardsByName(useCanvasStore.getState().elements);
 
     const cardBg = isDark ? 0x18181b : 0xffffff;
     const sectionHeaderBg = isDark ? 0x27272a : 0xf4f4f5;

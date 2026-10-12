@@ -15,6 +15,20 @@ export class PreviewLayer extends Container {
   private currentResolution: number = 1;
   private currentName: string | null = null;
 
+  /**
+   * Unique-name resolution for the ghost card, cached by board version + tool.
+   * `showPreview` runs on every pointer move, but the unique name only depends
+   * on the board and the tool — not the pointer — so this avoids rescanning the
+   * board while the user moves a not-yet-placed card around.
+   */
+  private ghostMeta: {
+    elements: CanvasElement[];
+    tool: string;
+    data: Record<string, unknown>;
+    size: { width: number; height: number };
+    name: string;
+  } | null = null;
+
   constructor() {
     super();
     this.addChild(this.borderAndShadow);
@@ -40,22 +54,35 @@ export class PreviewLayer extends Container {
       return;
     }
 
-    // Compute unique name matching the exact name that will be created
+    // Compute unique name matching the exact name that will be created. Cached
+    // by board version so pointer moves do not rescan the board.
     const existingElements = useCanvasStore.getState().elements;
-    const defaultData = toolDef.createDefaultData();
-    const candidateElement: CanvasElement = {
-      id: "__ghost_preview__",
-      type: toolType,
-      x: 0,
-      y: 0,
-      width: toolDef.defaultSize.width,
-      height: toolDef.defaultSize.height,
-      data: defaultData,
-    };
-    const uniqueGhost = ensureUniqueElement(candidateElement, existingElements);
-    const data = uniqueGhost.data;
-    const size = toolDef.computeSize ? toolDef.computeSize(data) : toolDef.defaultSize;
-    const candidateName = getElementName(uniqueGhost) || "";
+    let meta = this.ghostMeta;
+    if (!meta || meta.elements !== existingElements || meta.tool !== toolType) {
+      const defaultData = toolDef.createDefaultData();
+      const candidateElement: CanvasElement = {
+        id: "__ghost_preview__",
+        type: toolType,
+        x: 0,
+        y: 0,
+        width: toolDef.defaultSize.width,
+        height: toolDef.defaultSize.height,
+        data: defaultData,
+      };
+      const uniqueGhost = ensureUniqueElement(candidateElement, existingElements);
+      const data = uniqueGhost.data;
+      const size = toolDef.computeSize ? toolDef.computeSize(data) : toolDef.defaultSize;
+      meta = {
+        elements: existingElements,
+        tool: toolType,
+        data,
+        size,
+        name: getElementName(uniqueGhost) || "",
+      };
+      this.ghostMeta = meta;
+    }
+
+    const { data, size, name: candidateName } = meta;
 
     const x = Math.round(worldPoint.x - size.width / 2);
     const y = Math.round(worldPoint.y - size.height / 2);
@@ -83,6 +110,11 @@ export class PreviewLayer extends Container {
   }
 
   hidePreview() {
+    // Hot path: the engine calls this on every pointer move while no creation
+    // tool is active. Skip the teardown when there is nothing to hide.
+    if (!this.visible && this.currentTool === null && this.ghostCardContainer.children.length === 0) {
+      return;
+    }
     this.visible = false;
     this.currentTool = null;
     this.currentName = null;

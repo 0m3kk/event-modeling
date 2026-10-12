@@ -1,6 +1,7 @@
 import type { CanvasElement } from "@/types";
 import type { ValidationIssue } from "../types";
 import { nameKey } from "@/utils/naming";
+import { memoizeArray } from "@/utils/memo";
 
 /**
  * A Constraint card declares business invariants that must hold over one or more
@@ -52,8 +53,36 @@ export interface BoardStateCard {
 /**
  * Scans the board for State cards and the field names they expose (params +
  * projected states), so a constraint can offer valid targets and validate refs.
+ *
+ * Memoized by the board array so rendering/validating many Constraint cards
+ * rescans the board once per board version instead of once per card. The result
+ * is shared — treat it as read-only.
  */
 export function collectBoardStateCards(elements: CanvasElement[]): BoardStateCard[] {
+  return collectBoardStateCardsMemo(elements);
+}
+
+const collectBoardStateCardsMemo = memoizeArray(computeBoardStateCards);
+
+/**
+ * {@link collectBoardStateCards} indexed by normalized name. Memoized by the
+ * board array and shared, so the many Constraint renders/validations on one
+ * board version reuse a single index.
+ */
+export function boardStateCardsByName(elements: CanvasElement[]): Map<string, BoardStateCard> {
+  return boardStateCardsByNameMemo(elements);
+}
+
+const boardStateCardsByNameMemo = memoizeArray((elements: CanvasElement[]) => {
+  const byName = new Map<string, BoardStateCard>();
+  for (const card of collectBoardStateCards(elements)) {
+    const key = nameKey(card.name);
+    if (key && !byName.has(key)) byName.set(key, card);
+  }
+  return byName;
+});
+
+function computeBoardStateCards(elements: CanvasElement[]): BoardStateCard[] {
   const cards: BoardStateCard[] = [];
 
   for (const el of elements) {
@@ -92,13 +121,7 @@ export function validateConstraintCardData(
   ctx: ConstraintValidationContext,
 ): { data: ConstraintCardData; issues: ValidationIssue[] } {
   const issues: ValidationIssue[] = [];
-  const board = collectBoardStateCards(ctx.elements ?? []);
-
-  const boardByName = new Map<string, BoardStateCard>();
-  for (const card of board) {
-    const key = nameKey(card.name);
-    if (key && !boardByName.has(key)) boardByName.set(key, card);
-  }
+  const boardByName = boardStateCardsByName(ctx.elements ?? []);
 
   // 1. Normalize the states section: drop blanks/duplicates, flag unknown cards.
   const seenKeys = new Set<string>();

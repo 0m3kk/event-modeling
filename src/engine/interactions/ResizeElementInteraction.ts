@@ -68,6 +68,11 @@ export class ResizeElementInteraction implements CanvasInteraction {
   private start: { x: number; width: number } = { x: 0, width: 0 };
   private next: { x: number; width: number } = { x: 0, width: 0 };
 
+  // The committed width is tracked synchronously (`next`), but the redraw is
+  // coalesced to one pass per animation frame.
+  private ctx: InteractionContext | null = null;
+  private rafId: number | null = null;
+
   isActive(): boolean {
     return this.active;
   }
@@ -95,6 +100,8 @@ export class ResizeElementInteraction implements CanvasInteraction {
     this.startWorld = worldPoint;
     this.start = { x: element.x, width: element.width };
     this.next = { x: element.x, width: element.width };
+    this.ctx = null;
+    this.cancelFrame();
     return true;
   }
 
@@ -103,6 +110,35 @@ export class ResizeElementInteraction implements CanvasInteraction {
 
     const dx = worldPoint.x - this.startWorld.x;
     this.next = computeResize(this.side, this.start, dx, MIN_ELEMENT_WIDTH);
+    this.ctx = ctx;
+    ctx.setCursor("ew-resize");
+    this.scheduleFrame();
+  }
+
+  /** Schedules one resize render for the next animation frame (deduplicated). */
+  private scheduleFrame(): void {
+    if (this.rafId !== null) return;
+
+    if (typeof requestAnimationFrame !== "function") {
+      this.renderFrame();
+      return;
+    }
+
+    this.rafId = requestAnimationFrame(() => {
+      this.rafId = null;
+      this.renderFrame();
+    });
+  }
+
+  private cancelFrame(): void {
+    if (this.rafId !== null && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(this.rafId);
+    }
+    this.rafId = null;
+  }
+
+  private renderFrame(): void {
+    if (!this.active || !this.elementId || !this.ctx) return;
 
     const state = useCanvasStore.getState();
     const nextElements = state.elements.map((el) =>
@@ -116,21 +152,21 @@ export class ResizeElementInteraction implements CanvasInteraction {
         : el,
     );
 
-    ctx.elementLayer.renderElements(
+    this.ctx.elementLayer.renderElements(
       nextElements,
       new Set(state.selectedIds),
-      ctx.theme,
+      this.ctx.theme,
       state.viewport.zoom,
     );
-    ctx.gizmoLayer.drawSelectionBounds(
+    this.ctx.gizmoLayer.drawSelectionBounds(
       nextElements.filter((el) => el.id === this.elementId),
       state.viewport.zoom,
     );
-    ctx.setCursor("ew-resize");
   }
 
   onPointerUp(_e: PointerEvent, _worldPoint: Point, _ctx: InteractionContext): void {
     if (!this.active || !this.elementId) return;
+    this.cancelFrame();
 
     const id = this.elementId;
     const element = useCanvasStore.getState().elements.find((el) => el.id === id);
@@ -147,6 +183,7 @@ export class ResizeElementInteraction implements CanvasInteraction {
 
   onCancel(ctx: InteractionContext): void {
     if (!this.active) return;
+    this.cancelFrame();
     const id = this.elementId;
     this.reset();
     if (!id) return;
@@ -170,5 +207,6 @@ export class ResizeElementInteraction implements CanvasInteraction {
     this.elementId = null;
     this.start = { x: 0, width: 0 };
     this.next = { x: 0, width: 0 };
+    this.ctx = null;
   }
 }

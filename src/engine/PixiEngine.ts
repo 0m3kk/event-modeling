@@ -39,6 +39,8 @@ export class PixiEngine {
   public currentTheme: ResolvedTheme = "light";
   private isDestroyed = false;
   private initPromise: Promise<void> | null = null;
+  /** Last cursor written to the DOM, so hover moves do not restyle needlessly. */
+  private lastCursor = "";
 
   // Last rendered slices, used to skip redundant work when only the viewport
   // position changed (e.g. while panning). `null` means "not rendered yet".
@@ -130,7 +132,7 @@ export class PixiEngine {
       elementLayer: this.elementLayer,
       previewLayer: this.previewLayer,
       setCursor: (cursor) => {
-        this.container.style.cursor = cursor;
+        this.applyCursor(cursor);
       },
       get theme() {
         return activeEngine?.currentTheme || "light";
@@ -141,7 +143,14 @@ export class PixiEngine {
 
   setSpaceHeld(held: boolean) {
     this.isSpaceHeld = held;
-    this.container.style.cursor = held ? "grab" : "default";
+    this.applyCursor(held ? "grab" : "default");
+  }
+
+  /** Writes the cursor to the DOM only when it actually changes. */
+  private applyCursor(cursor: string) {
+    if (cursor === this.lastCursor) return;
+    this.lastCursor = cursor;
+    this.container.style.cursor = cursor;
   }
 
   setTheme(theme: ResolvedTheme) {

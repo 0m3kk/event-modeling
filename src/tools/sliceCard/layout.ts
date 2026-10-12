@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import type { CanvasElement, Point, Rect } from "@/types";
 import { DOMAIN_TYPE } from "../domainCard/layout";
 import { GROUP_TYPE } from "../groupCard/layout";
+import { memoizeArray } from "@/utils/memo";
 
 /**
  * Pure geometry + data helpers for the Slice tool.
@@ -130,9 +131,28 @@ export function isSliceElement(element: CanvasElement | null | undefined): eleme
   return Boolean(element && element.type === SLICE_TYPE);
 }
 
+/** Shared empty result so a missing container does not allocate each call. */
+const EMPTY_CHILDREN: CanvasElement[] = [];
+
+/**
+ * Children grouped by `sliceId`, built once per board version (see
+ * {@link memoizeArray}) so rendering every Slice is O(elements) rather than
+ * O(slices × elements).
+ */
+const sliceChildrenIndex = memoizeArray((elements: CanvasElement[]) => {
+  const index = new Map<string, CanvasElement[]>();
+  for (const el of elements) {
+    if (!el.sliceId) continue;
+    const list = index.get(el.sliceId);
+    if (list) list.push(el);
+    else index.set(el.sliceId, [el]);
+  }
+  return index;
+});
+
 /** Every child element currently assigned to a slice. */
 export function getSliceChildren(elements: CanvasElement[], sliceId: string): CanvasElement[] {
-  return elements.filter((el) => el.sliceId === sliceId);
+  return sliceChildrenIndex(elements).get(sliceId) ?? EMPTY_CHILDREN;
 }
 
 /** Children of one lane, ordered left-to-right. */
@@ -369,8 +389,17 @@ export function hitSliceLane(
  * Order used for rendering and hit-testing: containers first (Domains behind
  * Groups behind Slices behind cards), so a container's children always sit on
  * top of it. Relative order within each layer is preserved.
+ *
+ * Memoized by the board array: the render pass and the spatial index rebuild
+ * both need it, and it only changes when `elements` does.
  */
 export function orderForRender(elements: CanvasElement[]): CanvasElement[] {
+  return orderForRenderMemo(elements);
+}
+
+const orderForRenderMemo = memoizeArray(computeOrderForRender);
+
+function computeOrderForRender(elements: CanvasElement[]): CanvasElement[] {
   let hasContainer = false;
   for (const el of elements) {
     if (el.type === DOMAIN_TYPE || el.type === SLICE_TYPE || el.type === GROUP_TYPE) {
@@ -446,7 +475,7 @@ export function reflowSlices(elements: CanvasElement[]): CanvasElement[] {
   const validIds = new Set<string>();
 
   for (const slice of sliceById.values()) {
-    const sliceKids = elements.filter((el) => el.sliceId === slice.id);
+    const sliceKids = getSliceChildren(elements, slice.id);
     const kept: CanvasElement[] = [];
 
     for (const lane of slice.data.lanes ?? []) {
@@ -475,6 +504,9 @@ export function reflowSlices(elements: CanvasElement[]): CanvasElement[] {
   });
 
   const patches = new Map<string, Partial<CanvasElement>>();
+  // Index once so placement lookups are O(1) instead of O(elements) per child.
+  const byId = new Map<string, CanvasElement>();
+  for (const el of elements) byId.set(el.id, el);
 
   for (const slice of sliceById.values()) {
     const kids = validChildren.get(slice.id) ?? [];
@@ -485,7 +517,7 @@ export function reflowSlices(elements: CanvasElement[]): CanvasElement[] {
     }
 
     for (const [childId, pos] of layout.placements) {
-      const child = elements.find((el) => el.id === childId);
+      const child = byId.get(childId);
       if (child && (child.x !== pos.x || child.y !== pos.y)) {
         patches.set(childId, { x: pos.x, y: pos.y });
       }

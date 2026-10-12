@@ -1,5 +1,6 @@
 import type { CanvasElement, Point, Rect } from "@/types";
 import { findFreeSpot } from "@/utils/placement";
+import { memoizeArray } from "@/utils/memo";
 
 /**
  * Pure geometry + data helpers for the Group tool.
@@ -56,9 +57,28 @@ export function isGroupElement(element: CanvasElement | null | undefined): eleme
   return Boolean(element && element.type === GROUP_TYPE);
 }
 
+/** Shared empty result so a missing container does not allocate each call. */
+const EMPTY_CHILDREN: CanvasElement[] = [];
+
+/**
+ * Children grouped by `groupId`, built once per board version (see
+ * {@link memoizeArray}) so rendering every Group is O(elements) rather than
+ * O(groups × elements).
+ */
+const groupChildrenIndex = memoizeArray((elements: CanvasElement[]) => {
+  const index = new Map<string, CanvasElement[]>();
+  for (const el of elements) {
+    if (!el.groupId) continue;
+    const list = index.get(el.groupId);
+    if (list) list.push(el);
+    else index.set(el.groupId, [el]);
+  }
+  return index;
+});
+
 /** Direct children of a group. */
 export function getGroupChildren(elements: CanvasElement[], groupId: string): CanvasElement[] {
-  return elements.filter((el) => el.groupId === groupId);
+  return groupChildrenIndex(elements).get(groupId) ?? EMPTY_CHILDREN;
 }
 
 export interface GroupBounds {
@@ -130,7 +150,7 @@ export function reflowGroups(elements: CanvasElement[]): CanvasElement[] {
   // 2. Fit each group to its children.
   const patches = new Map<string, Partial<CanvasElement>>();
   for (const group of groupById.values()) {
-    const kids = normalized.filter((el) => el.groupId === group.id);
+    const kids = getGroupChildren(normalized, group.id);
     const bounds = computeGroupBounds(kids);
     if (!bounds) continue;
     if (

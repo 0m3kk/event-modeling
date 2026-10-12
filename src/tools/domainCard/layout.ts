@@ -1,5 +1,6 @@
 import type { CanvasElement, Point, Rect } from "@/types";
 import { findFreeSpot } from "@/utils/placement";
+import { memoizeArray } from "@/utils/memo";
 
 /**
  * Pure geometry + data helpers for the Domain tool.
@@ -33,9 +34,28 @@ export function isDomainElement(element: CanvasElement | null | undefined): elem
   return Boolean(element && element.type === DOMAIN_TYPE);
 }
 
+/** Shared empty result so a missing container does not allocate each call. */
+const EMPTY_CHILDREN: CanvasElement[] = [];
+
+/**
+ * Children grouped by `domainId`, built once per board version. Rendering every
+ * Domain used to scan the whole board (`elements.filter`) per Domain, i.e.
+ * O(containers × elements); this makes the pass O(elements).
+ */
+const domainChildrenIndex = memoizeArray((elements: CanvasElement[]) => {
+  const index = new Map<string, CanvasElement[]>();
+  for (const el of elements) {
+    if (!el.domainId) continue;
+    const list = index.get(el.domainId);
+    if (list) list.push(el);
+    else index.set(el.domainId, [el]);
+  }
+  return index;
+});
+
 /** Direct children of a domain (any card type). */
 export function getDomainChildren(elements: CanvasElement[], domainId: string): CanvasElement[] {
-  return elements.filter((el) => el.domainId === domainId);
+  return domainChildrenIndex(elements).get(domainId) ?? EMPTY_CHILDREN;
 }
 
 /** Domains cannot hold another domain (no nesting). */
@@ -114,7 +134,7 @@ export function reflowDomains(elements: CanvasElement[]): CanvasElement[] {
   // 2. Fit each domain to its children.
   const patches = new Map<string, Partial<CanvasElement>>();
   for (const domain of domainById.values()) {
-    const kids = normalized.filter((el) => el.domainId === domain.id);
+    const kids = getDomainChildren(normalized, domain.id);
     const bounds = computeDomainBounds(kids);
     if (!bounds) continue;
     if (

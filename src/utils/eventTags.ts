@@ -1,5 +1,6 @@
 import type { CanvasElement } from "@/types";
 import { toCamelIdentifier } from "./naming";
+import { memoizeArray } from "./memo";
 
 /**
  * DCB tag metadata collected from the Event cards on the board.
@@ -31,8 +32,18 @@ export function fieldTypeKey(field: { type?: string; isArray?: boolean }): strin
 /**
  * Scans every Event card on the board and returns the tag catalog: each tag
  * paired with the type(s) of the event field(s) it is attached to.
+ *
+ * Memoized by the board array (see {@link memoizeArray}): render and validation
+ * both call it, and it only changes when the board does. The result is shared —
+ * treat it as read-only.
  */
 export function collectBoardTags(elements: CanvasElement[]): BoardTagInfo[] {
+  return collectBoardTagsMemo(elements);
+}
+
+const collectBoardTagsMemo = memoizeArray(computeBoardTags);
+
+function computeBoardTags(elements: CanvasElement[]): BoardTagInfo[] {
   const map = new Map<string, { types: Set<string>; events: Set<string> }>();
 
   for (const el of elements) {
@@ -62,11 +73,18 @@ export function collectBoardTags(elements: CanvasElement[]): BoardTagInfo[] {
 /**
  * Convenience shape of {@link collectBoardTags} indexed by tag name, mapping to
  * the set of acceptable field type keys. Used to validate tag references.
+ *
+ * Memoized by the board array and shared between every State/View card that
+ * renders on that board version.
  */
 export function collectBoardTagCatalog(elements: CanvasElement[]): Map<string, Set<string>> {
+  return collectBoardTagCatalogMemo(elements);
+}
+
+const collectBoardTagCatalogMemo = memoizeArray((elements: CanvasElement[]) => {
   const catalog = new Map<string, Set<string>>();
   for (const info of collectBoardTags(elements)) {
     catalog.set(info.tag, new Set(info.types));
   }
   return catalog;
-}
+});

@@ -20,6 +20,34 @@ interface CacheableContainer extends Container {
   _sliceSig?: string;
 }
 
+/**
+ * Whether two versions of an element draw the same picture. Store updates are
+ * immutable, so a moved element is a new object that differs *only* in `x`/`y`.
+ * Position lives on the container transform, not inside `tool.render`, so a
+ * pure move must not trigger a redraw — otherwise dragging a Domain would
+ * rebuild every graph/text node of the Domain, its Groups, its Slice and all
+ * the cards inside them on every pointer event.
+ *
+ * Everything that *does* affect a card's own pixels (size, data, membership,
+ * reference state, lock) is compared here by reference or value.
+ */
+function sameRenderSource(a: CanvasElement, b: CanvasElement): boolean {
+  if (a === b) return true;
+  return (
+    a.type === b.type &&
+    a.width === b.width &&
+    a.height === b.height &&
+    a.data === b.data &&
+    a.referenceId === b.referenceId &&
+    a.isOriginal === b.isOriginal &&
+    a.locked === b.locked &&
+    a.sliceId === b.sliceId &&
+    a.laneId === b.laneId &&
+    a.domainId === b.domainId &&
+    a.groupId === b.groupId
+  );
+}
+
 export class ElementLayer extends Container {
   private elementContainers = new Map<string, CacheableContainer>();
 
@@ -102,11 +130,13 @@ export class ElementLayer extends Container {
         : false;
 
       // The store updates are immutable, so a changed element is a new object
-      // reference. Comparing by reference (plus the render flags) lets us skip
-      // the expensive per-element redraw — including the old JSON.stringify of
-      // every element's data on every pass.
+      // reference. Comparing render-relevant fields (see sameRenderSource) —
+      // instead of the raw reference — lets us skip the expensive per-element
+      // redraw when an element merely moved: `x`/`y` are applied to the
+      // container transform above, so a pure translation needs no redraw.
+      const sourceChanged = !container._src || !sameRenderSource(container._src, element);
       const needsRender =
-        container._src !== element ||
+        sourceChanged ||
         container._isSelected !== isSelected ||
         container._fieldKey !== fieldKey ||
         container._theme !== theme ||
@@ -114,15 +144,18 @@ export class ElementLayer extends Container {
         container._isOriginal !== isOriginal ||
         container._sliceSig !== sliceSig;
 
-      if (needsRender) {
-        container._src = element;
-        container._isSelected = isSelected;
-        container._fieldKey = fieldKey;
-        container._theme = theme;
-        container._textResolution = textResolution;
-        container._isOriginal = isOriginal;
-        container._sliceSig = sliceSig;
+      // Remember the latest source + flags even when nothing is redrawn, so the
+      // next pass compares against the newest version (the drag previews mutate
+      // positions without touching the store).
+      container._src = element;
+      container._isSelected = isSelected;
+      container._fieldKey = fieldKey;
+      container._theme = theme;
+      container._textResolution = textResolution;
+      container._isOriginal = isOriginal;
+      container._sliceSig = sliceSig;
 
+      if (needsRender) {
         const context: RenderContext = {
           theme,
           isSelected,
