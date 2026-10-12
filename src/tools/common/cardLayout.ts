@@ -9,6 +9,7 @@ import { getContrastTextColor } from "@/utils/color";
 import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { useCanvasStore } from "@/store";
 import { hasValidation, type FieldValidation } from "@/utils/fieldValidation";
+import { measureMonospaceText } from "@/utils/textWrap";
 import { addDescZone } from "./descZones";
 
 export const CARD_HEADER_HEIGHT = 32;
@@ -263,6 +264,96 @@ export function computeStandardCardSize(
   const height = CARD_HEADER_HEIGHT + contentCount * CARD_ROW_HEIGHT;
   return { width: customWidth, height };
 }
+
+/** Horizontal padding before a row's name text (mirrors the renderers' `x = 12`). */
+export const ROW_LEFT_PADDING = 12;
+/** Horizontal padding kept on a row's right edge (type label anchor). */
+export const ROW_RIGHT_PADDING = 12;
+/** Font size of a standard card title (`renderStandardCardTitle`). */
+export const CARD_TITLE_FONT_SIZE = 13;
+/** Font size of a field-row name (`renderStandardCardFields`). */
+export const CARD_NAME_FONT_SIZE = 12;
+/** Font size of a field-row type label. */
+export const CARD_TYPE_FONT_SIZE = 11;
+/** Font size of the required `*` marker. */
+export const CARD_REQUIRED_FONT_SIZE = 13;
+/** Font size of a `#tag` badge label. */
+export const CARD_TAG_FONT_SIZE = 9;
+/**
+ * Space kept right of a title so it clears the header ⓘ badge. The badge sits
+ * at `width - 17` on its own, but is nudged to `width - 40` when the card shows
+ * a reference ❖/🔗 corner badge (see {@link getHeaderDescBadgeCenter}). Reserve
+ * for the worst case so a title never overlaps the ⓘ whichever state the card
+ * is in — reference state can change without the data changing, so the width
+ * cannot rely on re-fitting.
+ */
+export const CARD_TITLE_RIGHT_RESERVE =
+  DESC_HEADER_BADGE_RIGHT_WITH_REF + DESC_HEADER_BADGE_RADIUS + 8;
+/**
+ * Minimum gap kept between a row's name block and its right-aligned type. Wide
+ * enough for the row's ⓘ description badge (`DESC_ROW_BADGE_GAP` + radius) so
+ * the name block never collides with it.
+ */
+export const CARD_ROW_CONTENT_GAP = DESC_ROW_BADGE_GAP + DESC_ROW_BADGE_RADIUS + 12;
+
+/**
+ * Pixel width a title needs so it never collides with the header ⓘ badge.
+ */
+export function measureCardTitleWidth(name: string | undefined): number {
+  return (
+    ROW_LEFT_PADDING +
+    measureMonospaceText(toDisplayName(name || ""), CARD_TITLE_FONT_SIZE) +
+    CARD_TITLE_RIGHT_RESERVE
+  );
+}
+
+/**
+ * Pixel width one standard field row needs so neither the left name block
+ * (name, required `*`, validation shield, `#tag` badge) nor the right-aligned
+ * type label is clipped.
+ */
+export function measureFieldRowWidth(field: CardFieldItem): number {
+  let left =
+    ROW_LEFT_PADDING + measureMonospaceText(toDisplayName(field.name), CARD_NAME_FONT_SIZE);
+  if (field.isRequired) left += 2 + measureMonospaceText("*", CARD_REQUIRED_FONT_SIZE);
+  if (hasValidation(field.validation)) left += 6 + VALIDATION_BADGE_W;
+  if (field.isTag || field.tag) {
+    const label = field.tag ? `#${toDisplayName(field.tag)}` : "#tag";
+    left += 6 + measureMonospaceText(label, CARD_TAG_FONT_SIZE) + 8;
+  }
+  const typeText = toDisplayType(field.type, field.isArray);
+  const typeWidth = typeText ? measureMonospaceText(typeText, CARD_TYPE_FONT_SIZE) : 0;
+  return left + CARD_ROW_CONTENT_GAP + typeWidth + ROW_RIGHT_PADDING;
+}
+
+/**
+ * Minimum card width that fits a title and every field row without clipping,
+ * never dropping below `baseWidth`. This is the text-driven floor used by the
+ * cards whose names/types must stay readable (Event, Command, Query, State,
+ * View). Callers combine it with their own content constraints (e.g. a State's
+ * query-item badges) by passing the larger of the two as `baseWidth`.
+ */
+export function measureStandardCardContentWidth(
+  name: string | undefined,
+  fields: CardFieldItem[] | undefined,
+  baseWidth = CARD_DEFAULT_WIDTH,
+): number {
+  let required = baseWidth;
+  required = Math.max(required, measureCardTitleWidth(name));
+  for (const field of fields ?? []) {
+    required = Math.max(required, measureFieldRowWidth(field));
+  }
+  return Math.ceil(required);
+}
+
+/**
+ * Pixel width a single full-width text row (e.g. a Command's action token)
+ * needs. Kept generic: callers pass the already-formatted display label.
+ */
+export function measureFullWidthRowWidth(label: string): number {
+  return ROW_LEFT_PADDING + measureMonospaceText(label, CARD_NAME_FONT_SIZE) + CARD_TITLE_RIGHT_RESERVE;
+}
+
 
 /**
  * Draws the standard domain card frame:

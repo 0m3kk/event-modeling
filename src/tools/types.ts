@@ -77,7 +77,22 @@ export interface ToolDefinition<TData = any> {
   schema: z.ZodType<TData, any, any>;
   createDefaultData: () => TData;
   defaultSize: { width: number; height: number };
-  computeSize?: (data: TData) => { width: number; height: number };
+  /**
+   * Content-driven size. `width` (when provided) is the width the card already
+   * has, so implementations can treat it as a floor and never shrink below it.
+   */
+  computeSize?: (data: TData, width?: number) => { width: number; height: number };
+  /**
+   * When true, the store keeps the card wide enough for its content: whenever
+   * its data changes it grows the width to at least `computeSize(data, width)`
+   * (never shrinking below the width the user already has) and reflows the
+   * height through `computeHeightForWidth` when the card defines one.
+   *
+   * Used by the text-heavy cards (Event, Command, Query, State, View,
+   * Constraint) whose names/types must never clip. Cards without it keep the
+   * width they were given.
+   */
+  autoFitWidth?: boolean;
   /**
    * Optional: the height a card needs when its width is `width`. Used while
    * resizing so cards whose content wraps to the width (e.g. a Constraint's

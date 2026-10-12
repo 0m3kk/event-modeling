@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { queryCardTool, type QueryCardData } from "./index";
+import { queryCardTool, computeQueryCardSize, type QueryCardData } from "./index";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 import { navigateSubSelect } from "@/utils/subSelection";
@@ -281,5 +281,36 @@ describe("queryCardTool multi-section (params & responses)", () => {
       null,
     );
     expect(cleared?.data?.params?.[1].validation).toBeUndefined();
+  });
+});
+
+describe("queryCardTool content width auto-grow", () => {
+  it("keeps the default width for short content", () => {
+    expect(
+      computeQueryCardSize({
+        name: "Q",
+        params: [{ name: "id", type: "string" }],
+        responses: [],
+      }).width,
+    ).toBe(220);
+  });
+
+  it("widens to fit a long param field type", () => {
+    const data: QueryCardData = {
+      name: "Q",
+      params: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+      responses: [],
+    };
+    // 12 + "Field"(36) + 30 gap + type(171.6) + 12 -> 262
+    expect(computeQueryCardSize(data).width).toBe(262);
+  });
+
+  it("never shrinks below a requested width", () => {
+    const data: QueryCardData = {
+      name: "Q",
+      params: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+      responses: [],
+    };
+    expect(computeQueryCardSize(data, 500).width).toBe(500);
   });
 });

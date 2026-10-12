@@ -3,6 +3,13 @@ import {
   type ActorCardData,
   type ActorPermission,
 } from "./rules";
+import { measureMonospaceText } from "@/utils/textWrap";
+import { toDisplayAction } from "@/utils/naming";
+import {
+  measureCardTitleWidth,
+  CARD_NAME_FONT_SIZE,
+  ROW_LEFT_PADDING,
+} from "../common/cardLayout";
 
 /**
  * Pure geometry for the Actor card.
@@ -38,9 +45,29 @@ export function computeActorCardLayout(data: ActorCardData): ActorCardLayout {
   };
 }
 
+/** Space kept right of a permission row for its right-aligned status hint. */
+export const ACTOR_STATUS_RESERVE = 80;
+
 export function computeActorCardSize(
   data: ActorCardData,
   customWidth = ACTOR_DEFAULT_WIDTH,
 ): { width: number; height: number } {
-  return { width: customWidth, height: computeActorCardLayout(data).contentHeight };
+  const width = Math.max(customWidth, computeActorContentWidth(data));
+  return { width, height: computeActorCardLayout(data).contentHeight };
+}
+
+/**
+ * Minimum width that fits the Actor title and every permission row's action
+ * token (plus room for the row's right-aligned status hint: `overlap`,
+ * `missing` or the wildcard reach count).
+ */
+export function computeActorContentWidth(data: ActorCardData): number {
+  let required = measureCardTitleWidth(data.name);
+  for (const permission of getActorPermissions(data)) {
+    const actionWidth =
+      ROW_LEFT_PADDING +
+      measureMonospaceText(toDisplayAction(permission.action), CARD_NAME_FONT_SIZE);
+    required = Math.max(required, actionWidth + ACTOR_STATUS_RESERVE);
+  }
+  return Math.ceil(required);
 }

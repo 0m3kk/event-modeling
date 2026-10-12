@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { viewCardTool, computeViewCardSize, queryItemHeight, type ViewCardData } from "./index";
+import {
+  viewCardTool,
+  computeViewCardSize,
+  computeQueryContentWidth,
+  queryItemHeight,
+  VIEW_QUERY_DESC_GUTTER,
+  type ViewCardData,
+} from "./index";
 import { validateViewCardData } from "./rules";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
@@ -236,12 +243,43 @@ describe("viewCardTool query width auto-grow", () => {
     expect(computeViewCardSize(data).width).toBe(308);
   });
 
+  it("reserves the ⓘ gutter for a described query item", () => {
+    const plain = computeQueryContentWidth([{ types: ["OrderPlaced"], tags: [] }]);
+    const described = computeQueryContentWidth([
+      { types: ["OrderPlaced"], tags: [], description: "why" },
+    ]);
+    expect(described).toBe(plain + VIEW_QUERY_DESC_GUTTER);
+  });
+
   it("never shrinks below the requested width", () => {
     const data: ViewCardData = {
       ...base,
       queryItems: [{ types: ["abcdefghijklmnopqrstuvwxyz"], tags: [] }],
     };
     expect(computeViewCardSize(data, 500).width).toBe(500);
+  });
+});
+
+describe("viewCardTool field content width auto-grow", () => {
+  it("widens to fit a long param type", () => {
+    const data: ViewCardData = {
+      name: "V",
+      params: [{ name: "p", type: "abcdefghijklmnopqrstuvwxyz" }],
+      queryItems: [],
+      states: [],
+    };
+    // 12 + "P"(7.2) + 30 gap + type(171.6) + 12 -> 233
+    expect(computeViewCardSize(data).width).toBe(233);
+  });
+
+  it("widens to fit a long state type", () => {
+    const data: ViewCardData = {
+      name: "V",
+      params: [],
+      queryItems: [],
+      states: [{ name: "p", type: "abcdefghijklmnopqrstuvwxyz" }],
+    };
+    expect(computeViewCardSize(data).width).toBe(233);
   });
 });
 

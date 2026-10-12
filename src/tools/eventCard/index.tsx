@@ -14,6 +14,7 @@ import {
   getStandardCardSubSelect,
   navigateStandardCardSubSelect,
   getStandardCardInlineEditTarget,
+  measureStandardCardContentWidth,
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
@@ -35,6 +36,20 @@ export interface EventCardData {
   fields: EventField[];
   color?: string;
   description?: string;
+}
+
+/**
+ * Content-driven size: one row per field, plus a width that fits the title and
+ * every field row (name + required/validation/tag markers + right-aligned type)
+ * without clipping.
+ */
+export function computeEventCardSize(
+  data: EventCardData,
+  customWidth = CARD_DEFAULT_WIDTH,
+): { width: number; height: number } {
+  const { height } = computeStandardCardSize(data.fields?.length || 0, customWidth);
+  const width = measureStandardCardContentWidth(data.name, data.fields, customWidth);
+  return { width, height };
 }
 
 export const EventCardSchema = z.object({
@@ -73,7 +88,9 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
 
   defaultSize: { width: CARD_DEFAULT_WIDTH, height: 60 },
 
-  computeSize: (data) => computeStandardCardSize(data.fields?.length || 0),
+  computeSize: (data, width) => computeEventCardSize(data, width),
+
+  autoFitWidth: true,
 
   optionsBar: EventCardOptions,
 
@@ -153,9 +170,10 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
     }
     const nextFields = element.data.fields.filter((_, i) => i !== fieldIndex);
     const nextData = { ...element.data, fields: nextFields };
-    const nextSize = eventCardTool.computeSize ? eventCardTool.computeSize(nextData) : null;
+    const nextSize = computeEventCardSize(nextData, element.width);
     return {
-      height: nextSize ? nextSize.height : element.height,
+      width: nextSize.width,
+      height: nextSize.height,
       data: nextData,
     };
   },

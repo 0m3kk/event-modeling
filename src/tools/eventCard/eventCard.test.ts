@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { eventCardTool, type EventCardData } from "./index";
+import { eventCardTool, computeEventCardSize, type EventCardData } from "./index";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 
@@ -177,5 +177,30 @@ describe("EventCardTool sub-selection & inline edit targets", () => {
     useCanvasStore.getState().undo();
     el = useCanvasStore.getState().elements.find((e) => e.id === "event-user");
     expect(el?.data.fields[1].tag).toBe("email");
+  });
+});
+
+describe("eventCardTool content width auto-grow", () => {
+  it("keeps the default width when content is short", () => {
+    expect(
+      computeEventCardSize({ name: "E", fields: [{ name: "id", type: "string" }] }).width,
+    ).toBe(220);
+  });
+
+  it("widens the card to fit a long field type", () => {
+    const data: EventCardData = {
+      name: "E",
+      fields: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+    };
+    // 12 + "Field"(36) + 30 gap + "Abcdefghijklmnopqrstuvwxyz"(171.6) + 12 = 261.6
+    expect(computeEventCardSize(data).width).toBe(262);
+  });
+
+  it("never shrinks below a requested width", () => {
+    const data: EventCardData = {
+      name: "E",
+      fields: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+    };
+    expect(computeEventCardSize(data, 500).width).toBe(500);
   });
 });

@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { stateCardTool, computeStateCardSize, queryItemHeight, type StateCardData } from "./index";
+import {
+  stateCardTool,
+  computeStateCardSize,
+  computeQueryContentWidth,
+  queryItemHeight,
+  STATE_QUERY_DESC_GUTTER,
+  type StateCardData,
+} from "./index";
 import { validateStateCardData } from "./rules";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
@@ -236,12 +243,43 @@ describe("stateCardTool query width auto-grow", () => {
     expect(computeStateCardSize(data).width).toBe(308);
   });
 
+  it("reserves the ⓘ gutter for a described query item", () => {
+    const plain = computeQueryContentWidth([{ types: ["OrderPlaced"], tags: [] }]);
+    const described = computeQueryContentWidth([
+      { types: ["OrderPlaced"], tags: [], description: "why" },
+    ]);
+    expect(described).toBe(plain + STATE_QUERY_DESC_GUTTER);
+  });
+
   it("never shrinks below the requested width", () => {
     const data: StateCardData = {
       ...base,
       queryItems: [{ types: ["abcdefghijklmnopqrstuvwxyz"], tags: [] }],
     };
     expect(computeStateCardSize(data, 500).width).toBe(500);
+  });
+});
+
+describe("stateCardTool field content width auto-grow", () => {
+  it("widens to fit a long param type", () => {
+    const data: StateCardData = {
+      name: "S",
+      params: [{ name: "p", type: "abcdefghijklmnopqrstuvwxyz" }],
+      queryItems: [],
+      states: [],
+    };
+    // 12 + "P"(7.2) + 30 gap + type(171.6) + 12 -> 233
+    expect(computeStateCardSize(data).width).toBe(233);
+  });
+
+  it("widens to fit a long state type", () => {
+    const data: StateCardData = {
+      name: "S",
+      params: [],
+      queryItems: [],
+      states: [{ name: "p", type: "abcdefghijklmnopqrstuvwxyz" }],
+    };
+    expect(computeStateCardSize(data).width).toBe(233);
   });
 });
 

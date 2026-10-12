@@ -15,6 +15,10 @@ import {
   getHeaderDescBadgeCenter,
   navigateStandardCardSubSelect,
   getStandardCardInlineEditTarget,
+  measureCardTitleWidth,
+  measureFieldRowWidth,
+  measureStandardCardContentWidth,
+  CARD_TITLE_RIGHT_RESERVE,
 } from "./cardLayout";
 import type { CanvasElement } from "@/types";
 
@@ -43,6 +47,54 @@ describe("cardLayout helpers", () => {
       const size = computeStandardCardSize(2, 280);
       expect(size.width).toBe(280);
       expect(size.height).toBe(32 + 2 * 28);
+    });
+  });
+
+  describe("content-width helpers", () => {
+    it("measures a title with the header badge reserve", () => {
+      // "Order Placed" = 12 chars * 13 * 0.6 = 93.6; + 12 left + badge reserve.
+      expect(measureCardTitleWidth("OrderPlaced")).toBeCloseTo(
+        12 + 93.6 + CARD_TITLE_RIGHT_RESERVE,
+      );
+    });
+
+    it("reserves enough for the reference-shifted header badge", () => {
+      // The badge moves from width-17 to width-40 when a reference corner badge
+      // is present, so the reserve must clear the further-left position.
+      expect(CARD_TITLE_RIGHT_RESERVE).toBeGreaterThanOrEqual(40 + 7);
+    });
+
+    it("measures a field row (name + gap + type + padding)", () => {
+      // "Field" = 5 * 12 * 0.6 = 36; type "abcdefghijklmnopqrstuvwxyz"
+      // -> "Abcdefghijklmnopqrstuvwxyz" = 26 * 11 * 0.6 = 171.6.
+      expect(
+        measureFieldRowWidth({ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }),
+      ).toBeCloseTo(12 + 36 + 30 + 171.6 + 12);
+    });
+
+    it("adds markers (required, validation, tag) to the row width", () => {
+      const plain = measureFieldRowWidth({ name: "id", type: "string" });
+      const marked = measureFieldRowWidth({
+        name: "id",
+        type: "string",
+        isRequired: true,
+        isTag: true,
+        tag: "account",
+      });
+      expect(marked).toBeGreaterThan(plain);
+    });
+
+    it("never drops below the base width", () => {
+      expect(measureStandardCardContentWidth("E", [], 220)).toBe(220);
+    });
+
+    it("grows past the base width for a long field row", () => {
+      const width = measureStandardCardContentWidth(
+        "E",
+        [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+        220,
+      );
+      expect(width).toBe(262); // ceil(12 + 36 + 30 + 171.6 + 12)
     });
   });
 

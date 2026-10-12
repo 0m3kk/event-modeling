@@ -11,6 +11,8 @@ import {
   renderHeaderDescBadge,
   drawInfoBadge,
   appendFieldValidationBadge,
+  measureStandardCardContentWidth,
+  measureFullWidthRowWidth,
   CARD_CORNER_RADIUS,
   VALIDATION_BADGE_W,
   VALIDATION_BADGE_H,
@@ -80,7 +82,13 @@ export function computeQueryCardSize(
     paramsCount * QUERY_ROW_HEIGHT +
     QUERY_SECTION_HEADER_HEIGHT +
     responsesCount * QUERY_ROW_HEIGHT;
-  return { width: customWidth, height };
+  // Widen to fit the title, the action row and every param/response row's name
+  // and right-aligned type so nothing is clipped.
+  const rows = [...params, ...responses];
+  let width = measureStandardCardContentWidth(data.name, rows, customWidth);
+  const actionLabel = data.action ? toDisplayAction(data.action) : "(not set)";
+  width = Math.max(width, Math.ceil(measureFullWidthRowWidth(actionLabel)));
+  return { width, height };
 }
 
 /**
@@ -176,7 +184,9 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
   // 32 + 28 (action row) + 22 + 28 + 22 + 28 = 160
   defaultSize: { width: QUERY_DEFAULT_WIDTH, height: 160 },
 
-  computeSize: (data) => computeQueryCardSize(data),
+  computeSize: (data, width) => computeQueryCardSize(data, width),
+
+  autoFitWidth: true,
 
   optionsBar: QueryCardOptions,
 
@@ -621,9 +631,10 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
       params: nextParams,
       responses: nextResponses,
     };
-    const nextSize = queryCardTool.computeSize ? queryCardTool.computeSize(nextData) : null;
+    const nextSize = computeQueryCardSize(nextData, element.width);
     return {
-      height: nextSize ? nextSize.height : element.height,
+      width: nextSize.width,
+      height: nextSize.height,
       data: nextData,
     };
   },

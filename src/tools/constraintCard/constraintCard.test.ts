@@ -151,12 +151,14 @@ describe("constraintCardTool (states + rules sections)", () => {
 
 describe("constraintCardTool rule wrapping", () => {
   // At width 120 the rule text fits 13 characters per line (12px * 0.6 = 7.2px).
+  // The title and state names are kept short so the content-driven width stays
+  // below 120 and the wrapping behaviour can be exercised at a fixed width.
   const narrow: CanvasElement<ConstraintCardData> = {
     ...card,
     width: 120,
     data: {
-      name: "WrappedRules",
-      states: [{ name: "AccountStatus" }],
+      name: "R",
+      states: [],
       rules: [
         "alpha beta gamma delta", // wraps to 2 lines -> row height 40
         "one two", // stays on 1 line -> row height 28
@@ -214,6 +216,31 @@ describe("constraintCardTool rule wrapping", () => {
     expect(updated?.data.rules?.[1]).toBe("one two three four five six");
     // The second rule now wraps to two lines: 160 - 22 + 34 = 172.
     expect(updated?.height).toBe(172);
+  });
+});
+
+describe("constraintCardTool content width auto-grow", () => {
+  const base: ConstraintCardData = {
+    name: "C",
+    states: [{ name: "AccountBalanceProjection" }],
+    rules: ["short"],
+  };
+
+  it("widens to fit a long state name", () => {
+    // 12 + "Account Balance Projection"(26 * 7.2 = 187.2) + 80 hint reserve
+    // = 279.2 -> 280, above the default 260.
+    expect(computeConstraintCardSize(base).width).toBe(280);
+  });
+
+  it("ignores the free-text rules when sizing the width", () => {
+    const long: ConstraintCardData = { ...base, rules: ["x".repeat(400)] };
+    expect(computeConstraintCardSize(long).width).toBe(280);
+  });
+
+  it("keeps the default width for short state names", () => {
+    expect(
+      computeConstraintCardSize({ name: "C", states: [{ name: "A" }], rules: [] }).width,
+    ).toBe(260);
   });
 });
 

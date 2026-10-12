@@ -184,11 +184,14 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
   // Header + two sections ("STATES" and "RULES") that each reserve one row.
   defaultSize: { width: CONSTRAINT_DEFAULT_WIDTH, height: 126 },
 
-  computeSize: (data) => computeConstraintCardSize(data),
+  computeSize: (data, width) => computeConstraintCardSize(data, width),
+
+  autoFitWidth: true,
 
   // Rules wrap to the card width, so widening/narrowing the card reflows its
-  // height to keep the wrapped text inside the frame.
-  computeHeightForWidth: (data, width) => computeConstraintCardSize(data, width).height,
+  // height to keep the wrapped text inside the frame. Height follows the exact
+  // resize width (not the content-driven minimum), so dragging behaves.
+  computeHeightForWidth: (data, width) => computeConstraintLayout(data, width).contentHeight,
 
   optionsBar: ConstraintCardOptions,
 

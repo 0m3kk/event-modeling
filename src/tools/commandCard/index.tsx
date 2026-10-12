@@ -11,6 +11,8 @@ import {
   renderHeaderDescBadge,
   drawInfoBadge,
   appendFieldValidationBadge,
+  measureStandardCardContentWidth,
+  measureFullWidthRowWidth,
   CARD_CORNER_RADIUS,
   VALIDATION_BADGE_W,
   VALIDATION_BADGE_H,
@@ -84,7 +86,13 @@ export function computeCommandCardSize(
     inputsCount * COMMAND_ROW_HEIGHT +
     COMMAND_SECTION_HEADER_HEIGHT +
     responsesCount * COMMAND_ROW_HEIGHT;
-  return { width: customWidth, height };
+  // Widen to fit the title, the action row and every input/response row's name
+  // and right-aligned type so nothing is clipped.
+  const rows = [...inputs, ...responses];
+  let width = measureStandardCardContentWidth(data.name, rows, customWidth);
+  const actionLabel = data.action ? toDisplayAction(data.action) : "(not set)";
+  width = Math.max(width, Math.ceil(measureFullWidthRowWidth(actionLabel)));
+  return { width, height };
 }
 
 /**
@@ -180,7 +188,9 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
   // 32 + 28 (action row) + 22 + 28 + 22 + 28 = 160
   defaultSize: { width: COMMAND_DEFAULT_WIDTH, height: 160 },
 
-  computeSize: (data) => computeCommandCardSize(data),
+  computeSize: (data, width) => computeCommandCardSize(data, width),
+
+  autoFitWidth: true,
 
   optionsBar: CommandCardOptions,
 
@@ -625,9 +635,10 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
       inputs: nextInputs,
       responses: nextResponses,
     };
-    const nextSize = commandCardTool.computeSize ? commandCardTool.computeSize(nextData) : null;
+    const nextSize = computeCommandCardSize(nextData, element.width);
     return {
-      height: nextSize ? nextSize.height : element.height,
+      width: nextSize.width,
+      height: nextSize.height,
       data: nextData,
     };
   },

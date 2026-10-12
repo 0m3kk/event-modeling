@@ -28,6 +28,7 @@ import {
   renderStandardCardTitle,
   renderHeaderDescBadge,
   drawInfoBadge,
+  measureStandardCardContentWidth,
   CARD_CORNER_RADIUS,
   DESC_HIT_HALF,
   DESC_ROW_BADGE_GAP,
@@ -53,6 +54,12 @@ export const VIEW_QUERY_TAG_FONT_SIZE = 9;
 export const VIEW_QUERY_TAG_PADDING_X = 8;
 /** Horizontal padding on each side of a query column's centered content. */
 export const VIEW_QUERY_COLUMN_PADDING = 8;
+/**
+ * Extra width a query column needs when its item carries a description: the
+ * item then shows an ⓘ badge in the right gutter, so the tag column must stay
+ * clear of it.
+ */
+export const VIEW_QUERY_DESC_GUTTER = 20;
 
 export type { ViewCardData, ViewField, ViewQueryItem, ViewQueryTag } from "./rules";
 export { getViewParams, getViewItems, getViewStates } from "./rules";
@@ -109,10 +116,14 @@ export function queryTagBadgeWidth(tag: string | undefined, field: string | unde
  */
 export function computeQueryContentWidth(items: ViewQueryItem[]): number {
   let required = 0;
-  // Column width = content + padding on both sides; the card holds two columns.
-  const padding = VIEW_QUERY_COLUMN_PADDING * 4;
 
   for (const item of items) {
+    // Column width = content + padding on both sides; the card holds two
+    // columns. A described item hosts an ⓘ badge in the right gutter, so its
+    // columns get extra room to keep the badges clear of it.
+    const padding =
+      VIEW_QUERY_COLUMN_PADDING * 4 + (item.description ? VIEW_QUERY_DESC_GUTTER : 0);
+
     const types = Array.isArray(item.types) ? item.types.filter(Boolean) : [];
     for (const type of types) {
       const badgeWidth = queryTypeBadgeWidth(type);
@@ -191,8 +202,13 @@ export function computeViewCardSize(
     (VIEW_SECTION_HEADER_HEIGHT + queryItemsHeight) +
     (VIEW_SECTION_HEADER_HEIGHT + statesCount * VIEW_ROW_HEIGHT);
   // Widen past the requested width when a query item's event type or tag badge
-  // would otherwise be clipped.
-  const width = Math.max(customWidth, Math.ceil(computeQueryContentWidth(queryItems)));
+  // would otherwise be clipped, or when the title/field rows need more room.
+  const queryWidth = Math.ceil(computeQueryContentWidth(queryItems));
+  const width = measureStandardCardContentWidth(
+    data.name,
+    [...getViewParams(data), ...getViewStates(data)],
+    Math.max(customWidth, queryWidth),
+  );
   return { width, height };
 }
 
@@ -594,7 +610,9 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
   // Minimum height with empty sections: 32 + 3 * (22 + 28) = 182
   defaultSize: { width: VIEW_DEFAULT_WIDTH, height: 182 },
 
-  computeSize: (data) => computeViewCardSize(data),
+  computeSize: (data, width) => computeViewCardSize(data, width),
+
+  autoFitWidth: true,
 
   optionsBar: ViewCardOptions,
 

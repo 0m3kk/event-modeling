@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { commandCardTool, type CommandCardData } from "./index";
+import { commandCardTool, computeCommandCardSize, type CommandCardData } from "./index";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 import { navigateSubSelect } from "@/utils/subSelection";
@@ -286,5 +286,46 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
       null,
     );
     expect(cleared?.data?.inputs?.[1].validation).toBeUndefined();
+  });
+});
+
+describe("commandCardTool content width auto-grow", () => {
+  it("keeps the default width for short content", () => {
+    expect(
+      computeCommandCardSize({
+        name: "C",
+        inputs: [{ name: "id", type: "string" }],
+        responses: [],
+      }).width,
+    ).toBe(220);
+  });
+
+  it("widens to fit a long input field type", () => {
+    const data: CommandCardData = {
+      name: "C",
+      inputs: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+      responses: [],
+    };
+    // 12 + "Field"(36) + 30 gap + type(171.6) + 12 -> 262
+    expect(computeCommandCardSize(data).width).toBe(262);
+  });
+
+  it("widens to fit a long action token", () => {
+    const data: CommandCardData = {
+      name: "C",
+      action: "sales:placeOrderEverySingleTime",
+      inputs: [],
+      responses: [],
+    };
+    expect(computeCommandCardSize(data).width).toBeGreaterThan(220);
+  });
+
+  it("never shrinks below a requested width", () => {
+    const data: CommandCardData = {
+      name: "C",
+      inputs: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+      responses: [],
+    };
+    expect(computeCommandCardSize(data, 500).width).toBe(500);
   });
 });

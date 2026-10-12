@@ -152,7 +152,9 @@ export const actorCardTool: ToolDefinition<ActorCardData> = {
     height: ACTOR_HEADER_HEIGHT + ACTOR_SECTION_HEADER_HEIGHT + ACTOR_ROW_HEIGHT,
   },
 
-  computeSize: (data) => computeActorCardSize(data),
+  computeSize: (data, width) => computeActorCardSize(data, width),
+
+  autoFitWidth: true,
 
   optionsBar: ActorCardOptions,
 
@@ -327,7 +329,8 @@ export const actorCardTool: ToolDefinition<ActorCardData> = {
       ...element.data,
       permissions: permissions.filter((_, i) => i !== fieldIndex),
     };
-    return { height: computeActorCardSize(nextData, element.width).height, data: nextData };
+    const nextSize = computeActorCardSize(nextData, element.width);
+    return { width: nextSize.width, height: nextSize.height, data: nextData };
   },
 
   getSubSelectSections: (element) => [

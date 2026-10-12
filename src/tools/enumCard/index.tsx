@@ -16,6 +16,7 @@ import {
   getStandardCardSubSelect,
   navigateStandardCardSubSelect,
   getStandardCardInlineEditTarget,
+  CARD_TITLE_RIGHT_RESERVE,
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
@@ -31,8 +32,6 @@ const ENUM_ROW_RIGHT_RESERVE = 34;
 const ENUM_VALUE_FONT_SIZE = 12;
 /** Font size of the header title in renderStandardCardTitle. */
 const ENUM_TITLE_FONT_SIZE = 13;
-/** Space kept right of the title for the header ⓘ badge. */
-const ENUM_TITLE_RIGHT_RESERVE = 30;
 
 /** On-canvas label of an enum value: verbatim (underscores kept) + ALL CAPS. */
 export function enumValueLabel(name: string | undefined): string {
@@ -65,7 +64,7 @@ export function computeEnumCardSize(
     required,
     ENUM_ROW_LEFT_PADDING +
       measureMonospaceText(toDisplayName(data.name), ENUM_TITLE_FONT_SIZE) +
-      ENUM_TITLE_RIGHT_RESERVE,
+      CARD_TITLE_RIGHT_RESERVE,
   );
 
   return { width: Math.max(customWidth, Math.ceil(required)), height };

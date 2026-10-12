@@ -163,6 +163,31 @@ function applyContainerLayout(elements: CanvasElement[]): CanvasElement[] {
   return reflowDomains(reflowGroups(reflowSlices(elements)));
 }
 
+/**
+ * Grows an opted-in card (`autoFitWidth`) to at least the width its content
+ * needs and, for width-sensitive cards, reflows its height to that width. Cards
+ * never shrink below the width already on the element, so a manually widened
+ * card stays wide. Returns the same reference when nothing changed.
+ */
+function fitElementToContent(element: CanvasElement): CanvasElement {
+  const tool = toolRegistry.get(element.type);
+  if (!tool?.autoFitWidth || !tool.computeSize) return element;
+
+  const size = tool.computeSize(element.data, element.width);
+  const width = Math.max(element.width, size.width);
+  const height = tool.computeHeightForWidth
+    ? tool.computeHeightForWidth(element.data, width)
+    : size.height;
+
+  if (width === element.width && height === element.height) return element;
+  return { ...element, width, height };
+}
+
+/** Content-fits every card before laying out the containers around them. */
+function fitElementsToContent(elements: CanvasElement[]): CanvasElement[] {
+  return elements.map(fitElementToContent);
+}
+
 export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   projectName: "Untitled Board",
   googleDriveFileId: null,
@@ -232,7 +257,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: applyContainerLayout([...state.elements, uniqueElement]),
+      elements: applyContainerLayout(fitElementsToContent([...state.elements, uniqueElement])),
       selectedIds: [uniqueElement.id],
       selectedField: null,
       inlineEdit: null,
@@ -251,7 +276,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: applyContainerLayout([...state.elements, ...processed]),
+      elements: applyContainerLayout(fitElementsToContent([...state.elements, ...processed])),
       selectedIds: processed.map((e) => e.id),
       selectedField: null,
       inlineEdit: null,
@@ -345,7 +370,11 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: applyContainerLayout(renamed),
+      // Only re-fit when content changed; pure geometry moves (drag, resize)
+      // keep the width/height the user set.
+      elements: applyContainerLayout(
+        finalPatch.data ? fitElementsToContent(renamed) : renamed,
+      ),
     }));
   },
 
@@ -375,7 +404,11 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: applyContainerLayout(updatedElements),
+      // Only re-fit when a patch changed content; pure geometry moves keep the
+      // width/height the user set.
+      elements: applyContainerLayout(
+        finalPatches.some((p) => p.data) ? fitElementsToContent(updatedElements) : updatedElements,
+      ),
     }));
   },
 

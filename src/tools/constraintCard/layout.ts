@@ -5,7 +5,13 @@ import {
   type ConstraintCardData,
   type ConstraintState,
 } from "./rules";
-import { wrapMonospaceText } from "@/utils/textWrap";
+import { measureMonospaceText, wrapMonospaceText } from "@/utils/textWrap";
+import { toDisplayName } from "@/utils/naming";
+import {
+  measureCardTitleWidth,
+  CARD_NAME_FONT_SIZE,
+  ROW_LEFT_PADDING,
+} from "../common/cardLayout";
 
 export const CONSTRAINT_HEADER_HEIGHT = 32;
 export const CONSTRAINT_SECTION_HEADER_HEIGHT = 22;
@@ -167,16 +173,40 @@ export function findRuleIndexAt(layout: ConstraintLayout, y: number): number | n
   return null;
 }
 
+/** Space kept right of a STATES row name for its right-aligned hint. */
+export const CONSTRAINT_STATE_HINT_RESERVE = 80;
+
 /**
  * Content-driven size of a Constraint card at the given width. The height
  * accounts for rule text wrapping to the card width.
+ *
+ * The width grows to fit the card's structured content — its title and the
+ * STATES rows (state name + right-aligned hint) — but deliberately ignores the
+ * free-text RULES: those wrap to whatever width the card has instead of
+ * stretching it.
  */
 export function computeConstraintCardSize(
   data: ConstraintCardData,
   customWidth = CONSTRAINT_DEFAULT_WIDTH,
 ): { width: number; height: number } {
+  const width = Math.max(customWidth, computeConstraintContentWidth(data));
   return {
-    width: customWidth,
-    height: computeConstraintLayout(data, customWidth).contentHeight,
+    width,
+    height: computeConstraintLayout(data, width).contentHeight,
   };
+}
+
+/**
+ * Minimum width that fits the Constraint title and every STATES row name
+ * (plus room for the row's right-aligned hint). Free-text rules are excluded
+ * on purpose: they wrap to the card width instead of widening it.
+ */
+export function computeConstraintContentWidth(data: ConstraintCardData): number {
+  let required = measureCardTitleWidth(data.name);
+  for (const state of getConstraintStates(data)) {
+    const nameWidth =
+      ROW_LEFT_PADDING + measureMonospaceText(toDisplayName(state.name), CARD_NAME_FONT_SIZE);
+    required = Math.max(required, nameWidth + CONSTRAINT_STATE_HINT_RESERVE);
+  }
+  return Math.ceil(required);
 }

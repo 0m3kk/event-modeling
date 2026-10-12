@@ -153,6 +153,30 @@ describe("actorCardTool", () => {
   });
 });
 
+describe("actorCardTool content width auto-grow", () => {
+  it("keeps the default width for short content", () => {
+    expect(computeActorCardSize({ name: "A", permissions: [] }).width).toBe(260);
+  });
+
+  it("widens to fit a long permission action", () => {
+    const data: ActorCardData = {
+      name: "A",
+      permissions: [{ action: "a".repeat(30) }],
+    };
+    // Action label "Aaaa…" (30 chars) at 12px * 0.6 = 216; + 12 left padding
+    // + 80 status reserve = 308, above the default 260.
+    expect(computeActorCardSize(data).width).toBe(308);
+  });
+
+  it("never shrinks below a requested width", () => {
+    const data: ActorCardData = {
+      name: "A",
+      permissions: [{ action: "a".repeat(30) }],
+    };
+    expect(computeActorCardSize(data, 800).width).toBe(800);
+  });
+});
+
 describe("validateActorCardData", () => {
   it("keeps exact actions that resolve", () => {
     const { data, issues } = validate({
