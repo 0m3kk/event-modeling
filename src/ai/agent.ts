@@ -18,6 +18,10 @@ import {
   isNestableInDomain,
   type DomainElement,
 } from "@/tools/domainCard/layout";
+import {
+  GROUP_TYPE,
+  isGroupEligibleChild,
+} from "@/tools/groupCard/layout";
 import { z } from "zod";
 import { sendChatMessage, createSessionId, type AISettings, type ChatMessage } from "./client";
 import type { CanvasElement, Point } from "@/types";
@@ -156,6 +160,21 @@ const DOMAIN_PLACEMENT_PROPS: Record<string, any> = {
   },
 };
 
+/**
+ * Extra JSON-schema property injected into every group-eligible card tool so
+ * the model can place a definition/service card inside a Group frame in the
+ * same call. Resolved by {@link resolveGroupMembership}.
+ */
+const GROUP_PLACEMENT_PROPS: Record<string, any> = {
+  group: {
+    type: "string",
+    description:
+      "Optional: name of an existing Group (a small frame that clusters Object/Enum/Alias definitions " +
+      "or Services, normally inside a Domain) to place this card inside. Only Object, Enum, Alias and " +
+      "Service cards can join a Group. Ignored when the card is placed in a Slice lane.",
+  },
+};
+
 export function buildOpenAITools(): any[] {
   const aiTools = toolRegistry.getAITools();
   const tools: any[] = [];
@@ -169,7 +188,8 @@ export function buildOpenAITools(): any[] {
         "Read all current elements on the canvas, including their IDs, types, and summary data. " +
         "Also returns `eventTypes`, `tagCatalog` (every DCB tag currently attached to an event field, " +
         "with its type and source events), `slices` (each Slice with its lanes and the cards already " +
-        "placed in them) and `domains` (each Domain frame with the cards/slices it contains) so you " +
+        "placed in them), `groups` (each Group frame with the definition/service cards it clusters) " +
+        "and `domains` (each Domain frame with the cards/slices it contains) so you " +
         "can build valid State card query tags, target slice lanes, and place new items into the right Domain.",
       parameters: {
         type: "object",
@@ -226,8 +246,11 @@ export function buildOpenAITools(): any[] {
     const eligibleForLane = isSliceEligibleChild(definition?.type ?? "");
     // Every card can live in a Domain except a Domain itself (no nesting).
     const eligibleForDomain = definition?.type !== DOMAIN_TYPE;
+    // Only definition/service cards can live in a Group.
+    const eligibleForGroup = isGroupEligibleChild(definition?.type ?? "");
     const createParams = zodToJsonSchema(t.parameters);
     if (eligibleForLane) Object.assign(createParams.properties, SLICE_PLACEMENT_PROPS);
+    if (eligibleForGroup) Object.assign(createParams.properties, GROUP_PLACEMENT_PROPS);
     if (eligibleForDomain) Object.assign(createParams.properties, DOMAIN_PLACEMENT_PROPS);
 
     tools.push({
@@ -247,6 +270,7 @@ export function buildOpenAITools(): any[] {
       }),
     );
     if (eligibleForLane) Object.assign(updateParams.properties, SLICE_PLACEMENT_PROPS);
+    if (eligibleForGroup) Object.assign(updateParams.properties, GROUP_PLACEMENT_PROPS);
     if (eligibleForDomain) Object.assign(updateParams.properties, DOMAIN_PLACEMENT_PROPS);
 
     tools.push({
@@ -436,6 +460,22 @@ function summarizeDomains(elements: CanvasElement[]): any[] {
     }));
 }
 
+/** Compact Group summary for the model (name + the definition/service cards it clusters). */
+function summarizeGroups(elements: CanvasElement[]): any[] {
+  return elements
+    .filter((el) => el.type === GROUP_TYPE)
+    .map((el) => ({
+      id: el.id,
+      name: getElementName(el) ?? "Group",
+      domain: el.domainId
+        ? getElementName(elements.find((d) => d.id === el.domainId) ?? {}) ?? null
+        : null,
+      cards: elements
+        .filter((child) => child.groupId === el.id)
+        .map((child) => getElementName(child) ?? child.id),
+    }));
+}
+
 interface DomainPlacement {
   /** True only when the call actually carried a `domain` argument. */
   requested: boolean;
@@ -487,6 +527,58 @@ function resolveDomainMembership(
   }
 
   return { requested: true, domainId: domain.id };
+}
+
+interface GroupPlacement {
+  /** True only when the call actually carried a `group` argument. */
+  requested: boolean;
+  groupId?: string;
+  error?: { message: string; issues: ValidationIssue[] };
+}
+
+const GROUP_NOT_REQUESTED: GroupPlacement = { requested: false };
+
+/**
+ * Turns the optional `group` argument of a create/update call into concrete
+ * `groupId` membership for a card. `group` is the Group's name; an explicit
+ * empty `group` detaches the card from any Group.
+ *
+ * Only definition/service cards can join a Group, and a card in a Slice lane is
+ * handled separately (lane and group membership are mutually exclusive).
+ */
+function resolveGroupMembership(
+  elements: CanvasElement[],
+  cardType: string,
+  args: any,
+): GroupPlacement {
+  if (!args || typeof args !== "object" || !("group" in args)) return GROUP_NOT_REQUESTED;
+
+  const groupName = typeof args.group === "string" ? args.group.trim() : "";
+  if (!groupName) return { requested: true, groupId: undefined };
+
+  const issue = (code: string, message: string): GroupPlacement => ({
+    requested: true,
+    error: { message, issues: [{ path: "group", code, message }] },
+  });
+
+  if (!isGroupEligibleChild(cardType)) {
+    return issue(
+      "group_ineligible_card",
+      `${cardType} cards cannot join a Group (only Object, Enum, Alias and Service cards can).`,
+    );
+  }
+
+  const group = elements.find(
+    (el) => el.type === GROUP_TYPE && nameKey(getElementName(el) ?? "") === nameKey(groupName),
+  );
+  if (!group) {
+    return issue(
+      "group_not_found",
+      `No Group named "${groupName}" exists on the board. Create it first with create_group_card or use get_canvas_overview to list groups.`,
+    );
+  }
+
+  return { requested: true, groupId: group.id };
 }
 
 /** Deletes a single element located by name (and optional type). */
@@ -612,38 +704,68 @@ function executeUpdateElement(updateName: string, args: any): string {
   }
   const inLane = placement.requested && Boolean(placement.sliceId);
   const membership: Partial<CanvasElement> = placement.requested
-    ? { sliceId: placement.sliceId, laneId: placement.laneId }
+    ? { sliceId: placement.sliceId, laneId: placement.laneId, groupId: undefined, domainId: undefined }
     : {};
   const nextWidth = Math.max(existing.width, size.width);
 
-  // Optional Domain placement carried by the update. Lane and domain membership
-  // are mutually exclusive, so a lane placement wins when both are requested.
-  const movedIntoDomain: Partial<CanvasElement> = {};
+  // Optional Group / Domain placement carried by the update. A card in a Slice
+  // lane cannot belong to a Group or Domain, so a lane placement wins. A Group
+  // is more specific than the Domain it may sit in, so it wins over a Domain.
+  const movedToContainer: Partial<CanvasElement> = {};
   if (!inLane) {
-    const domainPlacement = resolveDomainMembership(state.elements, definition.type, args);
-    if (domainPlacement.error) {
+    const groupPlacement = resolveGroupMembership(state.elements, definition.type, args);
+    if (groupPlacement.error) {
       return JSON.stringify({
         status: "error",
-        error: "domain_placement_failed",
-        message: domainPlacement.error.message,
-        issues: domainPlacement.error.issues,
+        error: "group_placement_failed",
+        message: groupPlacement.error.message,
+        issues: groupPlacement.error.issues,
       });
     }
-    if (domainPlacement.requested) {
-      membership.domainId = domainPlacement.domainId;
-      // When landing in a real Domain, sit beside its other children so the
+    if (groupPlacement.requested) {
+      membership.groupId = groupPlacement.groupId;
+      membership.domainId = undefined;
+      // When landing in a real Group, sit beside its other children so the
       // frame grows around the card instead of stretching to its old position.
-      if (domainPlacement.domainId) {
-        const domainChildren = state.elements.filter(
-          (el) => el.domainId === domainPlacement.domainId && el.id !== existing.id,
+      if (groupPlacement.groupId) {
+        const groupChildren = state.elements.filter(
+          (el) => el.groupId === groupPlacement.groupId && el.id !== existing.id,
         );
         const spot = findFreeSpot(
-          domainChildren,
+          groupChildren,
           { x: existing.x, y: existing.y, width: nextWidth, height: size.height },
           AI_PLACEMENT_GAP,
         );
-        movedIntoDomain.x = spot.x;
-        movedIntoDomain.y = spot.y;
+        movedToContainer.x = spot.x;
+        movedToContainer.y = spot.y;
+      }
+    } else {
+      const domainPlacement = resolveDomainMembership(state.elements, definition.type, args);
+      if (domainPlacement.error) {
+        return JSON.stringify({
+          status: "error",
+          error: "domain_placement_failed",
+          message: domainPlacement.error.message,
+          issues: domainPlacement.error.issues,
+        });
+      }
+      if (domainPlacement.requested) {
+        membership.domainId = domainPlacement.domainId;
+        membership.groupId = undefined;
+        // When landing in a real Domain, sit beside its other children so the
+        // frame grows around the card instead of stretching to its old position.
+        if (domainPlacement.domainId) {
+          const domainChildren = state.elements.filter(
+            (el) => el.domainId === domainPlacement.domainId && el.id !== existing.id,
+          );
+          const spot = findFreeSpot(
+            domainChildren,
+            { x: existing.x, y: existing.y, width: nextWidth, height: size.height },
+            AI_PLACEMENT_GAP,
+          );
+          movedToContainer.x = spot.x;
+          movedToContainer.y = spot.y;
+        }
       }
     }
   }
@@ -655,7 +777,7 @@ function executeUpdateElement(updateName: string, args: any): string {
     data: nextData,
     height: size.height,
     width: nextWidth,
-    ...movedIntoDomain,
+    ...movedToContainer,
     ...membership,
   });
 
@@ -687,6 +809,7 @@ export async function executeAITool(name: string, args: any): Promise<string> {
       definedTypes,
       primitiveTypes: Array.from(PRIMITIVE_FIELD_TYPES),
       slices: summarizeSlices(state.elements),
+      groups: summarizeGroups(state.elements),
       domains: summarizeDomains(state.elements),
     });
   }
@@ -747,27 +870,29 @@ export async function executeAITool(name: string, args: any): Promise<string> {
         // Lane membership: the card sits inside its slice lane.
         element = { ...element, sliceId: placement.sliceId, laneId: placement.laneId };
       } else {
-        // Optional Domain placement carried by the create call. A card in a
-        // Slice lane cannot also belong to a Domain, so lanes take precedence.
-        const domainPlacement = resolveDomainMembership(state.elements, element.type, args);
-        if (domainPlacement.error) {
+        // Optional Group / Domain placement carried by the create call. A card
+        // in a Slice lane cannot belong to a Group or Domain, so lanes take
+        // precedence; a Group is more specific than the Domain it sits in, so
+        // it wins over a Domain.
+        const groupPlacement = resolveGroupMembership(state.elements, element.type, args);
+        if (groupPlacement.error) {
           return JSON.stringify({
             status: "error",
-            error: "domain_placement_failed",
-            message: domainPlacement.error.message,
-            issues: domainPlacement.error.issues,
-            domains: summarizeDomains(state.elements),
+            error: "group_placement_failed",
+            message: groupPlacement.error.message,
+            issues: groupPlacement.error.issues,
+            groups: summarizeGroups(state.elements),
           });
         }
 
-        if (domainPlacement.requested && domainPlacement.domainId) {
-          // Land beside the domain's existing children so a batch spreads out
+        if (groupPlacement.requested && groupPlacement.groupId) {
+          // Land beside the group's existing children so a batch spreads out
           // instead of stacking, and so the card sits inside the frame.
-          const domainChildren = state.elements.filter(
-            (el) => el.domainId === domainPlacement.domainId,
+          const groupChildren = state.elements.filter(
+            (el) => el.groupId === groupPlacement.groupId,
           );
           const spot = findFreeSpot(
-            domainChildren,
+            groupChildren,
             { x: element.x, y: element.y, width: element.width, height: element.height },
             AI_PLACEMENT_GAP,
           );
@@ -775,17 +900,47 @@ export async function executeAITool(name: string, args: any): Promise<string> {
             ...element,
             x: spot.x,
             y: spot.y,
-            domainId: domainPlacement.domainId,
+            groupId: groupPlacement.groupId,
           };
         } else {
-          // Free-standing card: nudge it to the nearest free slot so a batch of
-          // AI-created cards spreads out instead of stacking on the same spot.
-          const spot = findFreeSpot(
-            state.elements,
-            { x: element.x, y: element.y, width: element.width, height: element.height },
-            AI_PLACEMENT_GAP,
-          );
-          element = { ...element, x: spot.x, y: spot.y };
+          const domainPlacement = resolveDomainMembership(state.elements, element.type, args);
+          if (domainPlacement.error) {
+            return JSON.stringify({
+              status: "error",
+              error: "domain_placement_failed",
+              message: domainPlacement.error.message,
+              issues: domainPlacement.error.issues,
+              domains: summarizeDomains(state.elements),
+            });
+          }
+
+          if (domainPlacement.requested && domainPlacement.domainId) {
+            // Land beside the domain's existing children so a batch spreads out
+            // instead of stacking, and so the card sits inside the frame.
+            const domainChildren = state.elements.filter(
+              (el) => el.domainId === domainPlacement.domainId,
+            );
+            const spot = findFreeSpot(
+              domainChildren,
+              { x: element.x, y: element.y, width: element.width, height: element.height },
+              AI_PLACEMENT_GAP,
+            );
+            element = {
+              ...element,
+              x: spot.x,
+              y: spot.y,
+              domainId: domainPlacement.domainId,
+            };
+          } else {
+            // Free-standing card: nudge it to the nearest free slot so a batch of
+            // AI-created cards spreads out instead of stacking on the same spot.
+            const spot = findFreeSpot(
+              state.elements,
+              { x: element.x, y: element.y, width: element.width, height: element.height },
+              AI_PLACEMENT_GAP,
+            );
+            element = { ...element, x: spot.x, y: spot.y };
+          }
         }
       }
 
@@ -825,13 +980,17 @@ export async function runAgentConversation(
   const languageInstruction = `OUTPUT LANGUAGE (IMPORTANT): the user is working in the ${languageName} language on this system. Write ALL of your output in ${languageName} — your chat replies, every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other human-readable text you put on the canvas — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form. Never answer in a language other than the one selected in the app.`;
   const systemPrompt = `You are the AI Event Modeling Architect.
 You help software architects and developers design domain events, business models, and reactive systems on an infinite canvas.
-You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create state (projection/decision-model) cards, create view (persisted read-model) cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), create constraint cards (assert INPUT preconditions in plain language, e.g. "The account must be active", over one or more State cards — a rule gates whether the event is emitted, not how data is stored), create Domain frames (a dashed bounded-context boundary that groups related cards and slices), create slices (a slice stacks lanes top-to-bottom, each lane holding cards of ONE type), and clear the board.
+You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create state (projection/decision-model) cards, create view (persisted read-model) cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), create constraint cards (assert INPUT preconditions in plain language, e.g. "The account must be active", over one or more State cards — a rule gates whether the event is emitted, not how data is stored), create Domain frames (a dashed bounded-context boundary that groups related cards and slices), create Groups (a compact frame that clusters related Object/Enum/Alias definitions or Services, usually inside a Domain), create slices (a slice stacks lanes top-to-bottom, each lane holding cards of ONE type), and clear the board.
 When the user asks to add or create something, always call the appropriate creation tool!
 DOMAINS (IMPORTANT): keep new work inside a Domain (bounded context). Before creating anything, call get_canvas_overview and check its "domains" list.
 - If one or more Domains already exist, place each new card or Slice into the most relevant existing one by passing "domain" = the domain's name (this also moves it there on update). Prefer an existing Domain over inventing a new one.
-- If NO Domain exists yet, first call create_domain_card with a meaningful bounded-context name (e.g. Ordering, Billing), then place the new card(s)/Slice into it with "domain".
+- If NO Domain exists yet, first call create_domain_card with a meaningful bounded-context name (e.g. Ordering, Billing), then place the new card(s)/Slice into it with "domain". When the work is a set of reusable definitions shared across several contexts, create a Domain named "Shared" instead and keep them there.
 - A card that lives in a Slice lane cannot also belong to a Domain, so put the Slice itself into the Domain — not the individual cards inside its lanes.
 - Mention to the user which Domain you placed the new work into.
+GROUPS (CONVENTION): a Group is a compact frame that clusters reusable definitions. Inside a Domain the standard layout is TWO groups: one for the type definitions (Object, Enum and Alias cards) and one for the Services.
+- Reuse the Domain's existing groups; create any missing one with create_group_card and give it a clear name (e.g. "Types" and "Services", or "MoneyTypes"/"PaymentServices" when more specific).
+- EVERY time you create a new Object, Enum, Alias or Service card, place it into the matching group by passing "group" = the group's name. Do not leave these cards free-standing inside the Domain.
+- Only Object/Enum/Alias/Service cards can join a Group, and a card in a Slice lane cannot. A Group lives inside the Domain (pass its own "domain"), so its cards do NOT need "domain" again.
 FLOW SEMANTICS (IMPORTANT): a "flow" in Event Modeling is ONE slice, not the whole command→event→read-model chain. There are two kinds:
 - Write slice: a Command that emits one or more Events. Its usual shape is three lanes top-to-bottom: commandCard, constraintCard, eventCard. Add a queryCard lane when the command must read data first, and a serviceCard lane only when the flow actually executes a service method (case-dependent).
 - Read slice: a Query that reads Events into a read model. Its usual shape is queryCard then viewCard (or stateCard when the projection is specific to that one flow — a reusable State usually stays outside the slice). A constraintCard lane is optional — add it only when a rule must be checked (e.g. whether the query's target exists); not every read slice has one.

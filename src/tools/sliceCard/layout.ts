@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import type { CanvasElement, Point, Rect } from "@/types";
 import { DOMAIN_TYPE } from "../domainCard/layout";
+import { GROUP_TYPE } from "../groupCard/layout";
 
 /**
  * Pure geometry + data helpers for the Slice tool.
@@ -76,6 +77,7 @@ export const SLICE_EXCLUDED_CHILD_TYPES: ReadonlySet<string> = new Set([
   "objectCard",
   "aliasCard",
   DOMAIN_TYPE,
+  GROUP_TYPE,
 ]);
 
 /** Whether a card type is allowed to be dropped into a slice lane. */
@@ -325,13 +327,13 @@ export function hitSliceLane(
 
 /**
  * Order used for rendering and hit-testing: containers first (Domains behind
- * Slices behind cards), so a container's children always sit on top of it.
- * Relative order within each layer is preserved.
+ * Groups behind Slices behind cards), so a container's children always sit on
+ * top of it. Relative order within each layer is preserved.
  */
 export function orderForRender(elements: CanvasElement[]): CanvasElement[] {
   let hasContainer = false;
   for (const el of elements) {
-    if (el.type === DOMAIN_TYPE || el.type === SLICE_TYPE) {
+    if (el.type === DOMAIN_TYPE || el.type === SLICE_TYPE || el.type === GROUP_TYPE) {
       hasContainer = true;
       break;
     }
@@ -339,14 +341,16 @@ export function orderForRender(elements: CanvasElement[]): CanvasElement[] {
   if (!hasContainer) return elements;
 
   const domains: CanvasElement[] = [];
+  const groups: CanvasElement[] = [];
   const slices: CanvasElement[] = [];
   const rest: CanvasElement[] = [];
   for (const el of elements) {
     if (el.type === DOMAIN_TYPE) domains.push(el);
+    else if (el.type === GROUP_TYPE) groups.push(el);
     else if (el.type === SLICE_TYPE) slices.push(el);
     else rest.push(el);
   }
-  return [...domains, ...slices, ...rest];
+  return [...domains, ...groups, ...slices, ...rest];
 }
 
 /** Repairs a slice's lane list (unique, well-formed ids, valid reserved types). */

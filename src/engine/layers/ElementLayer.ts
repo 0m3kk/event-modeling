@@ -52,8 +52,9 @@ export class ElementLayer extends Container {
     let renderIndex = 0;
 
     // A container's visuals depend on its children (lane type + count for
-    // slices; membership for domains). Hash that so a container redraws when its
-    // contents change even if its own size happens to stay the same.
+    // slices; membership for domains and groups). Hash that so a container
+    // redraws when its contents change even if its own size happens to stay the
+    // same.
     const childSigs = new Map<string, string[]>();
     for (const el of elements) {
       if (el.sliceId) {
@@ -65,6 +66,11 @@ export class ElementLayer extends Container {
         const list = childSigs.get(el.domainId) ?? [];
         list.push(`domain:${el.type}`);
         childSigs.set(el.domainId, list);
+      }
+      if (el.groupId) {
+        const list = childSigs.get(el.groupId) ?? [];
+        list.push(`group:${el.type}`);
+        childSigs.set(el.groupId, list);
       }
     }
 

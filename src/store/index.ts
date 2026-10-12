@@ -19,6 +19,7 @@ import { applyRenameMappings, collectRenameMappings } from "@/utils/rename";
 import { toolRegistry } from "@/tools/registry";
 import { reflowSlices } from "@/tools/sliceCard/layout";
 import { reflowDomains } from "@/tools/domainCard/layout";
+import { reflowGroups } from "@/tools/groupCard/layout";
 import {
   navigateSubSelect,
   getAdjacentSubSelectAfterDeletion,
@@ -148,11 +149,12 @@ function snapshotState(elements: CanvasElement[]): HistoryEntry {
 
 /**
  * Applies container layout after any structural change: slices first (size and
- * lane their cards), then domains (fit a dashed frame around their children,
- * which may include slices).
+ * lane their cards), then groups (fit a frame around their definition/service
+ * cards), then domains (fit a dashed frame around their children, which may
+ * include slices and groups).
  */
 function applyContainerLayout(elements: CanvasElement[]): CanvasElement[] {
-  return reflowDomains(reflowSlices(elements));
+  return reflowDomains(reflowGroups(reflowSlices(elements)));
 }
 
 export const useCanvasStore = create<CanvasStoreState>((set, get) => ({

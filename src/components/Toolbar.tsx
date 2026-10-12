@@ -11,7 +11,7 @@ import type { ToolDefinition } from "@/tools";
  * appended as a final group, so new tools never silently disappear.
  */
 const TOOL_GROUPS: string[][] = [
-  ["domainCard", "sliceCard"],
+  ["domainCard", "sliceCard", "groupCard"],
   ["eventCard", "commandCard", "queryCard", "stateCard", "constraintCard", "viewCard"],
   ["serviceCard", "objectCard", "enumCard", "aliasCard"],
   ["stickyNote"],

@@ -819,4 +819,108 @@ describe("AIAgent", () => {
     event = useCanvasStore.getState().elements.find((e) => e.id === created.createdId)!;
     expect(event.domainId).toBeUndefined();
   });
+
+  it("exposes create_group_card and group placement props", () => {
+    const tools = buildOpenAITools();
+    const names = tools.map((t) => t.function.name);
+    expect(names).toContain("create_group_card");
+    expect(names).toContain("update_group_card");
+
+    // A Group cannot nest, so its own tool must not advertise `group`, but it
+    // can still live in a Domain.
+    const groupTool = tools.find((t) => t.function.name === "create_group_card")!;
+    expect(groupTool.function.parameters.properties.group).toBeUndefined();
+    expect(groupTool.function.parameters.properties.domain.type).toBe("string");
+
+    // Definition/service cards can join a Group.
+    const objectTool = tools.find((t) => t.function.name === "create_object_card")!;
+    expect(objectTool.function.parameters.properties.group.type).toBe("string");
+    const serviceTool = tools.find((t) => t.function.name === "create_service_card")!;
+    expect(serviceTool.function.parameters.properties.group.type).toBe("string");
+
+    // Behavior cards cannot.
+    const eventTool = tools.find((t) => t.function.name === "create_event_card")!;
+    expect(eventTool.function.parameters.properties.group).toBeUndefined();
+  });
+
+  it("creates a group and places an object inside it", async () => {
+    await executeAITool("create_domain_card", { name: "Ordering" });
+    const groupRes = JSON.parse(
+      await executeAITool("create_group_card", { name: "MoneyTypes", domain: "Ordering" }),
+    );
+    expect(groupRes.status).toBe("success");
+    expect(groupRes.type).toBe("groupCard");
+
+    const objRes = JSON.parse(
+      await executeAITool("create_object_card", {
+        name: "Money",
+        fields: [],
+        group: "MoneyTypes",
+      }),
+    );
+    expect(objRes.status).toBe("success");
+
+    const elements = useCanvasStore.getState().elements;
+    const domain = elements.find((e) => e.type === "domainCard")!;
+    const group = elements.find((e) => e.type === "groupCard")!;
+    const object = elements.find((e) => e.type === "objectCard")!;
+    expect(group.domainId).toBe(domain.id);
+    expect(object.groupId).toBe(group.id);
+    // The object sits in the group, not directly in the domain.
+    expect(object.domainId).toBeUndefined();
+
+    const overview = JSON.parse(await executeAITool("get_canvas_overview", {}));
+    const info = overview.groups.find((g: any) => g.name.toLowerCase() === "moneytypes");
+    expect(info.cards).toContain("money");
+  });
+
+  it("reports group_placement_failed for a missing group or an ineligible card", async () => {
+    const missing = JSON.parse(
+      await executeAITool("create_object_card", { name: "Ghost", fields: [], group: "Nope" }),
+    );
+    expect(missing.status).toBe("error");
+    expect(missing.error).toBe("group_placement_failed");
+    expect(missing.issues.map((i: any) => i.code)).toContain("group_not_found");
+    expect(useCanvasStore.getState().elements).toHaveLength(0);
+
+    await executeAITool("create_group_card", { name: "Types" });
+    const ineligible = JSON.parse(
+      await executeAITool("create_event_card", { name: "OrderPlaced", fields: [], group: "Types" }),
+    );
+    expect(ineligible.status).toBe("error");
+    expect(ineligible.error).toBe("group_placement_failed");
+    expect(ineligible.issues.map((i: any) => i.code)).toContain("group_ineligible_card");
+  });
+
+  it("moves an existing card into a group via update, and detaches it again", async () => {
+    await executeAITool("create_group_card", { name: "Types" });
+    const created = JSON.parse(
+      await executeAITool("create_object_card", { name: "Money", fields: [] }),
+    );
+
+    const moved = JSON.parse(
+      await executeAITool("update_object_card", {
+        target: "Money",
+        name: "Money",
+        fields: [],
+        group: "Types",
+      }),
+    );
+    expect(moved.status).toBe("success");
+    const group = useCanvasStore.getState().elements.find((e) => e.type === "groupCard")!;
+    let object = useCanvasStore.getState().elements.find((e) => e.id === created.createdId)!;
+    expect(object.groupId).toBe(group.id);
+
+    const detached = JSON.parse(
+      await executeAITool("update_object_card", {
+        target: "Money",
+        name: "Money",
+        fields: [],
+        group: "",
+      }),
+    );
+    expect(detached.status).toBe("success");
+    object = useCanvasStore.getState().elements.find((e) => e.id === created.createdId)!;
+    expect(object.groupId).toBeUndefined();
+  });
 });

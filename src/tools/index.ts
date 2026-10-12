@@ -3,6 +3,7 @@ import { aliasCardTool } from "./aliasCard";
 import { commandCardTool } from "./commandCard";
 import { constraintCardTool } from "./constraintCard";
 import { domainCardTool } from "./domainCard";
+import { groupCardTool } from "./groupCard";
 import { queryCardTool } from "./queryCard";
 import { stateCardTool } from "./stateCard";
 import { viewCardTool } from "./viewCard";
@@ -16,6 +17,7 @@ import { stickyNoteTool } from "./stickyNote";
 // Register default decoupled tools (order here drives the toolbar order)
 toolRegistry.register(domainCardTool);
 toolRegistry.register(sliceCardTool);
+toolRegistry.register(groupCardTool);
 toolRegistry.register(eventCardTool);
 toolRegistry.register(commandCardTool);
 toolRegistry.register(queryCardTool);
@@ -35,6 +37,7 @@ export {
   commandCardTool,
   constraintCardTool,
   domainCardTool,
+  groupCardTool,
   queryCardTool,
   stateCardTool,
   viewCardTool,

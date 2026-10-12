@@ -88,7 +88,9 @@ export function reflowDomains(elements: CanvasElement[]): CanvasElement[] {
   }
 
   // 1. Drop membership that points nowhere, nests a domain, or clashes with a
-  //    slice lane (lane membership and domain membership are exclusive).
+  //    slice lane or a group (lane/group membership and direct domain
+  //    membership are exclusive — a group child sits in the domain via its
+  //    group frame).
   let changed = false;
   const normalized = elements.map((el) => {
     if (!el.domainId) return el;
@@ -97,7 +99,8 @@ export function reflowDomains(elements: CanvasElement[]): CanvasElement[] {
       Boolean(domain) &&
       el.id !== el.domainId &&
       isNestableInDomain(el.type) &&
-      !el.sliceId;
+      !el.sliceId &&
+      !el.groupId;
     if (valid) return el;
     changed = true;
     const { domainId: _domainId, ...rest } = el;

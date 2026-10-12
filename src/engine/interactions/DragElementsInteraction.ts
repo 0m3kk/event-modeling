@@ -4,6 +4,7 @@ import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { findSliceDropTarget, SLICE_TYPE } from "@/tools/sliceCard/layout";
 import { DOMAIN_TYPE, findDomainDropTarget, findDomainFreeSpot } from "@/tools/domainCard/layout";
+import { GROUP_TYPE, findGroupDropTarget, findGroupFreeSpot } from "@/tools/groupCard/layout";
 
 export class DragElementsInteraction implements CanvasInteraction {
   readonly id = "dragElements";
@@ -97,6 +98,13 @@ export class DragElementsInteraction implements CanvasInteraction {
             queue.push(child.id);
           }
         }
+      } else if (el.type === GROUP_TYPE) {
+        for (const child of elements) {
+          if (child.groupId === id && !dragIds.has(child.id)) {
+            dragIds.add(child.id);
+            queue.push(child.id);
+          }
+        }
       }
     }
     for (const id of dragIds) {
@@ -164,7 +172,11 @@ export class DragElementsInteraction implements CanvasInteraction {
     const elements = useCanvasStore.getState().elements;
 
     // Cards prefer a slice lane; a lane of the wrong type shows no highlight.
-    if (this.singleDragged.type !== SLICE_TYPE) {
+    // Containers (Slices, Groups) never join a lane.
+    if (
+      this.singleDragged.type !== SLICE_TYPE &&
+      this.singleDragged.type !== GROUP_TYPE
+    ) {
       const lane = findSliceDropTarget(
         elements,
         worldPoint,
@@ -175,6 +187,18 @@ export class DragElementsInteraction implements CanvasInteraction {
         ctx.gizmoLayer.drawDropTarget(lane.allowed ? lane.rect : null);
         return;
       }
+    }
+
+    // A Group is more specific than the Domain it may sit in, so it wins.
+    const group = findGroupDropTarget(
+      elements,
+      worldPoint,
+      this.singleDragged.id,
+      this.singleDragged.type,
+    );
+    if (group) {
+      ctx.gizmoLayer.drawDropTarget(group.rect);
+      return;
     }
 
     const domain = findDomainDropTarget(
@@ -220,6 +244,45 @@ export class DragElementsInteraction implements CanvasInteraction {
       domainId,
       sliceId: undefined,
       laneId: undefined,
+      groupId: undefined,
+    };
+  }
+
+  /**
+   * Attaches a dragged element to a group. As with domains, an element entering
+   * a group for the first time is auto-placed in a free spot so cards never
+   * overlap; moving within the same group keeps the dropped position.
+   */
+  private placeInGroup(
+    updates: Array<{ id: string } & Partial<CanvasElement>>,
+    index: number,
+    elements: CanvasElement[],
+    dragged: CanvasElement,
+    groupId: string,
+  ): void {
+    let x = updates[index].x as number;
+    let y = updates[index].y as number;
+
+    if (dragged.groupId !== groupId) {
+      const children = elements.filter((el) => el.groupId === groupId && el.id !== dragged.id);
+      const spot = findGroupFreeSpot(children, {
+        x,
+        y,
+        width: dragged.width,
+        height: dragged.height,
+      });
+      x = spot.x;
+      y = spot.y;
+    }
+
+    updates[index] = {
+      ...updates[index],
+      x,
+      y,
+      groupId,
+      domainId: undefined,
+      sliceId: undefined,
+      laneId: undefined,
     };
   }
 
@@ -253,8 +316,9 @@ export class DragElementsInteraction implements CanvasInteraction {
         const index = updates.findIndex((u) => u.id === single.id);
 
         if (dragged && index >= 0) {
-          if (single.type === SLICE_TYPE) {
-            // Slices never join a lane, but may join/leave a Domain.
+          if (single.type === SLICE_TYPE || single.type === GROUP_TYPE) {
+            // Containers never join a lane or another group, but may join/leave
+            // a Domain.
             const domain = findDomainDropTarget(elements, worldPoint, single.id, single.type);
             if (domain) {
               this.placeInDomain(updates, index, elements, dragged, domain.domainId);
@@ -272,19 +336,27 @@ export class DragElementsInteraction implements CanvasInteraction {
                 sliceId: lane.sliceId,
                 laneId: lane.laneId,
                 domainId: undefined,
+                groupId: undefined,
               };
             } else {
-              // Not over a lane: maybe a Domain, otherwise detach from everything.
-              const domain = findDomainDropTarget(elements, worldPoint, single.id, single.type);
-              if (domain) {
-                this.placeInDomain(updates, index, elements, dragged, domain.domainId);
+              // Not over a lane: maybe a Group (more specific) or a Domain,
+              // otherwise detach from everything.
+              const group = findGroupDropTarget(elements, worldPoint, single.id, single.type);
+              if (group) {
+                this.placeInGroup(updates, index, elements, dragged, group.groupId);
               } else {
-                updates[index] = {
-                  ...updates[index],
-                  domainId: undefined,
-                  sliceId: undefined,
-                  laneId: undefined,
-                };
+                const domain = findDomainDropTarget(elements, worldPoint, single.id, single.type);
+                if (domain) {
+                  this.placeInDomain(updates, index, elements, dragged, domain.domainId);
+                } else {
+                  updates[index] = {
+                    ...updates[index],
+                    domainId: undefined,
+                    sliceId: undefined,
+                    laneId: undefined,
+                    groupId: undefined,
+                  };
+                }
               }
             }
           }
