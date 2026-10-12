@@ -167,7 +167,7 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
   type: "constraintCard",
   name: "Constraint",
   description:
-    "A Constraint: declares free-text business rules in plain language over one or more State cards (e.g. The account must be active)",
+    "A Constraint: declares free-text INPUT preconditions in plain language over one or more State cards (e.g. The account must be active). Rules gate the command/query and decide whether the event is emitted.",
   icon: ShieldCheck,
   color: "#e11d48",
   category: "modeling",
@@ -548,7 +548,14 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
       "LINKAGE (IMPORTANT): the Constraint is the bridge between the flow's Command/Query and its State. " +
       "The State's params are the values the rule compares, so each one must be supplied by the Command " +
       "(its inputs) or Query (its params) in the same flow — check that the State's param names match " +
-      "fields that actually exist on that Command/Query, and add the missing input if they do not.",
+      "fields that actually exist on that Command/Query, and add the missing input if they do not. " +
+      "RULE SEMANTICS (IMPORTANT): a rule is an INPUT gate — it decides whether the command/query may " +
+      "proceed and therefore whether the event is emitted, so it must be checkable from the command/query " +
+      "inputs plus the referenced State before anything is written. Never write a rule about how data is " +
+      "stored or what the event payload will contain (an OUTPUT concern). For example, 'The password must " +
+      "be hashed before storage; raw passwords are never stored' is WRONG — it targets persisted event data, " +
+      "not an input precondition; express the input-side check instead (e.g. 'The password must be non-empty'), " +
+      "since hashing is a handler/implementation detail of the event payload, not a Constraint.",
     parameters: z.object({
       name: z.string().describe("PascalCase constraint name (e.g. AccountMustBeActive)"),
       states: z
@@ -559,7 +566,10 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
         .array(z.string())
         .optional()
         .describe(
-          "Free-text business rules in plain, human language, one per entry (e.g. 'The account must be active'). Avoid field-name notation.",
+          "Free-text INPUT preconditions, one per entry, in plain human language (e.g. 'The account must be active'). " +
+            "Each rule gates the command/query and decides whether the event is emitted, so it must be checkable " +
+            "from the command/query inputs plus the referenced State. Never describe how data is stored or what the " +
+            "event payload contains (e.g. 'The password must be hashed before storage' is wrong). Avoid field-name notation.",
         ),
       color: z.string().optional().describe("Optional header color hex code"),
       description: z.string().optional().describe("Optional plain-language description of the constraint"),

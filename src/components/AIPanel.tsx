@@ -75,7 +75,7 @@ function parsePositiveInt(value: string, fallback: number): number {
 }
 
 export function AIPanel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isOpen = useCanvasStore((s) => s.isAIPanelOpen);
   const setOpen = useCanvasStore((s) => s.setAIPanelOpen);
 
@@ -248,6 +248,7 @@ export function AIPanel() {
         history,
         callbacks,
         opencodeSessionRef.current,
+        i18n.language,
       );
 
       if (sessionIdRef.current !== sessionId) return;

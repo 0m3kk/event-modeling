@@ -807,15 +807,25 @@ export async function executeAITool(name: string, args: any): Promise<string> {
   return JSON.stringify({ error: `Unknown tool: ${name}` });
 }
 
+// Human-readable names for the languages the UI can be set to, so the model can
+// be told (in words) which language to write all of its output in.
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English",
+  vi: "Vietnamese",
+};
+
 export async function runAgentConversation(
   settings: AISettings,
   conversationHistory: ChatMessage[],
   callbacks?: AgentStepCallback,
   sessionId: string = createSessionId(),
+  language: string = "vi",
 ): Promise<string> {
+  const languageName = LANGUAGE_NAMES[language.slice(0, 2)] || "English";
+  const languageInstruction = `OUTPUT LANGUAGE (IMPORTANT): the user is working in the ${languageName} language on this system. Write ALL of your output in ${languageName} — your chat replies, every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other human-readable text you put on the canvas — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form. Never answer in a language other than the one selected in the app.`;
   const systemPrompt = `You are the AI Event Modeling Architect.
 You help software architects and developers design domain events, business models, and reactive systems on an infinite canvas.
-You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create state (projection/decision-model) cards, create view (persisted read-model) cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), create constraint cards (assert business rules in plain language, e.g. "The account must be active", over one or more State cards), create Domain frames (a dashed bounded-context boundary that groups related cards and slices), create slices (a slice stacks lanes top-to-bottom, each lane holding cards of ONE type), and clear the board.
+You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create state (projection/decision-model) cards, create view (persisted read-model) cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), create constraint cards (assert INPUT preconditions in plain language, e.g. "The account must be active", over one or more State cards — a rule gates whether the event is emitted, not how data is stored), create Domain frames (a dashed bounded-context boundary that groups related cards and slices), create slices (a slice stacks lanes top-to-bottom, each lane holding cards of ONE type), and clear the board.
 When the user asks to add or create something, always call the appropriate creation tool!
 DOMAINS (IMPORTANT): keep new work inside a Domain (bounded context). Before creating anything, call get_canvas_overview and check its "domains" list.
 - If one or more Domains already exist, place each new card or Slice into the most relevant existing one by passing "domain" = the domain's name (this also moves it there on update). Prefer an existing Domain over inventing a new one.
@@ -840,9 +850,12 @@ The linkage is indirect: the Command/Query SUPPLIES the value and the Constraint
 A State is ONE object: a value already listed in 'params' must NOT be repeated in 'states'. Params are inputs (used to select/filter and to compare); states are the projected output. Repeating a param name in states is rejected with 'state_echoes_param' — leave it out.
 For View cards: same shape and rules as State cards (params, query items, states), but a View represents a persisted read model stored in a database for sorting, searching and filtering. Use create_view_card when the user wants a queryable read model rather than an in-memory decision state.
 For Constraint cards: call get_canvas_overview first to discover existing State cards. List the State cards the constraint uses in "states" (by name); those must exist on the board. "rules" is a list of free-text business rules written in plain, human language (e.g. "The account must be active", "An order can only be paid once") — do NOT write them in field-name notation like "accountStatus.status == 'active'"; keep them readable. The Constraint is the bridge between the flow's Command/Query and its State: the state params a rule compares must be supplied by that Command's inputs or Query's params, so make sure those fields exist on the command/query (add them if missing).
+CONSTRAINT RULE SEMANTICS (IMPORTANT): a Constraint rule is a gate on the flow's INPUT — it decides whether the command/query is allowed to proceed and therefore whether the event gets emitted. Every rule must be checkable against the command/query inputs plus the referenced State at the moment the flow runs. A rule must NEVER describe how data is stored or what the event will contain (that is the event's payload, an OUTPUT concern). For example, "The password must be hashed before storage; raw passwords are never stored" is WRONG: it targets the data persisted by the event, not a precondition on input. Rewrite such intents as an input-side precondition, e.g. "The password must be non-empty" (reject bad input before emitting) — hashing is a handler/implementation detail that belongs in the event payload or a service, not a Constraint. Ask: "could this rule block the command before any event is written?" If not, it does not belong in the Constraint.
 For Slices: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom), each lane with a "type". A lane type must be one of commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote — Enum/Object/Alias cards and nested Slices are NOT allowed in lanes. Give at least one lane and do not repeat the same lane type twice.
+SLICE NAME (IMPORTANT): name a slice with a plain PascalCase business name that describes the flow, e.g. "PlaceOrder", "HandlePayment", "ViewOrderHistory". Do NOT end the name with the word "Slice" (never "PlaceOrderSlice") and do not include "slice" anywhere in it — "slice" is an internal Event Modeling concept that most users do not know, so the board should read as plain business language. Likewise never name a lane or card after the concept.
 Filling lanes: after create_slice, create the card(s) each lane needs and place each one into its lane by passing "slice" = the slice's name (and "lane" only when the card's type alone is ambiguous: give the lane's card type or its 1-based position). An AI-made slice must not be left empty — a slice with no cards is not a finished flow.
-Be concise, clear, and professional. Reply in the same language the user uses (Vietnamese or English).`;
+Be concise, clear, and professional.
+${languageInstruction}`;
 
   const wireMessages: any[] = [{ role: "system", content: systemPrompt }];
 

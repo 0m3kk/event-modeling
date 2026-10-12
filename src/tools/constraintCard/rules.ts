@@ -6,9 +6,11 @@ import { nameKey } from "@/utils/naming";
  * A Constraint card declares business rules that must hold over one or more
  * State cards. It has two sections:
  * - `states`: the State cards this constraint reads from (picked from the board);
- * - `rules`: free-text business rules, one per row, written in plain language
- *   (e.g. "The account must be active"). Rules are intentionally unstructured so
- *   they stay readable; each row is edited inline.
+ * - `rules`: free-text INPUT preconditions, one per row, written in plain language
+ *   (e.g. "The account must be active"). A rule gates the command/query and decides
+ *   whether the event is emitted, so it describes an input check — not how data is
+ *   stored or what the event payload contains. Rules are intentionally unstructured
+ *   so they stay readable; each row is edited inline.
  */
 
 /** A State card referenced by the constraint (kept by name, like DCB tags). */
