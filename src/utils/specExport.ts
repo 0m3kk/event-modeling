@@ -536,14 +536,15 @@ export function specFileName(name: string): string {
 }
 
 /**
- * Saves the board's specification to a `.spec.yaml` file, using the File System
- * Access API when available and falling back to a download link.
+ * Saves a pre-serialized specification to a `.spec.yaml` file, using the File
+ * System Access API when available and falling back to a download link.
+ * Exposed separately so a preview modal can save exactly what it shows.
  */
-export async function exportSpecificationToFile(
-  input: SpecificationInput,
+export async function downloadSpecification(
+  yaml: string,
+  name: string,
 ): Promise<void> {
-  const yaml = serializeSpecification(input);
-  const fileName = specFileName(input.name);
+  const fileName = specFileName(name);
 
   if ("showSaveFilePicker" in window) {
     try {
@@ -575,4 +576,14 @@ export async function exportSpecificationToFile(
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Saves the board's specification to a `.spec.yaml` file. Convenience wrapper
+ * that serializes the board and then downloads it.
+ */
+export async function exportSpecificationToFile(
+  input: SpecificationInput,
+): Promise<void> {
+  await downloadSpecification(serializeSpecification(input), input.name);
 }

@@ -10,7 +10,7 @@
     "newBoard": "New",
     "openLocal": "Open",
     "saveLocal": "Save",
-    "exportSpec": "Export Specification (YAML)",
+    "export": "Export",
     "drive": "Google Drive",
     "saveToDrive": "Save to Drive",
     "openFromDrive": "Open from Drive",
@@ -81,6 +81,13 @@
     "field": "Field: {{name}}",
     "placeholder": "Add a description...",
     "characters": "{{count}} characters"
+  },
+  "export": {
+    "title": "Export Specification",
+    "subtitle": "Copy or download the board's YAML specification",
+    "copy": "Copy",
+    "copied": "Copied",
+    "download": "Download"
   },
   "common": {
     "close": "Close",

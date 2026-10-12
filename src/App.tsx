@@ -8,6 +8,7 @@ import { InlineTextEditor } from "@/components/InlineTextEditor";
 import { AIPanel } from "@/components/AIPanel";
 import { GoogleDriveModal } from "@/components/GoogleDriveModal";
 import { SearchModal } from "@/components/SearchModal";
+import { ExportSpecModal } from "@/components/ExportSpecModal";
 import { useTheme } from "@/hooks/useTheme";
 import { useCanvasStore } from "@/store";
 import { saveToAutoSave, loadFromAutoSave } from "@/utils/fileIO";
@@ -47,6 +48,7 @@ export function App() {
         <AIPanel />
         <GoogleDriveModal />
         <SearchModal />
+        <ExportSpecModal />
       </main>
     </div>
   );

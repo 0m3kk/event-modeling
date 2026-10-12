@@ -24,7 +24,6 @@ import { useCanvasStore, undo, redo } from "@/store";
 import { useTheme } from "@/hooks/useTheme";
 import type { ThemeMode } from "@/types";
 import { saveProjectToFile, openProjectFromFile } from "@/utils/fileIO";
-import { exportSpecificationToFile } from "@/utils/specExport";
 
 const THEME_OPTIONS: { value: ThemeMode; labelKey: string; icon: typeof Sun }[] = [
   { value: "light", labelKey: "header.themeLight", icon: Sun },
@@ -54,6 +53,7 @@ export function Header() {
 
   const setSearchOpen = useCanvasStore((s) => s.setSearchOpen);
   const setGoogleDriveModalOpen = useCanvasStore((s) => s.setGoogleDriveModalOpen);
+  const setExportModalOpen = useCanvasStore((s) => s.setExportModalOpen);
 
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -125,10 +125,9 @@ export function Header() {
     await saveProjectToFile({ name: projectName, elements, viewport });
   };
 
-  const handleExportSpec = async () => {
+  const handleExportSpec = () => {
     setIsFileMenuOpen(false);
-    const { projectName, elements } = useCanvasStore.getState();
-    await exportSpecificationToFile({ name: projectName, elements });
+    setExportModalOpen(true);
   };
 
   const handleOpenLocal = async () => {
@@ -233,7 +232,7 @@ export function Header() {
                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
               >
                 <FileDown size={15} />
-                <span>{t("header.exportSpec")}</span>
+                <span>{t("header.export")}</span>
               </button>
             </div>
           )}

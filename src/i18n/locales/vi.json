@@ -10,7 +10,7 @@
     "newBoard": "Tạo bảng mới",
     "openLocal": "Mở tệp từ máy (JSON)",
     "saveLocal": "Lưu tệp về máy (JSON)",
-    "exportSpec": "Xuất đặc tả (YAML)",
+    "export": "Xuất",
     "drive": "Google Drive",
     "saveToDrive": "Lưu lên Google Drive",
     "openFromDrive": "Mở từ Google Drive",
@@ -81,6 +81,13 @@
     "field": "Trường: {{name}}",
     "placeholder": "Thêm mô tả...",
     "characters": "{{count}} ký tự"
+  },
+  "export": {
+    "title": "Xuất đặc tả",
+    "subtitle": "Sao chép hoặc tải xuống đặc tả YAML của bảng",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "download": "Tải xuống"
   },
   "common": {
     "close": "Đóng",

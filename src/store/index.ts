@@ -51,6 +51,7 @@ export interface CanvasStoreState {
   isSearchOpen: boolean;
   isGoogleDriveModalOpen: boolean;
   isAIPanelOpen: boolean;
+  isExportModalOpen: boolean;
   driveModalTab: "open" | "save";
 
   // History stacks
@@ -73,6 +74,7 @@ export interface CanvasStoreState {
   setSearchOpen: (open: boolean) => void;
   setGoogleDriveModalOpen: (open: boolean, tab?: "open" | "save") => void;
   setAIPanelOpen: (open: boolean) => void;
+  setExportModalOpen: (open: boolean) => void;
 
   // Element CRUD with Undo
   addElement: (element: CanvasElement) => void;
@@ -184,6 +186,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   isSearchOpen: false,
   isGoogleDriveModalOpen: false,
   isAIPanelOpen: false,
+  isExportModalOpen: false,
   driveModalTab: "save",
 
   undoStack: [],
@@ -215,6 +218,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   setGoogleDriveModalOpen: (open, tab = "save") =>
     set({ isGoogleDriveModalOpen: open, driveModalTab: tab }),
   setAIPanelOpen: (open) => set({ isAIPanelOpen: open }),
+  setExportModalOpen: (open) => set({ isExportModalOpen: open }),
 
   addElement: (element) => {
     const current = get().elements;
