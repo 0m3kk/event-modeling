@@ -10,6 +10,7 @@
     "newBoard": "New",
     "openLocal": "Open",
     "saveLocal": "Save",
+    "exportSpec": "Export Specification (YAML)",
     "drive": "Google Drive",
     "saveToDrive": "Save to Drive",
     "openFromDrive": "Open from Drive",

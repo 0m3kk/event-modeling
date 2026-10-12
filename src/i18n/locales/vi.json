@@ -10,6 +10,7 @@
     "newBoard": "Tạo bảng mới",
     "openLocal": "Mở tệp từ máy (JSON)",
     "saveLocal": "Lưu tệp về máy (JSON)",
+    "exportSpec": "Xuất đặc tả (YAML)",
     "drive": "Google Drive",
     "saveToDrive": "Lưu lên Google Drive",
     "openFromDrive": "Mở từ Google Drive",
