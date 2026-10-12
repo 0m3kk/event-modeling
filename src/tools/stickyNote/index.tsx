@@ -141,7 +141,7 @@ export const stickyNoteTool: ToolDefinition<StickyNoteData> = {
       description: z
         .string()
         .optional()
-        .describe("Optional longer description shown on the ⓘ badge"),
+        .describe("Optional longer description"),
     }),
     onCreate: (params, center: Point): CanvasElement<StickyNoteData> => {
       return {

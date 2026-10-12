@@ -363,26 +363,23 @@ export const sliceCardTool: ToolDefinition<SliceData> = {
   ai: {
     toolName: "create_slice",
     description:
-      "Create a Slice: a vertical grouping whose lanes are stacked top-to-bottom. Each lane holds cards of a single type; declare the lane types up front. " +
-      "A flow is ONE slice. A write slice is usually commandCard, constraintCard, eventCard — add a queryCard lane when the command reads data, and a serviceCard lane only when it executes a service. " +
-      "A read slice is queryCard then viewCard or stateCard — add a constraintCard lane only when a rule must be checked. " +
-      "NAME (IMPORTANT): give the slice a plain PascalCase business name describing the flow (e.g. PlaceOrder, HandlePayment). " +
-      "Do NOT put the word 'Slice' in the name (never PlaceOrderSlice) — 'slice' is an internal concept users do not know. " +
-      "After creating the slice, create each lane's card(s) and place them in the lane by passing `slice` (and `lane` when the type is ambiguous).",
+      "Create a Slice: a vertical stack of lanes (top-to-bottom), each lane holding cards of ONE type. " +
+      "A flow is ONE slice. Give it a plain PascalCase business name without the word 'Slice' (e.g. PlaceOrder). " +
+      "After creating it, create each lane's card(s) and place them in the lane via `slice` (and `lane` when the type is ambiguous).",
     parameters: z.object({
-      name: z.string().describe("PascalCase business name for the flow, WITHOUT the word 'Slice' (e.g. PlaceOrder)"),
+      name: z.string().describe("PascalCase flow name, without 'Slice' (e.g. PlaceOrder)"),
       description: z
         .string()
         .optional()
-        .describe("Optional plain-language description of what the slice covers"),
-      color: z.string().optional().describe("Optional header color hex code"),
+        .describe("Description of what the slice covers"),
+      color: z.string().optional().describe("Optional hex color"),
       lanes: z
         .array(
           z.object({
             type: z
               .string()
               .describe(
-                "Card type this lane holds: commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote",
+                "Lane card type (commandCard|queryCard|eventCard|stateCard|viewCard|constraintCard|serviceCard|stickyNote)",
               ),
           }),
         )

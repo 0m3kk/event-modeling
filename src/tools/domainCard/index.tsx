@@ -147,11 +147,10 @@ export const domainCardTool: ToolDefinition<DomainData> = {
   ai: {
     toolName: "create_domain_card",
     description:
-      "Create a Domain frame — a dashed boundary that groups related cards and Slices into one bounded context. " +
-      "Domains cannot be nested inside another Domain. Give it a meaningful bounded-context name (e.g. Ordering, Billing).",
+      "Create a Domain frame — a dashed bounded-context boundary grouping related cards and Slices. Domains do not nest.",
     parameters: z.object({
       name: z.string().describe("PascalCase domain name (e.g. Ordering, Billing)"),
-      color: z.string().optional().describe("Optional header color hex code"),
+      color: z.string().optional().describe("Optional hex color"),
     }),
     onCreate: (params, center: Point): CanvasElement<DomainData> => {
       const width = DOMAIN_DEFAULT_WIDTH;

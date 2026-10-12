@@ -158,21 +158,19 @@ export const groupCardTool: ToolDefinition<GroupData> = {
   ai: {
     toolName: "create_group_card",
     description:
-      "Create a Group — a compact frame that clusters reusable definitions inside a Domain. The standard layout is one Group for " +
-      "type definitions (Object, Enum, Alias) and one for Services (e.g. named Types and Services). Only Object, Enum, Alias and " +
-      "Service cards can join a Group. After creating it, place eligible cards by passing `group` = the group's name (the group's " +
-      "own `domain` already keeps them inside the bounded context).",
+      "Create a Group — a compact frame clustering reusable definitions (Object/Enum/Alias and/or Services) inside a Domain. " +
+      "After creating it, place eligible cards in it via `group`.",
     parameters: z.object({
       name: z
         .string()
         .describe(
-          "Short PascalCase label describing what the group clusters (e.g. MoneyTypes, PaymentServices)",
+          "PascalCase group name (e.g. MoneyTypes, PaymentServices)",
         ),
-      color: z.string().optional().describe("Optional frame color hex code"),
+      color: z.string().optional().describe("Optional hex color"),
       description: z
         .string()
         .optional()
-        .describe("Optional plain-language description of what the group clusters"),
+        .describe("Description of what the group clusters"),
     }),
     onCreate: (params, center: Point): CanvasElement<GroupData> => {
       const width = GROUP_DEFAULT_WIDTH;

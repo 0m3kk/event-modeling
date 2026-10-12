@@ -777,13 +777,13 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
         .array(
           z.object({
             name: z.string().describe("Input field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this field means"),
+              .describe("What this field means"),
           }),
         )
         .optional()
@@ -792,13 +792,13 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
         .array(
           z.object({
             name: z.string().describe("Response field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this field means"),
+              .describe("What this field means"),
           }),
         )
         .optional()
@@ -807,22 +807,22 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
         .array(
           z.object({
             name: z.string().describe("Field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this field means"),
+              .describe("What this field means"),
           }),
         )
         .optional()
         .describe("Legacy flat fields list (treated as inputs)"),
-      color: z.string().optional().describe("Optional header color hex code"),
+      color: z.string().optional().describe("Optional hex color"),
       description: z
         .string()
         .optional()
-        .describe("Optional plain-language description of the command"),
+        .describe("Description of the command"),
     }),
     onCreate: (params, center: Point): CanvasElement<CommandCardData> => {
       const inputs = params.inputs || params.fields || [];

@@ -794,7 +794,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
       methods: z
         .array(
           z.object({
-            name: z.string().describe("Method name in camelCase (e.g. placeOrder)"),
+            name: z.string().describe("Method name (camelCase)"),
             params: z
               .array(
                 z.object({
@@ -802,14 +802,14 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
                   type: z
                     .string()
                     .describe(
-                      "Field data type (e.g. string, number, boolean, or a defined Object/Enum/Alias name)",
+                      "Field type (primitive or defined type name)",
                     ),
-                  isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-                  isRequired: z.boolean().optional().describe("True when the field is required"),
+                  isArray: z.boolean().optional().describe("Array of this type"),
+                  isRequired: z.boolean().optional().describe("Required"),
                   description: z
                     .string()
                     .optional()
-                    .describe("Plain-language description of what this param means"),
+                    .describe("What this param means"),
                 }),
               )
               .optional()
@@ -817,18 +817,18 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
             returns: z
               .array(
                 z.object({
-                  name: z.string().describe("Return field name in camelCase"),
+                  name: z.string().describe("Return field name (camelCase)"),
                   type: z
                     .string()
                     .describe(
-                      "Field data type (e.g. string, number, boolean, or a defined Object/Enum/Alias name)",
+                      "Field type (primitive or defined type name)",
                     ),
-                  isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-                  isRequired: z.boolean().optional().describe("True when the field is required"),
+                  isArray: z.boolean().optional().describe("Array of this type"),
+                  isRequired: z.boolean().optional().describe("Required"),
                   description: z
                     .string()
                     .optional()
-                    .describe("Plain-language description of what this return field means"),
+                    .describe("What this return field means"),
                 }),
               )
               .optional()
@@ -838,11 +838,11 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
         )
         .optional()
         .describe("Methods exposed by the service"),
-      color: z.string().optional().describe("Optional header color hex code"),
+      color: z.string().optional().describe("Optional hex color"),
       description: z
         .string()
         .optional()
-        .describe("Optional plain-language description of the service"),
+        .describe("Description of the service"),
     }),
     onCreate: (params, center: Point): CanvasElement<ServiceCardData> => {
       const methods: ServiceMethod[] = (params.methods || []).map(

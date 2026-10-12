@@ -130,17 +130,11 @@ function toCreateToolName(updateToolName: string): string {
 const SLICE_PLACEMENT_PROPS: Record<string, any> = {
   slice: {
     type: "string",
-    description:
-      "Optional: name of an existing Slice to place this card inside one of its lanes. " +
-      "Set this right after create_slice so AI-made slices are not left empty.",
+    description: "Optional Slice name; place this card in one of its lanes.",
   },
   lane: {
     type: "string",
-    description:
-      "Optional lane inside `slice`, when the card's type alone is ambiguous or the lane " +
-      "should be chosen explicitly. Accepts the lane's card type (e.g. eventCard, queryCard, " +
-      "stateCard, viewCard) or its 1-based position from the top. Defaults to the lane whose " +
-      "reserved type matches this card.",
+    description: "Optional lane in `slice`: its card type or 1-based position.",
   },
 };
 
@@ -152,11 +146,7 @@ const SLICE_PLACEMENT_PROPS: Record<string, any> = {
 const DOMAIN_PLACEMENT_PROPS: Record<string, any> = {
   domain: {
     type: "string",
-    description:
-      "Optional: name of an existing Domain frame to place this card (or Slice) inside. " +
-      "If no Domain exists yet, create one first with create_domain_card, then pass its name here. " +
-      "A card that lives in a Slice lane cannot also be in a Domain — put the Slice itself, " +
-      "not its lane cards, into the Domain.",
+    description: "Optional Domain name; place this card/Slice inside it (create it first if none exists).",
   },
 };
 
@@ -168,10 +158,7 @@ const DOMAIN_PLACEMENT_PROPS: Record<string, any> = {
 const GROUP_PLACEMENT_PROPS: Record<string, any> = {
   group: {
     type: "string",
-    description:
-      "Optional: name of an existing Group (a small frame that clusters Object/Enum/Alias definitions " +
-      "or Services, normally inside a Domain) to place this card inside. Only Object, Enum, Alias and " +
-      "Service cards can join a Group. Ignored when the card is placed in a Slice lane.",
+    description: "Optional Group name; only Object/Enum/Alias/Service cards can join.",
   },
 };
 
@@ -185,12 +172,10 @@ export function buildOpenAITools(): any[] {
     function: {
       name: "get_canvas_overview",
       description:
-        "Read all current elements on the canvas, including their IDs, types, and summary data. " +
-        "Also returns `eventTypes`, `tagCatalog` (every DCB tag currently attached to an event field, " +
-        "with its type and source events), `slices` (each Slice with its lanes and the cards already " +
-        "placed in them), `groups` (each Group frame with the definition/service cards it clusters) " +
-        "and `domains` (each Domain frame with the cards/slices it contains) so you " +
-        "can build valid State card query tags, target slice lanes, and place new items into the right Domain.",
+        "Read a compact summary of every element (type, name, fields, tags) plus `eventTypes`, " +
+        "`tagCatalog`, `slices` (with lanes and their cards), `groups` and `domains`, so you can " +
+        "build valid State query tags, target slice lanes, and place new items in the right Domain. " +
+        "Descriptions are omitted; updates keep existing ones when you leave them out.",
       parameters: {
         type: "object",
         properties: {},
@@ -217,14 +202,14 @@ export function buildOpenAITools(): any[] {
     function: {
       name: "delete_element",
       description:
-        "Delete one element, located by its current name (`target`). Optionally narrow by `type` " +
-        "(e.g. eventCard, stateCard). Use get_canvas_overview to find the exact name first.",
+        "Delete one element by its current name (`target`), optionally narrowed by `type`. " +
+        "Use get_canvas_overview to find the exact name.",
       parameters: {
         type: "object",
         properties: {
           target: {
             type: "string",
-            description: "Current name of the element to delete (must exist on the board)",
+            description: "Current name of the element to delete",
           },
           type: {
             type: "string",
@@ -264,9 +249,7 @@ export function buildOpenAITools(): any[] {
 
     const updateParams = zodToJsonSchema(
       (t.parameters as z.ZodObject<any>).extend({
-        target: z
-          .string()
-          .describe("Current name of the element to update (must exist on the board)"),
+        target: z.string().describe("Element name to update"),
       }),
     );
     if (eligibleForLane) Object.assign(updateParams.properties, SLICE_PLACEMENT_PROPS);
@@ -278,10 +261,8 @@ export function buildOpenAITools(): any[] {
       function: {
         name: toUpdateToolName(t.toolName),
         description:
-          "Update an existing element located by its current name (`target`). " +
-          "Send the COMPLETE corrected definition: the payload replaces the existing data " +
-          "(array sections like fields/params are replaced wholesale). " +
-          t.description,
+          "Update the element named `target`; send the COMPLETE definition (array sections replace " +
+          "the old ones). Same fields/rules as the matching create tool.",
         parameters: updateParams,
       },
     });
@@ -434,7 +415,6 @@ function summarizeSlices(elements: CanvasElement[]): any[] {
     .map((el) => {
       const lanes: SliceLane[] = (el.data as any)?.lanes ?? [];
       return {
-        id: el.id,
         name: getElementName(el) ?? "Slice",
         lanes: lanes.map((lane, index) => ({
           index: index + 1,
@@ -452,7 +432,6 @@ function summarizeDomains(elements: CanvasElement[]): any[] {
   return elements
     .filter((el) => el.type === DOMAIN_TYPE)
     .map((el) => ({
-      id: el.id,
       name: getElementName(el) ?? "Domain",
       cards: elements
         .filter((child) => child.domainId === el.id)
@@ -465,7 +444,6 @@ function summarizeGroups(elements: CanvasElement[]): any[] {
   return elements
     .filter((el) => el.type === GROUP_TYPE)
     .map((el) => ({
-      id: el.id,
       name: getElementName(el) ?? "Group",
       domain: el.domainId
         ? getElementName(elements.find((d) => d.id === el.domainId) ?? {}) ?? null
@@ -474,6 +452,82 @@ function summarizeGroups(elements: CanvasElement[]): any[] {
         .filter((child) => child.groupId === el.id)
         .map((child) => getElementName(child) ?? child.id),
     }));
+}
+
+/**
+ * Fields dropped from every card's data in the canvas overview to keep the
+ * tool result small: internal ids and cosmetic colour. When
+ * {@link OVERVIEW_INCLUDE_DESCRIPTIONS} is false, `description` strings are
+ * dropped too — updates carry an existing description over by name (see
+ * {@link carryOverDescriptions}), so the model never needs their current text.
+ */
+const OVERVIEW_INCLUDE_DESCRIPTIONS = false;
+const OVERVIEW_DROP_KEYS = new Set(
+  OVERVIEW_INCLUDE_DESCRIPTIONS
+    ? ["id", "color"]
+    : ["id", "color", "description"],
+);
+
+/**
+ * Recursively strips overview noise from a value: drops the keys in
+ * {@link OVERVIEW_DROP_KEYS}, omits falsy flags (`false`/`null`) and empty
+ * arrays/objects. Returns `undefined` when nothing is left, so the caller can
+ * omit the key entirely.
+ */
+function stripOverviewValue(value: any): any {
+  if (Array.isArray(value)) {
+    const arr = value
+      .map((item) => stripOverviewValue(item))
+      .filter((item) => item !== undefined);
+    return arr.length > 0 ? arr : undefined;
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value)) {
+      if (OVERVIEW_DROP_KEYS.has(key)) continue;
+      if (val === false || val === null) continue;
+      const cleaned = stripOverviewValue(val);
+      if (cleaned === undefined) continue;
+      out[key] = cleaned;
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
+  }
+  return value;
+}
+
+/** Compact, id-free projection of one canvas element for the model. */
+function summarizeElement(el: CanvasElement): any {
+  const data = stripOverviewValue(el.data) ?? {};
+  return { type: el.type, ...data };
+}
+
+/**
+ * Carries an existing item's `description` over to a rebuilt array item with
+ * the same `name` when the new item omits one. The overview omits descriptions
+ * to stay small, so this keeps AI updates from wiping text the model never saw.
+ */
+function carryOverDescriptions(next: any, prev: any): any {
+  if (Array.isArray(next)) {
+    return next.map((item) => {
+      if (!item || typeof item !== "object" || typeof item.name !== "string") return item;
+      const match = Array.isArray(prev)
+        ? prev.find((p: any) => p && typeof p.name === "string" && nameKey(p.name) === nameKey(item.name))
+        : undefined;
+      if (match && item.description === undefined && typeof match.description === "string") {
+        return { ...item, description: match.description };
+      }
+      return item;
+    });
+  }
+  if (next && typeof next === "object") {
+    const out: Record<string, any> = { ...next };
+    for (const key of Object.keys(next)) {
+      const prevValue = prev && typeof prev === "object" ? prev[key] : undefined;
+      out[key] = carryOverDescriptions(next[key], prevValue);
+    }
+    return out;
+  }
+  return next;
 }
 
 interface DomainPlacement {
@@ -671,6 +725,10 @@ function executeUpdateElement(updateName: string, args: any): string {
     nextData = { ...nextData, methodRef: existingData.methodRef };
   }
 
+  // The canvas overview omits field-item descriptions, so carry the existing
+  // ones over by name when the model leaves them out of the payload.
+  nextData = carryOverDescriptions(nextData, existingData);
+
   // Enforce canonical camelCase identifiers before validating, so type/name
   // references the model wrote in any casing still resolve against the board.
   nextData = normalizeIdentifierNames(nextData, definition.type);
@@ -788,13 +846,7 @@ export async function executeAITool(name: string, args: any): Promise<string> {
   const state = useCanvasStore.getState();
 
   if (name === "get_canvas_overview") {
-    const summary = state.elements.map((el) => ({
-      id: el.id,
-      type: el.type,
-      x: el.x,
-      y: el.y,
-      data: el.data,
-    }));
+    const summary = state.elements.map(summarizeElement);
     const eventTypes = state.elements
       .filter((el) => el.type === "eventCard")
       .map((el) => el.data?.name)
@@ -978,41 +1030,31 @@ export async function runAgentConversation(
 ): Promise<string> {
   const languageName = LANGUAGE_NAMES[language.slice(0, 2)] || "English";
   const languageInstruction = `OUTPUT LANGUAGE (IMPORTANT): the user is working in the ${languageName} language on this system. Write ALL of your output in ${languageName} — your chat replies, every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other human-readable text you put on the canvas — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form. Never answer in a language other than the one selected in the app.`;
-  const systemPrompt = `You are the AI Event Modeling Architect.
-You help software architects and developers design domain events, business models, and reactive systems on an infinite canvas.
-You have tools to read the canvas, create sticky notes, create domain event cards, create command cards, create query cards, create state (projection/decision-model) cards, create view (persisted read-model) cards, create shared object definitions, create enum definitions, create type aliases, create service definitions (services expose methods with params and returns), create constraint cards (assert INPUT preconditions in plain language, e.g. "The account must be active", over one or more State cards — a rule gates whether the event is emitted, not how data is stored), create Domain frames (a dashed bounded-context boundary that groups related cards and slices), create Groups (a compact frame that clusters related Object/Enum/Alias definitions or Services, usually inside a Domain), create slices (a slice stacks lanes top-to-bottom, each lane holding cards of ONE type), and clear the board.
-When the user asks to add or create something, always call the appropriate creation tool!
-DOMAINS (IMPORTANT): keep new work inside a Domain (bounded context). Before creating anything, call get_canvas_overview and check its "domains" list.
-- If one or more Domains already exist, place each new card or Slice into the most relevant existing one by passing "domain" = the domain's name (this also moves it there on update). Prefer an existing Domain over inventing a new one.
-- If NO Domain exists yet, first call create_domain_card with a meaningful bounded-context name (e.g. Ordering, Billing), then place the new card(s)/Slice into it with "domain". When the work is a set of reusable definitions shared across several contexts, create a Domain named "Shared" instead and keep them there.
-- A card that lives in a Slice lane cannot also belong to a Domain, so put the Slice itself into the Domain — not the individual cards inside its lanes.
-- Mention to the user which Domain you placed the new work into.
-GROUPS (CONVENTION): a Group is a compact frame that clusters reusable definitions. Inside a Domain the standard layout is TWO groups: one for the type definitions (Object, Enum and Alias cards) and one for the Services.
-- Reuse the Domain's existing groups; create any missing one with create_group_card and give it a clear name (e.g. "Types" and "Services", or "MoneyTypes"/"PaymentServices" when more specific).
-- EVERY time you create a new Object, Enum, Alias or Service card, place it into the matching group by passing "group" = the group's name. Do not leave these cards free-standing inside the Domain.
-- Only Object/Enum/Alias/Service cards can join a Group, and a card in a Slice lane cannot. A Group lives inside the Domain (pass its own "domain"), so its cards do NOT need "domain" again.
-FLOW SEMANTICS (IMPORTANT): a "flow" in Event Modeling is ONE slice, not the whole command→event→read-model chain. There are two kinds:
-- Write slice: a Command that emits one or more Events. Its usual shape is three lanes top-to-bottom: commandCard, constraintCard, eventCard. Add a queryCard lane when the command must read data first, and a serviceCard lane only when the flow actually executes a service method (case-dependent).
-- Read slice: a Query that reads Events into a read model. Its usual shape is queryCard then viewCard (or stateCard when the projection is specific to that one flow — a reusable State usually stays outside the slice). A constraintCard lane is optional — add it only when a rule must be checked (e.g. whether the query's target exists); not every read slice has one.
-When the user asks to "draw/build a flow" (e.g. "vẽ flow") without naming the kind, produce exactly ONE write slice OR ONE read slice that matches their description — never both, and never the full command→event→view chain. Ask only when the kind is genuinely ambiguous. A write slice stops at the emitted events (no query/view); a read slice starts at the query (no command).
-To change an existing card, prefer its matching update tool (e.g. update_event_card) over deleting and recreating it: pass "target" = the card's current name and send the COMPLETE corrected definition. This preserves the card's id, position and links. Use delete_element (by "target" name) to remove a card.
-Data types: every field "type" MUST be either a primitive (${Array.from(PRIMITIVE_FIELD_TYPES).join(", ")}) or the exact name of an Object, Enum or Alias card that already exists on the board. Any other type is rejected — create the Object/Enum/Alias card first, then reference it by name.
-For Event cards: a DCB tag names the domain entity (aggregate) the event belongs to and identifies ONE field type across the whole board. Tag with the entity noun, never an id field: for a field "accountId" use the tag "account", for "userId" use "user", for "orderId" use "order" — the same entity always gets the same tag. Reusing a tag with a different field type is rejected, so keep the type identical whenever you reuse a tag.
-Field descriptions (IMPORTANT): for EVERY field you create — Event fields, Command inputs/responses, Query params/responses, Object fields, State params/states, View params/states, Service method params/returns, Enum values — always add a "description" explaining what that field means. Also give each card itself a "description" (and for an Object, a description of the object definition). These definitions are reused across the model, so each must be self-explanatory on its own.
-For State cards: call get_canvas_overview first to discover existing event types, DCB tags and defined types. Every query item's "types" must be names of Event cards on the board. Every query tag is a { tag, field } pair where "tag" already exists on an event field and "field" is one of the card's params with the SAME type. If a creation tool returns status "error" with issues, fix them (e.g. create the missing event/tag/type first) and try again. A State is a REUSABLE projection/decision model that many flows can share, so it usually lives OUTSIDE any slice (free-standing) and is referenced by Constraint cards; only place a State inside a slice lane when the projection genuinely belongs to that single flow and is not shared.
-STATE PARAM PROVENANCE (IMPORTANT): a param on a State (or View) is an INPUT, so its value must come from somewhere — never invent a field that has no source. Each param must trace to one of:
-- (a) a Command input or Query param of the same name that drives the flow — this is the usual case: the Constraint compares the command's value against the projected state, so reuse the command/query field's EXACT name as the State param;
-- (b) a DCB tag binding — write it as { tag, field } in a query item so the param selects the events it filters;
-- (c) an Enum-typed field (a fixed domain value), or
-- (d) a system value such as now / timeNow / today.
-The linkage is indirect: the Command/Query SUPPLIES the value and the Constraint CONSUMES the State, so model the Command/Query input first and name the State param after it. A param with no such source is rejected with 'param_source_unknown'; fix it by renaming it to the real Command/Query/Event field, binding it to a tag, or typing it as an Enum.
-A State is ONE object: a value already listed in 'params' must NOT be repeated in 'states'. Params are inputs (used to select/filter and to compare); states are the projected output. Repeating a param name in states is rejected with 'state_echoes_param' — leave it out.
-For View cards: same shape and rules as State cards (params, query items, states), but a View represents a persisted read model stored in a database for sorting, searching and filtering. Use create_view_card when the user wants a queryable read model rather than an in-memory decision state.
-For Constraint cards: call get_canvas_overview first to discover existing State cards. List the State cards the constraint uses in "states" (by name); those must exist on the board. "rules" is a list of free-text business rules written in plain, human language (e.g. "The account must be active", "An order can only be paid once") — do NOT write them in field-name notation like "accountStatus.status == 'active'"; keep them readable. The Constraint is the bridge between the flow's Command/Query and its State: the state params a rule compares must be supplied by that Command's inputs or Query's params, so make sure those fields exist on the command/query (add them if missing).
-CONSTRAINT RULE SEMANTICS (IMPORTANT): a Constraint rule is a gate on the flow's INPUT — it decides whether the command/query is allowed to proceed and therefore whether the event gets emitted. Every rule must be checkable against the command/query inputs plus the referenced State at the moment the flow runs. A rule must NEVER describe how data is stored or what the event will contain (that is the event's payload, an OUTPUT concern). For example, "The password must be hashed before storage; raw passwords are never stored" is WRONG: it targets the data persisted by the event, not a precondition on input. Rewrite such intents as an input-side precondition, e.g. "The password must be non-empty" (reject bad input before emitting) — hashing is a handler/implementation detail that belongs in the event payload or a service, not a Constraint. Ask: "could this rule block the command before any event is written?" If not, it does not belong in the Constraint.
-For Slices: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom), each lane with a "type". A lane type must be one of commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote — Enum/Object/Alias cards and nested Slices are NOT allowed in lanes. Give at least one lane and do not repeat the same lane type twice.
-SLICE NAME (IMPORTANT): name a slice with a plain PascalCase business name that describes the flow, e.g. "PlaceOrder", "HandlePayment", "ViewOrderHistory". Do NOT end the name with the word "Slice" (never "PlaceOrderSlice") and do not include "slice" anywhere in it — "slice" is an internal Event Modeling concept that most users do not know, so the board should read as plain business language. Likewise never name a lane or card after the concept.
-Filling lanes: after create_slice, create the card(s) each lane needs and place each one into its lane by passing "slice" = the slice's name (and "lane" only when the card's type alone is ambiguous: give the lane's card type or its 1-based position). An AI-made slice must not be left empty — a slice with no cards is not a finished flow.
+  const systemPrompt = `You are the AI Event Modeling Architect, helping architects design domain events, business models and reactive systems on an infinite canvas.
+Tools: read the canvas; create sticky notes, Events, Commands, Queries, States (projection/decision models), Views (persisted read models), Objects, Enums, Aliases, Services (methods with params + returns), Constraint cards, Domain frames, Groups and Slices; clear the board. When the user asks to add or create something, always call the matching creation tool.
+DOMAINS (bounded contexts): call get_canvas_overview first and check its "domains".
+- If a Domain exists, put each new card/Slice into the most relevant one via "domain" = its name (this also moves it on update); prefer an existing Domain.
+- If none exists, first create one with create_domain_card and a meaningful name (e.g. Ordering, Billing), then place the new cards/Slices in it. For reusable definitions shared across contexts, use a Domain named "Shared" instead.
+- A card in a Slice lane cannot also be in a Domain, so put the Slice itself in the Domain, not its lane cards. Tell the user which Domain you used.
+GROUPS: a Group clusters reusable definitions. Inside a Domain the standard layout is TWO groups: one for type definitions (Object/Enum/Alias) and one for Services.
+- Reuse existing groups; create missing ones with create_group_card (e.g. "Types", "Services", or "MoneyTypes"/"PaymentServices" when specific).
+- Every new Object/Enum/Alias/Service card goes into the matching group via "group" = its name; do not leave these free-standing. Only these types can join a Group, and not when in a Slice lane. A Group lives in the Domain (pass its own "domain"); its cards then do NOT need "domain" again.
+FLOW SEMANTICS: a "flow" is ONE slice, not the whole command→event→read-model chain.
+- Write slice: a Command emitting one or more Events — usual lanes top-to-bottom: commandCard, constraintCard, eventCard. Add a queryCard lane when the command must read data first, and a serviceCard lane only when the flow executes a service method.
+- Read slice: a Query reading Events into a read model — usual lanes: queryCard then viewCard (or stateCard when the projection is specific to that one flow). A constraintCard lane is optional — add it only when a rule must be checked.
+When the user asks to "draw/build a flow" (e.g. "vẽ flow") without naming the kind, produce exactly ONE write slice OR ONE read slice that matches their description — never both, never the full chain. Ask only if genuinely ambiguous. A write slice stops at the emitted events; a read slice starts at the query.
+To change an existing card, prefer its update tool (e.g. update_event_card) over deleting and recreating: pass "target" = the card's current name and the COMPLETE corrected definition (preserves id, position and links). Use delete_element (by "target") to remove a card. get_canvas_overview omits field descriptions; you may omit them on update too — existing text is kept.
+Data types: every field "type" must be a primitive (${Array.from(PRIMITIVE_FIELD_TYPES).join(", ")}) or the exact name of an existing Object/Enum/Alias card; otherwise it is rejected — create the definition first, then reference it by name.
+Event tags (DCB): a tag names the domain entity (aggregate) and fixes ONE field type across the whole board. Tag with the entity noun, never an id field: "accountId"→"account", "userId"→"user", "orderId"→"order". Reusing a tag with a different field type is rejected.
+Field descriptions: for EVERY field you create (Event fields, Command inputs/responses, Query params/responses, Object fields, State/View params/states, Service method params/returns, Enum values) add a "description" explaining it, and give each card its own "description" too. These definitions are reused across the model, so each must be self-explanatory.
+STATE cards: call get_canvas_overview first to discover event types, DCB tags and defined types. Every query item's "types" must name existing Event cards; every query tag is a { tag, field } pair where "tag" already exists on an event field and "field" is one of the card's params with the SAME type. If a creation returns status "error", fix the issues (create the missing event/tag/type) and retry. A State is a REUSABLE projection/decision model shared by many flows, so it usually lives OUTSIDE any slice (referenced by Constraint cards); place it in a slice lane only when the projection belongs to that single flow.
+STATE PARAM PROVENANCE: a State/View param is an INPUT, so its value must come from somewhere — never invent a field with no source. Each param must trace to (a) a Command input or Query param of the same name that drives the flow — the usual case: reuse that field's EXACT name; (b) a DCB tag binding written { tag, field } in a query item; (c) an Enum-typed field; or (d) a system value (now/timeNow/today). An unsourced param is rejected with 'param_source_unknown'. A State is ONE object: a name already in 'params' must NOT repeat in 'states' (rejected with 'state_echoes_param').
+VIEW cards: same shape and rules as State cards (params, query items, states), but a View is a persisted read model stored in a database for sorting/searching/filtering — use create_view_card for a queryable read model rather than an in-memory decision state.
+CONSTRAINT cards: call get_canvas_overview first to find existing State cards. List the State cards it uses in "states" (by name; they must exist). "rules" are free-text business rules in plain human language (e.g. "The account must be active", "An order can only be paid once") — NOT field-name notation like "accountStatus.status == 'active'". The Constraint is the bridge between the flow's Command/Query and its State: the state params a rule compares must be supplied by that Command's inputs or Query's params, so make sure those fields exist (add them if missing).
+CONSTRAINT RULE SEMANTICS: a rule gates the flow's INPUT — it decides whether the command/query may proceed and therefore whether the event is emitted. Every rule must be checkable from the command/query inputs plus the referenced State. A rule must NEVER describe data storage or the event payload (an OUTPUT concern): "The password must be hashed before storage" is WRONG; rewrite it input-side, e.g. "The password must be non-empty". Ask: "could this block the command before any event is written?" If not, it is not a Constraint.
+SLICES: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom), each lane with a "type" from commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote. Enum/Object/Alias cards and nested Slices are NOT allowed in lanes. Give at least one lane and do not repeat a lane type.
+SLICE NAME: give a slice a plain PascalCase business name describing the flow (e.g. PlaceOrder, HandlePayment, ViewOrderHistory). Do NOT include the word "Slice" (never "PlaceOrderSlice") — "slice" is an internal concept most users do not know, so do not name lanes or cards after it either.
+FILLING LANES: after create_slice, create each lane's card(s) and place each one via "slice" = the slice's name (and "lane" only when the card type is ambiguous: give the lane's card type or 1-based position). Never leave an AI-made slice empty.
 Be concise, clear, and professional.
 ${languageInstruction}`;
 

@@ -223,8 +223,7 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
   ai: {
     toolName: "create_object_card",
     description:
-      "Create a shared Object definition card (a reusable value/struct type) in the Event Model. " +
-      "Always provide a description for the object itself and a description for each field.",
+      "Create a shared Object definition card (a reusable value/struct type).",
     parameters: z.object({
       name: z.string().describe("PascalCase object name (e.g. Address, Customer)"),
       fields: z
@@ -233,22 +232,22 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
             name: z.string().describe("Field name in camelCase"),
             type: z
               .string()
-              .describe("Field data type (e.g. string, number, boolean, or another object name)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+              .describe("Field type (primitive or defined type name)"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this field means"),
+              .describe("What this field means"),
           }),
         )
         .optional()
-        .describe("Fields that make up the object definition"),
-      color: z.string().optional().describe("Optional header color hex code"),
+        .describe("Object fields"),
+      color: z.string().optional().describe("Optional hex color"),
       description: z
         .string()
         .optional()
-        .describe("Optional plain-language description of the object"),
+        .describe("Description of the object"),
     }),
     onCreate: (params, center: Point): CanvasElement<ObjectCardData> => {
       const fields = params.fields || [];

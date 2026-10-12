@@ -146,13 +146,13 @@ export const aliasCardTool: ToolDefinition<AliasCardData> = {
       name: z.string().describe("PascalCase alias name (e.g. CustomerId, Money, Email)"),
       type: z
         .string()
-        .describe("The wrapped type (e.g. string, uuid, number, or another defined type name)"),
-      isArray: z.boolean().optional().describe("True when the alias wraps a list of the type"),
-      color: z.string().optional().describe("Optional header color hex code"),
+        .describe("Wrapped type (primitive or defined type name)"),
+      isArray: z.boolean().optional().describe("Wraps a list of the type"),
+      color: z.string().optional().describe("Optional hex color"),
       description: z
         .string()
         .optional()
-        .describe("Optional plain-language description of the alias"),
+        .describe("Description of the alias"),
     }),
     onCreate: (params, center: Point): CanvasElement<AliasCardData> => {
       const data: AliasCardData = {

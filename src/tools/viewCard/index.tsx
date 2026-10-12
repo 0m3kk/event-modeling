@@ -1149,26 +1149,23 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
   ai: {
     toolName: "create_view_card",
     description:
-      "Create a View (persisted read model / DCB projection) card with 3 sections: params (input fields), " +
-      "query items (event types + DCB tags), and states (the projected view fields). Unlike an in-memory " +
-      "State, a View is stored in a database so its rows can be sorted, searched and filtered later. " +
-      "RULE: every query tag must be written as { tag, field } where `tag` is a tag already attached to " +
-      "an event field on the board AND `field` is the name of one of this card's params whose type is " +
-      "IDENTICAL to that tagged event field's type. Use get_canvas_overview to discover existing tags and " +
-      "event types first; the card is rejected if any tag is unknown or its param field type mismatches.",
+      "Create a View (persisted read model / DCB projection) with sections: params (inputs), query items " +
+      "(event types + DCB tags) and states (projected view fields). Unlike an in-memory State, a View is " +
+      "stored in a database so its rows can be sorted, searched and filtered later. Same tag/param rules " +
+      "as a State: every { tag, field } tag must already exist on an event field and match a param's type.",
     parameters: z.object({
-      name: z.string().describe("PascalCase view/read-model name (e.g. CourseCatalog, OrderList)"),
+      name: z.string().describe("PascalCase view name (e.g. OrderList)"),
       params: z
         .array(
           z.object({
             name: z.string().describe("Param field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean, uuid)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this param means"),
+              .describe("What this param means"),
           }),
         )
         .optional()
@@ -1179,47 +1176,47 @@ export const viewCardTool: ToolDefinition<ViewCardData> = {
             types: z
               .array(z.string())
               .optional()
-              .describe("Event types matched by this item (OR within the item)"),
+              .describe("Event types matched (OR within the item)"),
             tags: z
               .array(
                 z.object({
                   tag: z
                     .string()
-                    .describe("Tag name already attached to an event field on the board"),
+                    .describe("Existing event-field tag name"),
                   field: z
                     .string()
                     .describe(
-                      "Name of a param field (from `params`) with the same type as that tagged event field",
+                      "Param name whose type matches the tagged event field",
                     ),
                 }),
               )
               .optional()
-              .describe("DCB tags the item requires (all must match)"),
+              .describe("DCB tags the item requires"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this query item selects"),
+              .describe("What this query item selects"),
           }),
         )
         .optional()
-        .describe("DCB query items combined with OR"),
+        .describe("DCB query items (OR-combined)"),
       states: z
         .array(
           z.object({
             name: z.string().describe("View field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this view field means"),
+              .describe("What this view field means"),
           }),
         )
         .optional()
-        .describe("Projected view fields (the read-model shape)"),
-      color: z.string().optional().describe("Optional header color hex code"),
-      description: z.string().optional().describe("Optional plain-language description of the view"),
+        .describe("Projected view fields"),
+      color: z.string().optional().describe("Optional hex color"),
+      description: z.string().optional().describe("Description of the view"),
     }),
     onCreate: (params, center: Point): CanvasElement<ViewCardData> => {
       const paramsList: ViewField[] = (params.params || []).map((p: ViewField) => ({

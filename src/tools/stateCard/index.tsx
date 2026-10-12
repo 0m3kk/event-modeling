@@ -1149,39 +1149,32 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
   ai: {
     toolName: "create_state_card",
     description:
-      "Create a State (DCB projection / decision model) card with 3 sections: params (input fields), " +
-      "query items (event types + DCB tags), and states (the projected state fields). " +
-      "RULE: every query tag must be written as { tag, field } where `tag` is a tag already attached to " +
-      "an event field on the board AND `field` is the name of one of this card's params whose type is " +
-      "IDENTICAL to that tagged event field's type. Use get_canvas_overview to discover existing tags and " +
-      "event types first; the card is rejected if any tag is unknown or its param field type mismatches. " +
-      "PARAM PROVENANCE (IMPORTANT): a param is an INPUT, so its value must come from somewhere — never " +
-      "invent a field. Each param must trace to one of: (a) a Command input or Query param of the same " +
-      "name that drives the flow (reuse that exact field name), (b) a DCB tag binding written as " +
-      "{ tag, field } in a query item, (c) an Enum-typed field (a fixed domain value), or (d) a system " +
-      "value such as now/timeNow/today. A param with no such source is rejected with " +
-      "`param_source_unknown`. A State is ONE object: a field already listed in `params` must NOT be " +
-      "repeated in `states` (repeating it is rejected with `state_echoes_param`).",
+      "Create a State (DCB projection / decision model) with sections: params (inputs), query items " +
+      "(event types + DCB tags) and states (projected fields). Every query tag is { tag, field }: `tag` " +
+      "must already exist on an event field and `field` must be a param with the SAME type. Params are " +
+      "inputs and must trace to a Command input / Query param of the same name, a query tag binding, an " +
+      "Enum type, or a system value like now. A name in `params` must not repeat in `states`. Call " +
+      "get_canvas_overview first; unknown tags, type mismatches (`param_source_unknown`) and param/state " +
+      "echoes (`state_echoes_param`) are rejected.",
     parameters: z.object({
-      name: z.string().describe("PascalCase state/projection name (e.g. CourseSubscription, OrderState)"),
+      name: z.string().describe("PascalCase state name (e.g. OrderState)"),
       params: z
         .array(
           z.object({
             name: z.string().describe("Param field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean, uuid)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this param means"),
+              .describe("What this param means"),
           }),
         )
         .optional()
         .describe(
-          "Input params. Each must trace to a source (a Command input/Query param of the same name, " +
-            "a query tag binding, a defined Enum/Object type, or a system value like now); " +
-            "each query tag's `field` must reference one of these by name.",
+          "Input params; each must trace to a real source (Command input/Query param of the same " +
+            "name, query tag binding, Enum/Object type, or a system value like now).",
         ),
       queryItems: z
         .array(
@@ -1189,49 +1182,49 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
             types: z
               .array(z.string())
               .optional()
-              .describe("Event types matched by this item (OR within the item)"),
+              .describe("Event types matched (OR within the item)"),
             tags: z
               .array(
                 z.object({
                   tag: z
                     .string()
-                    .describe("Tag name already attached to an event field on the board"),
+                    .describe("Existing event-field tag name"),
                   field: z
                     .string()
                     .describe(
-                      "Name of a param field (from `params`) with the same type as that tagged event field",
+                      "Param name whose type matches the tagged event field",
                     ),
                 }),
               )
               .optional()
-              .describe("DCB tags the item requires (all must match)"),
+              .describe("DCB tags the item requires"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this query item selects"),
+              .describe("What this query item selects"),
           }),
         )
         .optional()
-        .describe("DCB query items combined with OR"),
+        .describe("DCB query items (OR-combined)"),
       states: z
         .array(
           z.object({
             name: z.string().describe("State field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this state field means"),
+              .describe("What this state field means"),
           }),
         )
         .optional()
         .describe(
-          "Projected state fields (the decision-model shape). Do not repeat a field already listed in `params`.",
+          "Projected state fields. Do not repeat a name already in `params`.",
         ),
-      color: z.string().optional().describe("Optional header color hex code"),
-      description: z.string().optional().describe("Optional plain-language description of the state"),
+      color: z.string().optional().describe("Optional hex color"),
+      description: z.string().optional().describe("Description of the state"),
     }),
     onCreate: (params, center: Point): CanvasElement<StateCardData> => {
       const paramsList: StateField[] = (params.params || []).map((p: StateField) => ({

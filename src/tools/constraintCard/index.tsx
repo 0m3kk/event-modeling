@@ -538,41 +538,28 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
   ai: {
     toolName: "create_constraint_card",
     description:
-      "Create a Constraint card that declares business rules over one or more State cards. " +
-      "It has two sections: states (the State cards this constraint reads from, referenced by name) " +
-      "and rules (free-text business rules written in plain, human language, e.g. 'The account must be active'). " +
-      "Write rules as readable sentences, never as field-name notation such as 'accountStatus.status == active'. " +
-      "RULE: every entry in `states` must match the name of an existing State card on the board; use " +
-      "get_canvas_overview to discover existing State cards and their fields first. The card is rejected " +
-      "if a state is unknown. " +
-      "LINKAGE (IMPORTANT): the Constraint is the bridge between the flow's Command/Query and its State. " +
-      "The State's params are the values the rule compares, so each one must be supplied by the Command " +
-      "(its inputs) or Query (its params) in the same flow — check that the State's param names match " +
-      "fields that actually exist on that Command/Query, and add the missing input if they do not. " +
-      "RULE SEMANTICS (IMPORTANT): a rule is an INPUT gate — it decides whether the command/query may " +
-      "proceed and therefore whether the event is emitted, so it must be checkable from the command/query " +
-      "inputs plus the referenced State before anything is written. Never write a rule about how data is " +
-      "stored or what the event payload will contain (an OUTPUT concern). For example, 'The password must " +
-      "be hashed before storage; raw passwords are never stored' is WRONG — it targets persisted event data, " +
-      "not an input precondition; express the input-side check instead (e.g. 'The password must be non-empty'), " +
-      "since hashing is a handler/implementation detail of the event payload, not a Constraint.",
+      "Create a Constraint card declaring business rules over one or more State cards. Sections: `states` " +
+      "(existing State card names it reads) and `rules` (plain-language rules, e.g. 'The account must be " +
+      "active' — never field-name notation). A rule is an INPUT gate: it must be checkable from the " +
+      "Command/Query inputs plus the referenced State, and must not describe data storage or the event " +
+      "payload. The State params a rule compares must be supplied by that Command's inputs / Query's " +
+      "params. Call get_canvas_overview first; unknown state names are rejected.",
     parameters: z.object({
       name: z.string().describe("PascalCase constraint name (e.g. AccountMustBeActive)"),
       states: z
         .array(z.string())
         .optional()
-        .describe("Names of the State cards this constraint reads from (must exist on the board)"),
+        .describe("Names of existing State cards this constraint reads"),
       rules: z
         .array(z.string())
         .optional()
         .describe(
-          "Free-text INPUT preconditions, one per entry, in plain human language (e.g. 'The account must be active'). " +
-            "Each rule gates the command/query and decides whether the event is emitted, so it must be checkable " +
-            "from the command/query inputs plus the referenced State. Never describe how data is stored or what the " +
-            "event payload contains (e.g. 'The password must be hashed before storage' is wrong). Avoid field-name notation.",
+          "Plain-language INPUT preconditions (one per entry), e.g. 'The account must be active'. Each " +
+            "must be checkable from the Command/Query inputs plus the referenced State; never describe " +
+            "storage or the event payload.",
         ),
-      color: z.string().optional().describe("Optional header color hex code"),
-      description: z.string().optional().describe("Optional plain-language description of the constraint"),
+      color: z.string().optional().describe("Optional hex color"),
+      description: z.string().optional().describe("Description of the constraint"),
     }),
     onCreate: (params, center: Point): CanvasElement<ConstraintCardData> => {
       const states: ConstraintState[] = (params.states || [])

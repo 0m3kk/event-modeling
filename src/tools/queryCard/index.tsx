@@ -773,13 +773,13 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
         .array(
           z.object({
             name: z.string().describe("Param field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this field means"),
+              .describe("What this field means"),
           }),
         )
         .optional()
@@ -788,22 +788,22 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
         .array(
           z.object({
             name: z.string().describe("Response field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this field means"),
+              .describe("What this field means"),
           }),
         )
         .optional()
         .describe("Return / response fields produced by the query"),
-      color: z.string().optional().describe("Optional header color hex code"),
+      color: z.string().optional().describe("Optional hex color"),
       description: z
         .string()
         .optional()
-        .describe("Optional plain-language description of the query"),
+        .describe("Description of the query"),
     }),
     onCreate: (params, center: Point): CanvasElement<QueryCardData> => {
       const queryParams = params.params || [];

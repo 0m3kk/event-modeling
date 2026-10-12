@@ -250,17 +250,17 @@ export const enumCardTool: ToolDefinition<EnumCardData> = {
       values: z
         .array(
           z.object({
-            name: z.string().describe("Enum value name (e.g. Draft, Active, Closed)"),
-            description: z.string().optional().describe("Optional description of the value"),
+            name: z.string().describe("Value name"),
+            description: z.string().optional().describe("Description of the value"),
           }),
         )
         .optional()
-        .describe("Values that make up the enum"),
-      color: z.string().optional().describe("Optional header color hex code"),
+        .describe("Enum values"),
+      color: z.string().optional().describe("Optional hex color"),
       description: z
         .string()
         .optional()
-        .describe("Optional plain-language description of the enum"),
+        .describe("Description of the enum"),
     }),
     onCreate: (params, center: Point): CanvasElement<EnumCardData> => {
       const fields = params.values || [];

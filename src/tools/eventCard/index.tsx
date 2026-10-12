@@ -277,37 +277,36 @@ export const eventCardTool: ToolDefinition<EventCardData> = {
 
   ai: {
     toolName: "create_event_card",
-    description: "Create a domain Event card in the Event Model. When tagging fields with a DCB tag, use the domain entity noun (e.g. \"account\", \"user\"), never an id field like \"accountId\".",
+    description: "Create a domain Event card. DCB tags use the entity noun (e.g. \"account\"), never an id field like \"accountId\".",
     parameters: z.object({
       name: z.string().describe("PascalCase event name (e.g. OrderPlaced, ItemAdded)"),
       fields: z
         .array(
           z.object({
             name: z.string().describe("Field name in camelCase"),
-            type: z.string().describe("Field data type (e.g. string, number, boolean, or a defined Object/Enum/Alias name)"),
-            isArray: z.boolean().optional().describe("True when the field is an array of the type"),
-            isRequired: z.boolean().optional().describe("True when the field is required"),
+            type: z.string().describe("Field type (primitive or defined type name)"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
             description: z
               .string()
               .optional()
-              .describe("Plain-language description of what this field means"),
+              .describe("What this field means"),
             tag: z
               .string()
               .optional()
               .describe(
-                "Optional DCB tag naming the domain entity/aggregate this event belongs to. " +
-                  "Use the entity noun, NOT an id field: for a field \"accountId\" use \"account\", " +
-                  "for \"userId\" use \"user\", for \"orderId\" use \"order\". All events reusing a tag MUST use the same field type.",
+                "Optional DCB tag naming the event's domain entity; use the entity noun, not an id " +
+                  "field (\"accountId\"->\"account\"). Reusing a tag requires the same field type.",
               ),
           }),
         )
         .optional()
         .describe("Payload fields carried by the event"),
-      color: z.string().optional().describe("Optional header color hex code"),
+      color: z.string().optional().describe("Optional hex color"),
       description: z
         .string()
         .optional()
-        .describe("Optional plain-language description of the event"),
+        .describe("Description of the event"),
     }),
     onCreate: (params, center: Point): CanvasElement<EventCardData> => {
       const fields = params.fields || [];

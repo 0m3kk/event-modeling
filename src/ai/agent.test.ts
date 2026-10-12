@@ -50,6 +50,45 @@ describe("AIAgent", () => {
     expect(Array.isArray(parsed.eventTypes)).toBe(true);
   });
 
+  it("omits cosmetic fields and descriptions from the canvas overview", async () => {
+    await executeAITool("create_event_card", {
+      name: "OrderPlaced",
+      description: "Raised when an order is placed",
+      fields: [{ name: "orderId", type: "string", tag: "order", description: "The order id" }],
+    });
+    const res = await executeAITool("get_canvas_overview", {});
+    const parsed = JSON.parse(res);
+    const event = parsed.elements.find((e: any) => e.name === "orderPlaced");
+
+    expect(event).toBeTruthy();
+    expect(event.id).toBeUndefined();
+    expect(event.x).toBeUndefined();
+    expect(event.data).toBeUndefined();
+    expect(event.description).toBeUndefined();
+    expect(res).not.toContain('"description"');
+    expect(event.fields[0]).toEqual({ name: "orderId", type: "string", tag: "order" });
+  });
+
+  it("preserves existing field descriptions when an update omits them", async () => {
+    await executeAITool("create_event_card", {
+      name: "OrderPlaced",
+      fields: [{ name: "orderId", type: "string", description: "The order id" }],
+    });
+    await executeAITool("update_event_card", {
+      target: "OrderPlaced",
+      name: "OrderPlaced",
+      fields: [{ name: "orderId", type: "number" }],
+    });
+    const event = useCanvasStore
+      .getState()
+      .elements.find((e) => e.type === "eventCard")!;
+    expect(event.data.fields[0]).toEqual({
+      name: "orderId",
+      type: "number",
+      description: "The order id",
+    });
+  });
+
   it("emits a nested JSON schema for state cards", () => {
     const tools = buildOpenAITools();
     const stateTool = tools.find((t) => t.function.name === "create_state_card");
