@@ -23,6 +23,7 @@ import {
   type ChatMessage,
 } from "@/ai/client";
 import { runAgentConversation } from "@/ai/agent";
+import { useFontScale } from "@/hooks/useFontScale";
 
 const AI_PANEL_WIDTH_STORAGE_KEY = "event_modeling_ai_panel_width";
 const MIN_PANEL_WIDTH = 320;
@@ -30,30 +31,9 @@ const MAX_PANEL_WIDTH = 800;
 const DEFAULT_PANEL_WIDTH = 480;
 
 const AI_PANEL_FONT_SCALE_STORAGE_KEY = "event_modeling_ai_panel_font_scale";
-// Discrete multipliers applied to the panel's base text sizes. The 1.0 entry is
-// the default/neutral step.
-const FONT_SCALE_LEVELS = [0.85, 1, 1.15, 1.3, 1.5];
-const DEFAULT_FONT_SCALE = 1;
 
 // Max height (px) the prompt textarea grows to before it starts scrolling.
 const MAX_INPUT_HEIGHT = 220;
-
-/** Restores the panel font scale from the last session, snapped to a known level. */
-function getStoredFontScale(): number {
-  try {
-    const raw = localStorage.getItem(AI_PANEL_FONT_SCALE_STORAGE_KEY);
-    const parsed = raw ? Number.parseFloat(raw) : Number.NaN;
-    if (Number.isFinite(parsed)) {
-      // Snap to the closest level so stale/free-form values stay in-sync.
-      return FONT_SCALE_LEVELS.reduce((best, level) =>
-        Math.abs(level - parsed) < Math.abs(best - parsed) ? level : best,
-      );
-    }
-  } catch {
-    // Ignore storage errors (private mode, quota, etc.)
-  }
-  return DEFAULT_FONT_SCALE;
-}
 
 /** Restores the panel width from the last session, clamped to sane bounds. */
 function getStoredPanelWidth(): number {
@@ -101,7 +81,13 @@ export function AIPanel() {
   const panelWidthRef = useRef(panelWidth);
 
   // Panel font scale (persisted across sessions)
-  const [fontScale, setFontScale] = useState(getStoredFontScale);
+  const {
+    fontScale,
+    increase: increaseFont,
+    decrease: decreaseFont,
+    canDecrease: canDecreaseFont,
+    canIncrease: canIncreaseFont,
+  } = useFontScale(AI_PANEL_FONT_SCALE_STORAGE_KEY);
 
   // The history snapshot for the most recent turn, used by retry.
   const lastTurnRef = useRef<ChatMessage[] | null>(null);
@@ -193,29 +179,6 @@ export function AIPanel() {
       // Ignore storage errors
     }
   };
-
-  // Step the panel font scale up or down within the predefined levels and persist it.
-  const changeFontScale = (direction: 1 | -1) => {
-    setFontScale((prev) => {
-      const currentIndex = FONT_SCALE_LEVELS.indexOf(prev);
-      const nextIndex = Math.min(
-        FONT_SCALE_LEVELS.length - 1,
-        Math.max(0, currentIndex + direction),
-      );
-      const next = FONT_SCALE_LEVELS[nextIndex];
-      if (next !== prev) {
-        try {
-          localStorage.setItem(AI_PANEL_FONT_SCALE_STORAGE_KEY, String(next));
-        } catch {
-          // Ignore storage errors
-        }
-      }
-      return next;
-    });
-  };
-
-  const canDecreaseFont = fontScale > FONT_SCALE_LEVELS[0];
-  const canIncreaseFont = fontScale < FONT_SCALE_LEVELS[FONT_SCALE_LEVELS.length - 1];
 
   const handleSaveSettings = () => {
     const updated: AISettings = {
@@ -346,7 +309,7 @@ export function AIPanel() {
       style={
         {
           width: `${panelWidth}px`,
-          "--ai-font-scale": String(fontScale),
+          "--panel-font-scale": String(fontScale),
         } as React.CSSProperties
       }
       className="ai-panel absolute right-0 top-14 bottom-6 z-20 flex flex-col border-l border-gray-200/80 bg-white/95 backdrop-blur-md shadow-2xl select-text dark:border-zinc-800/80 dark:bg-zinc-900/95"
@@ -365,7 +328,7 @@ export function AIPanel() {
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => changeFontScale(-1)}
+            onClick={decreaseFont}
             disabled={!canDecreaseFont}
             title={t("ai.decreaseFont")}
             aria-label={t("ai.decreaseFont")}
@@ -374,7 +337,7 @@ export function AIPanel() {
             <AArrowDown size={16} />
           </button>
           <button
-            onClick={() => changeFontScale(1)}
+            onClick={increaseFont}
             disabled={!canIncreaseFont}
             title={t("ai.increaseFont")}
             aria-label={t("ai.increaseFont")}

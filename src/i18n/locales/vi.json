@@ -89,7 +89,9 @@
     "subtitle": "Sao chép hoặc tải xuống đặc tả YAML của bảng",
     "copy": "Sao chép",
     "copied": "Đã sao chép",
-    "download": "Tải xuống"
+    "download": "Tải xuống",
+    "decreaseFont": "Giảm cỡ chữ",
+    "increaseFont": "Tăng cỡ chữ"
   },
   "common": {
     "close": "Đóng",

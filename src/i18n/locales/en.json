@@ -89,7 +89,9 @@
     "subtitle": "Copy or download the board's YAML specification",
     "copy": "Copy",
     "copied": "Copied",
-    "download": "Download"
+    "download": "Download",
+    "decreaseFont": "Decrease font size",
+    "increaseFont": "Increase font size"
   },
   "common": {
     "close": "Close",

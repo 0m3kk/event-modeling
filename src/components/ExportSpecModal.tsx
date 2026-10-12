@@ -1,12 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, Download, FileCode2, X } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { AArrowDown, AArrowUp, Check, Copy, Download, FileCode2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import { downloadSpecification, serializeSpecification } from "@/utils/specExport";
+import { useFontScale } from "@/hooks/useFontScale";
+
+/** Storage key for the preview's persisted font scale. */
+const SPEC_FONT_SCALE_STORAGE_KEY = "event_modeling_spec_font_scale";
 
 /**
  * Preview modal for the board's YAML specification. It renders exactly the text
  * that will be copied or downloaded, so what the user reviews is what they get.
+ * The preview text size can be scaled up/down, matching the AI panel.
  */
 export function ExportSpecModal() {
   const { t } = useTranslation();
@@ -17,6 +22,14 @@ export function ExportSpecModal() {
   const elements = useCanvasStore((s) => s.elements);
 
   const [copied, setCopied] = useState(false);
+
+  const {
+    fontScale,
+    increase: increaseFont,
+    decrease: decreaseFont,
+    canDecrease: canDecreaseFont,
+    canIncrease: canIncreaseFont,
+  } = useFontScale(SPEC_FONT_SCALE_STORAGE_KEY);
 
   // The spec is only built while the modal is open, over the board it opened on.
   const yaml = useMemo(
@@ -60,7 +73,8 @@ export function ExportSpecModal() {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+        style={{ "--panel-font-scale": String(fontScale) } as CSSProperties}
+        className="spec-modal flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-zinc-800">
@@ -75,13 +89,33 @@ export function ExportSpecModal() {
               </span>
             </div>
           </div>
-          <button
-            onClick={() => setOpen(false)}
-            title={t("common.close")}
-            className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={decreaseFont}
+              disabled={!canDecreaseFont}
+              title={t("export.decreaseFont")}
+              aria-label={t("export.decreaseFont")}
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer dark:text-zinc-400 dark:hover:bg-zinc-800 dark:disabled:hover:bg-transparent"
+            >
+              <AArrowDown size={16} />
+            </button>
+            <button
+              onClick={increaseFont}
+              disabled={!canIncreaseFont}
+              title={t("export.increaseFont")}
+              aria-label={t("export.increaseFont")}
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer dark:text-zinc-400 dark:hover:bg-zinc-800 dark:disabled:hover:bg-transparent"
+            >
+              <AArrowUp size={16} />
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              title={t("common.close")}
+              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Preview */}
