@@ -26,6 +26,7 @@ import {
   isSliceEligibleChild,
   laneEffectiveType,
   normalizeSliceData,
+  reconcileSliceLanes,
   type SliceData,
   type SliceElement,
   type SliceLane,
@@ -405,6 +406,27 @@ export const sliceCardTool: ToolDefinition<SliceData> = {
         height: size.height,
         data,
       };
+    },
+
+    /**
+     * Rebuilds an existing slice from an update payload, reusing the id of every
+     * lane that already covers the same card type. This keeps the slice's cards
+     * attached to their lanes — e.g. when a new lane is added — instead of
+     * detaching them because their old `laneId` no longer exists.
+     */
+    onUpdate: (element, params): CanvasElement<SliceData> => {
+      const lanes = reconcileSliceLanes(
+        element.data.lanes ?? [],
+        (params.lanes ?? []) as { type?: string }[],
+      );
+      const data: SliceData = {
+        ...element.data,
+        name: params.name ?? element.data.name,
+        lanes,
+        color: params.color ?? element.data.color,
+        ...(params.description !== undefined ? { description: params.description } : {}),
+      };
+      return { ...element, data };
     },
   },
 };

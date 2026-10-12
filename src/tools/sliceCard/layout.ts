@@ -58,6 +58,46 @@ export function createSliceLane(childType?: string | null): SliceLane {
 }
 
 /**
+ * Rebuilds a slice's lane list from an update payload, reusing the id of any
+ * existing lane reserved for the same card type.
+ *
+ * Updates describe lanes only by `type` (they carry no ids). Without this every
+ * edit would mint fresh lane ids, so the slice's cards — which still point at
+ * the old ids — would be detached by the next reflow instead of staying in
+ * their lanes. Cards are what matter here, so a lane's id is its identity.
+ */
+export function reconcileSliceLanes(
+  existing: SliceLane[],
+  incoming: { type?: string | null }[],
+): SliceLane[] {
+  const used = new Set<number>();
+  const take = (match: (lane: SliceLane) => boolean): string | null => {
+    const index = existing.findIndex((lane, i) => !used.has(i) && match(lane));
+    if (index < 0) return null;
+    used.add(index);
+    return existing[index].id;
+  };
+
+  // 1. Prefer the existing lane reserved for the same card type.
+  const ids = incoming.map((lane) =>
+    lane.type ? take((l) => l.childType === lane.type) : null,
+  );
+
+  // 2. Fall back to a free untyped lane (a manual lane that has not adopted a
+  //    type yet) so its cards keep their membership too.
+  for (let i = 0; i < ids.length; i++) {
+    if (!ids[i]) ids[i] = take((l) => !l.childType);
+  }
+
+  // 3. Anything still unmatched is a genuinely new lane.
+  return incoming.map((lane, i) => {
+    const id = ids[i];
+    if (!id) return createSliceLane(lane.type ?? undefined);
+    return lane.type ? { id, childType: lane.type } : { id };
+  });
+}
+
+/**
  * The type a lane currently accepts. A reserved lane (`childType`) always wins;
  * otherwise the lane adopts the type of its left-most card, or null when empty
  * (meaning it accepts anything).

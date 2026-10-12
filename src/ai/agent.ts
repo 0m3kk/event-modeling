@@ -14,11 +14,15 @@ import {
   type SliceLane,
 } from "@/tools/sliceCard/layout";
 import {
+  DOMAIN_LABEL_HEIGHT,
+  DOMAIN_PADDING,
   DOMAIN_TYPE,
   isNestableInDomain,
   type DomainElement,
 } from "@/tools/domainCard/layout";
 import {
+  GROUP_LABEL_HEIGHT,
+  GROUP_PADDING,
   GROUP_TYPE,
   isGroupEligibleChild,
 } from "@/tools/groupCard/layout";
@@ -764,7 +768,11 @@ function executeUpdateElement(updateName: string, args: any): string {
   }
 
   const { target: _target, ...payload } = args ?? {};
-  const built = ai.onCreate(payload, { x: existing.x, y: existing.y });
+  // A tool may reconcile an update against the existing element (e.g. a Slice
+  // reusing its lane ids so its cards stay put); otherwise rebuild from scratch.
+  const built = ai.onUpdate
+    ? ai.onUpdate(existing, payload)
+    : ai.onCreate(payload, { x: existing.x, y: existing.y });
 
   // Preserve identity/meta the payload did not mention so an update never
   // silently drops the card's name, colour, description or live links.
@@ -907,6 +915,25 @@ function executeUpdateElement(updateName: string, args: any): string {
 type CreatedPlacement = { error: string } | { delta: Partial<CanvasElement> };
 
 /**
+ * Top-left of a container's content area — the spot its first child occupies.
+ *
+ * AI cards spawn at the viewport centre, which can be far from the Group/Domain
+ * frame they are being placed into. Anchoring the free-spot search here keeps
+ * the new card inside (or right beside) the frame instead of dragging the frame
+ * across the canvas — and over other cards — to reach a distant spawn point.
+ */
+function containerContentOrigin(
+  container: { x: number; y: number } | undefined,
+  padding: number,
+  labelHeight: number,
+  fallback: { x: number; y: number },
+): { x: number; y: number } {
+  return container
+    ? { x: container.x + padding, y: container.y + padding + labelHeight }
+    : fallback;
+}
+
+/**
  * Resolves the optional `slice`/`lane`, `group` and `domain` placement carried
  * by a create/copy tool into a concrete position/membership delta, or a JSON
  * error string to hand back to the model when the request is invalid.
@@ -970,12 +997,23 @@ function resolveCreatedPlacement(
     };
   }
   if (groupPlacement.requested && groupPlacement.groupId) {
-    // Land beside the group's existing children so a batch spreads out instead
-    // of stacking, and so the card sits inside the frame.
+    // Anchor to the group's content area, then land beside its other children
+    // so a batch spreads out instead of stacking, and the frame barely grows.
+    const group = state.elements.find((el) => el.id === groupPlacement.groupId);
     const groupChildren = state.elements.filter(
-      (el) => el.groupId === groupPlacement.groupId,
+      (el) => el.groupId === groupPlacement.groupId && el.id !== element.id,
     );
-    const spot = findFreeSpot(groupChildren, rect, AI_PLACEMENT_GAP);
+    const origin = containerContentOrigin(
+      group,
+      GROUP_PADDING,
+      GROUP_LABEL_HEIGHT,
+      { x: element.x, y: element.y },
+    );
+    const spot = findFreeSpot(
+      groupChildren,
+      { ...rect, x: origin.x, y: origin.y },
+      AI_PLACEMENT_GAP,
+    );
     return {
       delta: {
         x: spot.x,
@@ -999,12 +1037,23 @@ function resolveCreatedPlacement(
     };
   }
   if (domainPlacement.requested && domainPlacement.domainId) {
-    // Land beside the domain's existing children so a batch spreads out instead
-    // of stacking, and so the card sits inside the frame.
+    // Anchor to the domain's content area, then land beside its other children
+    // so a batch spreads out instead of stacking, and the frame barely grows.
+    const domain = state.elements.find((el) => el.id === domainPlacement.domainId);
     const domainChildren = state.elements.filter(
-      (el) => el.domainId === domainPlacement.domainId,
+      (el) => el.domainId === domainPlacement.domainId && el.id !== element.id,
     );
-    const spot = findFreeSpot(domainChildren, rect, AI_PLACEMENT_GAP);
+    const origin = containerContentOrigin(
+      domain,
+      DOMAIN_PADDING,
+      DOMAIN_LABEL_HEIGHT,
+      { x: element.x, y: element.y },
+    );
+    const spot = findFreeSpot(
+      domainChildren,
+      { ...rect, x: origin.x, y: origin.y },
+      AI_PLACEMENT_GAP,
+    );
     return {
       delta: {
         x: spot.x,

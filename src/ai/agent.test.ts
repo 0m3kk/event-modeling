@@ -1106,4 +1106,96 @@ describe("AIAgent", () => {
     expect(copy.sliceId).toBe(slice.id);
     expect(copy.laneId).toBe(lane.id);
   });
+
+  it("anchors an AI card to its Group instead of the viewport centre", async () => {
+    // Pre-seed a Group and one child far from the viewport centre (500, 400).
+    useCanvasStore.setState({
+      elements: [
+        {
+          id: "g1",
+          type: "groupCard",
+          x: 2000,
+          y: 2000,
+          width: 240,
+          height: 130,
+          data: { name: "Types", color: "#a855f7" },
+        },
+        {
+          id: "o1",
+          type: "objectCard",
+          x: 2012,
+          y: 2038,
+          width: 180,
+          height: 80,
+          groupId: "g1",
+          data: { name: "Money", fields: [] },
+        },
+      ],
+    });
+
+    const res = JSON.parse(
+      await executeAITool("create_object_card", {
+        name: "Account",
+        fields: [],
+        group: "Types",
+      }),
+    );
+    expect(res.status).toBe("success");
+
+    const elements = useCanvasStore.getState().elements;
+    const created = elements.find((e) => e.id === res.createdId)!;
+    // The new card lands next to the group's existing child, not at the centre.
+    expect(created.x).toBeGreaterThan(1500);
+    expect(created.y).toBeGreaterThan(1500);
+    // The group did not balloon across the canvas to reach the new card.
+    const group = elements.find((e) => e.type === "groupCard")!;
+    expect(group.width).toBeLessThan(1000);
+  });
+
+  it("keeps a slice's cards in their lanes when a lane is added via update", async () => {
+    await executeAITool("create_slice", {
+      name: "PlaceOrder",
+      lanes: [{ type: "commandCard" }, { type: "eventCard" }],
+    });
+    const slice = useCanvasStore.getState().elements.find((e) => e.type === "sliceCard")!;
+    const [commandLane, eventLane] = (slice.data as any).lanes;
+
+    const cmdRes = JSON.parse(
+      await executeAITool("create_command_card", {
+        name: "PlaceOrder",
+        slice: "PlaceOrder",
+        lane: "commandCard",
+      }),
+    );
+    expect(cmdRes.status).toBe("success");
+
+    // Insert a new constraint lane in the middle.
+    const updated = JSON.parse(
+      await executeAITool("update_slice", {
+        target: "PlaceOrder",
+        name: "PlaceOrder",
+        lanes: [
+          { type: "commandCard" },
+          { type: "constraintCard" },
+          { type: "eventCard" },
+        ],
+      }),
+    );
+    expect(updated.status).toBe("success");
+
+    const slice2 = useCanvasStore.getState().elements.find((e) => e.type === "sliceCard")!;
+    const lanes = (slice2.data as any).lanes;
+    expect(lanes.map((l: any) => l.childType)).toEqual([
+      "commandCard",
+      "constraintCard",
+      "eventCard",
+    ]);
+    // Existing lane ids are reused, so cards keep their membership.
+    expect(lanes[0].id).toBe(commandLane.id);
+    expect(lanes[2].id).toBe(eventLane.id);
+
+    const cmd = useCanvasStore.getState().elements.find((e) => e.id === cmdRes.createdId)!;
+    expect(cmd.sliceId).toBe(slice2.id);
+    expect(cmd.laneId).toBe(commandLane.id);
+  });
 });
