@@ -123,7 +123,7 @@ describe("OptionsBar data workflows & undo/redo", () => {
         name: "OrderPlaced",
         fields: [
           { name: "orderId", type: "string" },
-          { name: "amount", type: "number" },
+          { name: "amount", type: "float" },
         ],
       },
     };
@@ -171,7 +171,7 @@ describe("OptionsBar data workflows & undo/redo", () => {
         name: "OrderPlaced",
         fields: [
           { name: "orderId", type: "string" },
-          { name: "amount", type: "number" },
+          { name: "amount", type: "float" },
         ],
       },
     };
@@ -221,7 +221,7 @@ describe("OptionsBar data workflows & undo/redo", () => {
         name: "OrderPlaced",
         fields: [
           { name: "orderId", type: "string" },
-          { name: "amount", type: "number" },
+          { name: "amount", type: "float" },
         ],
       },
     };
@@ -233,11 +233,11 @@ describe("OptionsBar data workflows & undo/redo", () => {
       fieldIndex: 0,
     });
 
-    // Change orderId from "string" to "uuid"
-    useCanvasStore.getState().updateSelectedFieldType("uuid");
+    // Change orderId from "string" to "boolean"
+    useCanvasStore.getState().updateSelectedFieldType("boolean");
 
     let updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
-    expect(updated?.data.fields[0].type).toBe("uuid");
+    expect(updated?.data.fields[0].type).toBe("boolean");
     expect(updated?.data.fields[0].name).toBe("orderId");
 
     // Undo reverts back to string
@@ -245,10 +245,10 @@ describe("OptionsBar data workflows & undo/redo", () => {
     updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
     expect(updated?.data.fields[0].type).toBe("string");
 
-    // Redo restores uuid
+    // Redo restores boolean
     useCanvasStore.getState().redo();
     updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
-    expect(updated?.data.fields[0].type).toBe("uuid");
+    expect(updated?.data.fields[0].type).toBe("boolean");
   });
 
   it("syncs field type change across reference copies", () => {
@@ -263,7 +263,7 @@ describe("OptionsBar data workflows & undo/redo", () => {
         name: "OrderPlaced",
         fields: [
           { name: "orderId", type: "string" },
-          { name: "amount", type: "number" },
+          { name: "amount", type: "float" },
         ],
       },
     };

@@ -182,9 +182,8 @@ export function buildOpenAITools(): any[] {
         "Read a compact summary of every element (type, name, fields, tags, plus its board " +
         "position `x`/`y` and `width`/`height`), alongside `eventTypes`, `tagCatalog`, `slices` " +
         "(with lanes and their cards), `groups` and `domains`, so you can build valid State query " +
-        "tags, target slice lanes, place new items in the right Domain, and decide where existing " +
-        "cards should sit with position_elements. Descriptions are omitted; updates keep existing " +
-        "ones when you leave them out.",
+        "tags, target slice lanes, and place new items in the right Domain. Descriptions are " +
+        "omitted; updates keep existing ones when you leave them out.",
       parameters: {
         type: "object",
         properties: {},
@@ -205,49 +204,7 @@ export function buildOpenAITools(): any[] {
     },
   });
 
-  // 3. Generic component-positioning tool (the AI decides the layout itself)
-  tools.push({
-    type: "function",
-    function: {
-      name: "position_elements",
-      description:
-        "Move one or more existing components to specific board coordinates so the whole model " +
-        "reads well (group related cards, line up flows, remove overlaps). Give each entry a " +
-        "`target` (current name, optionally narrowed by `type`) and the new top-left `x`/`y` in " +
-        "board coordinates. Read get_canvas_overview first for current positions, sizes and " +
-        "container membership, and avoid overlapping cards. Membership NEVER changes: a card " +
-        "stays in its Domain/Group. Moving a Domain/Group moves its whole frame and contents. " +
-        "Cards inside a Slice lane cannot be moved directly — move the Slice instead.",
-      parameters: {
-        type: "object",
-        properties: {
-          placements: {
-            type: "array",
-            description: "Components to move, with their new top-left position.",
-            items: {
-              type: "object",
-              properties: {
-                target: {
-                  type: "string",
-                  description: "Current name of the component to move",
-                },
-                type: {
-                  type: "string",
-                  description: "Optional element type to disambiguate (e.g. eventCard, domainCard)",
-                },
-                x: { type: "number", description: "New top-left X in board coordinates" },
-                y: { type: "number", description: "New top-left Y in board coordinates" },
-              },
-              required: ["target", "x", "y"],
-            },
-          },
-        },
-        required: ["placements"],
-      },
-    },
-  });
-
-  // 4. Generic single-element delete tool
+  // 3. Generic single-element delete tool
   tools.push({
     type: "function",
     function: {
@@ -272,7 +229,7 @@ export function buildOpenAITools(): any[] {
     },
   });
 
-  // 5. Create a live reference copy of an existing card
+  // 4. Create a live reference copy of an existing card
   tools.push({
     type: "function",
     function: {
@@ -302,7 +259,7 @@ export function buildOpenAITools(): any[] {
     },
   });
 
-  // 6. Create a live method-execution copy of a Service method
+  // 5. Create a live method-execution copy of a Service method
   tools.push({
     type: "function",
     function: {
@@ -332,7 +289,7 @@ export function buildOpenAITools(): any[] {
     },
   });
 
-  // 7. Dynamic decoupled tools from registry: each create tool also gets a
+  // 6. Dynamic decoupled tools from registry: each create tool also gets a
   //    matching update tool that reuses the same payload schema plus a
   //    `target` locator (the card's current name). Lane-eligible card tools
   //    also accept `slice` / `lane` so the model can drop the card straight
@@ -629,8 +586,8 @@ function stripOverviewValue(value: any): any {
 
 /**
  * Compact, id-free projection of one canvas element for the model. Includes the
- * card's board position and size so the model can reason about layout (avoid
- * overlaps, place related cards near each other) when calling position_elements.
+ * card's board position and size so the model's overview reflects what the user
+ * actually sees on the canvas.
  */
 function summarizeElement(el: CanvasElement): any {
   const data = stripOverviewValue(el.data) ?? {};
@@ -806,138 +763,6 @@ function executeDeleteElement(args: any): string {
 
   state.deleteElements([element.id]);
   return JSON.stringify({ status: "success", deletedId: element.id, type: element.type });
-}
-
-/** Every id in a container's subtree: the container plus all its descendants. */
-function collectSubtreeIds(elements: CanvasElement[], rootId: string): string[] {
-  const childrenByParent = new Map<string, string[]>();
-  for (const el of elements) {
-    const parentId = el.sliceId ?? el.groupId ?? el.domainId;
-    if (!parentId) continue;
-    const list = childrenByParent.get(parentId);
-    if (list) list.push(el.id);
-    else childrenByParent.set(parentId, [el.id]);
-  }
-
-  const ids: string[] = [];
-  const stack = [rootId];
-  while (stack.length > 0) {
-    const id = stack.pop()!;
-    ids.push(id);
-    const kids = childrenByParent.get(id);
-    if (kids) stack.push(...kids);
-  }
-  return ids;
-}
-
-/**
- * Moves a component (and, for a Domain/Group, its whole subtree) to a new
- * top-left. Membership is never touched — only positions change, and the store
- * re-fits any container frame around the cards it places.
- *
- * Returns the position patches, or an `error` string when the target cannot be
- * moved directly (a card that a Slice lays out in one of its lanes).
- */
-function buildMovePatches(
-  elements: CanvasElement[],
-  element: CanvasElement,
-  x: number,
-  y: number,
-): { patches: Array<{ id: string; x: number; y: number }>; error?: string } {
-  // A Slice positions its own lane cards; moving one directly would be undone.
-  if (element.sliceId) {
-    return {
-      patches: [],
-      error: "This card is laid out by its Slice lane; move the Slice instead.",
-    };
-  }
-
-  if (element.type === DOMAIN_TYPE || element.type === GROUP_TYPE) {
-    const byId = new Map(elements.map((el) => [el.id, el]));
-    const dx = x - element.x;
-    const dy = y - element.y;
-    const patches = collectSubtreeIds(elements, element.id).map((id) => {
-      const el = byId.get(id)!;
-      return { id, x: Math.round(el.x + dx), y: Math.round(el.y + dy) };
-    });
-    return { patches };
-  }
-
-  return { patches: [{ id: element.id, x: Math.round(x), y: Math.round(y) }] };
-}
-
-/**
- * Places existing components at explicit board coordinates. The model reads the
- * board with get_canvas_overview and decides the layout itself; this only
- * applies the requested positions. Container membership is never modified.
- */
-function executePositionElements(args: any): string {
-  const raw = Array.isArray(args?.placements) ? args.placements : [];
-
-  if (raw.length === 0) {
-    return JSON.stringify({
-      status: "error",
-      error: "validation_failed",
-      message: "`placements` must contain at least one { target, x, y } entry.",
-      issues: [
-        {
-          path: "placements",
-          code: "placements_empty",
-          message: "No placements were provided.",
-        },
-      ],
-    });
-  }
-
-  const patchesById = new Map<string, { id: string; x: number; y: number }>();
-  const failed: Array<{ target: string; error: string }> = [];
-  const elements = useCanvasStore.getState().elements;
-
-  for (const entry of raw) {
-    const target = typeof entry?.target === "string" ? entry.target.trim() : "";
-    const type = typeof entry?.type === "string" ? entry.type.trim() : "";
-    const x = Number(entry?.x);
-    const y = Number(entry?.y);
-
-    if (!target || !Number.isFinite(x) || !Number.isFinite(y)) {
-      failed.push({ target: target || "(missing)", error: "invalid_target_or_coordinates" });
-      continue;
-    }
-
-    const found = findElementByName(elements, target, type || undefined);
-    if (!found) {
-      failed.push({ target, error: "element_not_found" });
-      continue;
-    }
-
-    const { patches, error } = buildMovePatches(elements, found, x, y);
-    if (error) {
-      failed.push({ target, error });
-      continue;
-    }
-    for (const patch of patches) patchesById.set(patch.id, patch);
-  }
-
-  const patches = Array.from(patchesById.values());
-  if (patches.length > 0) {
-    useCanvasStore.getState().updateElements(patches);
-  }
-
-  if (patches.length === 0) {
-    return JSON.stringify({
-      status: "error",
-      error: "position_failed",
-      message: "No component could be positioned.",
-      failed,
-    });
-  }
-
-  return JSON.stringify({
-    status: "success",
-    placed: patches.length,
-    ...(failed.length > 0 ? { failed } : {}),
-    message: `Positioned ${patches.length} component(s).`,
-  });
 }
 
 /**
@@ -1468,10 +1293,6 @@ export async function executeAITool(name: string, args: any): Promise<string> {
     return executeDeleteElement(args);
   }
 
-  if (name === "position_elements") {
-    return executePositionElements(args);
-  }
-
   if (name === "create_reference_copy") {
     return executeCreateReferenceCopy(args);
   }
@@ -1557,7 +1378,7 @@ export async function runAgentConversation(
 1. CANVAS CONTENT (cards and everything you model): write ALL human-readable text you put on the canvas in the system's app language, which is ${languageName} — every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other text on a card — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form.
 2. CHAT REPLIES (your feedback, questions and explanations shown in the chat panel): always use the SAME language the user is currently writing in, detected from their latest message — NOT the app language. If the user writes in English, reply in English; if they write in Vietnamese, reply in Vietnamese; if they switch language, switch with them. The canvas content language (rule 1) never changes based on this.`;
   const systemPrompt = `You are the AI Event Modeling Architect, helping architects design domain events, business models and reactive systems on an infinite canvas.
-Tools: read the canvas; create sticky notes, Events, Commands, Queries, States (projection/decision models), Views (persisted read models), Objects, Enums, Aliases, Services (methods with params + returns), Constraint cards, Actors (RBAC), Domain frames, Groups and Slices; make live reference copies of a card (create_reference_copy) or method-execution copies of a Service method (create_service_method_execution); move existing components to chosen positions (position_elements); clear the board. When the user asks to add or create something, always call the matching creation tool.
+Tools: read the canvas; create sticky notes, Events, Commands, Queries, States (projection/decision models), Views (persisted read models), Objects, Enums, Aliases, Services (methods with params + returns), Constraint cards, Actors (RBAC), Domain frames, Groups and Slices; make live reference copies of a card (create_reference_copy) or method-execution copies of a Service method (create_service_method_execution); clear the board. When the user asks to add or create something, always call the matching creation tool.
 COPIES: create_reference_copy makes a linked duplicate of an existing card (locate it by "target", optionally "type") — both share one name and stay in sync. create_service_method_execution makes a live Service card that runs ONE method of a source Service (give "service" and "method"); use it for the serviceCard lane of a write slice, placing it via "slice"/"lane". Both accept the optional "slice"/"lane", "group" and "domain" placement.
 DOMAINS (bounded contexts): call get_canvas_overview first and check its "domains".
 - If a Domain exists, put each new card/Slice into the most relevant one via "domain" = its name (this also moves it on update); prefer an existing Domain.
@@ -1585,7 +1406,6 @@ ACTORS & ACTIONS (RBAC): a Command or Query declares an "action" — a canonical
 SLICES: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom), each lane with a "type" from commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote. Enum/Object/Alias cards and nested Slices are NOT allowed in lanes. Give at least one lane and do not repeat a lane type.
 SLICE NAME: give a slice a plain PascalCase business name describing the flow (e.g. PlaceOrder, HandlePayment, ViewOrderHistory). Do NOT include the word "Slice" (never "PlaceOrderSlice") — "slice" is an internal concept most users do not know, so do not name lanes or cards after it either.
 FILLING LANES: after create_slice, create each lane's card(s) and place each one via "slice" = the slice's name (and "lane" only when the card type is ambiguous: give the lane's card type or 1-based position). Never leave an AI-made slice empty.
-TIDYING (position_elements): when the user asks to rearrange, clean up or neaten the board (e.g. "sắp xếp lại"), first call get_canvas_overview to read every card's "x"/"y"/"width"/"height" and container membership, then decide a clean layout yourself and place components with position_elements (give each a "target" name and the new top-left "x"/"y"). Aim for a readable arrangement: aligned rows/columns, related cards near each other, comfortable gaps (about 40px) and no overlaps. Membership is never changed — you cannot move a card into or out of a Domain/Group/Slice this way (use the create/update tools for that). Moving a Domain or Group moves its whole frame and contents in one entry. Cards inside a Slice lane are laid out by the Slice, so move the Slice instead of its lane cards.
 FINAL REPLY (IMPORTANT): after you finish the tool calls, your closing message must be SHORT — a brief summary of the main points only, not a verbose report. State what you changed and any decision that matters to the user, then stop. Prefer 1–3 short sentences or a terse bullet list (a few words per bullet). Do NOT re-list every card you created, recite field descriptions or counts, dump the board structure, or explain your reasoning process. If nothing noteworthy needs saying, a single short line is enough. Write this reply in the same language the user is writing in (rule 2 above), NOT the app language. Be concise, clear, and professional.
 ${languageInstruction}`;
 

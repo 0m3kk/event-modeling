@@ -57,11 +57,11 @@ describe("collectRenameMappings", () => {
   it("maps an Event field tag rename to a tag reference", () => {
     const previous = el("eventCard", "ev1", {
       name: "courseDefined",
-      fields: [{ name: "courseId", type: "uuid", tag: "course" }],
+      fields: [{ name: "courseId", type: "string", tag: "course" }],
     });
     const mappings = collectRenameMappings(previous, {
       name: "courseDefined",
-      fields: [{ name: "courseId", type: "uuid", tag: "courseId" }],
+      fields: [{ name: "courseId", type: "string", tag: "courseId" }],
     });
     expect(mappings).toEqual([{ kind: "tag", from: "course", to: "courseId" }]);
   });
@@ -69,11 +69,11 @@ describe("collectRenameMappings", () => {
   it("maps a State param rename to a scoped field reference", () => {
     const previous = el("stateCard", "s1", {
       name: "courseSubscription",
-      params: [{ name: "courseId", type: "uuid" }],
+      params: [{ name: "courseId", type: "string" }],
     });
     const mappings = collectRenameMappings(previous, {
       name: "courseSubscription",
-      params: [{ name: "id", type: "uuid" }],
+      params: [{ name: "id", type: "string" }],
     });
     expect(mappings).toEqual([
       { kind: "field", from: "courseId", to: "id", scopeId: "s1" },
@@ -239,7 +239,7 @@ describe("applyRenameMappings", () => {
     const elements: CanvasElement[] = [
       el("stateCard", "s1", {
         name: "stateA",
-        params: [{ name: "id", type: "uuid" }],
+        params: [{ name: "id", type: "string" }],
         queryItems: [{ types: [], tags: [{ tag: "course", field: "courseId" }] }],
       }),
       el("stateCard", "s2", {

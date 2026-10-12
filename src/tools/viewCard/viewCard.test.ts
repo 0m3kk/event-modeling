@@ -21,7 +21,7 @@ describe("viewCardTool multi-section (params, query, states)", () => {
       name: "CourseView",
       params: [
         { name: "courseId", type: "string" },
-        { name: "capacity", type: "number" },
+        { name: "capacity", type: "float" },
       ],
       queryItems: [{ types: ["CourseDefined"], tags: [{ tag: "course", field: "courseId" }] }],
       states: [{ name: "exists", type: "boolean" }],
@@ -143,23 +143,23 @@ describe("viewCardTool multi-section (params, query, states)", () => {
     const paramPatch = viewCardTool.onUpdateSubSelectType!(
       card,
       { elementId: "view-1", sectionIndex: 0, fieldIndex: 0 },
-      "uuid",
+      "boolean",
     );
-    expect(paramPatch?.data?.params?.[0].type).toBe("uuid");
+    expect(paramPatch?.data?.params?.[0].type).toBe("boolean");
 
     const queryPatch = viewCardTool.onUpdateSubSelectType!(
       card,
       { elementId: "view-1", sectionIndex: 1, fieldIndex: 0 },
-      "uuid",
+      "boolean",
     );
     expect(queryPatch).toBeNull();
 
     const statePatch = viewCardTool.onUpdateSubSelectType!(
       card,
       { elementId: "view-1", sectionIndex: 2, fieldIndex: 0 },
-      "number",
+      "float",
     );
-    expect(statePatch?.data?.states?.[0].type).toBe("number");
+    expect(statePatch?.data?.states?.[0].type).toBe("float");
   });
 
   it("exposes section metadata and selected item", () => {
@@ -325,7 +325,7 @@ describe("viewCardTool DCB rule enforcement", () => {
     const { issues } = validateViewCardData(
       {
         name: "Course",
-        params: [{ name: "courseId", type: "number" }],
+        params: [{ name: "courseId", type: "float" }],
         queryItems: [{ types: [], tags: [{ tag: "course", field: "courseId" }] }],
       },
       {

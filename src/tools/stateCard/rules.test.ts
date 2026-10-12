@@ -69,7 +69,7 @@ describe("validateStateCardData", () => {
   it("flags a param field whose type mismatches the tagged event field", () => {
     const data: StateCardData = {
       ...base,
-      params: [{ name: "userId", type: "number" }],
+      params: [{ name: "userId", type: "float" }],
     };
     const { issues } = validateStateCardData(data, { elements: board });
     expect(issues.map((i) => i.code)).toEqual(["type_mismatch"]);
@@ -176,7 +176,7 @@ describe("validateStateCardData", () => {
       name: "User",
       params: [
         { name: "currency", type: "Currency" },
-        { name: "timeNow", type: "date" },
+        { name: "timeNow", type: "string" },
       ],
       states: [{ name: "exists", type: "boolean" }],
     };

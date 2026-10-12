@@ -71,11 +71,11 @@ describe("aliasCardTool", () => {
   it("exposes an AI creation operation", () => {
     expect(aliasCardTool.ai?.toolName).toBe("create_alias_card");
     const element = aliasCardTool.ai!.onCreate(
-      { name: "Money", type: "number" },
+      { name: "Money", type: "float" },
       { x: 0, y: 0 },
     );
     expect(element.type).toBe("aliasCard");
-    expect((element.data as AliasCardData).aliasedType).toBe("number");
+    expect((element.data as AliasCardData).aliasedType).toBe("float");
   });
 
   it("carries validation on the wrapped type", () => {
@@ -86,7 +86,7 @@ describe("aliasCardTool", () => {
     const element = aliasCardTool.ai!.onCreate(
       {
         name: "Money",
-        type: "number",
+        type: "float",
         validation: { min: 0, rule: "two decimal places" },
       },
       { x: 0, y: 0 },

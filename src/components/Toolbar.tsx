@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { MousePointer, Trash2, LayoutGrid } from "lucide-react";
+import { MousePointer, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
@@ -17,8 +17,8 @@ const TOOL_GROUPS: string[][] = [
 ];
 
 /**
- * Card tools that sit in the trailing action cluster (sticky note, tidy up,
- * delete) instead of the main tool groups.
+ * Card tools that sit in the trailing action cluster (sticky note, delete)
+ * instead of the main tool groups.
  */
 const TRAY_TOOL_TYPES = ["stickyNote"];
 
@@ -62,8 +62,6 @@ export function Toolbar() {
   const deleteSelectedField = useCanvasStore((s) => s.deleteSelectedField);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const selectedField = useCanvasStore((s) => s.selectedField);
-  const elementCount = useCanvasStore((s) => s.elements.length);
-  const organizeBoard = useCanvasStore((s) => s.organizeBoard);
 
   const registeredTools = toolRegistry.getAll();
   const toolByType = new Map(registeredTools.map((tool) => [tool.type, tool]));
@@ -129,7 +127,7 @@ export function Toolbar() {
 
       <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />
 
-      {/* 3. Action cluster: sticky note + tidy up + delete */}
+      {/* 3. Action cluster: sticky note + delete */}
       <div className="flex items-center gap-1">
         {trayTools.map((tool) => (
           <ToolButton
@@ -139,20 +137,6 @@ export function Toolbar() {
             onSelect={() => setTool(tool.type)}
           />
         ))}
-
-        <div className="group relative flex items-center justify-center">
-          <button
-            onClick={() => organizeBoard()}
-            disabled={elementCount < 2}
-            title={t("toolbar.organize")}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-indigo-500 outline-none hover:bg-indigo-50 disabled:opacity-30 dark:hover:bg-indigo-950/40 cursor-pointer"
-          >
-            <LayoutGrid size={20} />
-          </button>
-          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-zinc-800 whitespace-nowrap">
-            {t("toolbar.organize")}
-          </div>
-        </div>
 
         <div className="group relative flex items-center justify-center">
           <button

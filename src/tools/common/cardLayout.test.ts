@@ -105,7 +105,7 @@ describe("cardLayout helpers", () => {
         name: "OrderPlaced",
         fields: [
           { name: "orderId", type: "string" },
-          { name: "amount", type: "number" },
+          { name: "amount", type: "float" },
         ],
       },
     };
@@ -152,7 +152,6 @@ describe("cardLayout helpers", () => {
       const upper = getStandardCardInlineEditTarget(rawElement, { x: 50, y: 45 }, "Enum", {
         humanizeFieldNames: false,
         uppercaseFieldNames: true,
-        camelCaseFieldNames: true,
       });
       expect(upper?.initialValue).toBe("IN_PROGRESS");
     });
@@ -182,7 +181,7 @@ describe("cardLayout helpers", () => {
           elementId: "card-1",
           fields: [
             { name: "orderId", type: "string" },
-            { name: "amount", type: "number" },
+            { name: "amount", type: "float" },
           ],
           selectedFieldIndex: 0,
           width: 220,
@@ -236,7 +235,7 @@ describe("cardLayout helpers", () => {
         description: "Card level note",
         fields: [
           { name: "orderId", type: "string", description: "Row note" },
-          { name: "amount", type: "number" },
+          { name: "amount", type: "float" },
         ],
       },
     };

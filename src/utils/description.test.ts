@@ -20,7 +20,7 @@ function event(description?: string): CanvasElement {
       ...(description ? { description } : {}),
       fields: [
         { name: "orderId", type: "string", description: "The order identifier" },
-        { name: "amount", type: "number" },
+        { name: "amount", type: "float" },
       ],
     },
   };

@@ -23,7 +23,7 @@ describe("Store Reference Copies & Unique Naming", () => {
       name,
       fields: [
         { name: "id", type: "string" },
-        { name: "timestamp", type: "datetime" },
+        { name: "timestamp", type: "string" },
       ],
       color,
     },
@@ -96,7 +96,7 @@ describe("Store Reference Copies & Unique Naming", () => {
 
     const nextFields = [
       ...card1.data.fields,
-      { name: "totalAmount", type: "number" },
+      { name: "totalAmount", type: "float" },
     ];
     const nextData = { ...card1.data, fields: nextFields };
     const nextSize = eventCardTool.computeSize!(nextData);

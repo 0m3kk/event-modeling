@@ -133,7 +133,7 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
   it("exposes an AI creation operation", () => {
     expect(objectCardTool.ai?.toolName).toBe("create_object_card");
     const element = objectCardTool.ai!.onCreate(
-      { name: "Money", fields: [{ name: "amount", type: "number" }] },
+      { name: "Money", fields: [{ name: "amount", type: "float" }] },
       { x: 0, y: 0 },
     );
     expect(element.type).toBe("objectCard");
@@ -148,7 +148,7 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
         fields: [
           {
             name: "amount",
-            type: "number",
+            type: "float",
             description: "The numeric value, in minor units",
           },
         ],

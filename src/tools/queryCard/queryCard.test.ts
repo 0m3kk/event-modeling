@@ -20,7 +20,7 @@ describe("queryCardTool multi-section (params & responses)", () => {
       name: "GetOrder",
       params: [
         { name: "orderId", type: "string" },
-        { name: "totalAmount", type: "number" },
+        { name: "totalAmount", type: "float" },
       ],
       responses: [{ name: "trackingCode", type: "string" }],
       color: "#16a34a",
@@ -198,9 +198,9 @@ describe("queryCardTool multi-section (params & responses)", () => {
     const paramPatch = queryCardTool.onUpdateSubSelectType!(
       card,
       { elementId: "qry-1", sectionIndex: 0, fieldIndex: 0 },
-      "uuid",
+      "boolean",
     );
-    expect(paramPatch?.data?.params?.[0].type).toBe("uuid");
+    expect(paramPatch?.data?.params?.[0].type).toBe("boolean");
 
     // Update response type
     const respPatch = queryCardTool.onUpdateSubSelectType!(

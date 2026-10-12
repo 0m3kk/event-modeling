@@ -204,7 +204,7 @@ describe("Naming utility", () => {
       const input = {
         name: "Order Placed",
         fields: [
-          { name: "Order ID", type: "UUID" },
+          { name: "Order ID", type: "BOOLEAN" },
           { name: "first name", type: "string" },
         ],
         description: "Something happened",
@@ -212,7 +212,7 @@ describe("Naming utility", () => {
       expect(normalizeIdentifierNames(input, "eventCard")).toEqual({
         name: "orderPlaced",
         fields: [
-          { name: "orderId", type: "uuid" },
+          { name: "orderId", type: "boolean" },
           { name: "firstName", type: "string" },
         ],
         description: "Something happened",
@@ -222,7 +222,7 @@ describe("Naming utility", () => {
     it("camelCases query tag refs, DCB tags and event type lists", () => {
       const input = {
         name: "Order state",
-        params: [{ name: "Order ID", type: "uuid" }],
+        params: [{ name: "Order ID", type: "boolean" }],
         items: [
           {
             types: ["Order Placed", "Order Cancelled"],
@@ -254,7 +254,7 @@ describe("Naming utility", () => {
     });
 
     it("returns the same reference when nothing changes", () => {
-      const input = { name: "orderPlaced", fields: [{ name: "orderId", type: "uuid" }] };
+      const input = { name: "orderPlaced", fields: [{ name: "orderId", type: "boolean" }] };
       expect(normalizeIdentifierNames(input, "eventCard")).toBe(input);
     });
 

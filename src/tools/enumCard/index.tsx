@@ -233,11 +233,11 @@ export const enumCardTool: ToolDefinition<EnumCardData> = {
 
   getInlineEditTarget: (element, localPoint) =>
     getStandardCardInlineEditTarget(element, localPoint, "Enum", {
-      // Editor shows the value in ALL CAPS (matching the card), but committing
-      // stores a canonical camelCase identifier. The card widens/shrinks to fit.
+      // Editor shows the value in ALL CAPS (matching the card); committing
+      // stores it verbatim, so separators such as `_` and the casing the user
+      // types are preserved. The card widens/shrinks to fit.
       humanizeFieldNames: false,
       uppercaseFieldNames: true,
-      camelCaseFieldNames: true,
       resolveSize: (data) => computeEnumCardSize(data, element.width),
     }),
 

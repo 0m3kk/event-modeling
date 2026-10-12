@@ -31,7 +31,7 @@ describe("validateEventCardData", () => {
     const data: EventCardData = {
       name: "UserRegistered",
       fields: [
-        { name: "id", type: "uuid" },
+        { name: "id", type: "string" },
         { name: "address", type: "Address" },
       ],
     };
@@ -70,7 +70,7 @@ describe("validateEventCardData", () => {
   it("rejects reusing an existing tag with a different type", () => {
     const data: EventCardData = {
       name: "UserEmailChanged",
-      fields: [{ name: "userId", type: "number", tag: "user" }],
+      fields: [{ name: "userId", type: "float", tag: "user" }],
     };
     const { issues } = validateEventCardData(data, { elements: board });
     expect(issues.map((i) => i.code)).toEqual(["tag_type_conflict"]);
@@ -82,7 +82,7 @@ describe("validateEventCardData", () => {
       name: "Confusing",
       fields: [
         { name: "a", type: "string", tag: "shared" },
-        { name: "b", type: "number", tag: "shared" },
+        { name: "b", type: "float", tag: "shared" },
       ],
     };
     const { issues } = validateEventCardData(data, { elements: [] });

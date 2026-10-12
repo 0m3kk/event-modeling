@@ -19,7 +19,7 @@ describe("EventCardTool sub-selection & inline edit targets", () => {
       name: "OrderPlaced",
       fields: [
         { name: "orderId", type: "string" },
-        { name: "amount", type: "number" },
+        { name: "amount", type: "float" },
       ],
       color: "#f97316",
     },
@@ -117,12 +117,12 @@ describe("EventCardTool sub-selection & inline edit targets", () => {
       elementId: "card-1",
       fieldIndex: 1,
     });
-    expect(item).toEqual({ name: "amount", type: "number" });
+    expect(item).toEqual({ name: "amount", type: "float" });
 
     // Update type
-    useCanvasStore.getState().updateSelectedFieldType("decimal");
+    useCanvasStore.getState().updateSelectedFieldType("integer");
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "card-1");
-    expect(updated?.data.fields[1].type).toBe("decimal");
+    expect(updated?.data.fields[1].type).toBe("integer");
   });
 
   it("customizes field tag names (e.g. user on id, email on email)", () => {
@@ -136,7 +136,7 @@ describe("EventCardTool sub-selection & inline edit targets", () => {
       data: {
         name: "UserRegistered",
         fields: [
-          { name: "id", type: "uuid" },
+          { name: "id", type: "string" },
           { name: "email", type: "string" },
         ],
         color: "#f97316",

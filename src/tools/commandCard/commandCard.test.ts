@@ -20,7 +20,7 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
       name: "PlaceOrder",
       inputs: [
         { name: "orderId", type: "string" },
-        { name: "totalAmount", type: "number" },
+        { name: "totalAmount", type: "float" },
       ],
       responses: [
         { name: "trackingCode", type: "string" },
@@ -202,9 +202,9 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
     const inputPatch = commandCardTool.onUpdateSubSelectType!(
       card,
       { elementId: "cmd-1", sectionIndex: 0, fieldIndex: 0 },
-      "uuid",
+      "boolean",
     );
-    expect(inputPatch?.data?.inputs?.[0].type).toBe("uuid");
+    expect(inputPatch?.data?.inputs?.[0].type).toBe("boolean");
 
     // Update response type
     const respPatch = commandCardTool.onUpdateSubSelectType!(

@@ -72,7 +72,7 @@ describe("Store method-execution copies (Service methods)", () => {
       m.id === "m1"
         ? {
             ...m,
-            params: [...m.params, { name: "total", type: "number" }],
+            params: [...m.params, { name: "total", type: "float" }],
             returns: [{ name: "trackingCode", type: "string" }],
           }
         : m,
@@ -134,7 +134,7 @@ describe("Store method-execution copies (Service methods)", () => {
 
     const data = source().data as ServiceCardData;
     const nextMethods = data.methods.map((m) =>
-      m.id === "m1" ? { ...m, params: [...m.params, { name: "total", type: "number" }] } : m,
+      m.id === "m1" ? { ...m, params: [...m.params, { name: "total", type: "float" }] } : m,
     );
     useCanvasStore.getState().updateElements([
       { id: "svc-1", data: { ...data, methods: nextMethods } },

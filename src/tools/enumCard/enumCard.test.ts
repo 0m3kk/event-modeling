@@ -75,13 +75,13 @@ describe("enumCardTool", () => {
     target?.onCommit("Pending");
 
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "enum-1");
-    // Commit always stores canonical camelCase.
-    expect(updated?.data.fields[0].name).toBe("pending");
+    // Commit stores the value verbatim.
+    expect(updated?.data.fields[0].name).toBe("Pending");
     // Values stay typeless.
     expect("type" in updated!.data.fields[0]).toBe(false);
   });
 
-  it("shows values in ALL CAPS but stores them as camelCase", () => {
+  it("shows values in ALL CAPS but stores them verbatim (underscores kept)", () => {
     const underscored: CanvasElement<EnumCardData> = {
       ...card,
       data: { ...card.data, fields: [{ name: "in_progress" }] },
@@ -94,8 +94,8 @@ describe("enumCardTool", () => {
 
     target?.onCommit("ON_HOLD");
     const updated = useCanvasStore.getState().elements.find((e) => e.id === "enum-1");
-    // Whatever was typed, the stored value is camelCase.
-    expect(updated?.data.fields[0].name).toBe("onHold");
+    // Underscores and casing are preserved as typed.
+    expect(updated?.data.fields[0].name).toBe("ON_HOLD");
   });
 
   it("reports selected values as typeless", () => {

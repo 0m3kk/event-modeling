@@ -21,7 +21,7 @@ describe("navigateSelectedField in canvas store", () => {
       fields: [
         { name: "id", type: "string" },
         { name: "orderId", type: "string" },
-        { name: "total", type: "number" },
+        { name: "total", type: "float" },
       ],
     },
   };

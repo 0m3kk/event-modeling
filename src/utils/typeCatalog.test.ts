@@ -17,14 +17,17 @@ describe("typeCatalog", () => {
   it("normalizes type tokens, stripping array markers", () => {
     expect(normalizeTypeName("  string  ")).toBe("string");
     expect(normalizeTypeName("string[]")).toBe("string");
-    expect(normalizeTypeName("number[][]")).toBe("number");
+    expect(normalizeTypeName("float[][]")).toBe("float");
     expect(normalizeTypeName(undefined)).toBe("");
   });
 
   it("recognizes primitive types", () => {
     expect(isPrimitiveFieldType("string")).toBe(true);
-    expect(isPrimitiveFieldType("uuid")).toBe(true);
-    expect(isPrimitiveFieldType("decimal")).toBe(true);
+    expect(isPrimitiveFieldType("integer")).toBe(true);
+    expect(isPrimitiveFieldType("float")).toBe(true);
+    expect(isPrimitiveFieldType("boolean")).toBe(true);
+    expect(isPrimitiveFieldType("uuid")).toBe(false);
+    expect(isPrimitiveFieldType("decimal")).toBe(false);
     expect(isPrimitiveFieldType("Order")).toBe(false);
   });
 

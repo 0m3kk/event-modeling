@@ -68,7 +68,7 @@ describe("useCanvasStore", () => {
       height: 88,
       data: {
         name: "Order Placed",
-        fields: [{ name: "Order ID", type: "UUID" }],
+        fields: [{ name: "Order ID", type: "BOOLEAN" }],
       },
     };
     useCanvasStore.getState().addElement(el);
@@ -76,7 +76,7 @@ describe("useCanvasStore", () => {
     const data = useCanvasStore.getState().elements[0].data as any;
     expect(data.name).toBe("orderPlaced");
     expect(data.fields[0].name).toBe("orderId");
-    expect(data.fields[0].type).toBe("uuid");
+    expect(data.fields[0].type).toBe("boolean");
   });
 
   it("normalizes identifiers on update", () => {
@@ -91,7 +91,7 @@ describe("useCanvasStore", () => {
     };
     useCanvasStore.getState().addElement(el);
     useCanvasStore.getState().updateElement("el-1", {
-      data: { name: "Order Placed", fields: [{ name: "Order ID", type: "uuid" }] },
+      data: { name: "Order Placed", fields: [{ name: "Order ID", type: "boolean" }] },
     });
 
     const data = useCanvasStore.getState().elements[0].data as any;
@@ -156,57 +156,4 @@ describe("useCanvasStore", () => {
     expect(useCanvasStore.getState().elements.length).toBe(2);
   });
 
-  it("organizes the board and collapses into a single undo step", () => {
-    const a: CanvasElement = {
-      id: "a",
-      type: "stickyNote",
-      x: 0,
-      y: 0,
-      width: 160,
-      height: 120,
-      data: { text: "A" },
-    };
-    const b: CanvasElement = {
-      id: "b",
-      type: "stickyNote",
-      x: 10,
-      y: 10,
-      width: 160,
-      height: 120,
-      data: { text: "B" },
-    };
-    useCanvasStore.getState().addElements([a, b]);
-
-    const moved = useCanvasStore.getState().organizeBoard();
-    expect(moved).toBeGreaterThan(0);
-
-    const [first, second] = useCanvasStore.getState().elements;
-    const overlap =
-      first.x < second.x + second.width &&
-      first.x + first.width > second.x &&
-      first.y < second.y + second.height &&
-      first.y + first.height > second.y;
-    expect(overlap).toBe(false);
-
-    // One undo restores the pre-organize positions.
-    useCanvasStore.getState().undo();
-    expect(useCanvasStore.getState().elements.map((e) => [e.x, e.y])).toEqual([
-      [0, 0],
-      [10, 10],
-    ]);
-  });
-
-  it("does nothing when there is nothing to organize", () => {
-    const el: CanvasElement = {
-      id: "a",
-      type: "stickyNote",
-      x: 0,
-      y: 0,
-      width: 160,
-      height: 120,
-      data: { text: "A" },
-    };
-    useCanvasStore.getState().addElement(el);
-    expect(useCanvasStore.getState().organizeBoard()).toBe(0);
-  });
 });

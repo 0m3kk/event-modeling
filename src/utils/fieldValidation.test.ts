@@ -40,9 +40,9 @@ describe("fieldValidation helpers", () => {
     expect(validationKindFor("string")).toBe("string");
     expect(validationKindFor("integer")).toBe("number");
     expect(validationKindFor("float")).toBe("number");
-    expect(validationKindFor("Money")).toBe("number");
+    expect(validationKindFor("Money")).toBe("string");
     expect(validationKindFor("CustomerId")).toBe("string");
-    expect(validationKindFor("number", true)).toBe("array");
+    expect(validationKindFor("float", true)).toBe("array");
     expect(validationKindFor(undefined)).toBe("string");
   });
 

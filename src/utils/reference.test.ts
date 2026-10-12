@@ -70,7 +70,7 @@ describe("Reference utility", () => {
         name: "OrderApproved",
         fields: [
           { name: "orderId", type: "string" },
-          { name: "approvedAt", type: "datetime" },
+          { name: "approvedAt", type: "string" },
         ],
       },
     });

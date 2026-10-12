@@ -13,9 +13,6 @@ export const COMMON_FIELD_TYPES: FieldTypePreset[] = [
   { type: "integer", label: "integer" },
   { type: "float", label: "float" },
   { type: "boolean", label: "boolean" },
-  { type: "date", label: "date" },
-  { type: "datetime", label: "datetime" },
-  { type: "uuid", label: "uuid" },
 ];
 
 type ReusableKind = "object" | "enum" | "alias";

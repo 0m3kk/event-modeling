@@ -70,19 +70,7 @@ export const FIELD_FORMAT_PRESETS: FieldFormatPreset[] = [
 export type FieldValidationKind = "string" | "number" | "array";
 
 /** Type names (lowercased) treated as numeric for validation grouping. */
-const NUMERIC_TYPES = new Set([
-  "integer",
-  "int",
-  "float",
-  "double",
-  "number",
-  "decimal",
-  "long",
-  "short",
-  "byte",
-  "bigint",
-  "money",
-]);
+const NUMERIC_TYPES = new Set(["integer", "float"]);
 
 /**
  * Picks the validation group to surface for a field. Array fields always use

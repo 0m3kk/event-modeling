@@ -28,7 +28,7 @@ describe("serviceCardTool (methods with params & returns)", () => {
           name: "placeOrder",
           params: [
             { name: "orderId", type: "string" },
-            { name: "total", type: "number" },
+            { name: "total", type: "float" },
           ],
           returns: [{ name: "trackingCode", type: "string" }],
         },
@@ -215,9 +215,9 @@ describe("serviceCardTool (methods with params & returns)", () => {
     const typePatch = serviceCardTool.onUpdateSubSelectType!(
       card,
       { elementId: "svc-1", sectionId: "params", sectionIndex: 0, fieldIndex: 0 },
-      "uuid",
+      "boolean",
     );
-    expect(typePatch?.data?.methods?.[0].params[0].type).toBe("uuid");
+    expect(typePatch?.data?.methods?.[0].params[0].type).toBe("boolean");
 
     const arrayPatch = serviceCardTool.onToggleSubSelectArray!(card, {
       elementId: "svc-1",
@@ -261,7 +261,7 @@ describe("serviceCardTool (methods with params & returns)", () => {
       {
         name: "PaymentService",
         methods: [
-          { name: "charge", params: [{ name: "amount", type: "number" }], returns: [] },
+          { name: "charge", params: [{ name: "amount", type: "float" }], returns: [] },
         ],
       },
       { x: 500, y: 500 },

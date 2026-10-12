@@ -19,8 +19,8 @@ describe("subSelection navigation utility", () => {
       name: "OrderPlaced",
       fields: [
         { name: "id", type: "string" },
-        { name: "amount", type: "number" },
-        { name: "timestamp", type: "datetime" },
+        { name: "amount", type: "float" },
+        { name: "timestamp", type: "string" },
       ],
     },
   };

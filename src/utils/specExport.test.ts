@@ -97,7 +97,7 @@ describe("buildSpecification", () => {
         name: "Order",
         fields: [
           { name: "id", type: "string" },
-          { name: "total", type: "number" },
+          { name: "total", type: "float" },
         ],
       }),
       el("e1", "eventCard", { name: "OrderPlaced", fields: [{ name: "order", type: "Order" }] }),
@@ -116,7 +116,7 @@ describe("buildSpecification", () => {
               object: "Order",
               fields: [
                 { name: "id", type: "string" },
-                { name: "total", type: "number" },
+                { name: "total", type: "float" },
               ],
             },
           },

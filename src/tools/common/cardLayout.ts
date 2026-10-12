@@ -6,12 +6,7 @@ import type {
   InlineEditState,
 } from "@/types";
 import { getContrastTextColor } from "@/utils/color";
-import {
-  isSameIdentifier,
-  toCamelIdentifier,
-  toDisplayName,
-  toDisplayType,
-} from "@/utils/naming";
+import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { useCanvasStore } from "@/store";
 import { hasValidation, type FieldValidation } from "@/utils/fieldValidation";
 import { addDescZone } from "./descZones";
@@ -631,11 +626,6 @@ export interface StandardCardInlineEditOptions<TData> {
    */
   uppercaseFieldNames?: boolean;
   /**
-   * When true a committed field value is stored as a canonical camelCase
-   * identifier (see {@link toCamelIdentifier}), whatever the editor contained.
-   */
-  camelCaseFieldNames?: boolean;
-  /**
    * Optional content-driven size resolver. When set, a committed header/field
    * edit also resizes the card (e.g. Enum widens to fit a longer value).
    */
@@ -658,7 +648,6 @@ export function getStandardCardInlineEditTarget<
   const {
     humanizeFieldNames = true,
     uppercaseFieldNames = false,
-    camelCaseFieldNames = false,
     resolveSize,
   } = options;
 
@@ -719,14 +708,14 @@ export function getStandardCardInlineEditTarget<
       multiline: false,
       onCommit: (newName) => {
         const trimmed = newName.trim();
-        // Storage form: canonical camelCase when requested, else the raw text.
-        const nextName = camelCaseFieldNames ? toCamelIdentifier(trimmed) : trimmed;
+        // The committed value is stored verbatim, so separators such as `_`
+        // are preserved (Enum members are stored values, not identifiers).
         const changed = humanizeFieldNames
           ? !isSameIdentifier(trimmed, field.name)
-          : nextName !== field.name;
-        if (nextName && changed) {
+          : trimmed !== field.name;
+        if (trimmed && changed) {
           const nextFields = [...fields];
-          nextFields[index] = { ...field, name: nextName };
+          nextFields[index] = { ...field, name: trimmed };
           const nextData = { ...element.data, fields: nextFields };
           useCanvasStore.getState().updateElement(element.id, {
             ...sizePatch(nextData),
