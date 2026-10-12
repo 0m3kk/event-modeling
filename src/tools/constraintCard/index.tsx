@@ -544,7 +544,11 @@ export const constraintCardTool: ToolDefinition<ConstraintCardData> = {
       "Write rules as readable sentences, never as field-name notation such as 'accountStatus.status == active'. " +
       "RULE: every entry in `states` must match the name of an existing State card on the board; use " +
       "get_canvas_overview to discover existing State cards and their fields first. The card is rejected " +
-      "if a state is unknown.",
+      "if a state is unknown. " +
+      "LINKAGE (IMPORTANT): the Constraint is the bridge between the flow's Command/Query and its State. " +
+      "The State's params are the values the rule compares, so each one must be supplied by the Command " +
+      "(its inputs) or Query (its params) in the same flow — check that the State's param names match " +
+      "fields that actually exist on that Command/Query, and add the missing input if they do not.",
     parameters: z.object({
       name: z.string().describe("PascalCase constraint name (e.g. AccountMustBeActive)"),
       states: z

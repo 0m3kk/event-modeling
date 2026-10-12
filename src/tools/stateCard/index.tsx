@@ -1154,7 +1154,14 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
       "RULE: every query tag must be written as { tag, field } where `tag` is a tag already attached to " +
       "an event field on the board AND `field` is the name of one of this card's params whose type is " +
       "IDENTICAL to that tagged event field's type. Use get_canvas_overview to discover existing tags and " +
-      "event types first; the card is rejected if any tag is unknown or its param field type mismatches.",
+      "event types first; the card is rejected if any tag is unknown or its param field type mismatches. " +
+      "PARAM PROVENANCE (IMPORTANT): a param is an INPUT, so its value must come from somewhere — never " +
+      "invent a field. Each param must trace to one of: (a) a Command input or Query param of the same " +
+      "name that drives the flow (reuse that exact field name), (b) a DCB tag binding written as " +
+      "{ tag, field } in a query item, (c) an Enum-typed field (a fixed domain value), or (d) a system " +
+      "value such as now/timeNow/today. A param with no such source is rejected with " +
+      "`param_source_unknown`. A State is ONE object: a field already listed in `params` must NOT be " +
+      "repeated in `states` (repeating it is rejected with `state_echoes_param`).",
     parameters: z.object({
       name: z.string().describe("PascalCase state/projection name (e.g. CourseSubscription, OrderState)"),
       params: z
@@ -1171,7 +1178,11 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
           }),
         )
         .optional()
-        .describe("Input params. Each query tag's `field` must reference one of these by name."),
+        .describe(
+          "Input params. Each must trace to a source (a Command input/Query param of the same name, " +
+            "a query tag binding, a defined Enum/Object type, or a system value like now); " +
+            "each query tag's `field` must reference one of these by name.",
+        ),
       queryItems: z
         .array(
           z.object({
@@ -1216,7 +1227,9 @@ export const stateCardTool: ToolDefinition<StateCardData> = {
           }),
         )
         .optional()
-        .describe("Projected state fields (the decision-model shape)"),
+        .describe(
+          "Projected state fields (the decision-model shape). Do not repeat a field already listed in `params`.",
+        ),
       color: z.string().optional().describe("Optional header color hex code"),
       description: z.string().optional().describe("Optional plain-language description of the state"),
     }),

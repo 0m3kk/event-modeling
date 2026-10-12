@@ -142,6 +142,69 @@ describe("AIAgent", () => {
     expect(ok.type).toBe("stateCard");
   });
 
+  it("rejects a state param with no traceable source, then accepts it once declared", async () => {
+    const failed = JSON.parse(
+      await executeAITool("create_state_card", {
+        name: "OrderState",
+        params: [{ name: "ghostField", type: "string" }],
+        queryItems: [],
+        states: [{ name: "exists", type: "boolean" }],
+      }),
+    );
+    expect(failed.status).toBe("error");
+    expect(failed.issues.map((i: any) => i.code)).toContain("param_source_unknown");
+    expect(useCanvasStore.getState().elements).toHaveLength(0);
+
+    // Declare the field on a Command, then retry: the param is now sourced.
+    await executeAITool("create_command_card", {
+      name: "PlaceOrder",
+      inputs: [{ name: "ghostField", type: "string" }],
+    });
+
+    const ok = JSON.parse(
+      await executeAITool("create_state_card", {
+        name: "OrderState",
+        params: [{ name: "ghostField", type: "string" }],
+        queryItems: [],
+        states: [{ name: "exists", type: "boolean" }],
+      }),
+    );
+    expect(ok.status).toBe("success");
+    expect(ok.type).toBe("stateCard");
+  });
+
+  it("rejects a state field that echoes a param, then accepts it once removed", async () => {
+    await executeAITool("create_event_card", {
+      name: "OrderPlaced",
+      fields: [{ name: "orderId", type: "string", tag: "order" }],
+    });
+
+    const echoed = JSON.parse(
+      await executeAITool("create_state_card", {
+        name: "OrderState",
+        params: [{ name: "orderId", type: "string" }],
+        queryItems: [{ types: ["OrderPlaced"], tags: [{ tag: "order", field: "orderId" }] }],
+        states: [
+          { name: "orderId", type: "string" },
+          { name: "exists", type: "boolean" },
+        ],
+      }),
+    );
+    expect(echoed.status).toBe("error");
+    expect(echoed.issues.map((i: any) => i.code)).toContain("state_echoes_param");
+    expect(useCanvasStore.getState().elements.filter((e) => e.type === "stateCard")).toHaveLength(0);
+
+    const ok = JSON.parse(
+      await executeAITool("create_state_card", {
+        name: "OrderState",
+        params: [{ name: "orderId", type: "string" }],
+        queryItems: [{ types: ["OrderPlaced"], tags: [{ tag: "order", field: "orderId" }] }],
+        states: [{ name: "exists", type: "boolean" }],
+      }),
+    );
+    expect(ok.status).toBe("success");
+  });
+
   it("creates a View card once its tag exists on the board", async () => {
     await executeAITool("create_event_card", {
       name: "CourseDefined",
@@ -302,7 +365,10 @@ describe("AIAgent", () => {
   });
 
   it("widens a state card when an AI update adds a long event type", async () => {
-    await executeAITool("create_event_card", { name: "CourseDefined", fields: [] });
+    await executeAITool("create_event_card", {
+      name: "CourseDefined",
+      fields: [{ name: "courseId", type: "string" }],
+    });
     await executeAITool("create_event_card", {
       name: "abcdefghijklmnopqrstuvwxyz",
       fields: [],

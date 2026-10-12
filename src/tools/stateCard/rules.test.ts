@@ -125,4 +125,76 @@ describe("validateStateCardData", () => {
     const { issues } = validateStateCardData(data, { elements: withObject });
     expect(issues).toHaveLength(0);
   });
+
+  it("flags a param that has no traceable source", () => {
+    const data: StateCardData = {
+      name: "User",
+      params: [{ name: "ghostField", type: "string" }],
+      queryItems: [],
+      states: [{ name: "exists", type: "boolean" }],
+    };
+    const { issues } = validateStateCardData(data, { elements: board });
+    expect(issues.map((i) => i.code)).toEqual(["param_source_unknown"]);
+  });
+
+  it("accepts a param whose name matches a Command input", () => {
+    const withCommand = [
+      ...board,
+      {
+        id: "cmd-1",
+        type: "commandCard",
+        x: 0,
+        y: 0,
+        width: 220,
+        height: 100,
+        data: { name: "RegisterUser", inputs: [{ name: "referralCode", type: "string" }] },
+      } as CanvasElement,
+    ];
+    const data: StateCardData = {
+      name: "User",
+      params: [{ name: "referralCode", type: "string" }],
+      states: [{ name: "exists", type: "boolean" }],
+    };
+    const { issues } = validateStateCardData(data, { elements: withCommand });
+    expect(issues).toHaveLength(0);
+  });
+
+  it("accepts an Enum-typed param and a system-value param", () => {
+    const withEnum = [
+      ...board,
+      {
+        id: "enum-1",
+        type: "enumCard",
+        x: 0,
+        y: 0,
+        width: 220,
+        height: 100,
+        data: { name: "Currency", fields: [{ name: "USD" }, { name: "EUR" }] },
+      } as CanvasElement,
+    ];
+    const data: StateCardData = {
+      name: "User",
+      params: [
+        { name: "currency", type: "Currency" },
+        { name: "timeNow", type: "date" },
+      ],
+      states: [{ name: "exists", type: "boolean" }],
+    };
+    const { issues } = validateStateCardData(data, { elements: withEnum });
+    expect(issues).toHaveLength(0);
+  });
+
+  it("flags a state field that merely echoes a param of the same name", () => {
+    const data: StateCardData = {
+      name: "User",
+      params: [{ name: "userId", type: "string" }],
+      queryItems: [],
+      states: [
+        { name: "userId", type: "string" },
+        { name: "exists", type: "boolean" },
+      ],
+    };
+    const { issues } = validateStateCardData(data, { elements: board });
+    expect(issues.map((i) => i.code)).toEqual(["state_echoes_param"]);
+  });
 });
