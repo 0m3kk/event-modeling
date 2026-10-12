@@ -145,6 +145,14 @@ export function toCamelIdentifier(input: string | undefined | null): string {
 const IDENTIFIER_STRING_KEYS = new Set(["name", "field", "tag", "type", "aliasedType"]);
 
 /**
+ * Card types whose `action` tokens (a Command/Query's declared `action`, an
+ * Actor's `permissions[].action`) follow the identifier storage rule. Kept
+ * separate from {@link IDENTIFIER_STRING_KEYS} because a token carries the `:`
+ * namespace separator and the `*` wildcard, so it needs its own normalizer.
+ */
+const ACTION_TOKEN_TYPES = new Set(["commandCard", "queryCard", "actorCard"]);
+
+/**
  * True when committing `input` would leave the stored identifier `current`
  * unchanged. Tolerance for the display layer: the inline editor shows the
  * human-readable form while the data holds camelCase, so an untouched commit
@@ -167,6 +175,7 @@ export function isSameIdentifier(input: string, current: string | undefined): bo
  */
 export function normalizeIdentifierNames<T = any>(data: T, elementType?: string): T {
   const isEnumCard = elementType === "enumCard";
+  const canonicalizesActions = ACTION_TOKEN_TYPES.has(elementType ?? "");
 
   function walk(value: any, normalizeName: boolean): any {
     if (Array.isArray(value)) {
@@ -186,7 +195,13 @@ export function normalizeIdentifierNames<T = any>(data: T, elementType?: string)
       for (const [key, child] of Object.entries(value)) {
         let nextChild = child;
 
-        if (typeof child === "string" && IDENTIFIER_STRING_KEYS.has(key)) {
+        if (typeof child === "string" && canonicalizesActions && key === "action") {
+          const canonical = toCanonicalAction(child);
+          if (canonical !== child) {
+            nextChild = canonical;
+            changed = true;
+          }
+        } else if (typeof child === "string" && IDENTIFIER_STRING_KEYS.has(key)) {
           // Enum members live under `fields[].name` and are values, not names.
           if (key !== "name" || normalizeName) {
             const canonical = toCamelIdentifier(child);
@@ -245,6 +260,53 @@ export function toDisplayType(type: string | undefined | null, isArray?: boolean
   const label = toDisplayName(type);
   if (!label) return "";
   return `${label}${isArray ? "[]" : ""}`;
+}
+
+/**
+ * Converts an RBAC action token or permission pattern into a human-readable
+ * display label. The `:` namespace separator and the `*` wildcard are
+ * preserved, and each literal segment runs through the same transform as
+ * {@link toDisplayName}.
+ *
+ * Display-only: the stored token keeps its canonical form.
+ * E.g. "sales:placeOrder" -> "Sales:Place Order", "sales:*" -> "Sales:*",
+ * "*:getOrder" -> "*:Get Order". Idempotent.
+ */
+export function toDisplayAction(input: string | undefined | null): string {
+  if (!input || !input.trim()) return "";
+  return input
+    .split(":")
+    .map((part) => (part.trim() === "*" ? "*" : toDisplayName(part)))
+    .join(":");
+}
+
+/**
+ * Converts an action token or permission pattern into its canonical storage
+ * form: the inverse of {@link toDisplayAction}. Each `:`-separated segment is
+ * reduced to a camelCase identifier and `*` wildcards are preserved, so
+ * however a human or AI writes the token it lands in one agreed form.
+ *
+ * E.g. "Sales:Place Order" -> "sales:placeOrder", "Sales:*" -> "sales:*",
+ * "*:Get Order" -> "*:getOrder". Idempotent.
+ */
+export function toCanonicalAction(input: string | undefined | null): string {
+  if (!input || !input.trim()) return "";
+  return input
+    .split(":")
+    .map((part) => (part.trim() === "*" ? "*" : toCamelIdentifier(part)))
+    .join(":");
+}
+
+/**
+ * True when committing `input` would leave the stored action token `current`
+ * unchanged. Tolerates the display form, so an untouched commit from the inline
+ * editor ("Sales:Place Order" vs. "sales:placeOrder") is not a spurious edit.
+ * The action-token counterpart of {@link isSameIdentifier}.
+ */
+export function isSameAction(input: string, current: string | undefined): boolean {
+  const trimmed = input.trim();
+  if (trimmed === (current ?? "")) return true;
+  return toCanonicalAction(trimmed) === toCanonicalAction(current);
 }
 
 /**

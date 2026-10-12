@@ -110,6 +110,32 @@ describe("actorCardTool", () => {
     });
   });
 
+  it("shows a permission human-readable while storing its canonical form", () => {
+    const el: CanvasElement<ActorCardData> = {
+      id: "actor-1",
+      type: "actorCard",
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 110,
+      data: { name: "Customer", permissions: [{ action: "sales:placeOrder" }] },
+    };
+    useCanvasStore.getState().addElement(placeOrder);
+    useCanvasStore.getState().addElement(el);
+
+    // Row 0 occupies y in [54, 82); e.g. y = 60.
+    const target = actorCardTool.getInlineEditTarget!(el, { x: 10, y: 60 });
+    expect(target?.initialValue).toBe("Sales:Place Order");
+
+    const undoBefore = useCanvasStore.getState().undoStack.length;
+    target?.onCommit("Sales:Place Order");
+    expect(useCanvasStore.getState().undoStack.length).toBe(undoBefore);
+
+    target?.onCommit("Sales:*");
+    const updated = useCanvasStore.getState().elements.find((e) => e.id === "actor-1");
+    expect((updated?.data as ActorCardData).permissions).toEqual([{ action: "sales:*" }]);
+  });
+
   it("exposes the permissions section and registers an AI op", () => {
     const el: CanvasElement<ActorCardData> = {
       id: "actor-1",

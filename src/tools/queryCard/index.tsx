@@ -19,7 +19,7 @@ import {
 } from "../common/cardLayout";
 import { validateActionToken } from "@/utils/rbac";
 import { resolveHeaderColor } from "@/utils/color";
-import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
+import { isSameIdentifier, isSameAction, toDisplayName, toDisplayType, toDisplayAction } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { validateFieldTypes } from "../common/typeValidation";
 import { FieldValidationSchema, hasValidation, type FieldValidation } from "@/utils/fieldValidation";
@@ -304,7 +304,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
       // 9. Action token as a single field-like row under the header.
       const hasAction = Boolean(element.data.action);
       const actionText = new Text({
-        text: hasAction ? element.data.action! : "(not set)",
+        text: hasAction ? toDisplayAction(element.data.action) : "(not set)",
         style: {
           fontSize: 12,
           fontFamily: '"Geist Mono", monospace',
@@ -779,15 +779,14 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
           width: Math.max(80, element.width - 20),
           height: 24,
         },
-        initialValue: element.data.action ?? "",
+        initialValue: toDisplayAction(element.data.action),
         multiline: false,
         onCommit: (newValue) => {
           const trimmed = newValue.trim();
-          if (trimmed !== (element.data.action ?? "")) {
-            useCanvasStore.getState().updateElement(element.id, {
-              data: { ...element.data, action: trimmed || undefined },
-            });
-          }
+          if (isSameAction(trimmed, element.data.action)) return;
+          useCanvasStore.getState().updateElement(element.id, {
+            data: { ...element.data, action: trimmed || undefined },
+          });
         },
       };
     }

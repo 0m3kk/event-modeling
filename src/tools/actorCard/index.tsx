@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import type { ToolDefinition } from "../types";
 import type { CanvasElement, InlineEditState, Point, SelectedField } from "@/types";
 import { useCanvasStore } from "@/store";
-import { isSameIdentifier, toDisplayName } from "@/utils/naming";
+import { isSameIdentifier, isSameAction, toDisplayName, toDisplayAction } from "@/utils/naming";
 import { ActorCardOptions } from "./ActorCardOptions";
 import {
   renderStandardCardTitle,
@@ -69,7 +69,7 @@ function renderPermissionRow(
   } = opts;
 
   const actionText = new Text({
-    text: permission.action,
+    text: toDisplayAction(permission.action),
     style: {
       fontSize: 12,
       fontWeight: isSelectedRow ? "bold" : "normal",
@@ -306,7 +306,7 @@ export const actorCardTool: ToolDefinition<ActorCardData> = {
         isSelectedRow: activeFieldIndex === index,
         overlaps: overlapping.has(index),
         matchedCount: matched,
-        resolvedName: resolved && resolved.length > 0 ? resolved[0].cardName : null,
+        resolvedName: resolved && resolved.length > 0 ? toDisplayName(resolved[0].cardName) : null,
         textResolution: context.textResolution,
       });
     });
@@ -387,17 +387,16 @@ export const actorCardTool: ToolDefinition<ActorCardData> = {
             width: Math.max(80, element.width - 24),
             height: 24,
           },
-          initialValue: current.action,
+          initialValue: toDisplayAction(current.action),
           multiline: false,
           onCommit: (newValue) => {
             const trimmed = newValue.trim();
-            if (trimmed && trimmed !== current.action) {
-              const nextPermissions = [...permissions];
-              nextPermissions[index] = { ...current, action: trimmed };
-              useCanvasStore.getState().updateElement(element.id, {
-                data: { ...element.data, permissions: nextPermissions },
-              });
-            }
+            if (!trimmed || isSameAction(trimmed, current.action)) return;
+            const nextPermissions = [...permissions];
+            nextPermissions[index] = { ...current, action: trimmed };
+            useCanvasStore.getState().updateElement(element.id, {
+              data: { ...element.data, permissions: nextPermissions },
+            });
           },
         };
       }

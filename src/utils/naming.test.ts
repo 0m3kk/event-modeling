@@ -3,9 +3,12 @@ import {
   nameKey,
   toDisplayName,
   toDisplayType,
+  toDisplayAction,
+  toCanonicalAction,
   toCamelIdentifier,
   normalizeIdentifierNames,
   isSameIdentifier,
+  isSameAction,
   makeUniqueName,
   getElementName,
   setElementName,
@@ -118,7 +121,68 @@ describe("Naming utility", () => {
     });
   });
 
+  describe("toDisplayAction", () => {
+    it("humanizes each segment while preserving ':' and '*'", () => {
+      expect(toDisplayAction("sales:placeOrder")).toBe("Sales:Place Order");
+      expect(toDisplayAction("sales:*")).toBe("Sales:*");
+      expect(toDisplayAction("*:getOrder")).toBe("*:Get Order");
+      expect(toDisplayAction("inventory:restockItem")).toBe("Inventory:Restock Item");
+    });
+
+    it("is idempotent and handles empty input", () => {
+      expect(toDisplayAction("Sales:Place Order")).toBe("Sales:Place Order");
+      expect(toDisplayAction("")).toBe("");
+      expect(toDisplayAction(undefined)).toBe("");
+    });
+  });
+
+  describe("toCanonicalAction", () => {
+    it("camelCases each segment while preserving ':' and '*'", () => {
+      expect(toCanonicalAction("Sales:Place Order")).toBe("sales:placeOrder");
+      expect(toCanonicalAction("Sales:PlaceOrder")).toBe("sales:placeOrder");
+      expect(toCanonicalAction("Sales:*")).toBe("sales:*");
+      expect(toCanonicalAction("*:Get Order")).toBe("*:getOrder");
+    });
+
+    it("is idempotent and handles empty input", () => {
+      expect(toCanonicalAction("sales:placeOrder")).toBe("sales:placeOrder");
+      expect(toCanonicalAction("")).toBe("");
+      expect(toCanonicalAction(undefined)).toBe("");
+    });
+  });
+
+  describe("isSameAction", () => {
+    it("treats the human-readable form of the stored token as unchanged", () => {
+      expect(isSameAction("Sales:Place Order", "sales:placeOrder")).toBe(true);
+      expect(isSameAction("sales:placeOrder", "sales:placeOrder")).toBe(true);
+      expect(isSameAction("  sales:placeOrder  ", "sales:placeOrder")).toBe(true);
+      expect(isSameAction("Sales:*", "sales:*")).toBe(true);
+    });
+
+    it("detects a genuine change", () => {
+      expect(isSameAction("Sales:Cancel Order", "sales:placeOrder")).toBe(false);
+    });
+  });
+
   describe("normalizeIdentifierNames", () => {
+    it("canonicalizes Command/Query action tokens and Actor permissions", () => {
+      expect(normalizeIdentifierNames({ name: "Place Order", action: "Sales:Place Order" }, "commandCard")).toEqual({
+        name: "placeOrder",
+        action: "sales:placeOrder",
+      });
+
+      const actor = normalizeIdentifierNames(
+        { name: "Customer", permissions: [{ action: "Sales:*" }, { action: "*:Get Order" }] },
+        "actorCard",
+      ) as any;
+      expect(actor.permissions).toEqual([{ action: "sales:*" }, { action: "*:getOrder" }]);
+    });
+
+    it("leaves `action` free text on unrelated card types alone", () => {
+      const input = { name: "foo", action: "Some Free Text" };
+      expect(normalizeIdentifierNames(input, "groupCard")).toBe(input);
+    });
+
     it("camelCases card names, field names and types", () => {
       const input = {
         name: "Order Placed",

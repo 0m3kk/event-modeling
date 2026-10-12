@@ -108,6 +108,28 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
     expect(reverted?.data.name).toBe("placeOrder");
   });
 
+  it("shows the action token human-readable while storing its canonical form", () => {
+    const withAction: CanvasElement<CommandCardData> = {
+      ...card,
+      data: { ...card.data, action: "sales:placeOrder" },
+    };
+    useCanvasStore.getState().addElement(withAction);
+
+    // Action row occupies y in [32, 60); e.g. y = 45.
+    const target = commandCardTool.getInlineEditTarget!(withAction, { x: 30, y: 45 });
+    expect(target?.initialValue).toBe("Sales:Place Order");
+
+    const undoBefore = useCanvasStore.getState().undoStack.length;
+    // Committing the untouched display form is a no-op (no spurious undo step).
+    target?.onCommit("Sales:Place Order");
+    expect(useCanvasStore.getState().undoStack.length).toBe(undoBefore);
+
+    // A genuine edit is stored in canonical form.
+    target?.onCommit("Sales:Cancel Order");
+    const updated = useCanvasStore.getState().elements.find((e) => e.id === "cmd-1");
+    expect(updated?.data.action).toBe("sales:cancelOrder");
+  });
+
   it("returns inline edit target for Input Field Name", () => {
     useCanvasStore.getState().addElement(card);
 
