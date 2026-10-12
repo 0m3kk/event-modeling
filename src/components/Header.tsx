@@ -54,6 +54,8 @@ export function Header() {
   const setSearchOpen = useCanvasStore((s) => s.setSearchOpen);
   const setGoogleDriveModalOpen = useCanvasStore((s) => s.setGoogleDriveModalOpen);
   const setExportModalOpen = useCanvasStore((s) => s.setExportModalOpen);
+  const googleDriveFileId = useCanvasStore((s) => s.googleDriveFileId);
+  const googleDriveFileName = useCanvasStore((s) => s.googleDriveFileName);
 
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -136,6 +138,9 @@ export function Header() {
       const project = await openProjectFromFile();
       if (project) {
         useCanvasStore.getState().loadProject(project);
+        // A local file is not linked to any Drive file; drop the previous link
+        // so the next "Save to Drive" creates a new file instead of overwriting.
+        useCanvasStore.getState().setGoogleDriveFileId(null);
       }
     } catch (err: any) {
       alert(`Lỗi đọc tệp: ${err.message}`);
@@ -241,10 +246,26 @@ export function Header() {
         {/* Google Drive Button */}
         <button
           onClick={() => setGoogleDriveModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200/80 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+          title={
+            googleDriveFileId
+              ? t("header.driveLinked", { name: googleDriveFileName || projectName })
+              : t("header.drive")
+          }
+          className={`flex max-w-[13rem] items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer ${
+            googleDriveFileId
+              ? "border-green-300 bg-green-50/60 text-green-700 hover:bg-green-100 dark:border-green-800/60 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
+              : "border-gray-200/80 text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          }`}
         >
-          <Cloud size={14} className="text-blue-500" />
-          <span>{t("header.drive")}</span>
+          <span className="relative flex shrink-0 items-center">
+            <Cloud size={14} className="text-blue-500" />
+            {googleDriveFileId && (
+              <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-zinc-900" />
+            )}
+          </span>
+          <span className="truncate">
+            {googleDriveFileId ? googleDriveFileName || projectName : t("header.drive")}
+          </span>
         </button>
       </div>
 

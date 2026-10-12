@@ -27,6 +27,7 @@ export function GoogleDriveModal() {
   const elements = useCanvasStore((s) => s.elements);
   const viewport = useCanvasStore((s) => s.viewport);
   const googleDriveFileId = useCanvasStore((s) => s.googleDriveFileId);
+  const googleDriveFileName = useCanvasStore((s) => s.googleDriveFileName);
   const setGoogleDriveFileId = useCanvasStore((s) => s.setGoogleDriveFileId);
 
   const [tab, setTab] = useState<"save" | "open">(initialTab);
@@ -100,7 +101,7 @@ export function GoogleDriveModal() {
         json,
         googleDriveFileId,
       );
-      setGoogleDriveFileId(res.id);
+      setGoogleDriveFileId(res.id, saveFileName);
       setProjectName(saveFileName);
       setStatusMessage(t("drive.saveSuccess"));
       setTimeout(() => setOpen(false), 1200);
@@ -119,7 +120,7 @@ export function GoogleDriveModal() {
       const json = await downloadFromGoogleDrive(auth.accessToken, file.id);
       const project = parseProjectFile(json);
       useCanvasStore.getState().loadProject(project);
-      setGoogleDriveFileId(file.id);
+      setGoogleDriveFileId(file.id, file.name);
       setStatusMessage(t("drive.openSuccess", { name: file.name }));
       setTimeout(() => setOpen(false), 800);
     } catch (err: any) {
@@ -255,6 +256,13 @@ export function GoogleDriveModal() {
                     onChange={(e) => setSaveFileName(e.target.value)}
                     className="w-full rounded-xl border border-gray-300 bg-transparent px-3 py-2 text-xs outline-none focus:border-blue-500 dark:border-zinc-700 dark:text-zinc-100"
                   />
+                  {googleDriveFileId && (
+                    <p className="text-[11px] text-green-600 dark:text-green-400">
+                      {t("drive.overwriteHint", {
+                        name: googleDriveFileName || saveFileName,
+                      })}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={handleSave}

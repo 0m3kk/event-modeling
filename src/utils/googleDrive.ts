@@ -50,6 +50,7 @@ export interface GoogleDriveAuthState {
 
 const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
 const CLIENT_ID_STORAGE_KEY = "event_modeling_gdrive_client_id";
+const DRIVE_FILE_STORAGE_KEY = "event_modeling_gdrive_last_file";
 
 export function getStoredGoogleClientId(): string {
   if (typeof window === "undefined") return "";
@@ -60,6 +61,47 @@ export function getStoredGoogleClientId(): string {
 
 export function setStoredGoogleClientId(clientId: string) {
   localStorage.setItem(CLIENT_ID_STORAGE_KEY, clientId);
+}
+
+/**
+ * Reference to the Google Drive file the current board is linked to. Kept in
+ * localStorage so that "Save to Drive" keeps overwriting the same file after a
+ * page reload instead of silently creating a duplicate.
+ */
+export interface DriveFileRef {
+  id: string;
+  name: string;
+}
+
+export function getStoredDriveFile(): DriveFileRef | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRIVE_FILE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.id === "string" && parsed.id) {
+      return {
+        id: parsed.id,
+        name: typeof parsed.name === "string" ? parsed.name : "",
+      };
+    }
+  } catch {
+    // Ignore malformed or inaccessible storage.
+  }
+  return null;
+}
+
+export function setStoredDriveFile(ref: DriveFileRef | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (!ref) {
+      localStorage.removeItem(DRIVE_FILE_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(DRIVE_FILE_STORAGE_KEY, JSON.stringify(ref));
+  } catch {
+    // Persistence is best-effort; ignore quota/security errors.
+  }
 }
 
 declare global {

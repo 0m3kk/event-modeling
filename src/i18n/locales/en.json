@@ -12,6 +12,7 @@
     "saveLocal": "Save",
     "export": "Export",
     "drive": "Google Drive",
+    "driveLinked": "Open on Drive: {{name}}",
     "saveToDrive": "Save to Drive",
     "openFromDrive": "Open from Drive",
     "search": "Search (Ctrl+K)",
@@ -66,6 +67,7 @@
     "connected": "Google Connected",
     "errorList": "Failed to load file list: {{message}}",
     "saveSuccess": "✅ Saved to Google Drive successfully!",
+    "overwriteHint": "Saving will overwrite the Drive file: {{name}}",
     "errorSave": "Failed to save: {{message}}",
     "openSuccess": "✅ Opened file {{name}}",
     "errorOpen": "Failed to open file: {{message}}"

@@ -12,6 +12,7 @@ import { ExportSpecModal } from "@/components/ExportSpecModal";
 import { useTheme } from "@/hooks/useTheme";
 import { useCanvasStore } from "@/store";
 import { saveToAutoSave, loadFromAutoSave } from "@/utils/fileIO";
+import { getStoredDriveFile } from "@/utils/googleDrive";
 
 export function App() {
   useTheme();
@@ -21,6 +22,12 @@ export function App() {
     const saved = loadFromAutoSave();
     if (saved && saved.elements.length > 0) {
       useCanvasStore.getState().loadProject(saved);
+      // Re-link the Drive file the board was last saved to, so "Save to Drive"
+      // overwrites it instead of creating a duplicate.
+      const driveFile = getStoredDriveFile();
+      if (driveFile) {
+        useCanvasStore.getState().setGoogleDriveFileId(driveFile.id, driveFile.name);
+      }
     }
   }, []);
 

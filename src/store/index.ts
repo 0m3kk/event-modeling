@@ -26,6 +26,7 @@ import {
   navigateSubSelect,
   getAdjacentSubSelectAfterDeletion,
 } from "@/utils/subSelection";
+import { setStoredDriveFile } from "@/utils/googleDrive";
 
 interface HistoryEntry {
   elements: CanvasElement[];
@@ -35,6 +36,7 @@ export interface CanvasStoreState {
   // Project info
   projectName: string;
   googleDriveFileId: string | null;
+  googleDriveFileName: string | null;
 
   // Canvas data
   elements: CanvasElement[];
@@ -60,7 +62,7 @@ export interface CanvasStoreState {
 
   // Actions
   setProjectName: (name: string) => void;
-  setGoogleDriveFileId: (id: string | null) => void;
+  setGoogleDriveFileId: (id: string | null, name?: string) => void;
   setTool: (tool: string) => void;
   setViewport: (viewport: Partial<Viewport>) => void;
   setSelectedIds: (ids: string[]) => void;
@@ -166,6 +168,7 @@ function applyContainerLayout(elements: CanvasElement[]): CanvasElement[] {
 export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   projectName: "Untitled Board",
   googleDriveFileId: null,
+  googleDriveFileName: null,
 
   elements: [],
   selectedIds: [],
@@ -193,7 +196,12 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
   redoStack: [],
 
   setProjectName: (name) => set({ projectName: name }),
-  setGoogleDriveFileId: (id) => set({ googleDriveFileId: id }),
+  setGoogleDriveFileId: (id, name) => {
+    set({ googleDriveFileId: id, googleDriveFileName: id ? name ?? get().projectName : null });
+    // Remember the linked Drive file so a later save overwrites it even after
+    // a reload; clearing the id also clears the persisted reference.
+    setStoredDriveFile(id ? { id, name: name ?? get().projectName } : null);
+  },
   setTool: (tool) => set({ tool }),
   setViewport: (patch) =>
     set((state) => ({ viewport: { ...state.viewport, ...patch } })),
@@ -669,11 +677,14 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
   clearBoard: () => {
     const current = get().elements;
+    setStoredDriveFile(null);
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
       elements: [],
       selectedIds: [],
+      googleDriveFileId: null,
+      googleDriveFileName: null,
     }));
   },
 

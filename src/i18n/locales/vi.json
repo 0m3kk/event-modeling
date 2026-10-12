@@ -12,6 +12,7 @@
     "saveLocal": "Lưu tệp về máy (JSON)",
     "export": "Xuất",
     "drive": "Google Drive",
+    "driveLinked": "Đang mở trên Drive: {{name}}",
     "saveToDrive": "Lưu lên Google Drive",
     "openFromDrive": "Mở từ Google Drive",
     "search": "Tìm kiếm (Ctrl+K)",
@@ -66,6 +67,7 @@
     "connected": "Đã kết nối Google",
     "errorList": "Lỗi tải danh sách: {{message}}",
     "saveSuccess": "✅ Đã lưu thành công lên Google Drive!",
+    "overwriteHint": "Thao tác lưu sẽ ghi đè tệp Drive: {{name}}",
     "errorSave": "Lỗi lưu: {{message}}",
     "openSuccess": "✅ Đã mở tệp {{name}}",
     "errorOpen": "Lỗi mở tệp: {{message}}"
