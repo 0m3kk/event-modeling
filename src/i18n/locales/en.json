@@ -23,6 +23,7 @@
   },
   "toolbar": {
     "select": "Select (V)",
+    "organize": "Tidy Up Board",
     "delete": "Delete Selected (Del)",
     "clearCanvas": "Clear Canvas"
   },

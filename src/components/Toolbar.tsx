@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { MousePointer, Trash2 } from "lucide-react";
+import { MousePointer, Trash2, LayoutGrid } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
@@ -12,10 +12,15 @@ import type { ToolDefinition } from "@/tools";
  */
 const TOOL_GROUPS: string[][] = [
   ["domainCard", "sliceCard", "groupCard"],
-  ["eventCard", "commandCard", "queryCard", "stateCard", "constraintCard", "viewCard"],
+  ["eventCard", "commandCard", "queryCard", "stateCard", "constraintCard", "viewCard", "actorCard"],
   ["serviceCard", "objectCard", "enumCard", "aliasCard"],
-  ["stickyNote"],
 ];
+
+/**
+ * Card tools that sit in the trailing action cluster (sticky note, tidy up,
+ * delete) instead of the main tool groups.
+ */
+const TRAY_TOOL_TYPES = ["stickyNote"];
 
 function ToolButton({
   tool,
@@ -57,14 +62,19 @@ export function Toolbar() {
   const deleteSelectedField = useCanvasStore((s) => s.deleteSelectedField);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const selectedField = useCanvasStore((s) => s.selectedField);
+  const elementCount = useCanvasStore((s) => s.elements.length);
+  const organizeBoard = useCanvasStore((s) => s.organizeBoard);
 
   const registeredTools = toolRegistry.getAll();
   const toolByType = new Map(registeredTools.map((tool) => [tool.type, tool]));
-  const listedTypes = new Set(TOOL_GROUPS.flat());
+  const listedTypes = new Set([...TOOL_GROUPS.flat(), ...TRAY_TOOL_TYPES]);
   const groups: ToolDefinition[][] = TOOL_GROUPS.map((types) =>
     types
       .map((type) => toolByType.get(type))
       .filter((tool): tool is ToolDefinition => Boolean(tool)),
+  );
+  const trayTools = TRAY_TOOL_TYPES.map((type) => toolByType.get(type)).filter(
+    (tool): tool is ToolDefinition => Boolean(tool),
   );
   const unlistedTools = registeredTools.filter((tool) => !listedTypes.has(tool.type));
   if (unlistedTools.length > 0) groups.push(unlistedTools);
@@ -119,18 +129,43 @@ export function Toolbar() {
 
       <div className="mx-1 h-6 w-px bg-gray-200 dark:bg-zinc-800" />
 
-      {/* 3. Delete Selected */}
-      <div className="group relative flex items-center justify-center">
-        <button
-          onClick={handleDelete}
-          disabled={selectedCount === 0}
-          title={t("toolbar.delete")}
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-red-500 outline-none hover:bg-red-50 disabled:opacity-30 dark:hover:bg-red-950/40 cursor-pointer"
-        >
-          <Trash2 size={20} />
-        </button>
-        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-zinc-800 whitespace-nowrap">
-          {t("toolbar.delete")}
+      {/* 3. Action cluster: sticky note + tidy up + delete */}
+      <div className="flex items-center gap-1">
+        {trayTools.map((tool) => (
+          <ToolButton
+            key={tool.type}
+            tool={tool}
+            isActive={currentTool === tool.type}
+            onSelect={() => setTool(tool.type)}
+          />
+        ))}
+
+        <div className="group relative flex items-center justify-center">
+          <button
+            onClick={() => organizeBoard()}
+            disabled={elementCount < 2}
+            title={t("toolbar.organize")}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-indigo-500 outline-none hover:bg-indigo-50 disabled:opacity-30 dark:hover:bg-indigo-950/40 cursor-pointer"
+          >
+            <LayoutGrid size={20} />
+          </button>
+          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-zinc-800 whitespace-nowrap">
+            {t("toolbar.organize")}
+          </div>
+        </div>
+
+        <div className="group relative flex items-center justify-center">
+          <button
+            onClick={handleDelete}
+            disabled={selectedCount === 0}
+            title={t("toolbar.delete")}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-red-500 outline-none hover:bg-red-50 disabled:opacity-30 dark:hover:bg-red-950/40 cursor-pointer"
+          >
+            <Trash2 size={20} />
+          </button>
+          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-zinc-800 whitespace-nowrap">
+            {t("toolbar.delete")}
+          </div>
         </div>
       </div>
     </div>

@@ -62,9 +62,13 @@ describe("AIAgent", () => {
 
     expect(event).toBeTruthy();
     expect(event.id).toBeUndefined();
-    expect(event.x).toBeUndefined();
     expect(event.data).toBeUndefined();
     expect(event.description).toBeUndefined();
+    // Position and size are included so the model can reason about layout.
+    expect(typeof event.x).toBe("number");
+    expect(typeof event.y).toBe("number");
+    expect(typeof event.width).toBe("number");
+    expect(typeof event.height).toBe("number");
     expect(res).not.toContain('"description"');
     expect(event.fields[0]).toEqual({ name: "orderId", type: "string", tag: "order" });
   });
@@ -1197,5 +1201,111 @@ describe("AIAgent", () => {
     const cmd = useCanvasStore.getState().elements.find((e) => e.id === cmdRes.createdId)!;
     expect(cmd.sliceId).toBe(slice2.id);
     expect(cmd.laneId).toBe(commandLane.id);
+  });
+
+  it("exposes a position_elements tool", () => {
+    const tool = buildOpenAITools().find((t) => t.function.name === "position_elements");
+    expect(tool).toBeTruthy();
+    expect(tool!.function.parameters.properties.placements.type).toBe("array");
+    expect(tool!.function.parameters.required).toContain("placements");
+  });
+
+  it("moves components to explicit positions", async () => {
+    await executeAITool("create_sticky_note", { text: "A" });
+    await executeAITool("create_sticky_note", { text: "B" });
+
+    const res = JSON.parse(
+      await executeAITool("position_elements", {
+        placements: [
+          { target: "A", x: 1000, y: 200 },
+          { target: "B", x: 1200, y: 200 },
+        ],
+      }),
+    );
+    expect(res.status).toBe("success");
+    expect(res.placed).toBe(2);
+
+    const elements = useCanvasStore.getState().elements;
+    const a = elements.find((e) => e.data.text === "A")!;
+    const b = elements.find((e) => e.data.text === "B")!;
+    expect([a.x, a.y]).toEqual([1000, 200]);
+    expect([b.x, b.y]).toEqual([1200, 200]);
+  });
+
+  it("reports an unknown target without moving anything", async () => {
+    await executeAITool("create_sticky_note", { text: "A" });
+    const res = JSON.parse(
+      await executeAITool("position_elements", {
+        placements: [{ target: "Ghost", x: 10, y: 10 }],
+      }),
+    );
+    expect(res.status).toBe("error");
+    expect(res.failed[0].error).toBe("element_not_found");
+    expect(useCanvasStore.getState().elements[0].x).not.toBe(10);
+  });
+
+  it("moves a Domain with its whole subtree and keeps membership", async () => {
+    await executeAITool("create_domain_card", { name: "Ordering" });
+    await executeAITool("create_group_card", { name: "Ordering Types", domain: "Ordering" });
+    await executeAITool("create_object_card", {
+      name: "Money",
+      fields: [],
+      group: "Ordering Types",
+    });
+
+    const before = useCanvasStore.getState().elements;
+    const domain = before.find((e) => e.type === "domainCard")!;
+    const group = before.find((e) => e.type === "groupCard")!;
+    const object = before.find((e) => e.type === "objectCard")!;
+
+    const res = JSON.parse(
+      await executeAITool("position_elements", {
+        placements: [{ target: "Ordering", x: 3000, y: 1500 }],
+      }),
+    );
+    expect(res.status).toBe("success");
+
+    const after = useCanvasStore.getState().elements;
+    const domainAfter = after.find((e) => e.id === domain.id)!;
+    const groupAfter = after.find((e) => e.id === group.id)!;
+    const objectAfter = after.find((e) => e.id === object.id)!;
+
+    // The frame and everything inside shifted together.
+    expect(domainAfter.x).toBe(3000);
+    expect(domainAfter.y).toBe(1500);
+    expect(groupAfter.x).toBeGreaterThan(3000);
+    expect(objectAfter.x).toBeGreaterThan(3000);
+    // Membership is untouched.
+    expect(groupAfter.domainId).toBe(domain.id);
+    expect(objectAfter.groupId).toBe(group.id);
+  });
+
+  it("refuses to move a Slice lane card, but moves the Slice", async () => {
+    await executeAITool("create_slice", {
+      name: "PlaceOrder",
+      lanes: [{ type: "eventCard" }],
+    });
+    await executeAITool("create_event_card", {
+      name: "OrderPlaced",
+      fields: [],
+      slice: "PlaceOrder",
+    });
+
+    const laneCard = JSON.parse(
+      await executeAITool("position_elements", {
+        placements: [{ target: "OrderPlaced", x: 10, y: 10 }],
+      }),
+    );
+    expect(laneCard.status).toBe("error");
+    expect(laneCard.failed[0].error).toContain("Slice");
+
+    const sliceRes = JSON.parse(
+      await executeAITool("position_elements", {
+        placements: [{ target: "PlaceOrder", x: 500, y: 600 }],
+      }),
+    );
+    expect(sliceRes.status).toBe("success");
+    const slice = useCanvasStore.getState().elements.find((e) => e.type === "sliceCard")!;
+    expect([slice.x, slice.y]).toEqual([500, 600]);
   });
 });

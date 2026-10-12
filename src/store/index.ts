@@ -21,6 +21,7 @@ import { toolRegistry } from "@/tools/registry";
 import { reflowSlices } from "@/tools/sliceCard/layout";
 import { reflowDomains } from "@/tools/domainCard/layout";
 import { reflowGroups } from "@/tools/groupCard/layout";
+import { arrangeBoard } from "@/utils/arrange";
 import {
   navigateSubSelect,
   getAdjacentSubSelectAfterDeletion,
@@ -80,6 +81,7 @@ export interface CanvasStoreState {
   createMethodCopy: (sourceId: string, methodId: string) => CanvasElement | null;
   updateElement: (id: string, patch: Partial<CanvasElement>) => void;
   updateElements: (patches: Array<{ id: string } & Partial<CanvasElement>>) => void;
+  organizeBoard: (options?: { columns?: number }) => number;
   deleteElements: (ids: string[]) => void;
   deleteSelectedField: () => void;
   updateSelectedFieldType: (type: string) => void;
@@ -365,6 +367,23 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
       redoStack: [],
       elements: applyContainerLayout(updatedElements),
     }));
+  },
+
+  organizeBoard: (options) => {
+    const current = get().elements;
+    const patches = arrangeBoard(
+      current,
+      options?.columns ? { columns: options.columns } : {},
+    );
+    const byId = new Map(current.map((el) => [el.id, el]));
+    const moved = patches.filter((patch) => {
+      const el = byId.get(patch.id);
+      return el ? el.x !== patch.x || el.y !== patch.y : false;
+    });
+    if (moved.length === 0) return 0;
+
+    get().updateElements(moved);
+    return moved.length;
   },
 
   deleteElements: (ids) => {

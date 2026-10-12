@@ -155,4 +155,58 @@ describe("useCanvasStore", () => {
     useCanvasStore.getState().undo();
     expect(useCanvasStore.getState().elements.length).toBe(2);
   });
+
+  it("organizes the board and collapses into a single undo step", () => {
+    const a: CanvasElement = {
+      id: "a",
+      type: "stickyNote",
+      x: 0,
+      y: 0,
+      width: 160,
+      height: 120,
+      data: { text: "A" },
+    };
+    const b: CanvasElement = {
+      id: "b",
+      type: "stickyNote",
+      x: 10,
+      y: 10,
+      width: 160,
+      height: 120,
+      data: { text: "B" },
+    };
+    useCanvasStore.getState().addElements([a, b]);
+
+    const moved = useCanvasStore.getState().organizeBoard();
+    expect(moved).toBeGreaterThan(0);
+
+    const [first, second] = useCanvasStore.getState().elements;
+    const overlap =
+      first.x < second.x + second.width &&
+      first.x + first.width > second.x &&
+      first.y < second.y + second.height &&
+      first.y + first.height > second.y;
+    expect(overlap).toBe(false);
+
+    // One undo restores the pre-organize positions.
+    useCanvasStore.getState().undo();
+    expect(useCanvasStore.getState().elements.map((e) => [e.x, e.y])).toEqual([
+      [0, 0],
+      [10, 10],
+    ]);
+  });
+
+  it("does nothing when there is nothing to organize", () => {
+    const el: CanvasElement = {
+      id: "a",
+      type: "stickyNote",
+      x: 0,
+      y: 0,
+      width: 160,
+      height: 120,
+      data: { text: "A" },
+    };
+    useCanvasStore.getState().addElement(el);
+    expect(useCanvasStore.getState().organizeBoard()).toBe(0);
+  });
 });

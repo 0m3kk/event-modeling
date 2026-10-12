@@ -23,6 +23,7 @@
   },
   "toolbar": {
     "select": "Chọn đối tượng (V)",
+    "organize": "Sắp xếp gọn bảng",
     "delete": "Xóa đối tượng đang chọn (Del)",
     "clearCanvas": "Xóa toàn bộ bảng"
   },
