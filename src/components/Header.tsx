@@ -13,16 +13,31 @@ import {
   Sparkles,
   Sun,
   Moon,
+  Monitor,
+  Check,
+  Languages,
   ChevronDown,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore, undo, redo } from "@/store";
 import { useTheme } from "@/hooks/useTheme";
+import type { ThemeMode } from "@/types";
 import { saveProjectToFile, openProjectFromFile } from "@/utils/fileIO";
+
+const THEME_OPTIONS: { value: ThemeMode; labelKey: string; icon: typeof Sun }[] = [
+  { value: "light", labelKey: "header.themeLight", icon: Sun },
+  { value: "dark", labelKey: "header.themeDark", icon: Moon },
+  { value: "system", labelKey: "header.themeSystem", icon: Monitor },
+];
+
+const LANGUAGE_OPTIONS = [
+  { value: "vi", label: "Tiếng Việt" },
+  { value: "en", label: "English" },
+];
 
 export function Header() {
   const { t, i18n } = useTranslation();
-  const { resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   const projectName = useCanvasStore((s) => s.projectName);
   const setProjectName = useCanvasStore((s) => s.setProjectName);
@@ -68,10 +83,25 @@ export function Header() {
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
 
+  // Theme dropdown
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
+
+  // Language dropdown
+  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+  const langMenuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
-      if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (fileMenuRef.current && !fileMenuRef.current.contains(target)) {
         setIsFileMenuOpen(false);
+      }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(target)) {
+        setIsThemeMenuOpen(false);
+      }
+      if (langMenuRef.current && !langMenuRef.current.contains(target)) {
+        setIsLangMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleOutside);
@@ -113,11 +143,18 @@ export function Header() {
     }
   };
 
-  const toggleLanguage = () => {
-    const next = i18n.language === "vi" ? "en" : "vi";
-    i18n.changeLanguage(next);
-    localStorage.setItem("event-modeling-lang", next);
+  const changeLanguage = (lang: string) => {
+    if (lang === i18n.language) {
+      setIsLangMenuOpen(false);
+      return;
+    }
+    i18n.changeLanguage(lang);
+    localStorage.setItem("event-modeling-lang", lang);
+    setIsLangMenuOpen(false);
   };
+
+  const currentTheme = THEME_OPTIONS.find((o) => o.value === theme) ?? THEME_OPTIONS[2];
+  const CurrentThemeIcon = currentTheme.icon;
 
   return (
     <header className="flex h-14 w-full items-center justify-between border-b border-gray-200/80 bg-white/90 px-4 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/90 select-none z-30">
@@ -261,19 +298,80 @@ export function Header() {
           <span className="hidden sm:inline font-mono">⌘K</span>
         </button>
 
-        <button
-          onClick={toggleLanguage}
-          className="rounded-lg border border-gray-200/80 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer font-mono"
-        >
-          {i18n.language.toUpperCase()}
-        </button>
+        {/* Language Dropdown */}
+        <div className="relative" ref={langMenuRef}>
+          <button
+            onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
+            title={t("header.language")}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200/80 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+          >
+            <Languages size={14} />
+            <span className="font-mono">{i18n.language.slice(0, 2).toUpperCase()}</span>
+            <ChevronDown size={13} />
+          </button>
 
-        <button
-          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-          className="rounded-lg p-1.5 text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
-        >
-          {resolvedTheme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
+          {isLangMenuOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-36 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 z-50">
+              {LANGUAGE_OPTIONS.map((opt) => {
+                const active = i18n.language.slice(0, 2) === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => changeLanguage(opt.value)}
+                    className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer ${
+                      active
+                        ? "font-medium text-blue-600 dark:text-blue-400"
+                        : "text-gray-700 dark:text-zinc-300"
+                    }`}
+                  >
+                    <span className="flex-1 text-left">{opt.label}</span>
+                    {active && <Check size={14} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Theme Dropdown */}
+        <div className="relative" ref={themeMenuRef}>
+          <button
+            onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
+            title={t("header.theme")}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200/80 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+          >
+            <CurrentThemeIcon size={15} />
+            <span className="hidden sm:inline">{t(currentTheme.labelKey)}</span>
+            <ChevronDown size={13} />
+          </button>
+
+          {isThemeMenuOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-36 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 z-50">
+              {THEME_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                const active = theme === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      setTheme(opt.value);
+                      setIsThemeMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer ${
+                      active
+                        ? "font-medium text-blue-600 dark:text-blue-400"
+                        : "text-gray-700 dark:text-zinc-300"
+                    }`}
+                  >
+                    <Icon size={15} />
+                    <span className="flex-1 text-left">{t(opt.labelKey)}</span>
+                    {active && <Check size={14} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
 

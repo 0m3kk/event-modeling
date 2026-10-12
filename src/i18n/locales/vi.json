@@ -14,7 +14,12 @@
     "saveToDrive": "Lưu lên Google Drive",
     "openFromDrive": "Mở từ Google Drive",
     "search": "Tìm kiếm (Ctrl+K)",
-    "aiAssistant": "Trợ lý AI"
+    "aiAssistant": "Trợ lý AI",
+    "theme": "Giao diện",
+    "themeLight": "Sáng",
+    "themeDark": "Tối",
+    "themeSystem": "Hệ thống",
+    "language": "Ngôn ngữ"
   },
   "toolbar": {
     "select": "Chọn đối tượng (V)",

@@ -32,7 +32,7 @@ function ToolButton({
       <button
         onClick={onSelect}
         title={tool.name}
-        className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
+        className={`flex h-10 w-10 items-center justify-center rounded-xl outline-none transition-all cursor-pointer ${
           isActive
             ? "bg-blue-600 text-white shadow-sm"
             : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -85,7 +85,7 @@ export function Toolbar() {
         <button
           onClick={() => setTool("select")}
           title={t("toolbar.select")}
-          className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
+          className={`flex h-10 w-10 items-center justify-center rounded-xl outline-none transition-all cursor-pointer ${
             currentTool === "select"
               ? "bg-blue-600 text-white shadow-sm"
               : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -125,7 +125,7 @@ export function Toolbar() {
           onClick={handleDelete}
           disabled={selectedCount === 0}
           title={t("toolbar.delete")}
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-red-500 hover:bg-red-50 disabled:opacity-30 dark:hover:bg-red-950/40 cursor-pointer"
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-red-500 outline-none hover:bg-red-50 disabled:opacity-30 dark:hover:bg-red-950/40 cursor-pointer"
         >
           <Trash2 size={20} />
         </button>
