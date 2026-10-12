@@ -4,7 +4,6 @@ import {
   serializeSpecification,
   toYaml,
   specFileName,
-  SPEC_VERSION,
 } from "./specExport";
 import type { CanvasElement } from "@/types";
 
@@ -56,7 +55,7 @@ describe("toYaml", () => {
 });
 
 describe("buildSpecification", () => {
-  it("groups cards by meaning and omits geometry", () => {
+  it("groups cards by meaning and omits geometry and bookkeeping", () => {
     const elements: CanvasElement[] = [
       el("d1", "domainCard", { name: "Sales" }),
       el("ev", "eventCard", { name: "OrderPlaced", fields: [{ name: "orderId", type: "string" }] }, { domainId: "d1" }),
@@ -64,13 +63,15 @@ describe("buildSpecification", () => {
       el("ob", "objectCard", { name: "Order", fields: [{ name: "id", type: "string", isRequired: true }] }, { domainId: "d1" }),
     ];
 
-    const spec = buildSpecification({ name: "Shop", elements, generatedAt: "2026-01-01T00:00:00.000Z" });
+    const spec = buildSpecification({ name: "Shop", elements });
 
-    expect(spec.specVersion).toBe(SPEC_VERSION);
     expect(spec.name).toBe("Shop");
-    expect(spec.generatedAt).toBe("2026-01-01T00:00:00.000Z");
+    // No bookkeeping summary, version or timestamp: just the model.
+    expect(spec.summary).toBeUndefined();
+    expect(spec.specVersion).toBeUndefined();
+    expect(spec.generatedAt).toBeUndefined();
 
-    expect(spec.domains).toEqual([{ name: "Sales", cards: ["OrderPlaced", "PlaceOrder", "Order"] }]);
+    expect(spec.domains).toEqual([{ name: "Sales", cards: ["OrderPlaced", "PlaceOrder"] }]);
     expect(spec.events).toEqual([
       { name: "OrderPlaced", fields: [{ name: "orderId", type: "string" }] },
     ]);
@@ -81,14 +82,131 @@ describe("buildSpecification", () => {
         inputs: [{ name: "orderId", type: "string" }],
       },
     ]);
-    expect(spec.types).toEqual({
-      objects: [{ name: "Order", fields: [{ name: "id", type: "string", required: true }] }],
-    });
-
+    // Data containers are not listed in their own section.
+    expect(spec.types).toBeUndefined();
     // Geometry is intentionally absent from every definition.
-    const yaml = serializeSpecification({ name: "Shop", elements, generatedAt: "2026-01-01T00:00:00.000Z" });
+    const yaml = serializeSpecification({ name: "Shop", elements });
     expect(yaml).not.toMatch(/\bx:\s/);
     expect(yaml).not.toMatch(/\bwidth:\s/);
+    expect(yaml).not.toMatch(/^summary:/m);
+  });
+
+  it("inlines a data definition at its first reference, then references by name", () => {
+    const elements: CanvasElement[] = [
+      el("o1", "objectCard", {
+        name: "Order",
+        fields: [
+          { name: "id", type: "string" },
+          { name: "total", type: "number" },
+        ],
+      }),
+      el("e1", "eventCard", { name: "OrderPlaced", fields: [{ name: "order", type: "Order" }] }),
+      el("e2", "eventCard", { name: "OrderShipped", fields: [{ name: "order", type: "Order" }] }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+
+    expect(spec.events).toEqual([
+      {
+        name: "OrderPlaced",
+        fields: [
+          {
+            name: "order",
+            type: {
+              object: "Order",
+              fields: [
+                { name: "id", type: "string" },
+                { name: "total", type: "number" },
+              ],
+            },
+          },
+        ],
+      },
+      { name: "OrderShipped", fields: [{ name: "order", type: "Order" }] },
+    ]);
+  });
+
+  it("inlines enum and alias definitions and expands nested references once", () => {
+    const elements: CanvasElement[] = [
+      el("en", "enumCard", { name: "Status", fields: [{ name: "pending" }, { name: "paid" }] }),
+      el("al", "aliasCard", { name: "OrderId", aliasedType: "string" }),
+      el("o1", "objectCard", {
+        name: "Order",
+        fields: [
+          { name: "id", type: "OrderId" },
+          { name: "status", type: "Status" },
+        ],
+      }),
+      el("e1", "eventCard", { name: "OrderPlaced", fields: [{ name: "order", type: "Order" }] }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+
+    expect(spec.events).toEqual([
+      {
+        name: "OrderPlaced",
+        fields: [
+          {
+            name: "order",
+            type: {
+              object: "Order",
+              fields: [
+                { name: "id", type: { alias: "OrderId", of: "string" } },
+                { name: "status", type: { enum: "Status", values: ["pending", "paid"] } },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("survives cyclic data references", () => {
+    const elements: CanvasElement[] = [
+      el("a", "objectCard", { name: "A", fields: [{ name: "b", type: "B" }] }),
+      el("b", "objectCard", { name: "B", fields: [{ name: "a", type: "A" }] }),
+      el("e1", "eventCard", { name: "E", fields: [{ name: "a", type: "A" }] }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+
+    expect(spec.events).toEqual([
+      {
+        name: "E",
+        fields: [
+          {
+            name: "a",
+            type: {
+              object: "A",
+              fields: [
+                {
+                  name: "b",
+                  type: {
+                    object: "B",
+                    fields: [{ name: "a", type: "A" }],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("omits data containers from domain and group membership lists", () => {
+    const elements: CanvasElement[] = [
+      el("d1", "domainCard", { name: "Sales" }),
+      el("g1", "groupCard", { name: "Sales Types" }, { domainId: "d1" }),
+      el("o1", "objectCard", { name: "Order", fields: [{ name: "id", type: "string" }] }, { domainId: "d1", groupId: "g1" }),
+      el("svc", "serviceCard", { name: "OrderService", methods: [] }, { domainId: "d1", groupId: "g1" }),
+      el("e1", "eventCard", { name: "OrderPlaced", fields: [{ name: "order", type: "Order" }] }, { domainId: "d1" }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+
+    expect(spec.domains).toEqual([{ name: "Sales", groups: ["Sales Types"], cards: ["OrderService", "OrderPlaced"] }]);
+    expect(spec.groups).toEqual([{ name: "Sales Types", domain: "Sales", cards: ["OrderService"] }]);
   });
 
   it("de-duplicates mirror copies but keeps them in slice lanes", () => {

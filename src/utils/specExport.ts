@@ -1,25 +1,31 @@
 import type { CanvasElement } from "@/types";
 import { getElementName, nameKey } from "./naming";
 import { collectBoardTags } from "./eventTags";
+import { normalizeTypeName } from "./typeCatalog";
 import { cleanValidation, hasValidation, type FieldValidation } from "./fieldValidation";
 
 /**
  * Exports the board as a human-readable, tool-agnostic domain specification in
  * YAML.
  *
- * The spec is *semantic*: it is organised by meaning (domains, slices, type
- * definitions, events, commands, queries, views, states, constraints, services,
- * actors, DCB tags) rather than by canvas geometry, so it reads like a design
- * document and can be diffed, reviewed or fed to code generators. Board
- * positions, sizes, colours and internal ids are deliberately omitted.
+ * The spec is *semantic*: it is organised by meaning (domains, slices, events,
+ * commands, queries, views, states, constraints, services, actors, DCB tags)
+ * rather than by canvas geometry, so it reads like a design document and can be
+ * diffed, reviewed or fed to code generators. Board positions, sizes, colours
+ * and internal ids are deliberately omitted. There is no bookkeeping summary
+ * either — the document is just the model.
+ *
+ * Data containers (Object / Enum / Alias cards) are never listed as standalone
+ * entries — not in a section of their own, nor in the Domain/Group membership
+ * lists. Each definition is expanded inline at the first field that references
+ * its type; later references stay as the plain type name. The model therefore
+ * centres on the objects that use the data, and the data travels with them.
+ * Data types that no field ever references are omitted.
  *
  * Reference copies and service method-execution copies share the name of the
- * card they mirror, so definition sections de-duplicate by name while Slice
- * lanes still reference the copies that appear inside them.
+ * card they mirror, so definitions de-duplicate by name while Slice lanes still
+ * reference the copies that appear inside them.
  */
-
-/** Bump when the exported specification shape changes incompatibly. */
-export const SPEC_VERSION = "1.0";
 
 /** Display labels for the card types a Slice lane can be reserved for. */
 const TOOL_LABELS: Record<string, string> = {
@@ -39,6 +45,9 @@ const TOOL_LABELS: Record<string, string> = {
   domainCard: "Domain",
   stickyNote: "Sticky Note",
 };
+
+/** Card types that hold reusable data definitions (expanded inline, not listed). */
+const DATA_CARD_TYPES = new Set(["objectCard", "enumCard", "aliasCard"]);
 
 /** A field row as stored on most cards (superset of the per-card shapes). */
 interface RawField {
@@ -63,8 +72,6 @@ export interface SpecificationInput {
   name: string;
   /** Every element currently on the canvas. */
   elements: CanvasElement[];
-  /** Override the generation timestamp (used by tests). */
-  generatedAt?: string;
 }
 
 function elementName(el: CanvasElement): string {
@@ -83,27 +90,6 @@ function uniqueByName(elements: CanvasElement[]): CanvasElement[] {
     out.push(el);
   }
   return out;
-}
-
-/** Maps a stored field row to its spec form, dropping empty optional keys. */
-function mapField(field: RawField | undefined | null): Record<string, unknown> {
-  const out: Record<string, unknown> = {
-    name: field?.name ?? "",
-    type: field?.type ?? "",
-  };
-  if (field?.isArray) out.array = true;
-  if (field?.isRequired) out.required = true;
-  if (field?.tag) out.tag = field.tag;
-  if (field?.description) out.description = field.description;
-  if (field?.validation && hasValidation(field.validation)) {
-    out.validation = cleanValidation(field.validation) ?? field.validation;
-  }
-  return out;
-}
-
-function mapFields(fields: unknown): Record<string, unknown>[] | undefined {
-  if (!Array.isArray(fields) || fields.length === 0) return undefined;
-  return fields.map((f) => mapField(f as RawField));
 }
 
 /** Maps DCB query items (`types` OR'd, `tags` AND'd) to their spec form. */
@@ -154,7 +140,6 @@ function listNamed(
 export function buildSpecification({
   name,
   elements,
-  generatedAt,
 }: SpecificationInput): Record<string, unknown> {
   const byType = (type: string) => elements.filter((el) => el.type === type);
 
@@ -183,6 +168,93 @@ export function buildSpecification({
 
   const domainIdToName = new Map(domains.map((d) => [d.id, nameOf(d)]));
 
+  // ---- Data containers: Object / Enum / Alias ------------------------------
+  //
+  // Data definitions are not listed in a section of their own. Each one is
+  // expanded inline at the first field that references its type; later
+  // references stay as the plain type name. The spec therefore reads around the
+  // modelling objects while the data they consume travels with them.
+  const dataTypes = new Map<
+    string,
+    { kind: "object" | "enum" | "alias"; element: CanvasElement }
+  >();
+  for (const el of objects) {
+    dataTypes.set(nameKey(elementName(el)), { kind: "object", element: el });
+  }
+  for (const el of enums) {
+    dataTypes.set(nameKey(elementName(el)), { kind: "enum", element: el });
+  }
+  for (const el of aliases) {
+    dataTypes.set(nameKey(elementName(el)), { kind: "alias", element: el });
+  }
+  /** Names of data types already expanded inline, so each is expanded once. */
+  const expandedData = new Set<string>();
+
+  /** Expands a data definition (its fields may reference further data types). */
+  function expandData(data: {
+    kind: "object" | "enum" | "alias";
+    element: CanvasElement;
+  }): Record<string, unknown> {
+    const el = data.element;
+    const typeName = nameOf(el);
+    if (data.kind === "object") {
+      const out: Record<string, unknown> = { object: typeName };
+      if (el.data?.description) out.description = el.data.description;
+      const fields = Array.isArray(el.data?.fields) ? el.data.fields : [];
+      const mapped = fields.map((f: RawField) => mapField(f));
+      if (mapped.length > 0) out.fields = mapped;
+      return out;
+    }
+    if (data.kind === "enum") {
+      const out: Record<string, unknown> = { enum: typeName };
+      if (el.data?.description) out.description = el.data.description;
+      const values = listNamed(el.data?.fields);
+      if (values.length > 0) out.values = values;
+      return out;
+    }
+    const out: Record<string, unknown> = {
+      alias: typeName,
+      of: el.data?.aliasedType ?? "",
+    };
+    if (el.data?.isArray) out.array = true;
+    if (el.data?.description) out.description = el.data.description;
+    const validation = cleanValidation(el.data?.validation);
+    if (validation) out.validation = validation;
+    return out;
+  }
+
+  /**
+   * Maps a stored field row to its spec form, dropping empty optional keys.
+   * When the field's type names a data card that has not been expanded yet, the
+   * type is replaced by that card's inline definition.
+   */
+  function mapField(field: RawField | undefined | null): Record<string, unknown> {
+    const out: Record<string, unknown> = {
+      name: field?.name ?? "",
+      type: field?.type ?? "",
+    };
+    if (field?.isArray) out.array = true;
+    if (field?.isRequired) out.required = true;
+    if (field?.tag) out.tag = field.tag;
+    if (field?.description) out.description = field.description;
+    if (field?.validation && hasValidation(field.validation)) {
+      out.validation = cleanValidation(field.validation) ?? field.validation;
+    }
+
+    const typeKey = field?.type ? nameKey(normalizeTypeName(field.type)) : "";
+    const data = typeKey ? dataTypes.get(typeKey) : undefined;
+    if (data && !expandedData.has(typeKey)) {
+      expandedData.add(typeKey);
+      out.type = expandData(data);
+    }
+    return out;
+  }
+
+  function mapFields(fields: unknown): Record<string, unknown>[] | undefined {
+    if (!Array.isArray(fields) || fields.length === 0) return undefined;
+    return fields.map((f) => mapField(f as RawField));
+  }
+
   // ---- Structure: Domains, Groups, Slices ----------------------------------
   const domainsSpec = domains.map((domain) => {
     const out: Record<string, unknown> = { name: nameOf(domain) };
@@ -191,7 +263,10 @@ export function buildSpecification({
     const directCards = elements
       .filter(
         (el) =>
-          el.domainId === domain.id && el.type !== "groupCard" && el.type !== "sliceCard",
+          el.domainId === domain.id &&
+          el.type !== "groupCard" &&
+          el.type !== "sliceCard" &&
+          !DATA_CARD_TYPES.has(el.type),
       )
       .map(nameOf);
     if (childGroups.length > 0) out.groups = childGroups;
@@ -204,7 +279,9 @@ export function buildSpecification({
     const out: Record<string, unknown> = { name: nameOf(group) };
     const domain = group.domainId ? domainIdToName.get(group.domainId) : undefined;
     if (domain) out.domain = domain;
-    const cards = elements.filter((el) => el.groupId === group.id).map(nameOf);
+    const cards = elements
+      .filter((el) => el.groupId === group.id && !DATA_CARD_TYPES.has(el.type))
+      .map(nameOf);
     if (cards.length > 0) out.cards = cards;
     return out;
   });
@@ -233,40 +310,6 @@ export function buildSpecification({
     if (laneSpec.length > 0) out.lanes = laneSpec;
     return out;
   });
-
-  // ---- Type definitions ----------------------------------------------------
-  const typesSpec: Record<string, unknown> = {};
-  if (objects.length > 0) {
-    typesSpec.objects = objects.map((el) => {
-      const out: Record<string, unknown> = { name: nameOf(el) };
-      if (el.data?.description) out.description = el.data.description;
-      const fields = mapFields(el.data?.fields);
-      if (fields) out.fields = fields;
-      return out;
-    });
-  }
-  if (enums.length > 0) {
-    typesSpec.enums = enums.map((el) => {
-      const out: Record<string, unknown> = { name: nameOf(el) };
-      if (el.data?.description) out.description = el.data.description;
-      const values = listNamed(el.data?.fields);
-      if (values.length > 0) out.values = values;
-      return out;
-    });
-  }
-  if (aliases.length > 0) {
-    typesSpec.aliases = aliases.map((el) => {
-      const out: Record<string, unknown> = {
-        name: nameOf(el),
-        aliasedType: el.data?.aliasedType ?? "",
-      };
-      if (el.data?.isArray) out.array = true;
-      if (el.data?.description) out.description = el.data.description;
-      const validation = cleanValidation(el.data?.validation);
-      if (validation) out.validation = validation;
-      return out;
-    });
-  }
 
   // ---- Behavior ------------------------------------------------------------
   const eventsSpec = events.map((el) => {
@@ -393,33 +436,11 @@ export function buildSpecification({
   });
 
   // ---- Assemble ------------------------------------------------------------
-  const spec: Record<string, unknown> = {
-    specVersion: SPEC_VERSION,
-    name,
-    generatedAt: generatedAt ?? new Date().toISOString(),
-    summary: {
-      domains: domains.length,
-      groups: groups.length,
-      slices: slices.length,
-      objects: objects.length,
-      enums: enums.length,
-      aliases: aliases.length,
-      events: events.length,
-      commands: commands.length,
-      queries: queries.length,
-      views: views.length,
-      states: states.length,
-      constraints: constraints.length,
-      services: services.length,
-      actors: actors.length,
-      tags: tagsSpec.length,
-    },
-  };
+  const spec: Record<string, unknown> = { name };
 
   if (domainsSpec.length > 0) spec.domains = domainsSpec;
   if (groupsSpec.length > 0) spec.groups = groupsSpec;
   if (slicesSpec.length > 0) spec.slices = slicesSpec;
-  if (Object.keys(typesSpec).length > 0) spec.types = typesSpec;
   if (eventsSpec.length > 0) spec.events = eventsSpec;
   if (commandsSpec.length > 0) spec.commands = commandsSpec;
   if (queriesSpec.length > 0) spec.queries = queriesSpec;
