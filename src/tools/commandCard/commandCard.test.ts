@@ -233,4 +233,33 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
       fieldIndex: 1,
     });
   });
+
+  it("sets validation on input fields and ignores response fields", () => {
+    const inputPatch = commandCardTool.onUpdateSubSelectValidation!(
+      card,
+      { elementId: "cmd-1", sectionIndex: 0, fieldIndex: 1 },
+      { min: 0, max: 1000 },
+    );
+    expect(inputPatch?.data?.inputs?.[1].validation).toEqual({ min: 0, max: 1000 });
+
+    // Responses are outputs, so validation is not accepted on them.
+    const respPatch = commandCardTool.onUpdateSubSelectValidation!(
+      card,
+      { elementId: "cmd-1", sectionIndex: 1, fieldIndex: 0 },
+      { pattern: "^[A-Z]+$" },
+    );
+    expect(respPatch).toBeNull();
+
+    // Clearing removes the key.
+    const withValidation = {
+      ...card,
+      data: { ...card.data, inputs: inputPatch!.data!.inputs! },
+    };
+    const cleared = commandCardTool.onUpdateSubSelectValidation!(
+      withValidation as CanvasElement<CommandCardData>,
+      { elementId: "cmd-1", sectionIndex: 0, fieldIndex: 1 },
+      null,
+    );
+    expect(cleared?.data?.inputs?.[1].validation).toBeUndefined();
+  });
 });

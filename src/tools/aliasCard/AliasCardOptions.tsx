@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Brackets, Type } from "lucide-react";
+import { Brackets, ShieldCheck, Type } from "lucide-react";
 import type { CanvasElement } from "@/types";
 import type { AliasCardData } from "./index";
 import { FieldTypePopover } from "@/components/FieldTypePopover";
+import { FieldValidationPopover } from "@/components/FieldValidationPopover";
 import { toDisplayType } from "@/utils/naming";
+import { hasValidation } from "@/utils/fieldValidation";
 
 interface AliasCardOptionsProps {
   element: CanvasElement<AliasCardData>;
@@ -12,6 +14,7 @@ interface AliasCardOptionsProps {
 
 export function AliasCardOptions({ element, onUpdate }: AliasCardOptionsProps) {
   const [isTypePickerOpen, setIsTypePickerOpen] = useState(false);
+  const [isValidationOpen, setIsValidationOpen] = useState(false);
   const isArray = Boolean(element.data.isArray);
 
   return (
@@ -46,6 +49,36 @@ export function AliasCardOptions({ element, onUpdate }: AliasCardOptionsProps) {
       >
         <Brackets size={16} />
       </button>
+
+      {/* Validation: constraints on the wrapped type itself (an alias has no
+          field rows of its own). */}
+      <div className="relative">
+        <button
+          onClick={() => setIsValidationOpen(!isValidationOpen)}
+          title={
+            hasValidation(element.data.validation)
+              ? "Edit Validation"
+              : "Add Validation"
+          }
+          className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
+            hasValidation(element.data.validation)
+              ? "bg-blue-500/15 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
+              : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          }`}
+        >
+          <ShieldCheck size={16} />
+        </button>
+
+        <FieldValidationPopover
+          currentValidation={element.data.validation}
+          type={element.data.aliasedType}
+          isArray={isArray}
+          isOpen={isValidationOpen}
+          onClose={() => setIsValidationOpen(false)}
+          onApply={(validation) => onUpdate({ validation: validation ?? undefined })}
+          placement="top"
+        />
+      </div>
     </div>
   );
 }

@@ -1,15 +1,17 @@
 import { useState, useMemo, useEffect } from "react";
-import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets, Asterisk, Diamond, Play } from "lucide-react";
+import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets, Asterisk, Diamond, Play, ShieldCheck } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import { FieldTypePopover } from "./FieldTypePopover";
 import { FieldTagPopover } from "./FieldTagPopover";
+import { FieldValidationPopover } from "./FieldValidationPopover";
 import { DescriptionPopover } from "./DescriptionPopover";
 import type { CanvasElement } from "@/types";
 import { isElementOriginal } from "@/utils/reference";
 import { findDescriptionText } from "@/utils/description";
 import { toDisplayName, toDisplayType } from "@/utils/naming";
+import { hasValidation } from "@/utils/fieldValidation";
 
 export function OptionsBar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
@@ -26,11 +28,13 @@ export function OptionsBar() {
   const updateSelectedFieldTag = useCanvasStore((s) => s.updateSelectedFieldTag);
   const toggleSelectedFieldArray = useCanvasStore((s) => s.toggleSelectedFieldArray);
   const toggleSelectedFieldRequired = useCanvasStore((s) => s.toggleSelectedFieldRequired);
+  const updateSelectedFieldValidation = useCanvasStore((s) => s.updateSelectedFieldValidation);
   const isDragging = useCanvasStore((s) => s.isDragging);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [isTypePickerOpen, setIsTypePickerOpen] = useState(false);
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
+  const [isValidationOpen, setIsValidationOpen] = useState(false);
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
 
   // Collect all unique tags across events in the board for smart suggestions
@@ -88,6 +92,7 @@ export function OptionsBar() {
   // lingers on a different card.
   useEffect(() => {
     setIsDescriptionOpen(false);
+    setIsValidationOpen(false);
   }, [selectedIds]);
 
   if (isDragging || !bounds || selectedElements.length === 0) return null;
@@ -158,7 +163,7 @@ export function OptionsBar() {
     if (Array.isArray(singleElement.data?.fields)) {
       return (
         (singleElement.data.fields[selectedField.fieldIndex] as
-          | { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean; isRequired?: boolean }
+          | { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean; isRequired?: boolean; validation?: import("@/utils/fieldValidation").FieldValidation }
           | undefined) ?? null
       );
     }
@@ -188,6 +193,17 @@ export function OptionsBar() {
     Boolean(currentField) &&
     (singleElement?.type === "eventCard" || Boolean(toolDef?.onToggleSubSelectTag));
   const showAnyFieldControl = showFieldTypeControls || showFieldTagControl;
+
+  // Field validation is offered on input-side fields only: Object fields,
+  // Command inputs and Query params. Response/output fields are produced by the
+  // system, so they are not validated as input. (An Alias has no field rows, so
+  // its validation control lives in its own options bar.)
+  const supportsFieldValidation =
+    Boolean(currentField) &&
+    (singleElement?.type === "objectCard" ||
+      ((singleElement?.type === "commandCard" || singleElement?.type === "queryCard") &&
+        selectedField?.sectionIndex === 0));
+  const showValidationControl = showFieldTypeControls && supportsFieldValidation;
 
   // Description scope: a selected field row (if any) or the card itself.
   const descriptionScopeField =
@@ -292,6 +308,37 @@ export function OptionsBar() {
                 >
                   <Asterisk size={16} />
                 </button>
+
+                {/* Validation: structured bounds + a custom rule on the field */}
+                {showValidationControl && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsValidationOpen(!isValidationOpen)}
+                      title={
+                        hasValidation(currentField.validation)
+                          ? "Edit Field Validation"
+                          : "Add Field Validation"
+                      }
+                      className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
+                        hasValidation(currentField.validation)
+                          ? "bg-blue-500/15 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
+                          : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      <ShieldCheck size={16} />
+                    </button>
+
+                    <FieldValidationPopover
+                      currentValidation={currentField.validation}
+                      type={currentField.type}
+                      isArray={currentField.isArray}
+                      isOpen={isValidationOpen}
+                      onClose={() => setIsValidationOpen(false)}
+                      onApply={(validation) => updateSelectedFieldValidation(validation)}
+                      placement={popoverPlacement}
+                    />
+                  </div>
+                )}
               </>
             )}
 

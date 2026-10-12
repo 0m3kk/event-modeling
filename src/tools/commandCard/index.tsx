@@ -10,7 +10,10 @@ import {
   renderStandardCardTitle,
   renderHeaderDescBadge,
   drawInfoBadge,
+  appendFieldValidationBadge,
   CARD_CORNER_RADIUS,
+  VALIDATION_BADGE_W,
+  VALIDATION_BADGE_H,
   DESC_HIT_HALF,
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
@@ -19,6 +22,7 @@ import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { navigateSubSelect } from "@/utils/subSelection";
 import { validateFieldTypes } from "../common/typeValidation";
+import { FieldValidationSchema, hasValidation, type FieldValidation } from "@/utils/fieldValidation";
 
 export const COMMAND_HEADER_HEIGHT = 32;
 export const COMMAND_SECTION_HEADER_HEIGHT = 22;
@@ -31,6 +35,7 @@ export interface CommandField {
   isArray?: boolean;
   isRequired?: boolean;
   description?: string;
+  validation?: FieldValidation;
 }
 
 export interface CommandCardData {
@@ -124,6 +129,7 @@ export const CommandCardSchema = z.object({
         isArray: z.boolean().optional(),
         isRequired: z.boolean().optional(),
         description: z.string().optional(),
+        validation: FieldValidationSchema.optional(),
       }),
     )
     .default([]),
@@ -327,6 +333,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           container.addChild(fieldName);
 
           // Required marker: a "*" right after the field name.
+          let commandNameEndX = fieldName.x + fieldName.width;
           if (field.isRequired) {
             const requiredStar = new Text({
               text: "*",
@@ -341,6 +348,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
             requiredStar.x = fieldName.x + fieldName.width + 2;
             requiredStar.y = rowY + 6;
             container.addChild(requiredStar);
+            commandNameEndX = requiredStar.x + requiredStar.width;
           }
 
           const typeLabel = new Text({
@@ -356,6 +364,19 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           typeLabel.x = w - typeLabel.width - 12;
           typeLabel.y = rowY + 8;
           container.addChild(typeLabel);
+
+          // Validation marker: shield badge when the field declares rules.
+          if (
+            hasValidation(field.validation) &&
+            commandNameEndX + 6 + VALIDATION_BADGE_W < typeLabel.x - 4
+          ) {
+            appendFieldValidationBadge(container, {
+              x: commandNameEndX + 6,
+              y: rowY + (COMMAND_ROW_HEIGHT - VALIDATION_BADGE_H) / 2,
+              isDark,
+              validation: field.validation,
+            });
+          }
 
           if (showDescBadge) {
             renderCommandRowDescBadge(
@@ -427,6 +448,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           container.addChild(fieldName);
 
           // Required marker: a "*" right after the field name.
+          let commandNameEndX = fieldName.x + fieldName.width;
           if (field.isRequired) {
             const requiredStar = new Text({
               text: "*",
@@ -441,6 +463,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
             requiredStar.x = fieldName.x + fieldName.width + 2;
             requiredStar.y = rowY + 6;
             container.addChild(requiredStar);
+            commandNameEndX = requiredStar.x + requiredStar.width;
           }
 
           const typeLabel = new Text({
@@ -456,6 +479,19 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
           typeLabel.x = w - typeLabel.width - 12;
           typeLabel.y = rowY + 8;
           container.addChild(typeLabel);
+
+          // Validation marker: shield badge when the field declares rules.
+          if (
+            hasValidation(field.validation) &&
+            commandNameEndX + 6 + VALIDATION_BADGE_W < typeLabel.x - 4
+          ) {
+            appendFieldValidationBadge(container, {
+              x: commandNameEndX + 6,
+              y: rowY + (COMMAND_ROW_HEIGHT - VALIDATION_BADGE_H) / 2,
+              isDark,
+              validation: field.validation,
+            });
+          }
 
           if (showDescBadge) {
             renderCommandRowDescBadge(
@@ -630,6 +666,25 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     }
   },
 
+  onUpdateSubSelectValidation: (element, field, validation) => {
+    // Validation is an input-side concern; response fields are outputs and are
+    // not validated on input.
+    if (field.sectionIndex === 1) return null;
+    const inputs = getCommandInputs(element.data);
+    if (field.fieldIndex < 0 || field.fieldIndex >= inputs.length) return null;
+    const nextInputs = [...inputs];
+    const nextField = { ...nextInputs[field.fieldIndex] };
+    if (validation) {
+      nextField.validation = validation;
+    } else {
+      delete nextField.validation;
+    }
+    nextInputs[field.fieldIndex] = nextField;
+    return {
+      data: { ...element.data, inputs: nextInputs },
+    };
+  },
+
   getSelectedFieldItem: (element, field) => {
     if (field.sectionIndex === 1) {
       const responses = getCommandResponses(element.data);
@@ -638,7 +693,6 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     const inputs = getCommandInputs(element.data);
     return inputs[field.fieldIndex] ?? null;
   },
-
   getSubSelectSections: (element) => {
     const inputs = getCommandInputs(element.data);
     const responses = getCommandResponses(element.data);
@@ -784,6 +838,9 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
               .string()
               .optional()
               .describe("What this field means"),
+            validation: FieldValidationSchema.optional().describe(
+              "Validation constraints for this field",
+            ),
           }),
         )
         .optional()
@@ -814,6 +871,9 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
               .string()
               .optional()
               .describe("What this field means"),
+            validation: FieldValidationSchema.optional().describe(
+              "Validation constraints for this field",
+            ),
           }),
         )
         .optional()

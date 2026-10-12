@@ -77,4 +77,21 @@ describe("aliasCardTool", () => {
     expect(element.type).toBe("aliasCard");
     expect((element.data as AliasCardData).aliasedType).toBe("number");
   });
+
+  it("carries validation on the wrapped type", () => {
+    expect(
+      AliasCardSchema.parse({ validation: { min: 0, max: 1000 } }).validation,
+    ).toEqual({ min: 0, max: 1000 });
+
+    const element = aliasCardTool.ai!.onCreate(
+      {
+        name: "Money",
+        type: "number",
+        validation: { min: 0, rule: "two decimal places" },
+      },
+      { x: 0, y: 0 },
+    );
+    const data = element.data as AliasCardData;
+    expect(data.validation).toEqual({ min: 0, rule: "two decimal places" });
+  });
 });

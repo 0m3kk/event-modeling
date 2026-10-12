@@ -16,6 +16,7 @@ import {
   pruneDanglingReferences,
 } from "@/utils/reference";
 import { applyRenameMappings, collectRenameMappings } from "@/utils/rename";
+import { cleanValidation, type FieldValidation } from "@/utils/fieldValidation";
 import { toolRegistry } from "@/tools/registry";
 import { reflowSlices } from "@/tools/sliceCard/layout";
 import { reflowDomains } from "@/tools/domainCard/layout";
@@ -86,6 +87,7 @@ export interface CanvasStoreState {
   updateSelectedFieldTag: (tag: string | null) => void;
   toggleSelectedFieldArray: () => void;
   toggleSelectedFieldRequired: () => void;
+  updateSelectedFieldValidation: (validation: FieldValidation | null) => void;
   navigateSelectedField: (direction: "up" | "down") => void;
   clearBoard: () => void;
   loadProject: (project: ProjectFileV2) => void;
@@ -583,6 +585,44 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     const nextFields = [...fields];
     const cur = nextFields[index];
     nextFields[index] = { ...cur, isRequired: !cur.isRequired };
+
+    get().updateElement(element.id, {
+      data: { ...element.data, fields: nextFields },
+    });
+  },
+
+  updateSelectedFieldValidation: (validation) => {
+    const { selectedField, elements } = get();
+    if (!selectedField) return;
+
+    const element = elements.find((el) => el.id === selectedField.elementId);
+    if (!element) return;
+
+    const cleaned = cleanValidation(validation) ?? null;
+
+    const tool = toolRegistry.get(element.type);
+    if (tool?.onUpdateSubSelectValidation) {
+      const patch = tool.onUpdateSubSelectValidation(element, selectedField, cleaned);
+      if (patch) {
+        get().updateElement(element.id, patch);
+      }
+      return;
+    }
+
+    if (!Array.isArray(element.data?.fields)) return;
+
+    const fields = element.data.fields;
+    const index = selectedField.fieldIndex;
+    if (index < 0 || index >= fields.length) return;
+
+    const nextFields = [...fields];
+    const nextField = { ...nextFields[index] };
+    if (cleaned) {
+      nextField.validation = cleaned;
+    } else {
+      delete nextField.validation;
+    }
+    nextFields[index] = nextField;
 
     get().updateElement(element.id, {
       data: { ...element.data, fields: nextFields },

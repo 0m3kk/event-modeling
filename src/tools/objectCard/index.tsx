@@ -19,6 +19,7 @@ import {
 import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 import { validateFieldTypes } from "../common/typeValidation";
+import { FieldValidationSchema, type FieldValidation } from "@/utils/fieldValidation";
 
 export interface ObjectField {
   name: string;
@@ -26,6 +27,7 @@ export interface ObjectField {
   isArray?: boolean;
   isRequired?: boolean;
   description?: string;
+  validation?: FieldValidation;
 }
 
 export interface ObjectCardData {
@@ -45,6 +47,7 @@ export const ObjectCardSchema = z.object({
         isArray: z.boolean().optional(),
         isRequired: z.boolean().optional(),
         description: z.string().optional(),
+        validation: FieldValidationSchema.optional(),
       }),
     )
     .default([]),
@@ -197,6 +200,24 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
     };
   },
 
+  onUpdateSubSelectValidation: (element, field, validation) => {
+    const fields = element.data.fields;
+    if (!fields || field.fieldIndex < 0 || field.fieldIndex >= fields.length) {
+      return null;
+    }
+    const nextFields = [...fields];
+    const nextField = { ...nextFields[field.fieldIndex] };
+    if (validation) {
+      nextField.validation = validation;
+    } else {
+      delete nextField.validation;
+    }
+    nextFields[field.fieldIndex] = nextField;
+    return {
+      data: { ...element.data, fields: nextFields },
+    };
+  },
+
   getSelectedFieldItem: (element, field) => {
     return element.data.fields?.[field.fieldIndex] ?? null;
   },
@@ -239,6 +260,9 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
               .string()
               .optional()
               .describe("What this field means"),
+            validation: FieldValidationSchema.optional().describe(
+              "Validation constraints for this field",
+            ),
           }),
         )
         .optional()

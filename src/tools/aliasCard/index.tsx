@@ -10,25 +10,31 @@ import {
   drawStandardCardFrame,
   renderStandardCardTitle,
   renderHeaderDescBadge,
+  appendFieldValidationBadge,
   getStandardCardInlineEditTarget,
   CARD_HEADER_HEIGHT,
   CARD_DEFAULT_WIDTH,
+  VALIDATION_BADGE_W,
+  VALIDATION_BADGE_H,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
 import { beginDescZones, hitDescZone } from "../common/descZones";
 import { validateTypeValue } from "../common/typeValidation";
 import { collectDefinedTypeNames } from "@/utils/typeCatalog";
 import { toDisplayType } from "@/utils/naming";
+import { FieldValidationSchema, type FieldValidation } from "@/utils/fieldValidation";
 
 /**
  * An Alias: a named domain type that wraps a single existing type
  * (e.g. `CustomerId = uuid`, `Money = number`). It holds no fields of its
  * own — just the wrapped type, which can be any primitive or defined type.
+ * Validation rules attach to the wrapped type itself.
  */
 export interface AliasCardData {
   name: string;
   aliasedType: string;
   isArray?: boolean;
+  validation?: FieldValidation;
   color?: string;
   description?: string;
 }
@@ -37,6 +43,7 @@ export const AliasCardSchema = z.object({
   name: z.string().default("AliasName"),
   aliasedType: z.string().default("string"),
   isArray: z.boolean().optional(),
+  validation: FieldValidationSchema.optional(),
   color: z.string().optional(),
   description: z.string().optional(),
 });
@@ -115,6 +122,18 @@ export const aliasCardTool: ToolDefinition<AliasCardData> = {
       wrapped.x = 12;
       wrapped.y = CARD_HEADER_HEIGHT + 7;
       container.addChild(wrapped);
+
+      // Validation marker: shield badge when the alias declares rules on the
+      // wrapped type.
+      const aliasBadgeX = wrapped.x + wrapped.width + 6;
+      if (aliasBadgeX + VALIDATION_BADGE_W < element.width - 12) {
+        appendFieldValidationBadge(container, {
+          x: aliasBadgeX,
+          y: CARD_HEADER_HEIGHT + (28 - VALIDATION_BADGE_H) / 2,
+          isDark,
+          validation: element.data.validation,
+        });
+      }
     }
 
     // 4. Header ⓘ description badge (shows when present or selected)
@@ -148,6 +167,9 @@ export const aliasCardTool: ToolDefinition<AliasCardData> = {
         .string()
         .describe("Wrapped type (primitive or defined type name)"),
       isArray: z.boolean().optional().describe("Wraps a list of the type"),
+      validation: FieldValidationSchema.optional().describe(
+        "Validation constraints on the wrapped type",
+      ),
       color: z.string().optional().describe("Optional hex color"),
       description: z
         .string()
@@ -159,6 +181,7 @@ export const aliasCardTool: ToolDefinition<AliasCardData> = {
         name: params.name || "Alias",
         aliasedType: params.type || "string",
         ...(params.isArray ? { isArray: true } : {}),
+        ...(params.validation ? { validation: params.validation } : {}),
         color: params.color || aliasCardTool.color,
         ...(params.description ? { description: params.description } : {}),
       };

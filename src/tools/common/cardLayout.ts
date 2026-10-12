@@ -13,12 +13,17 @@ import {
   toDisplayType,
 } from "@/utils/naming";
 import { useCanvasStore } from "@/store";
+import { hasValidation, type FieldValidation } from "@/utils/fieldValidation";
 import { addDescZone } from "./descZones";
 
 export const CARD_HEADER_HEIGHT = 32;
 export const CARD_ROW_HEIGHT = 28;
 export const CARD_CORNER_RADIUS = 8;
 export const CARD_DEFAULT_WIDTH = 220;
+
+/** Size of the small "has validation" shield badge shown on a field row. */
+export const VALIDATION_BADGE_W = 15;
+export const VALIDATION_BADGE_H = 13;
 
 /** Radius of the header ⓘ badge (its center sits at the header mid-line). */
 export const DESC_HEADER_BADGE_RADIUS = 7;
@@ -45,6 +50,51 @@ export interface CardFieldItem {
   isArray?: boolean;
   isRequired?: boolean;
   description?: string;
+  /** Optional validation constraints; a shield badge marks rows that have them. */
+  validation?: FieldValidation;
+}
+
+/**
+ * Draws the small shield-check badge that marks a field as carrying validation
+ * constraints. `x`/`y` is the top-left corner of the badge. Kept in this module
+ * so every card renders the marker identically.
+ */
+export function drawValidationBadge(
+  g: Graphics,
+  x: number,
+  y: number,
+  isDark: boolean,
+): void {
+  const fill = isDark ? 0x1e3a8a : 0xdbeafe;
+  const stroke = isDark ? 0x3b82f6 : 0x93c5fd;
+  const check = isDark ? 0xbfdbfe : 0x1d4ed8;
+
+  g.roundRect(x, y, VALIDATION_BADGE_W, VALIDATION_BADGE_H, 3);
+  g.fill({ color: fill, alpha: 0.95 });
+  g.stroke({ color: stroke, width: 1 });
+
+  // Checkmark: two strokes hugging the badge centre.
+  g.moveTo(x + 3.5, y + 6.6);
+  g.lineTo(x + 6, y + 9);
+  g.lineTo(x + 11, y + 3.6);
+  g.stroke({ color: check, width: 1.6 });
+}
+
+/**
+ * Appends a validation shield badge to `container` at the given top-left corner
+ * when `validation` carries rules. Returns the horizontal space the badge
+ * occupies (0 when nothing was drawn) so callers can lay out what follows.
+ */
+export function appendFieldValidationBadge(
+  container: Container,
+  options: { x: number; y: number; isDark: boolean; validation?: FieldValidation },
+): number {
+  const { x, y, isDark, validation } = options;
+  if (!hasValidation(validation)) return 0;
+  const g = new Graphics();
+  drawValidationBadge(g, x, y, isDark);
+  container.addChild(g);
+  return VALIDATION_BADGE_W;
 }
 
 export interface InfoBadgeStyle {
@@ -402,6 +452,12 @@ export function renderStandardCardFields(
         nameEndX = requiredStar.x + requiredStar.width;
       }
 
+      // Reserve space for a validation shield badge. It is drawn once the type
+      // label position is known (below) so it never overlaps the right-aligned
+      // type text.
+      const hasFieldValidation = hasValidation(field.validation);
+      const validationBadgeX = nameEndX + 6;
+
       // Type label is optional: typeless rows (e.g. Enum members) only render
       // a name, so the right-edge anchor falls back to the row padding.
       const typeText = toDisplayType(field.type, field.isArray);
@@ -420,6 +476,17 @@ export function renderStandardCardFields(
         typeLabel.y = currentY + 8;
         container.addChild(typeLabel);
         rightAnchorX = typeLabel.x;
+      }
+
+      // Validation marker: a small shield badge when the field declares rules.
+      if (hasFieldValidation && validationBadgeX + VALIDATION_BADGE_W < rightAnchorX - 4) {
+        appendFieldValidationBadge(container, {
+          x: validationBadgeX,
+          y: currentY + (CARD_ROW_HEIGHT - VALIDATION_BADGE_H) / 2,
+          isDark,
+          validation: field.validation,
+        });
+        nameEndX = validationBadgeX + VALIDATION_BADGE_W;
       }
 
       // Row ⓘ badge sits just left of the type label (or the right edge for

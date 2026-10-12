@@ -9,6 +9,7 @@ import type {
   InlineEditState,
   DescHoverTarget,
 } from "@/types";
+import type { FieldValidation } from "@/utils/fieldValidation";
 
 export interface RenderContext {
   theme: ResolvedTheme;
@@ -138,8 +139,16 @@ export interface ToolDefinition<TData = any> {
   // Optional: handles toggling required status on sub-element (renders a "*" after the name)
   onToggleSubSelectRequired?: (element: CanvasElement<TData>, field: SelectedField) => Partial<CanvasElement<TData>> | null;
 
+  // Optional: handles setting validation constraints on a sub-element. Passing
+  // null clears any existing validation.
+  onUpdateSubSelectValidation?: (
+    element: CanvasElement<TData>,
+    field: SelectedField,
+    validation: FieldValidation | null,
+  ) => Partial<CanvasElement<TData>> | null;
+
   // Optional: resolves selected item data for UI (e.g. OptionsBar)
-  getSelectedFieldItem?: (element: CanvasElement<TData>, field: SelectedField) => { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean; isRequired?: boolean } | null;
+  getSelectedFieldItem?: (element: CanvasElement<TData>, field: SelectedField) => { name: string; type: string; isTag?: boolean; tag?: string; isArray?: boolean; isRequired?: boolean; validation?: FieldValidation } | null;
 
   // Optional: handles custom navigation between sub-elements / sections
   onNavigateSubSelect?: (

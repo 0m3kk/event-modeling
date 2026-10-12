@@ -10,7 +10,10 @@ import {
   renderStandardCardTitle,
   renderHeaderDescBadge,
   drawInfoBadge,
+  appendFieldValidationBadge,
   CARD_CORNER_RADIUS,
+  VALIDATION_BADGE_W,
+  VALIDATION_BADGE_H,
   DESC_HIT_HALF,
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
@@ -18,6 +21,7 @@ import { resolveHeaderColor } from "@/utils/color";
 import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
 import { validateFieldTypes } from "../common/typeValidation";
+import { FieldValidationSchema, hasValidation, type FieldValidation } from "@/utils/fieldValidation";
 
 export const QUERY_HEADER_HEIGHT = 32;
 export const QUERY_SECTION_HEADER_HEIGHT = 22;
@@ -30,6 +34,7 @@ export interface QueryField {
   isArray?: boolean;
   isRequired?: boolean;
   description?: string;
+  validation?: FieldValidation;
 }
 
 export interface QueryCardData {
@@ -120,6 +125,7 @@ export const QueryCardSchema = z.object({
         isArray: z.boolean().optional(),
         isRequired: z.boolean().optional(),
         description: z.string().optional(),
+        validation: FieldValidationSchema.optional(),
       }),
     )
     .default([]),
@@ -323,6 +329,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
           container.addChild(fieldName);
 
           // Required marker: a "*" right after the field name.
+          let queryNameEndX = fieldName.x + fieldName.width;
           if (field.isRequired) {
             const requiredStar = new Text({
               text: "*",
@@ -337,6 +344,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
             requiredStar.x = fieldName.x + fieldName.width + 2;
             requiredStar.y = rowY + 6;
             container.addChild(requiredStar);
+            queryNameEndX = requiredStar.x + requiredStar.width;
           }
 
           const typeLabel = new Text({
@@ -352,6 +360,19 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
           typeLabel.x = w - typeLabel.width - 12;
           typeLabel.y = rowY + 8;
           container.addChild(typeLabel);
+
+          // Validation marker: shield badge when the field declares rules.
+          if (
+            hasValidation(field.validation) &&
+            queryNameEndX + 6 + VALIDATION_BADGE_W < typeLabel.x - 4
+          ) {
+            appendFieldValidationBadge(container, {
+              x: queryNameEndX + 6,
+              y: rowY + (QUERY_ROW_HEIGHT - VALIDATION_BADGE_H) / 2,
+              isDark,
+              validation: field.validation,
+            });
+          }
 
           if (showDescBadge) {
             renderQueryRowDescBadge(
@@ -423,6 +444,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
           container.addChild(fieldName);
 
           // Required marker: a "*" right after the field name.
+          let queryNameEndX = fieldName.x + fieldName.width;
           if (field.isRequired) {
             const requiredStar = new Text({
               text: "*",
@@ -437,6 +459,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
             requiredStar.x = fieldName.x + fieldName.width + 2;
             requiredStar.y = rowY + 6;
             container.addChild(requiredStar);
+            queryNameEndX = requiredStar.x + requiredStar.width;
           }
 
           const typeLabel = new Text({
@@ -452,6 +475,19 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
           typeLabel.x = w - typeLabel.width - 12;
           typeLabel.y = rowY + 8;
           container.addChild(typeLabel);
+
+          // Validation marker: shield badge when the field declares rules.
+          if (
+            hasValidation(field.validation) &&
+            queryNameEndX + 6 + VALIDATION_BADGE_W < typeLabel.x - 4
+          ) {
+            appendFieldValidationBadge(container, {
+              x: queryNameEndX + 6,
+              y: rowY + (QUERY_ROW_HEIGHT - VALIDATION_BADGE_H) / 2,
+              isDark,
+              validation: field.validation,
+            });
+          }
 
           if (showDescBadge) {
             renderQueryRowDescBadge(
@@ -626,6 +662,25 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
     }
   },
 
+  onUpdateSubSelectValidation: (element, field, validation) => {
+    // Validation is an input-side concern; response fields are outputs and are
+    // not validated on input.
+    if (field.sectionIndex === 1) return null;
+    const params = getQueryParams(element.data);
+    if (field.fieldIndex < 0 || field.fieldIndex >= params.length) return null;
+    const nextParams = [...params];
+    const nextField = { ...nextParams[field.fieldIndex] };
+    if (validation) {
+      nextField.validation = validation;
+    } else {
+      delete nextField.validation;
+    }
+    nextParams[field.fieldIndex] = nextField;
+    return {
+      data: { ...element.data, params: nextParams },
+    };
+  },
+
   getSelectedFieldItem: (element, field) => {
     if (field.sectionIndex === 1) {
       const responses = getQueryResponses(element.data);
@@ -780,6 +835,9 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
               .string()
               .optional()
               .describe("What this field means"),
+            validation: FieldValidationSchema.optional().describe(
+              "Validation constraints for this field",
+            ),
           }),
         )
         .optional()

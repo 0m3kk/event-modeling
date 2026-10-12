@@ -192,6 +192,24 @@ describe("cardLayout helpers", () => {
       }).not.toThrow();
     });
 
+    it("renders a validation badge for a field that declares rules", () => {
+      const container = new Container();
+      expect(() => {
+        renderStandardCardFields(container, {
+          elementId: "card-1",
+          fields: [
+            { name: "email", type: "string", validation: { pattern: "^.+@.+$" } },
+            { name: "age", type: "integer", validation: { min: 0, max: 120 } },
+            { name: "plain", type: "string" },
+          ],
+          selectedFieldIndex: -1,
+          width: 260,
+          isDark: false,
+          textResolution: 1,
+        });
+      }).not.toThrow();
+    });
+
     it("formats field labels per the humanize/uppercase display rules", () => {
       // Identifiers are humanized by default.
       expect(formatFieldNameLabel("orderId")).toBe("Order ID");

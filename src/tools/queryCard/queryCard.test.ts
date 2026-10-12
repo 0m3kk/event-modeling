@@ -231,4 +231,32 @@ describe("queryCardTool multi-section (params & responses)", () => {
       fieldIndex: 1,
     });
   });
+
+  it("sets validation on params and ignores response fields", () => {
+    const paramPatch = queryCardTool.onUpdateSubSelectValidation!(
+      card,
+      { elementId: "qry-1", sectionIndex: 0, fieldIndex: 1 },
+      { min: 0 },
+    );
+    expect(paramPatch?.data?.params?.[1].validation).toEqual({ min: 0 });
+
+    // Responses are outputs, so validation is not accepted on them.
+    const respPatch = queryCardTool.onUpdateSubSelectValidation!(
+      card,
+      { elementId: "qry-1", sectionIndex: 1, fieldIndex: 0 },
+      { minItems: 1, maxItems: 5 },
+    );
+    expect(respPatch).toBeNull();
+
+    const withValidation = {
+      ...card,
+      data: { ...card.data, params: paramPatch!.data!.params! },
+    };
+    const cleared = queryCardTool.onUpdateSubSelectValidation!(
+      withValidation as CanvasElement<QueryCardData>,
+      { elementId: "qry-1", sectionIndex: 0, fieldIndex: 1 },
+      null,
+    );
+    expect(cleared?.data?.params?.[1].validation).toBeUndefined();
+  });
 });

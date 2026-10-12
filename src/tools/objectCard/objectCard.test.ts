@@ -159,4 +159,47 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
     expect(data.description).toBe("An amount of money in a given currency");
     expect(data.fields[0].description).toBe("The numeric value, in minor units");
   });
+
+  it("sets and clears a field's validation constraints", () => {
+    const setPatch = objectCardTool.onUpdateSubSelectValidation!(
+      card,
+      { elementId: "obj-1", fieldIndex: 0 },
+      { minLength: 3, maxLength: 32 },
+    );
+    expect(setPatch?.data?.fields?.[0].validation).toEqual({ minLength: 3, maxLength: 32 });
+    // Other rows untouched
+    expect(setPatch?.data?.fields?.[1].validation).toBeUndefined();
+
+    const withValidation = {
+      ...card,
+      data: { ...card.data, fields: setPatch!.data!.fields! },
+    };
+
+    const clearPatch = objectCardTool.onUpdateSubSelectValidation!(
+      withValidation as CanvasElement<ObjectCardData>,
+      { elementId: "obj-1", fieldIndex: 0 },
+      null,
+    );
+    expect(clearPatch?.data?.fields?.[0].validation).toBeUndefined();
+  });
+
+  it("applies validation through the store with undo/redo", () => {
+    useCanvasStore.getState().addElement(card);
+    useCanvasStore.getState().setSelectedIds(["obj-1"]);
+    useCanvasStore.getState().setSelectedField({ elementId: "obj-1", fieldIndex: 1 });
+
+    useCanvasStore.getState().updateSelectedFieldValidation({ maxLength: 10 });
+
+    let updated = useCanvasStore.getState().elements.find((e) => e.id === "obj-1");
+    expect(updated?.data.fields[1].validation).toEqual({ maxLength: 10 });
+
+    // Clearing drops the key entirely.
+    useCanvasStore.getState().updateSelectedFieldValidation(null);
+    updated = useCanvasStore.getState().elements.find((e) => e.id === "obj-1");
+    expect(updated?.data.fields[1].validation).toBeUndefined();
+
+    useCanvasStore.getState().undo();
+    updated = useCanvasStore.getState().elements.find((e) => e.id === "obj-1");
+    expect(updated?.data.fields[1].validation).toEqual({ maxLength: 10 });
+  });
 });
