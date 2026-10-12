@@ -1,5 +1,6 @@
 import type { CanvasElement } from "@/types";
 import { getElementName, nameKey } from "./naming";
+import { actionKey, getElementAction, isWildcard } from "./rbac";
 
 /**
  * Cross-element references on the board are stored *by name*, not by id:
@@ -7,14 +8,17 @@ import { getElementName, nameKey } from "./naming";
  * point at Event cards, a query item's `tags` point at DCB tags owned by Event
  * fields, and a Constraint's `states` point at State cards.
  *
- * Those names are therefore live references: renaming the source must rewrite
- * every reference to it, or the reference silently dangles. This module
- * collects the renames implied by a single element update and applies them
- * across the whole board.
+ * An Actor's `permissions[].action` is different: it points at the `action` token
+ * declared on a Command/Query (matched case-insensitively, wildcards never
+ * rewritten).
+ *
+ * Those references are live: renaming the source must rewrite every reference to
+ * it, or the reference silently dangles. This module collects the renames implied
+ * by a single element update and applies them across the whole board.
  */
 
-/** The kinds of name reference that can be rewritten. */
-export type RenameKind = "type" | "event" | "state" | "tag" | "field";
+/** The kinds of reference that can be rewritten. */
+export type RenameKind = "type" | "event" | "state" | "tag" | "field" | "action";
 
 export interface RenameMapping {
   kind: RenameKind;
@@ -117,6 +121,15 @@ export function collectRenameMappings(
     }
   }
 
+  // A Command/Query's `action` token is referenced by Actor permissions.
+  if (previous.type === "commandCard" || previous.type === "queryCard") {
+    const from = getElementAction(previous);
+    const to = getElementAction({ type: previous.type, data: nextData });
+    if (from && to && actionKey(from) !== actionKey(to)) {
+      mappings.push({ kind: "action", from, to });
+    }
+  }
+
   if (previous.type === "eventCard") {
     mappings.push(...collectTagRenames(previous, nextData));
   }
@@ -151,6 +164,21 @@ function rewriteTypeValue(value: unknown, mappings: RenameMapping[]): unknown {
   return rewritten === base ? value : `${rewritten}${suffix}`;
 }
 
+/**
+ * Rewrites an action token when it matches a mapping's `from`, comparing through
+ * {@link actionKey} (case-insensitive, namespace-preserving) rather than
+ * {@link nameKey} so `sales:placeOrder` is not treated as two words.
+ */
+function rewriteActionValue(value: unknown, mappings: RenameMapping[]): unknown {
+  if (typeof value !== "string" || mappings.length === 0) return value;
+  const key = actionKey(value);
+  if (!key) return value;
+  for (const mapping of mappings) {
+    if (actionKey(mapping.from) === key) return mapping.to;
+  }
+  return value;
+}
+
 /** Maps an array, returning the original reference when nothing changed. */
 function rewriteArray<T>(array: T[], rewrite: (item: T) => T): T[] {
   let changed = false;
@@ -168,6 +196,7 @@ interface MappingBuckets {
   stateMappings: RenameMapping[];
   tagMappings: RenameMapping[];
   fieldMappings: RenameMapping[];
+  actionMappings: RenameMapping[];
 }
 
 /** Rewrites the field `type`s of a `fields`/`inputs`/`params`-style array. */
@@ -281,6 +310,26 @@ function rewriteElementReferences(
     }
   }
 
+  // An Actor references Command/Query `action` tokens (non-wildcard only).
+  if (element.type === "actorCard") {
+    const hasActionWork = buckets.actionMappings.length > 0;
+
+    const permissions = nextData.permissions;
+    if (Array.isArray(permissions) && hasActionWork) {
+      const nextPermissions = rewriteArray(permissions, (perm: any) => {
+        if (!perm || typeof perm !== "object") return perm;
+        if (typeof perm.action === "string" && !isWildcard(perm.action)) {
+          const action = rewriteActionValue(perm.action, buckets.actionMappings);
+          if (action !== perm.action) return { ...perm, action };
+        }
+        return perm;
+      });
+      if (nextPermissions !== permissions) {
+        nextData = { ...nextData, permissions: nextPermissions };
+      }
+    }
+  }
+
   return nextData === data ? element : { ...element, data: nextData };
 }
 
@@ -300,6 +349,7 @@ export function applyRenameMappings(
     stateMappings: mappings.filter((m) => m.kind === "state"),
     tagMappings: mappings.filter((m) => m.kind === "tag"),
     fieldMappings: mappings.filter((m) => m.kind === "field"),
+    actionMappings: mappings.filter((m) => m.kind === "action"),
   };
 
   let changed = false;

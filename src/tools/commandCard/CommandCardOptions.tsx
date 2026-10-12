@@ -1,15 +1,18 @@
-import { LogIn, LogOut } from "lucide-react";
+import { useState } from "react";
+import { LogIn, LogOut, KeyRound } from "lucide-react";
 import type { CanvasElement } from "@/types";
 import type { CommandCardData, CommandField } from "./index";
 import { commandCardTool, getCommandInputs, getCommandResponses } from "./index";
 import { useCanvasStore } from "@/store";
+import { ActionTokenPopover } from "../common/ActionTokenPopover";
 
 interface CommandCardOptionsProps {
   element: CanvasElement<CommandCardData>;
   onUpdate: (partial: Partial<CommandCardData>) => void;
 }
 
-export function CommandCardOptions({ element }: CommandCardOptionsProps) {
+export function CommandCardOptions({ element, onUpdate }: CommandCardOptionsProps) {
+  const [isActionOpen, setIsActionOpen] = useState(false);
   const handleAddInput = () => {
     const inputs = getCommandInputs(element.data);
     const responses = getCommandResponses(element.data);
@@ -69,6 +72,29 @@ export function CommandCardOptions({ element }: CommandCardOptionsProps) {
       >
         <LogOut size={16} />
       </button>
+
+      <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-zinc-800" />
+
+      <div className="relative">
+        <button
+          onClick={() => setIsActionOpen((prev) => !prev)}
+          title={element.data.action ? `Action: ${element.data.action}` : "Set Action Token"}
+          className={`flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer ${
+            element.data.action
+              ? "bg-blue-500/15 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
+              : "text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          }`}
+        >
+          <KeyRound size={16} />
+        </button>
+
+        <ActionTokenPopover
+          value={element.data.action}
+          isOpen={isActionOpen}
+          onClose={() => setIsActionOpen(false)}
+          onCommit={(value) => onUpdate({ action: value || undefined })}
+        />
+      </div>
     </div>
   );
 }

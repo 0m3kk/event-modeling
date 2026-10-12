@@ -13,6 +13,7 @@ import { objectCardTool } from "./objectCard";
 import { serviceCardTool } from "./serviceCard";
 import { sliceCardTool } from "./sliceCard";
 import { stickyNoteTool } from "./stickyNote";
+import { actorCardTool } from "./actorCard";
 
 // Register default decoupled tools (order here drives the toolbar order)
 toolRegistry.register(domainCardTool);
@@ -28,6 +29,7 @@ toolRegistry.register(serviceCardTool);
 toolRegistry.register(objectCardTool);
 toolRegistry.register(enumCardTool);
 toolRegistry.register(aliasCardTool);
+toolRegistry.register(actorCardTool);
 toolRegistry.register(stickyNoteTool);
 
 export * from "./types";
@@ -46,5 +48,6 @@ export {
   objectCardTool,
   serviceCardTool,
   sliceCardTool,
+  actorCardTool,
   stickyNoteTool,
 };

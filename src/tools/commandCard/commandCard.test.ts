@@ -34,25 +34,28 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
     expect(commandCardTool.name).toBe("Command");
     expect(commandCardTool.color).toBe("#2563eb");
     expect(commandCardTool.category).toBe("modeling");
-    expect(commandCardTool.defaultSize).toEqual({ width: 220, height: 132 });
+    expect(commandCardTool.defaultSize).toEqual({ width: 220, height: 160 });
   });
 
   it("computes height accurately for 2 sections", () => {
-    // 32 (header) + 22 (input header) + 2*28 (inputs) + 22 (resp header) + 1*28 (responses) = 160
+    // 32 (header) + 28 (action row) + 22 (input header) + 2*28 (inputs) + 22 (resp header) + 1*28 (responses) = 188
     const size = commandCardTool.computeSize!(card.data);
     expect(size.width).toBe(220);
-    expect(size.height).toBe(160);
+    expect(size.height).toBe(188);
   });
 
   it("sub-selects fields correctly across both sections", () => {
     // Header area (y <= 32)
     expect(commandCardTool.onSubSelect!(card, { x: 50, y: 15 })).toBeNull();
 
-    // Input section banner (32 <= y < 54)
-    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 40 })).toBeNull();
+    // Action row (32 <= y < 60) is not selectable
+    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 45 })).toBeNull();
 
-    // Input 0: y in [54, 82) -> e.g. y = 65
-    const in0 = commandCardTool.onSubSelect!(card, { x: 50, y: 65 });
+    // Input section banner (60 <= y < 82)
+    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 70 })).toBeNull();
+
+    // Input 0: y in [82, 110) -> e.g. y = 95
+    const in0 = commandCardTool.onSubSelect!(card, { x: 50, y: 95 });
     expect(in0).toEqual({
       elementId: "cmd-1",
       sectionIndex: 0,
@@ -60,8 +63,8 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
       fieldIndex: 0,
     });
 
-    // Input 1: y in [82, 110) -> e.g. y = 95
-    const in1 = commandCardTool.onSubSelect!(card, { x: 50, y: 95 });
+    // Input 1: y in [110, 138) -> e.g. y = 125
+    const in1 = commandCardTool.onSubSelect!(card, { x: 50, y: 125 });
     expect(in1).toEqual({
       elementId: "cmd-1",
       sectionIndex: 0,
@@ -69,11 +72,11 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
       fieldIndex: 1,
     });
 
-    // Response section banner (110 <= y < 132) -> e.g. y = 120
-    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 120 })).toBeNull();
+    // Response section banner (138 <= y < 160) -> e.g. y = 150
+    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 150 })).toBeNull();
 
-    // Response 0: y in [132, 160) -> e.g. y = 145
-    const res0 = commandCardTool.onSubSelect!(card, { x: 50, y: 145 });
+    // Response 0: y in [160, 188) -> e.g. y = 175
+    const res0 = commandCardTool.onSubSelect!(card, { x: 50, y: 175 });
     expect(res0).toEqual({
       elementId: "cmd-1",
       sectionIndex: 1,
@@ -82,7 +85,7 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
     });
 
     // Below card -> null
-    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 180 })).toBeNull();
+    expect(commandCardTool.onSubSelect!(card, { x: 50, y: 210 })).toBeNull();
   });
 
   it("returns inline edit target for header (Command Name)", () => {
@@ -108,8 +111,8 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
   it("returns inline edit target for Input Field Name", () => {
     useCanvasStore.getState().addElement(card);
 
-    // Double click on input 0 (orderId) at y = 65
-    const target = commandCardTool.getInlineEditTarget!(card, { x: 30, y: 65 });
+    // Double click on input 0 (orderId) at y = 95
+    const target = commandCardTool.getInlineEditTarget!(card, { x: 30, y: 95 });
     expect(target).not.toBeNull();
     expect(target?.initialValue).toBe("Order ID");
 
@@ -132,8 +135,8 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
   it("returns inline edit target for Response Field Name", () => {
     useCanvasStore.getState().addElement(card);
 
-    // Double click on response 0 (trackingCode) at y = 145
-    const target = commandCardTool.getInlineEditTarget!(card, { x: 30, y: 145 });
+    // Double click on response 0 (trackingCode) at y = 175
+    const target = commandCardTool.getInlineEditTarget!(card, { x: 30, y: 175 });
     expect(target).not.toBeNull();
     expect(target?.initialValue).toBe("Tracking Code");
 
@@ -159,8 +162,8 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
     expect(patch?.data?.inputs?.length).toBe(1);
     expect(patch?.data?.inputs?.[0].name).toBe("totalAmount");
     expect(patch?.data?.responses?.length).toBe(1);
-    // Height updated: 32 + 22 + 1*28 + 22 + 1*28 = 132
-    expect(patch?.height).toBe(132);
+    // Height updated: 32 + 28 (action) + 22 + 1*28 + 22 + 1*28 = 160
+    expect(patch?.height).toBe(160);
   });
 
   it("deletes sub-selected field from section 1 (responses)", () => {
@@ -168,8 +171,8 @@ describe("commandCardTool multi-section (inputs & responses)", () => {
     expect(patch).not.toBeNull();
     expect(patch?.data?.inputs?.length).toBe(2);
     expect(patch?.data?.responses?.length).toBe(0);
-    // Height: 32 + 22 + 2*28 + 22 + 1*28 (min 1 row for empty response) = 160
-    expect(patch?.height).toBe(160);
+    // Height: 32 + 28 (action) + 22 + 2*28 + 22 + 1*28 (min 1 row for empty response) = 188
+    expect(patch?.height).toBe(188);
   });
 
   it("updates field type for input and response", () => {

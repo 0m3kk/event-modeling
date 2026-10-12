@@ -17,6 +17,7 @@ import {
   DESC_HIT_HALF,
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
+import { validateActionToken } from "@/utils/rbac";
 import { resolveHeaderColor } from "@/utils/color";
 import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
@@ -27,6 +28,13 @@ export const QUERY_HEADER_HEIGHT = 32;
 export const QUERY_SECTION_HEADER_HEIGHT = 22;
 export const QUERY_ROW_HEIGHT = 28;
 export const QUERY_DEFAULT_WIDTH = 220;
+/**
+ * The action token is shown as a single field-like row directly under the
+ * header (no section band, since there is only ever one action).
+ */
+export const QUERY_ACTION_ROW_TOP = QUERY_HEADER_HEIGHT;
+/** Y of the PARAMS section's header band (below the action row). */
+export const QUERY_PARAM_BAND_TOP = QUERY_ACTION_ROW_TOP + QUERY_ROW_HEIGHT;
 
 export interface QueryField {
   name: string;
@@ -39,6 +47,8 @@ export interface QueryField {
 
 export interface QueryCardData {
   name: string;
+  /** RBAC permission token this query declares (e.g. `sales:getOrder`). */
+  action?: string;
   params?: QueryField[];
   responses?: QueryField[];
   color?: string;
@@ -65,6 +75,7 @@ export function computeQueryCardSize(
   const responsesCount = Math.max(1, responses.length);
   const height =
     QUERY_HEADER_HEIGHT +
+    QUERY_ROW_HEIGHT +
     QUERY_SECTION_HEADER_HEIGHT +
     paramsCount * QUERY_ROW_HEIGHT +
     QUERY_SECTION_HEADER_HEIGHT +
@@ -117,6 +128,7 @@ function renderQueryRowDescBadge(
 
 export const QueryCardSchema = z.object({
   name: z.string().default("QueryName"),
+  action: z.string().optional(),
   params: z
     .array(
       z.object({
@@ -160,8 +172,9 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
     color: "#16a34a",
   }),
 
-  // Minimum height with empty params and responses: 32 + 22 + 28 + 22 + 28 = 132
-  defaultSize: { width: QUERY_DEFAULT_WIDTH, height: 132 },
+  // Minimum height with empty params and responses:
+  // 32 + 28 (action row) + 22 + 28 + 22 + 28 = 160
+  defaultSize: { width: QUERY_DEFAULT_WIDTH, height: 160 },
 
   computeSize: (data) => computeQueryCardSize(data),
 
@@ -172,6 +185,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
     issues: [
       ...validateFieldTypes(getQueryParams(data), "params", context.elements ?? []),
       ...validateFieldTypes(getQueryResponses(data), "responses", context.elements ?? []),
+      ...validateActionToken(data.action, context.elements ?? []),
     ],
   }),
 
@@ -191,7 +205,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
     const paramsCount = Math.max(1, params.length);
     const responsesCount = Math.max(1, responses.length);
 
-    const paramStartY = QUERY_HEADER_HEIGHT + QUERY_SECTION_HEADER_HEIGHT;
+    const paramStartY = QUERY_PARAM_BAND_TOP + QUERY_SECTION_HEADER_HEIGHT;
     const respHeaderY = paramStartY + paramsCount * QUERY_ROW_HEIGHT;
     const respStartY = respHeaderY + QUERY_SECTION_HEADER_HEIGHT;
 
@@ -227,7 +241,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
     g.fill({ color: cardBg });
 
     // 3. Fill Param Section header banner
-    g.rect(0, QUERY_HEADER_HEIGHT, w, QUERY_SECTION_HEADER_HEIGHT);
+    g.rect(0, QUERY_PARAM_BAND_TOP, w, QUERY_SECTION_HEADER_HEIGHT);
     g.fill({ color: sectionHeaderBg });
 
     // 4. Fill Response Section header banner
@@ -274,7 +288,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
       context.textResolution,
     );
 
-    // 7b. Header ⓘ description badge (shows when present or selected)
+    // 8. Header ⓘ description badge (shows when present or selected)
     renderHeaderDescBadge(container, {
       elementId: element.id,
       width: w,
@@ -287,7 +301,28 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
     });
 
     if (typeof document !== "undefined") {
-      // 8. Render Param Section Header Label
+      // 9. Action token as a single field-like row under the header.
+      const hasAction = Boolean(element.data.action);
+      const actionText = new Text({
+        text: hasAction ? element.data.action! : "(not set)",
+        style: {
+          fontSize: 12,
+          fontFamily: '"Geist Mono", monospace',
+          fill: hasAction
+            ? isDark
+              ? 0x86efac
+              : 0x16a34a
+            : isDark
+              ? 0x52525b
+              : 0xc4c4c8,
+        },
+        resolution: context.textResolution,
+      });
+      actionText.x = 12;
+      actionText.y = QUERY_ACTION_ROW_TOP + 7;
+      container.addChild(actionText);
+
+      // 10. Render Param Section Header Label
       const paramSectionLabel = new Text({
         text: "PARAM",
         style: {
@@ -299,7 +334,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
         resolution: context.textResolution,
       });
       paramSectionLabel.x = 12;
-      paramSectionLabel.y = QUERY_HEADER_HEIGHT + 4;
+      paramSectionLabel.y = QUERY_PARAM_BAND_TOP + 4;
       container.addChild(paramSectionLabel);
 
       // 9. Render Param Fields
@@ -525,7 +560,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
     const params = getQueryParams(element.data);
     const responses = getQueryResponses(element.data);
     const paramsCount = Math.max(1, params.length);
-    const paramStartY = QUERY_HEADER_HEIGHT + QUERY_SECTION_HEADER_HEIGHT;
+    const paramStartY = QUERY_PARAM_BAND_TOP + QUERY_SECTION_HEADER_HEIGHT;
     const paramEndY = paramStartY + paramsCount * QUERY_ROW_HEIGHT;
 
     // Check Param section rows
@@ -731,10 +766,36 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
       };
     }
 
+    // 2. Double click on the ACTION row -> edit the action token.
+    if (
+      localPoint.y >= QUERY_ACTION_ROW_TOP &&
+      localPoint.y < QUERY_ACTION_ROW_TOP + QUERY_ROW_HEIGHT
+    ) {
+      return {
+        elementId: element.id,
+        worldBounds: {
+          x: element.x + 10,
+          y: element.y + QUERY_ACTION_ROW_TOP + 2,
+          width: Math.max(80, element.width - 20),
+          height: 24,
+        },
+        initialValue: element.data.action ?? "",
+        multiline: false,
+        onCommit: (newValue) => {
+          const trimmed = newValue.trim();
+          if (trimmed !== (element.data.action ?? "")) {
+            useCanvasStore.getState().updateElement(element.id, {
+              data: { ...element.data, action: trimmed || undefined },
+            });
+          }
+        },
+      };
+    }
+
     const params = getQueryParams(element.data);
     const responses = getQueryResponses(element.data);
     const paramsCount = Math.max(1, params.length);
-    const paramStartY = QUERY_HEADER_HEIGHT + QUERY_SECTION_HEADER_HEIGHT;
+    const paramStartY = QUERY_PARAM_BAND_TOP + QUERY_SECTION_HEADER_HEIGHT;
     const paramEndY = paramStartY + paramsCount * QUERY_ROW_HEIGHT;
 
     // 2. Double click on Param row
@@ -824,6 +885,12 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
     description: "Create a domain Query card in the Event Model with param and response fields",
     parameters: z.object({
       name: z.string().describe("PascalCase query name (e.g. GetOrder, ListUsers)"),
+      action: z
+        .string()
+        .optional()
+        .describe(
+          "RBAC permission token this query declares, 'domain:verb' in camelCase (e.g. sales:getOrder). Unique across the board; defaults to the query name when omitted.",
+        ),
       params: z
         .array(
           z.object({
@@ -868,6 +935,7 @@ export const queryCardTool: ToolDefinition<QueryCardData> = {
       const responses = params.responses || [];
       const data: QueryCardData = {
         name: params.name || "Query",
+        ...(params.action ? { action: params.action } : {}),
         params: queryParams,
         responses,
         color: params.color || queryCardTool.color,

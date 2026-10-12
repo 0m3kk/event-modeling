@@ -155,10 +155,11 @@ export function drawInfoBadge(
 export function getHeaderDescBadgeCenter(
   width: number,
   hasReference: boolean,
+  headerHeight: number = CARD_HEADER_HEIGHT,
 ): { x: number; y: number } {
   return {
     x: width - (hasReference ? DESC_HEADER_BADGE_RIGHT_WITH_REF : DESC_HEADER_BADGE_RIGHT),
-    y: CARD_HEADER_HEIGHT / 2,
+    y: headerHeight / 2,
   };
 }
 
@@ -172,6 +173,8 @@ export interface HeaderDescBadgeOptions {
   /** Description text; a hover zone is only registered when present. */
   text?: string;
   textResolution: number;
+  /** Header height, so the badge stays vertically centered on taller headers. */
+  headerHeight?: number;
 }
 
 /**
@@ -186,11 +189,11 @@ export function renderHeaderDescBadge(
 ): { x: number; y: number; width: number; height: number } | null {
   if (typeof document === "undefined") return null;
 
-  const { elementId, width, isDark, isSelected, hasDescription, hasReference, text, textResolution } =
+  const { elementId, width, isDark, isSelected, hasDescription, hasReference, text, textResolution, headerHeight } =
     options;
   if (!hasDescription && !isSelected) return null;
 
-  const center = getHeaderDescBadgeCenter(width, hasReference);
+  const center = getHeaderDescBadgeCenter(width, hasReference, headerHeight);
   const g = new Graphics();
   drawInfoBadge(g, container, center.x, center.y, {
     radius: DESC_HEADER_BADGE_RADIUS,

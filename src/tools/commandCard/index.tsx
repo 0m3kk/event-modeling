@@ -17,6 +17,7 @@ import {
   DESC_HIT_HALF,
   DESC_ROW_BADGE_GAP,
 } from "../common/cardLayout";
+import { validateActionToken } from "@/utils/rbac";
 import { resolveHeaderColor } from "@/utils/color";
 import { isSameIdentifier, toDisplayName, toDisplayType } from "@/utils/naming";
 import { beginDescZones, addDescZone, hitDescZone } from "../common/descZones";
@@ -28,6 +29,13 @@ export const COMMAND_HEADER_HEIGHT = 32;
 export const COMMAND_SECTION_HEADER_HEIGHT = 22;
 export const COMMAND_ROW_HEIGHT = 28;
 export const COMMAND_DEFAULT_WIDTH = 220;
+/**
+ * The action token is shown as a single field-like row directly under the
+ * header (no section band, since there is only ever one action).
+ */
+export const COMMAND_ACTION_ROW_TOP = COMMAND_HEADER_HEIGHT;
+/** Y of the INPUT section's header band (below the action row). */
+export const COMMAND_INPUT_BAND_TOP = COMMAND_ACTION_ROW_TOP + COMMAND_ROW_HEIGHT;
 
 export interface CommandField {
   name: string;
@@ -40,6 +48,8 @@ export interface CommandField {
 
 export interface CommandCardData {
   name: string;
+  /** RBAC permission token this command declares (e.g. `sales:placeOrder`). */
+  action?: string;
   inputs?: CommandField[];
   responses?: CommandField[];
   color?: string;
@@ -69,6 +79,7 @@ export function computeCommandCardSize(
   const responsesCount = Math.max(1, responses.length);
   const height =
     COMMAND_HEADER_HEIGHT +
+    COMMAND_ROW_HEIGHT +
     COMMAND_SECTION_HEADER_HEIGHT +
     inputsCount * COMMAND_ROW_HEIGHT +
     COMMAND_SECTION_HEADER_HEIGHT +
@@ -121,6 +132,7 @@ function renderCommandRowDescBadge(
 
 export const CommandCardSchema = z.object({
   name: z.string().default("CommandName"),
+  action: z.string().optional(),
   inputs: z
     .array(
       z.object({
@@ -164,8 +176,9 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     color: "#2563eb",
   }),
 
-  // Minimum height with empty inputs and responses: 32 + 22 + 28 + 22 + 28 = 132
-  defaultSize: { width: COMMAND_DEFAULT_WIDTH, height: 132 },
+  // Minimum height with empty inputs and responses:
+  // 32 + 28 (action row) + 22 + 28 + 22 + 28 = 160
+  defaultSize: { width: COMMAND_DEFAULT_WIDTH, height: 160 },
 
   computeSize: (data) => computeCommandCardSize(data),
 
@@ -176,6 +189,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     issues: [
       ...validateFieldTypes(getCommandInputs(data), "inputs", context.elements ?? []),
       ...validateFieldTypes(getCommandResponses(data), "responses", context.elements ?? []),
+      ...validateActionToken(data.action, context.elements ?? []),
     ],
   }),
 
@@ -195,7 +209,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     const inputsCount = Math.max(1, inputs.length);
     const responsesCount = Math.max(1, responses.length);
 
-    const inputStartY = COMMAND_HEADER_HEIGHT + COMMAND_SECTION_HEADER_HEIGHT;
+    const inputStartY = COMMAND_INPUT_BAND_TOP + COMMAND_SECTION_HEADER_HEIGHT;
     const respHeaderY = inputStartY + inputsCount * COMMAND_ROW_HEIGHT;
     const respStartY = respHeaderY + COMMAND_SECTION_HEADER_HEIGHT;
 
@@ -231,14 +245,14 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     g.fill({ color: cardBg });
 
     // 3. Fill Input Section header banner
-    g.rect(0, COMMAND_HEADER_HEIGHT, w, COMMAND_SECTION_HEADER_HEIGHT);
+    g.rect(0, COMMAND_INPUT_BAND_TOP, w, COMMAND_SECTION_HEADER_HEIGHT);
     g.fill({ color: sectionHeaderBg });
 
-    // 4. Fill Response Section header banner
+    // 5. Fill Response Section header banner
     g.rect(0, respHeaderY, w, COMMAND_SECTION_HEADER_HEIGHT);
     g.fill({ color: sectionHeaderBg });
 
-    // 5. Sunken highlight for active selected field
+    // 6. Sunken highlight for active selected field
     if (isThisElement && activeFieldIndex >= 0) {
       if (activeSection === 0 && activeFieldIndex < inputs.length) {
         const highlightY = inputStartY + activeFieldIndex * COMMAND_ROW_HEIGHT;
@@ -278,7 +292,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
       context.textResolution,
     );
 
-    // 7b. Header ⓘ description badge (shows when present or selected)
+    // 8. Header ⓘ description badge (shows when present or selected)
     renderHeaderDescBadge(container, {
       elementId: element.id,
       width: w,
@@ -291,7 +305,28 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     });
 
     if (typeof document !== "undefined") {
-      // 8. Render Input Section Header Label
+      // 9. Action token as a single field-like row under the header.
+      const hasAction = Boolean(element.data.action);
+      const actionText = new Text({
+        text: hasAction ? element.data.action! : "(not set)",
+        style: {
+          fontSize: 12,
+          fontFamily: '"Geist Mono", monospace',
+          fill: hasAction
+            ? isDark
+              ? 0x93c5fd
+              : 0x2563eb
+            : isDark
+              ? 0x52525b
+              : 0xc4c4c8,
+        },
+        resolution: context.textResolution,
+      });
+      actionText.x = 12;
+      actionText.y = COMMAND_ACTION_ROW_TOP + 7;
+      container.addChild(actionText);
+
+      // 10. Render Input Section Header Label
       const inputSectionLabel = new Text({
         text: "INPUT",
         style: {
@@ -303,7 +338,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
         resolution: context.textResolution,
       });
       inputSectionLabel.x = 12;
-      inputSectionLabel.y = COMMAND_HEADER_HEIGHT + 4;
+      inputSectionLabel.y = COMMAND_INPUT_BAND_TOP + 4;
       container.addChild(inputSectionLabel);
 
       // 9. Render Input Fields
@@ -529,7 +564,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     const inputs = getCommandInputs(element.data);
     const responses = getCommandResponses(element.data);
     const inputsCount = Math.max(1, inputs.length);
-    const inputStartY = COMMAND_HEADER_HEIGHT + COMMAND_SECTION_HEADER_HEIGHT;
+    const inputStartY = COMMAND_INPUT_BAND_TOP + COMMAND_SECTION_HEADER_HEIGHT;
     const inputEndY = inputStartY + inputsCount * COMMAND_ROW_HEIGHT;
 
     // Check Input section rows
@@ -734,10 +769,36 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
       };
     }
 
+    // 2. Double click on the ACTION row -> edit the action token.
+    if (
+      localPoint.y >= COMMAND_ACTION_ROW_TOP &&
+      localPoint.y < COMMAND_ACTION_ROW_TOP + COMMAND_ROW_HEIGHT
+    ) {
+      return {
+        elementId: element.id,
+        worldBounds: {
+          x: element.x + 10,
+          y: element.y + COMMAND_ACTION_ROW_TOP + 2,
+          width: Math.max(80, element.width - 20),
+          height: 24,
+        },
+        initialValue: element.data.action ?? "",
+        multiline: false,
+        onCommit: (newValue) => {
+          const trimmed = newValue.trim();
+          if (trimmed !== (element.data.action ?? "")) {
+            useCanvasStore.getState().updateElement(element.id, {
+              data: { ...element.data, action: trimmed || undefined },
+            });
+          }
+        },
+      };
+    }
+
     const inputs = getCommandInputs(element.data);
     const responses = getCommandResponses(element.data);
     const inputsCount = Math.max(1, inputs.length);
-    const inputStartY = COMMAND_HEADER_HEIGHT + COMMAND_SECTION_HEADER_HEIGHT;
+    const inputStartY = COMMAND_INPUT_BAND_TOP + COMMAND_SECTION_HEADER_HEIGHT;
     const inputEndY = inputStartY + inputsCount * COMMAND_ROW_HEIGHT;
 
     // 2. Double click on Input row
@@ -827,6 +888,12 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
     description: "Create a domain Command card in the Event Model with inputs and response fields",
     parameters: z.object({
       name: z.string().describe("PascalCase command name (e.g. PlaceOrder, RegisterUser)"),
+      action: z
+        .string()
+        .optional()
+        .describe(
+          "RBAC permission token this command declares, 'domain:verb' in camelCase (e.g. sales:placeOrder). Unique across the board; defaults to the command name when omitted.",
+        ),
       inputs: z
         .array(
           z.object({
@@ -889,6 +956,7 @@ export const commandCardTool: ToolDefinition<CommandCardData> = {
       const responses = params.responses || [];
       const data: CommandCardData = {
         name: params.name || "Command",
+        ...(params.action ? { action: params.action } : {}),
         inputs,
         responses,
         color: params.color || commandCardTool.color,

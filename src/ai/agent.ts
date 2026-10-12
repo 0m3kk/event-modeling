@@ -2,6 +2,8 @@ import { toolRegistry, ToolValidationError } from "@/tools";
 import type { ValidationIssue } from "@/tools";
 import { useCanvasStore } from "@/store";
 import { collectBoardTags } from "@/utils/eventTags";
+import { collectBoardActions } from "@/utils/rbac";
+import { collectBoardActors } from "@/tools/actorCard";
 import { getElementName, nameKey, normalizeIdentifierNames } from "@/utils/naming";
 import {
   listDefinedTypeNames,
@@ -355,6 +357,8 @@ function buildValidationError(issues: ValidationIssue[]): string {
     eventTypes,
     definedTypes: listDefinedTypeNames(latest.elements),
     primitiveTypes: Array.from(PRIMITIVE_FIELD_TYPES),
+    actions: summarizeActions(latest.elements),
+    actors: summarizeActors(latest.elements),
   });
 }
 
@@ -517,6 +521,25 @@ function summarizeGroups(elements: CanvasElement[]): any[] {
         .filter((child) => child.groupId === el.id)
         .map((child) => getElementName(child) ?? child.id),
     }));
+}
+
+/** Compact RBAC action summary: every action token a Command/Query declares. */
+function summarizeActions(elements: CanvasElement[]): any[] {
+  return collectBoardActions(elements).map((a) => ({
+    action: a.action,
+    type: a.cardType,
+    card: a.cardName,
+  }));
+}
+
+/** Compact Actor summary: name and the action patterns it grants. */
+function summarizeActors(elements: CanvasElement[]): any[] {
+  return collectBoardActors(elements).map((a) => ({
+    name: a.name,
+    permissions: ((a.data as any)?.permissions ?? [])
+      .map((p: any) => p?.action)
+      .filter((v: unknown): v is string => typeof v === "string" && v.length > 0),
+  }));
 }
 
 /**
@@ -1243,6 +1266,8 @@ export async function executeAITool(name: string, args: any): Promise<string> {
       slices: summarizeSlices(state.elements),
       groups: summarizeGroups(state.elements),
       domains: summarizeDomains(state.elements),
+      actions: summarizeActions(state.elements),
+      actors: summarizeActors(state.elements),
     });
   }
 
@@ -1337,7 +1362,7 @@ export async function runAgentConversation(
   const languageName = LANGUAGE_NAMES[language.slice(0, 2)] || "English";
   const languageInstruction = `OUTPUT LANGUAGE (IMPORTANT): the user is working in the ${languageName} language on this system. Write ALL of your output in ${languageName} — your chat replies, every card name, every field "description", every business rule on Constraint cards, Slice and Domain names, and any other human-readable text you put on the canvas — regardless of the language the user's message happens to be written in. Keep only technical identifiers (field names, type names, DCB tags) in their canonical form. Never answer in a language other than the one selected in the app.`;
   const systemPrompt = `You are the AI Event Modeling Architect, helping architects design domain events, business models and reactive systems on an infinite canvas.
-Tools: read the canvas; create sticky notes, Events, Commands, Queries, States (projection/decision models), Views (persisted read models), Objects, Enums, Aliases, Services (methods with params + returns), Constraint cards, Domain frames, Groups and Slices; make live reference copies of a card (create_reference_copy) or method-execution copies of a Service method (create_service_method_execution); clear the board. When the user asks to add or create something, always call the matching creation tool.
+Tools: read the canvas; create sticky notes, Events, Commands, Queries, States (projection/decision models), Views (persisted read models), Objects, Enums, Aliases, Services (methods with params + returns), Constraint cards, Actors (RBAC), Domain frames, Groups and Slices; make live reference copies of a card (create_reference_copy) or method-execution copies of a Service method (create_service_method_execution); clear the board. When the user asks to add or create something, always call the matching creation tool.
 COPIES: create_reference_copy makes a linked duplicate of an existing card (locate it by "target", optionally "type") — both share one name and stay in sync. create_service_method_execution makes a live Service card that runs ONE method of a source Service (give "service" and "method"); use it for the serviceCard lane of a write slice, placing it via "slice"/"lane". Both accept the optional "slice"/"lane", "group" and "domain" placement.
 DOMAINS (bounded contexts): call get_canvas_overview first and check its "domains".
 - If a Domain exists, put each new card/Slice into the most relevant one via "domain" = its name (this also moves it on update); prefer an existing Domain.
@@ -1360,6 +1385,7 @@ STATE PARAM PROVENANCE: a State/View param is an INPUT, so its value must come f
 VIEW cards: same shape and rules as State cards (params, query items, states), but a View is a persisted read model stored in a database for sorting/searching/filtering — use create_view_card for a queryable read model rather than an in-memory decision state.
 CONSTRAINT cards: call get_canvas_overview first to find existing State cards. List the State cards it uses in "states" (by name; they must exist). "rules" are free-text business invariants in plain human language (e.g. "The account must be active", "An order can only be paid once") — NOT field-name notation like "accountStatus.status == 'active'". The Constraint is the bridge between the flow's Command/Query and its State: the state params a rule compares must be supplied by that Command's inputs or Query's params, so make sure those fields exist (add them if missing).
 CONSTRAINT RULE SEMANTICS: a rule expresses a business INVARIANT over the referenced State — a domain truth that must hold before the flow may proceed, gating whether the event is emitted. Every rule must be checkable from the command/query inputs plus the referenced State. A rule must NEVER describe data storage or the event payload (an OUTPUT concern): "The password must be hashed before storage" is WRONG — rewrite it as an input-side invariant, e.g. "An account can only be debited when its balance covers the amount". A rule is NOT data validation: never write required/type/format/empty checks such as "The password must be non-empty" or "email must be a valid address" — generic field validation is a separate concern, not a Constraint. Ask: "does this state a domain invariant that could block the command before any event is written?" If not, it is not a Constraint.
+ACTORS & ACTIONS (RBAC): a Command or Query declares an "action" — a canonical, EXPLICIT permission token in the form "domain:verb" (camelCase verb), e.g. sales:placeOrder, sales:getOrder; never a wildcard. The action is unique across the board and is the join key for permissions, so give every Command/Query a meaningful "action" (defaults to the card name if omitted). An Actor card grants permissions by referencing those actions in "permissions": each entry is "{ action }" where "action" is either an exact token (sales:placeOrder) or a * wildcard (sales:* grants the whole namespace, *:getOrder grants that verb in any namespace). Rules the tool enforces: a bare match-all ("*", "*:*") is REJECTED; a pattern that matches no existing action is REJECTED; two overlapping permissions in one actor are REJECTED. ALWAYS create the Command/Query cards (with their actions) BEFORE the Actor that references them, and call get_canvas_overview to read the existing "actions" and "actors" before creating or updating an Actor.
 SLICES: create_slice takes a "name" and an ordered "lanes" list (top-to-bottom), each lane with a "type" from commandCard, queryCard, eventCard, stateCard, viewCard, constraintCard, serviceCard or stickyNote. Enum/Object/Alias cards and nested Slices are NOT allowed in lanes. Give at least one lane and do not repeat a lane type.
 SLICE NAME: give a slice a plain PascalCase business name describing the flow (e.g. PlaceOrder, HandlePayment, ViewOrderHistory). Do NOT include the word "Slice" (never "PlaceOrderSlice") — "slice" is an internal concept most users do not know, so do not name lanes or cards after it either.
 FILLING LANES: after create_slice, create each lane's card(s) and place each one via "slice" = the slice's name (and "lane" only when the card type is ambiguous: give the lane's card type or 1-based position). Never leave an AI-made slice empty.
