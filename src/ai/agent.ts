@@ -159,13 +159,13 @@ const DOMAIN_PLACEMENT_PROPS: Record<string, any> = {
 
 /**
  * Extra JSON-schema property injected into every group-eligible card tool so
- * the model can place a definition/service/state card inside a Group frame in
- * the same call. Resolved by {@link resolveGroupMembership}.
+ * the model can place a definition/service/state/actor card inside a Group
+ * frame in the same call. Resolved by {@link resolveGroupMembership}.
  */
 const GROUP_PLACEMENT_PROPS: Record<string, any> = {
   group: {
     type: "string",
-    description: "Optional Group name; only Object/Enum/Alias/Service/State cards can join.",
+    description: "Optional Group name; only Object/Enum/Alias/Service/State/Actor cards can join.",
   },
 };
 
@@ -298,7 +298,7 @@ export function buildOpenAITools(): any[] {
     const eligibleForLane = isSliceEligibleChild(definition?.type ?? "");
     // Every card can live in a Domain except a Domain itself (no nesting).
     const eligibleForDomain = definition?.type !== DOMAIN_TYPE;
-    // Only definition/service/state cards can live in a Group.
+    // Only definition/service/state/actor cards can live in a Group.
     const eligibleForGroup = isGroupEligibleChild(definition?.type ?? "");
     const createParams = zodToJsonSchema(t.parameters);
     if (eligibleForLane) Object.assign(createParams.properties, SLICE_PLACEMENT_PROPS);
@@ -508,7 +508,7 @@ function summarizeDomains(elements: CanvasElement[]): any[] {
     }));
 }
 
-/** Compact Group summary for the model (name + the definition/service/state cards it clusters). */
+/** Compact Group summary for the model (name + the reusable cards it clusters). */
 function summarizeGroups(elements: CanvasElement[]): any[] {
   return elements
     .filter((el) => el.type === GROUP_TYPE)
@@ -685,8 +685,9 @@ const GROUP_NOT_REQUESTED: GroupPlacement = { requested: false };
  * `groupId` membership for a card. `group` is the Group's name; an explicit
  * empty `group` detaches the card from any Group.
  *
- * Only definition/service/state cards can join a Group, and a card in a Slice
- * lane is handled separately (lane and group membership are mutually exclusive).
+ * Only definition/service/state/actor cards can join a Group, and a card in a
+ * Slice lane is handled separately (lane and group membership are mutually
+ * exclusive).
  */
 function resolveGroupMembership(
   elements: CanvasElement[],
@@ -706,7 +707,7 @@ function resolveGroupMembership(
   if (!isGroupEligibleChild(cardType)) {
     return issue(
       "group_ineligible_card",
-      `${cardType} cards cannot join a Group (only Object, Enum, Alias, Service and State cards can).`,
+      `${cardType} cards cannot join a Group (only Object, Enum, Alias, Service, State and Actor cards can).`,
     );
   }
 
@@ -1370,7 +1371,8 @@ DOMAINS (bounded contexts): call get_canvas_overview first and check its "domain
 - A card in a Slice lane cannot also be in a Domain, so put the Slice itself in the Domain, not its lane cards. Tell the user which Domain you used.
 GROUPS: a Group clusters reusable definitions. Inside a Domain the standard layout is THREE groups: one for type definitions (Object/Enum/Alias), one for Services, and one wrapping the Domain's States. Name each one after its Domain — "<Domain> Types", "<Domain> Services", "<Domain> States" (e.g. Account Types, Account States, Account Services) — so group names stay globally unique across Domains instead of colliding and getting numbered ("Types 2").
 - Reuse existing groups; create missing ones with create_group_card using that Domain-prefixed name.
-- Every new Object/Enum/Alias/Service/State card goes into the matching group via "group" = its name; do not leave these free-standing. Only these types can join a Group, and not when in a Slice lane. Wrap all of the Domain's State cards in its "<Domain> States" group. A Group lives in the Domain (pass its own "domain"); its cards then do NOT need "domain" again.
+- Every new Object/Enum/Alias/Service/State card goes into the matching group via "group" = its name; do not leave these free-standing. Only these types plus Actors can join a Group, and not when in a Slice lane. Wrap all of the Domain's State cards in its "<Domain> States" group. A Group lives in the Domain (pass its own "domain"); its cards then do NOT need "domain" again.
+- Actor cards are cross-cutting RBAC, not tied to one Domain: keep every Actor in ONE board-wide "Actors" group (create it with create_group_card if missing) via "group" = "Actors"; do not scatter Actors across Domain groups.
 FLOW SEMANTICS: a "flow" is ONE slice, not the whole command→event→read-model chain.
 - Write slice: a Command emitting one or more Events — usual lanes top-to-bottom: commandCard, constraintCard, eventCard. Add a queryCard lane when the command must read data first, and a serviceCard lane only when the flow executes a service method — fill it with create_service_method_execution (not create_service_card).
 - Read slice: a Query reading Events into a read model — usual lanes: queryCard then viewCard (or stateCard when the projection is specific to that one flow). A constraintCard lane is optional — add it only when a rule must be checked.

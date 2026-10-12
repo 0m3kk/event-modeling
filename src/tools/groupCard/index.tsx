@@ -44,7 +44,7 @@ export const groupCardTool: ToolDefinition<GroupData> = {
   type: GROUP_TYPE,
   name: "Group",
   description:
-    "A Group is a compact frame that clusters related Object, Enum, Alias, Service or State cards (usually inside a Domain)",
+    "A Group is a compact frame that clusters related Object, Enum, Alias, Service, State or Actor cards (usually inside a Domain)",
   icon: Boxes,
   color: "#0d9488",
   category: "modeling",
@@ -102,7 +102,7 @@ export const groupCardTool: ToolDefinition<GroupData> = {
 
     if (children.length === 0) {
       const hint = new Text({
-        text: "Drop objects, enums, aliases, services or states here",
+        text: "Drop objects, enums, aliases, services, states or actors here",
         style: {
           fontSize: 11,
           fontFamily: '"Geist Mono", monospace',
@@ -158,8 +158,9 @@ export const groupCardTool: ToolDefinition<GroupData> = {
   ai: {
     toolName: "create_group_card",
     description:
-      "Create a Group — a compact frame clustering reusable definitions (Object/Enum/Alias), Services and/or States inside a Domain. " +
-      "Name it after its Domain (e.g. Account Types, Account States, Account Services) so names stay unique across Domains. " +
+      "Create a Group — a compact frame clustering reusable definitions (Object/Enum/Alias), Services, States and/or Actors inside a Domain. " +
+      "Name it after its Domain (e.g. Account Types, Account States, Account Services) so names stay unique across Domains; " +
+      "Actors are the exception — keep them in a single board-wide \"Actors\" group. " +
       "After creating it, place eligible cards in it via `group`.",
     parameters: z.object({
       name: z

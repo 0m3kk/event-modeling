@@ -21,6 +21,30 @@ describe("AI integration for RBAC", () => {
     expect(names).toContain("update_actor_card");
   });
 
+  it("exposes the group placement option on create_actor_card", () => {
+    const tool = buildOpenAITools().find((t) => t.function.name === "create_actor_card")!;
+    expect(tool.function.parameters.properties.group).toBeDefined();
+  });
+
+  it("places a new Actor in an existing group", async () => {
+    useCanvasStore.getState().addElement(command("c1", "PlaceOrder", "sales:placeOrder"));
+    await executeAITool("create_group_card", { name: "Actors" });
+
+    const result = JSON.parse(
+      await executeAITool("create_actor_card", {
+        name: "Customer",
+        permissions: [{ action: "sales:placeOrder" }],
+        group: "Actors",
+      }),
+    );
+    expect(result.status).toBe("success");
+
+    const elements = useCanvasStore.getState().elements;
+    const group = elements.find((e) => e.type === "groupCard")!;
+    const actorElement = elements.find((e) => e.type === "actorCard")!;
+    expect(actorElement.groupId).toBe(group.id);
+  });
+
   it("includes actions and actors in the canvas overview", async () => {
     useCanvasStore.getState().addElement(command("c1", "PlaceOrder", "sales:placeOrder"));
     useCanvasStore.getState().addElement(actor("a1", "Customer", [{ action: "sales:placeOrder" }]));
