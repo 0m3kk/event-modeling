@@ -8,6 +8,7 @@ import { useCanvasStore } from "@/store";
 import { getContrastTextColor, hexToNumber, resolveHeaderColor } from "@/utils/color";
 import { isSameIdentifier, toDisplayName } from "@/utils/naming";
 import { MONOSPACE_ADVANCE_RATIO } from "@/utils/textWrap";
+import { GroupOptions } from "./GroupOptions";
 import {
   GROUP_DEFAULT_HEIGHT,
   GROUP_DEFAULT_WIDTH,
@@ -55,6 +56,8 @@ export const groupCardTool: ToolDefinition<GroupData> = {
   createDefaultData: () => ({ name: "Group", color: "#0d9488" }),
 
   defaultSize: { width: GROUP_DEFAULT_WIDTH, height: GROUP_DEFAULT_HEIGHT },
+
+  optionsBar: GroupOptions,
 
   render: (container: Container, element, context) => {
     container.removeChildren();

@@ -21,6 +21,7 @@ import { toolRegistry } from "@/tools/registry";
 import { reflowSlices } from "@/tools/sliceCard/layout";
 import { reflowDomains } from "@/tools/domainCard/layout";
 import { planDomainArrange } from "@/tools/domainCard/arrange";
+import { planGroupArrange } from "@/tools/groupCard/arrange";
 import { reflowGroups } from "@/tools/groupCard/layout";
 import {
   navigateSubSelect,
@@ -87,6 +88,8 @@ export interface CanvasStoreState {
   updateElements: (patches: Array<{ id: string } & Partial<CanvasElement>>) => void;
   /** Auto-arranges a Domain: Groups stacked left, Slices in a row beside them. */
   arrangeDomain: (domainId: string) => void;
+  /** Auto-arranges a Group's child cards into a compact grid. */
+  arrangeGroup: (groupId: string) => void;
   deleteElements: (ids: string[]) => void;
   deleteSelectedField: () => void;
   updateSelectedFieldType: (type: string) => void;
@@ -189,6 +192,28 @@ function fitElementToContent(element: CanvasElement): CanvasElement {
 /** Content-fits every card before laying out the containers around them. */
 function fitElementsToContent(elements: CanvasElement[]): CanvasElement[] {
   return elements.map(fitElementToContent);
+}
+
+/**
+ * Drops arrangement patches that would not change anything, so repeating an
+ * "Arrange" action never stacks identical undo entries.
+ */
+function dropUnchangedPatches(
+  elements: CanvasElement[],
+  patches: Array<{ id: string } & Partial<CanvasElement>>,
+): Array<{ id: string } & Partial<CanvasElement>> {
+  const byId = new Map(elements.map((el) => [el.id, el]));
+  return patches.filter((patch) => {
+    const el = byId.get(patch.id);
+    if (!el) return false;
+    const moved =
+      (patch.x !== undefined && patch.x !== el.x) ||
+      (patch.y !== undefined && patch.y !== el.y);
+    const dataChanged =
+      patch.data !== undefined &&
+      JSON.stringify(patch.data) !== JSON.stringify(el.data);
+    return moved || dataChanged;
+  });
 }
 
 export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
@@ -422,19 +447,18 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
     // Keep only patches that actually change something, so pressing "Arrange"
     // twice does not stack identical undo entries.
-    const byId = new Map(current.map((el) => [el.id, el]));
-    const effective = patches.filter((patch) => {
-      const el = byId.get(patch.id);
-      if (!el) return false;
-      const moved =
-        (patch.x !== undefined && patch.x !== el.x) ||
-        (patch.y !== undefined && patch.y !== el.y);
-      const dataChanged =
-        patch.data !== undefined &&
-        JSON.stringify(patch.data) !== JSON.stringify(el.data);
-      return moved || dataChanged;
-    });
+    const effective = dropUnchangedPatches(current, patches);
+    if (effective.length > 0) {
+      get().updateElements(effective);
+    }
+  },
 
+  arrangeGroup: (groupId) => {
+    const current = get().elements;
+    const patches = planGroupArrange(current, groupId);
+    if (!patches) return;
+
+    const effective = dropUnchangedPatches(current, patches);
     if (effective.length > 0) {
       get().updateElements(effective);
     }
