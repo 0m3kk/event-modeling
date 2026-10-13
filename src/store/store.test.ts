@@ -213,18 +213,16 @@ describe("useCanvasStore content width auto-fit", () => {
 
   it("does not auto-fit a card that has not opted in", () => {
     useCanvasStore.getState().addElement({
-      id: "obj-1",
-      type: "objectCard",
+      id: "note-1",
+      type: "stickyNote",
       x: 0,
       y: 0,
       width: 220,
       height: 60,
-      data: {
-        name: "Obj",
-        fields: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
-      },
+      data: { text: "a very long sticky note that must not change its size" },
     });
     expect(useCanvasStore.getState().elements[0].width).toBe(220);
+    expect(useCanvasStore.getState().elements[0].height).toBe(60);
   });
 
   it("reflows the height of a width-sensitive card on data change", () => {

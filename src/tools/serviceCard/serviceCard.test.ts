@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import "@/tools";
 import { serviceCardTool, type ServiceCardData } from "./index";
+import { computeServiceCardSize } from "./layout";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 import { navigateSubSelect } from "@/utils/subSelection";
@@ -273,5 +275,93 @@ describe("serviceCardTool (methods with params & returns)", () => {
     expect(element.data.methods[0].name).toBe("charge");
     expect(element.data.methods[0].id).toBeTruthy();
     expect(element.width).toBe(240);
+  });
+});
+
+describe("serviceCardTool content width auto-grow", () => {
+  it("keeps the default width for short content", () => {
+    expect(
+      computeServiceCardSize({
+        name: "OrderService",
+        methods: [
+          { id: "m1", name: "place", params: [{ name: "id", type: "string" }], returns: [] },
+        ],
+      }).width,
+    ).toBe(240);
+  });
+
+  it("widens to fit a long param field type", () => {
+    const data: ServiceCardData = {
+      name: "OrderService",
+      methods: [
+        {
+          id: "m1",
+          name: "place",
+          params: [{ name: "p", type: "a".repeat(40) }],
+          returns: [],
+        },
+      ],
+    };
+    // 12 + "P"(7.2) + 30 gap + type(40 chars * 11 * 0.6 = 264) + 12 -> 326
+    expect(computeServiceCardSize(data).width).toBe(326);
+  });
+
+  it("widens to fit a long method name", () => {
+    const data: ServiceCardData = {
+      name: "S",
+      methods: [
+        { id: "m1", name: "placeOrderEverySingleTime", params: [], returns: [] },
+      ],
+    };
+    expect(computeServiceCardSize(data).width).toBeGreaterThan(240);
+  });
+
+  it("never shrinks below a requested width", () => {
+    const data: ServiceCardData = {
+      name: "OrderService",
+      methods: [
+        {
+          id: "m1",
+          name: "place",
+          params: [{ name: "p", type: "a".repeat(40) }],
+          returns: [],
+        },
+      ],
+    };
+    expect(computeServiceCardSize(data, 900).width).toBe(900);
+  });
+});
+
+describe("serviceCardTool store auto-fit", () => {
+  beforeEach(() => {
+    useCanvasStore.getState().clearBoard();
+  });
+
+  it("widens the card when a method's param type grows", () => {
+    useCanvasStore.getState().addElement({
+      id: "svc-1",
+      type: "serviceCard",
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 134,
+      data: {
+        name: "OrderService",
+        methods: [
+          { id: "m1", name: "place", params: [{ name: "p", type: "string" }], returns: [] },
+        ],
+      },
+    });
+    expect(useCanvasStore.getState().elements[0].width).toBe(240);
+
+    useCanvasStore.getState().updateElement("svc-1", {
+      data: {
+        name: "OrderService",
+        methods: [
+          { id: "m1", name: "place", params: [{ name: "p", type: "a".repeat(40) }], returns: [] },
+        ],
+      },
+    });
+    expect(useCanvasStore.getState().elements[0].width).toBe(326);
   });
 });

@@ -266,7 +266,9 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
 
   defaultSize: { width: SERVICE_DEFAULT_WIDTH, height: SERVICE_HEADER_HEIGHT + SERVICE_ROW_HEIGHT },
 
-  computeSize: (data) => computeServiceCardSize(data),
+  computeSize: (data, width) => computeServiceCardSize(data, width),
+
+  autoFitWidth: true,
 
   optionsBar: ServiceCardOptions,
 
@@ -617,8 +619,8 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
         ...element.data,
         methods: methods.filter((_, i) => i !== methodIndex),
       };
-      const size = computeServiceCardSize(nextData);
-      return { height: size.height, data: nextData };
+      const size = computeServiceCardSize(nextData, element.width);
+      return { width: size.width, height: size.height, data: nextData };
     }
 
     const methodIndex = bandToMethodIndex(sectionIndex);
@@ -638,8 +640,8 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
         rows.filter((_, i) => i !== fieldIndex),
       ),
     };
-    const size = computeServiceCardSize(nextData);
-    return { height: size.height, data: nextData };
+    const size = computeServiceCardSize(nextData, element.width);
+    return { width: size.width, height: size.height, data: nextData };
   },
 
   onUpdateSubSelectType: (element, field, type) => {

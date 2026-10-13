@@ -1,4 +1,11 @@
 import type { SelectedField } from "@/types";
+import { measureMonospaceText } from "@/utils/textWrap";
+import { toDisplayName } from "@/utils/naming";
+import {
+  measureCardTitleWidth,
+  measureFieldRowWidth,
+  CARD_NAME_FONT_SIZE,
+} from "../common/cardLayout";
 
 /**
  * Pure geometry + data helpers for the Service card.
@@ -122,10 +129,43 @@ export function getMethodLayouts(data: ServiceCardData): MethodLayout[] {
   return layouts;
 }
 
+/** Horizontal padding before a method/row name (mirrors the renderer's `x = 14`). */
+export const SERVICE_ROW_LEFT_PADDING = 14;
+/** Space kept right of a method header name for its right-aligned ⓘ badge. */
+export const SERVICE_METHOD_BADGE_RESERVE = 30;
+
+/**
+ * Minimum width that fits the Service title, every method header name (plus its
+ * right-aligned ⓘ badge) and every param/return row (name + required marker +
+ * right-aligned type). Kept alongside the layout so reference copies and
+ * method-execution copies size themselves the same way the store re-fits them.
+ */
+export function computeServiceContentWidth(data: ServiceCardData): number {
+  let required = measureCardTitleWidth(data.name);
+  for (const method of data.methods ?? []) {
+    const headerWidth =
+      SERVICE_ROW_LEFT_PADDING +
+      measureMonospaceText(toDisplayName(method.name), CARD_NAME_FONT_SIZE) +
+      SERVICE_METHOD_BADGE_RESERVE;
+    required = Math.max(required, headerWidth);
+    for (const field of [...(method.params ?? []), ...(method.returns ?? [])]) {
+      required = Math.max(required, measureFieldRowWidth(field));
+    }
+  }
+  return Math.ceil(required);
+}
+
+/**
+ * Content-driven size: one block per method (its header + PARAMS/RETURNS rows),
+ * plus a width that fits the title, method headers and every row without
+ * clipping. Never narrows below `customWidth`, so a user-widened card stays
+ * wide.
+ */
 export function computeServiceCardSize(
   data: ServiceCardData,
-  width = SERVICE_DEFAULT_WIDTH,
+  customWidth = SERVICE_DEFAULT_WIDTH,
 ): { width: number; height: number } {
+  const width = Math.max(customWidth, computeServiceContentWidth(data));
   const methods = data.methods ?? [];
   if (methods.length === 0) {
     return { width, height: SERVICE_HEADER_HEIGHT + SERVICE_ROW_HEIGHT };

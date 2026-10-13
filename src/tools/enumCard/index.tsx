@@ -118,7 +118,9 @@ export const enumCardTool: ToolDefinition<EnumCardData> = {
 
   defaultSize: { width: CARD_DEFAULT_WIDTH, height: 60 },
 
-  computeSize: (data) => computeEnumCardSize(data),
+  computeSize: (data, width) => computeEnumCardSize(data, width),
+
+  autoFitWidth: true,
 
   optionsBar: EnumCardOptions,
 
@@ -199,9 +201,10 @@ export const enumCardTool: ToolDefinition<EnumCardData> = {
     }
     const nextFields = element.data.fields.filter((_, i) => i !== fieldIndex);
     const nextData = { ...element.data, fields: nextFields };
-    const nextSize = enumCardTool.computeSize ? enumCardTool.computeSize(nextData) : null;
+    const nextSize = computeEnumCardSize(nextData, element.width);
     return {
-      height: nextSize ? nextSize.height : element.height,
+      width: nextSize.width,
+      height: nextSize.height,
       data: nextData,
     };
   },

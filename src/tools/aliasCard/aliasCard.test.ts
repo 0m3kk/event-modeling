@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { aliasCardTool, AliasCardSchema, type AliasCardData } from "./index";
+import "@/tools";
+import { aliasCardTool, computeAliasCardSize, AliasCardSchema, type AliasCardData } from "./index";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 
@@ -93,5 +94,56 @@ describe("aliasCardTool", () => {
     );
     const data = element.data as AliasCardData;
     expect(data.validation).toEqual({ min: 0, rule: "two decimal places" });
+  });
+});
+
+describe("aliasCardTool content width auto-grow", () => {
+  it("keeps the default width for short content", () => {
+    expect(computeAliasCardSize({ name: "CustomerId", aliasedType: "uuid" }).width).toBe(220);
+  });
+
+  it("widens to fit a long wrapped type", () => {
+    // Body line: 12 + type(32 chars * 12 * 0.6 = 230.4) + 12 -> 255
+    const width = computeAliasCardSize({ name: "Money", aliasedType: "a".repeat(32) }).width;
+    expect(width).toBe(255);
+  });
+
+  it("reserves room for the validation shield on the wrapped type", () => {
+    const type = "a".repeat(30); // 12 + 216 + 12 -> 240
+    const plain = computeAliasCardSize({ name: "Money", aliasedType: type }).width;
+    const withValidation = computeAliasCardSize({
+      name: "Money",
+      aliasedType: type,
+      validation: { minLength: 1 },
+    }).width;
+    // Shield adds 6 gap + 15 badge.
+    expect(plain).toBe(240);
+    expect(withValidation).toBe(261);
+  });
+
+  it("never shrinks below a requested width", () => {
+    const width = computeAliasCardSize(
+      { name: "Money", aliasedType: "a".repeat(32) },
+      900,
+    ).width;
+    expect(width).toBe(900);
+  });
+
+  it("widens the card when the wrapped type grows through the store", () => {
+    useCanvasStore.getState().addElement({
+      id: "alias-1",
+      type: "aliasCard",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 60,
+      data: { name: "Money", aliasedType: "float" },
+    });
+    expect(useCanvasStore.getState().elements[0].width).toBe(220);
+
+    useCanvasStore.getState().updateElement("alias-1", {
+      data: { name: "Money", aliasedType: "a".repeat(32) },
+    });
+    expect(useCanvasStore.getState().elements[0].width).toBe(255);
   });
 });

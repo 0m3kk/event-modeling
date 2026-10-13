@@ -12,8 +12,12 @@ import {
   renderHeaderDescBadge,
   appendFieldValidationBadge,
   getStandardCardInlineEditTarget,
+  measureCardTitleWidth,
   CARD_HEADER_HEIGHT,
   CARD_DEFAULT_WIDTH,
+  ROW_LEFT_PADDING,
+  ROW_RIGHT_PADDING,
+  CARD_NAME_FONT_SIZE,
   VALIDATION_BADGE_W,
   VALIDATION_BADGE_H,
 } from "../common/cardLayout";
@@ -22,7 +26,12 @@ import { beginDescZones, hitDescZone } from "../common/descZones";
 import { validateTypeValue } from "../common/typeValidation";
 import { collectDefinedTypeNames } from "@/utils/typeCatalog";
 import { toDisplayType } from "@/utils/naming";
-import { FieldValidationSchema, type FieldValidation } from "@/utils/fieldValidation";
+import { measureMonospaceText } from "@/utils/textWrap";
+import {
+  FieldValidationSchema,
+  hasValidation,
+  type FieldValidation,
+} from "@/utils/fieldValidation";
 
 /**
  * An Alias: a named domain type that wraps a single existing type
@@ -48,6 +57,26 @@ export const AliasCardSchema = z.object({
   description: z.string().optional(),
 });
 
+/**
+ * Content-driven size: a header + a single body row showing the wrapped type,
+ * with a width that fits the title and the wrapped-type line (plus its
+ * validation shield when present) without clipping.
+ */
+export function computeAliasCardSize(
+  data: AliasCardData,
+  customWidth = CARD_DEFAULT_WIDTH,
+): { width: number; height: number } {
+  const { height } = computeStandardCardSize(0, customWidth);
+
+  const typeText = toDisplayType(data.aliasedType || "unknown", data.isArray);
+  let bodyWidth = ROW_LEFT_PADDING + measureMonospaceText(typeText, CARD_NAME_FONT_SIZE);
+  if (hasValidation(data.validation)) bodyWidth += 6 + VALIDATION_BADGE_W;
+  bodyWidth += ROW_RIGHT_PADDING;
+
+  const width = Math.max(customWidth, Math.ceil(measureCardTitleWidth(data.name)), Math.ceil(bodyWidth));
+  return { width, height };
+}
+
 export const aliasCardTool: ToolDefinition<AliasCardData> = {
   type: "aliasCard",
   name: "Alias",
@@ -66,7 +95,9 @@ export const aliasCardTool: ToolDefinition<AliasCardData> = {
   // Header + a single body row showing the wrapped type.
   defaultSize: { width: CARD_DEFAULT_WIDTH, height: CARD_HEADER_HEIGHT + 28 },
 
-  computeSize: () => computeStandardCardSize(0),
+  computeSize: (data, width) => computeAliasCardSize(data, width),
+
+  autoFitWidth: true,
 
   optionsBar: AliasCardOptions,
 

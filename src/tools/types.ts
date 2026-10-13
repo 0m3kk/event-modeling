@@ -89,8 +89,8 @@ export interface ToolDefinition<TData = any> {
    * height through `computeHeightForWidth` when the card defines one.
    *
    * Used by the text-heavy cards (Event, Command, Query, State, View,
-   * Constraint) whose names/types must never clip. Cards without it keep the
-   * width they were given.
+   * Constraint, Actor, Enum, Object, Alias, Service) whose names/types must
+   * never clip. Cards without it keep the width they were given.
    */
   autoFitWidth?: boolean;
   /**

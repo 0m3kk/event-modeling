@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { objectCardTool, type ObjectCardData } from "./index";
+import "@/tools";
+import { objectCardTool, computeObjectCardSize, type ObjectCardData } from "./index";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 
@@ -201,5 +202,52 @@ describe("ObjectCardTool sub-selection & inline edit targets", () => {
     useCanvasStore.getState().undo();
     updated = useCanvasStore.getState().elements.find((e) => e.id === "obj-1");
     expect(updated?.data.fields[1].validation).toEqual({ maxLength: 10 });
+  });
+});
+
+describe("objectCardTool content width auto-grow", () => {
+  it("keeps the default width for short content", () => {
+    expect(
+      computeObjectCardSize({ name: "Address", fields: [{ name: "id", type: "string" }] }).width,
+    ).toBe(220);
+  });
+
+  it("widens to fit a long field type", () => {
+    const data: ObjectCardData = {
+      name: "Address",
+      fields: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+    };
+    // 12 + "Field"(36) + 30 gap + type(171.6) + 12 -> 262
+    expect(computeObjectCardSize(data).width).toBe(262);
+  });
+
+  it("never shrinks below a requested width", () => {
+    const data: ObjectCardData = {
+      name: "Address",
+      fields: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+    };
+    expect(computeObjectCardSize(data, 500).width).toBe(500);
+  });
+
+  it("re-fits a card when its fields change through the store", () => {
+    useCanvasStore.getState().clearBoard();
+    useCanvasStore.getState().addElement({
+      id: "obj-1",
+      type: "objectCard",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 88,
+      data: { name: "Address", fields: [{ name: "street", type: "string" }] },
+    });
+    expect(useCanvasStore.getState().elements[0].width).toBe(220);
+
+    useCanvasStore.getState().updateElement("obj-1", {
+      data: {
+        name: "Address",
+        fields: [{ name: "field", type: "abcdefghijklmnopqrstuvwxyz" }],
+      },
+    });
+    expect(useCanvasStore.getState().elements[0].width).toBe(262);
   });
 });

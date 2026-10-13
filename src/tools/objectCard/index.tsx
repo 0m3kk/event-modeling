@@ -14,6 +14,7 @@ import {
   getStandardCardSubSelect,
   navigateStandardCardSubSelect,
   getStandardCardInlineEditTarget,
+  measureStandardCardContentWidth,
   CARD_DEFAULT_WIDTH,
 } from "../common/cardLayout";
 import { resolveHeaderColor } from "@/utils/color";
@@ -55,6 +56,20 @@ export const ObjectCardSchema = z.object({
   description: z.string().optional(),
 });
 
+/**
+ * Content-driven size: one row per field, plus a width that fits the title and
+ * every field row (name + required/validation markers + right-aligned type)
+ * without clipping.
+ */
+export function computeObjectCardSize(
+  data: ObjectCardData,
+  customWidth = CARD_DEFAULT_WIDTH,
+): { width: number; height: number } {
+  const { height } = computeStandardCardSize(data.fields?.length || 0, customWidth);
+  const width = measureStandardCardContentWidth(data.name, data.fields, customWidth);
+  return { width, height };
+}
+
 export const objectCardTool: ToolDefinition<ObjectCardData> = {
   type: "objectCard",
   name: "Object",
@@ -73,7 +88,9 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
 
   defaultSize: { width: CARD_DEFAULT_WIDTH, height: 60 },
 
-  computeSize: (data) => computeStandardCardSize(data.fields?.length || 0),
+  computeSize: (data, width) => computeObjectCardSize(data, width),
+
+  autoFitWidth: true,
 
   optionsBar: ObjectCardOptions,
 
@@ -153,9 +170,10 @@ export const objectCardTool: ToolDefinition<ObjectCardData> = {
     }
     const nextFields = element.data.fields.filter((_, i) => i !== fieldIndex);
     const nextData = { ...element.data, fields: nextFields };
-    const nextSize = objectCardTool.computeSize ? objectCardTool.computeSize(nextData) : null;
+    const nextSize = computeObjectCardSize(nextData, element.width);
     return {
-      height: nextSize ? nextSize.height : element.height,
+      width: nextSize.width,
+      height: nextSize.height,
       data: nextData,
     };
   },

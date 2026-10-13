@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import "@/tools";
 import { enumCardTool, computeEnumCardSize, type EnumCardData } from "./index";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
@@ -140,5 +141,40 @@ describe("enumCardTool", () => {
     );
     expect(element.type).toBe("enumCard");
     expect((element.data as EnumCardData).fields).toHaveLength(2);
+  });
+});
+
+describe("enumCardTool content width auto-grow", () => {
+  beforeEach(() => {
+    useCanvasStore.getState().clearBoard();
+  });
+
+  it("keeps the default width for short values", () => {
+    expect(
+      computeEnumCardSize({ name: "OrderStatus", fields: [{ name: "Draft" }] }).width,
+    ).toBe(220);
+  });
+
+  it("never shrinks below a requested width", () => {
+    const data: EnumCardData = { name: "OrderStatus", fields: [{ name: "Draft" }] };
+    expect(computeEnumCardSize(data, 500).width).toBe(500);
+  });
+
+  it("re-fits a card when a value grows through the store", () => {
+    useCanvasStore.getState().addElement({
+      id: "enum-1",
+      type: "enumCard",
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 88,
+      data: { name: "OrderStatus", fields: [{ name: "Draft" }] },
+    });
+    expect(useCanvasStore.getState().elements[0].width).toBe(220);
+
+    useCanvasStore.getState().updateElement("enum-1", {
+      data: { name: "OrderStatus", fields: [{ name: "aVeryLongEnumValueNameForTesting" }] },
+    });
+    expect(useCanvasStore.getState().elements[0].width).toBeGreaterThan(220);
   });
 });
