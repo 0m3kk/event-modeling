@@ -223,6 +223,54 @@ describe("buildSpecification", () => {
     ]);
   });
 
+  it("labels an untyped lane with the type of the card it holds", () => {
+    const elements: CanvasElement[] = [
+      el("s1", "sliceCard", { name: "Place order", lanes: [{ id: "l1" }] }),
+      el("c1", "commandCard", { name: "PlaceOrder", action: "sales:placeOrder" }, { sliceId: "s1", laneId: "l1" }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+    expect(spec.slices).toEqual([
+      { name: "Place order", lanes: [{ type: "Command", cards: ["PlaceOrder"] }] },
+    ]);
+  });
+
+  it("reports a reference copy's source type in an untyped lane", () => {
+    const elements: CanvasElement[] = [
+      el("s1", "sliceCard", { name: "Place order", lanes: [{ id: "l1" }] }),
+      el("c1", "commandCard", { name: "PlaceOrder", action: "sales:placeOrder", referenceId: "r1", isOriginal: true }),
+      el("c2", "commandCard", { name: "PlaceOrder", action: "sales:placeOrder", referenceId: "r1", isOriginal: false }, { sliceId: "s1", laneId: "l1" }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+    expect(spec.slices).toEqual([
+      { name: "Place order", lanes: [{ type: "Command", cards: ["PlaceOrder"] }] },
+    ]);
+  });
+
+  it("appends the executed method to a service method-execution copy in a lane", () => {
+    const elements: CanvasElement[] = [
+      el("svc", "serviceCard", {
+        name: "OrderService",
+        methods: [
+          { id: "m1", name: "place", params: [], returns: [] },
+          { id: "m2", name: "cancel", params: [], returns: [] },
+        ],
+      }),
+      el("s1", "sliceCard", { name: "Place order", lanes: [{ id: "l1" }] }),
+      el("c1", "serviceCard", {
+        name: "OrderService",
+        methods: [{ id: "m1", name: "place", params: [], returns: [] }],
+        methodRef: { serviceId: "svc", methodId: "m1" },
+      }, { sliceId: "s1", laneId: "l1" }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+    expect(spec.slices).toEqual([
+      { name: "Place order", lanes: [{ type: "Service", cards: ["OrderService.place"] }] },
+    ]);
+  });
+
   it("excludes service method-execution copies from service definitions", () => {
     const elements: CanvasElement[] = [
       el("svc", "serviceCard", { name: "OrderService", methods: [{ id: "m1", name: "place", params: [], returns: [] }] }),

@@ -22,9 +22,12 @@ import { cleanValidation, hasValidation, type FieldValidation } from "./fieldVal
  * centres on the objects that use the data, and the data travels with them.
  * Data types that no field ever references are omitted.
  *
- * Reference copies and service method-execution copies share the name of the
- * card they mirror, so definitions de-duplicate by name while Slice lanes still
- * reference the copies that appear inside them.
+ * Reference copies share the name of the card they mirror, so definitions
+ * de-duplicate by name while Slice lanes still reference the copies that appear
+ * inside them. A lane whose reserved type is unset reports the type of the card
+ * it holds (a reference copy's type matches its source), and a service
+ * method-execution copy is labelled `Service.method` so the specific method it
+ * mirrors stays visible.
  */
 
 /** Display labels for the card types a Slice lane can be reserved for. */
@@ -166,6 +169,24 @@ export function buildSpecification({
   const idToName = new Map(elements.map((el) => [el.id, elementName(el)]));
   const nameOf = (el: CanvasElement) => idToName.get(el.id) ?? elementName(el);
 
+  /**
+   * Label for a card listed inside a Slice lane. A service method-execution copy
+   * mirrors a single method of a source Service, so it is rendered as
+   * `Service.method` — the plain service name would otherwise be ambiguous with
+   * the definition and with copies of the service's other methods.
+   */
+  const laneCardLabel = (el: CanvasElement): string => {
+    const data = (el.data ?? {}) as { methodRef?: unknown; methods?: unknown };
+    if (data.methodRef) {
+      const methods = Array.isArray(data.methods) ? data.methods : [];
+      const methodName = (methods[0] as { name?: unknown } | undefined)?.name;
+      if (typeof methodName === "string" && methodName) {
+        return `${nameOf(el)}.${methodName}`;
+      }
+    }
+    return nameOf(el);
+  };
+
   const domainIdToName = new Map(domains.map((d) => [d.id, nameOf(d)]));
 
   // ---- Data containers: Object / Enum / Alias ------------------------------
@@ -299,12 +320,16 @@ export function buildSpecification({
         Boolean(lane) && typeof (lane as { id?: unknown }).id === "string",
       )
       .map((lane) => {
-        const cards = elements
-          .filter((el) => el.sliceId === slice.id && el.laneId === lane.id)
-          .map(nameOf);
+        const laneCards = elements.filter(
+          (el) => el.sliceId === slice.id && el.laneId === lane.id,
+        );
+        // A reserved lane uses its `childType`; an untyped (manual) lane adopts
+        // the type of the card it holds. A reference copy carries the same type
+        // as its source, so the lane reports the source's type rather than "any".
+        const laneType = lane.childType ?? laneCards[0]?.type ?? null;
         return {
-          type: lane.childType ? TOOL_LABELS[lane.childType] ?? lane.childType : "any",
-          cards,
+          type: laneType ? TOOL_LABELS[laneType] ?? laneType : "any",
+          cards: laneCards.map(laneCardLabel),
         };
       });
     if (laneSpec.length > 0) out.lanes = laneSpec;
