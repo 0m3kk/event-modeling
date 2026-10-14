@@ -113,7 +113,7 @@ export function ExportSpecModal() {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{ "--panel-font-scale": String(fontScale) } as CSSProperties}
-        className="spec-modal flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+        className="spec-modal grid max-h-[92vh] w-full max-w-5xl grid-rows-[auto_minmax(0,1fr)_auto] rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-zinc-800">
@@ -176,7 +176,7 @@ export function ExportSpecModal() {
         </div>
 
         {/* Preview */}
-        <div className="min-h-0 flex-1 overflow-hidden p-3">
+        <div className="min-h-0 overflow-hidden p-3">
           <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200/70 bg-gray-50 p-3 font-mono text-[11px] leading-relaxed text-gray-800 dark:border-zinc-800 dark:bg-zinc-950/60 dark:text-zinc-200">
             {outline.roots.map((node) => (
               <YamlOutlineRow
