@@ -4,59 +4,28 @@ import { collectBoardTagCatalog, fieldTypeKey } from "@/utils/eventTags";
 import { collectDefinedTypeNames, collectEventTypeNames } from "@/utils/typeCatalog";
 import { nameKey, toCamelIdentifier } from "@/utils/naming";
 import { validateFieldTypes } from "../common/typeValidation";
+import {
+  getProjectionItems,
+  getProjectionParams,
+  getProjectionStates,
+} from "../common/projection/metrics";
+import type {
+  ProjectionCardData,
+  ProjectionField,
+  ProjectionQueryItem,
+  ProjectionQueryTag,
+} from "../common/projection/types";
 
-/** A typed field row used by both the `params` and `states` sections. */
-export interface StateField {
-  name: string;
-  type: string;
-  isArray?: boolean;
-  isRequired?: boolean;
-  description?: string;
-}
+// State and View share the same data shape; the aliases below keep the public
+// State-flavoured names while a single implementation lives in common/projection.
+export type StateField = ProjectionField;
+export type QueryTag = ProjectionQueryTag;
+export type QueryItem = ProjectionQueryItem;
+export type StateCardData = ProjectionCardData;
 
-/**
- * A DCB tag reference inside a query item.
- *
- * `tag` is the tag name already attached to an event field on the board and
- * `field` is the name of a param field on this State card. They are rendered as
- * `tagName:{fieldName}` (e.g. `course:{courseId}`). The param field type MUST
- * match the type of the event field carrying the tag.
- */
-export interface QueryTag {
-  tag: string;
-  field: string;
-}
-
-/**
- * One DCB query item: a set of event `types` (matched with OR) and a set of
- * `tags` (all required). Query items are combined with OR.
- */
-export interface QueryItem {
-  types: string[];
-  tags: QueryTag[];
-  description?: string;
-}
-
-export interface StateCardData {
-  name: string;
-  params?: StateField[];
-  queryItems?: QueryItem[];
-  states?: StateField[];
-  color?: string;
-  description?: string;
-}
-
-export function getStateParams(data: StateCardData): StateField[] {
-  return Array.isArray(data.params) ? data.params : [];
-}
-
-export function getQueryItems(data: StateCardData): QueryItem[] {
-  return Array.isArray(data.queryItems) ? data.queryItems : [];
-}
-
-export function getStateFields(data: StateCardData): StateField[] {
-  return Array.isArray(data.states) ? data.states : [];
-}
+export const getStateParams = getProjectionParams;
+export const getQueryItems = getProjectionItems;
+export const getStateFields = getProjectionStates;
 
 /**
  * System-provided values that need no external source: they are supplied by the

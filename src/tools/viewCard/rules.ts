@@ -4,59 +4,28 @@ import { collectBoardTagCatalog, fieldTypeKey } from "@/utils/eventTags";
 import { collectEventTypeNames } from "@/utils/typeCatalog";
 import { nameKey, toCamelIdentifier } from "@/utils/naming";
 import { validateFieldTypes } from "../common/typeValidation";
+import {
+  getProjectionItems,
+  getProjectionParams,
+  getProjectionStates,
+} from "../common/projection/metrics";
+import type {
+  ProjectionCardData,
+  ProjectionField,
+  ProjectionQueryItem,
+  ProjectionQueryTag,
+} from "../common/projection/types";
 
-/** A typed field row used by both the `params` and `states` sections. */
-export interface ViewField {
-  name: string;
-  type: string;
-  isArray?: boolean;
-  isRequired?: boolean;
-  description?: string;
-}
+// View and State share the same data shape; the aliases below keep the public
+// View-flavoured names while a single implementation lives in common/projection.
+export type ViewField = ProjectionField;
+export type ViewQueryTag = ProjectionQueryTag;
+export type ViewQueryItem = ProjectionQueryItem;
+export type ViewCardData = ProjectionCardData;
 
-/**
- * A DCB tag reference inside a query item.
- *
- * `tag` is the tag name already attached to an event field on the board and
- * `field` is the name of a param field on this View card. They are rendered as
- * `tagName:{fieldName}` (e.g. `course:{courseId}`). The param field type MUST
- * match the type of the event field carrying the tag.
- */
-export interface ViewQueryTag {
-  tag: string;
-  field: string;
-}
-
-/**
- * One DCB query item: a set of event `types` (matched with OR) and a set of
- * `tags` (all required). Query items are combined with OR.
- */
-export interface ViewQueryItem {
-  types: string[];
-  tags: ViewQueryTag[];
-  description?: string;
-}
-
-export interface ViewCardData {
-  name: string;
-  params?: ViewField[];
-  queryItems?: ViewQueryItem[];
-  states?: ViewField[];
-  color?: string;
-  description?: string;
-}
-
-export function getViewParams(data: ViewCardData): ViewField[] {
-  return Array.isArray(data.params) ? data.params : [];
-}
-
-export function getViewItems(data: ViewCardData): ViewQueryItem[] {
-  return Array.isArray(data.queryItems) ? data.queryItems : [];
-}
-
-export function getViewStates(data: ViewCardData): ViewField[] {
-  return Array.isArray(data.states) ? data.states : [];
-}
+export const getViewParams = getProjectionParams;
+export const getViewItems = getProjectionItems;
+export const getViewStates = getProjectionStates;
 
 export interface ViewValidationContext {
   /** All elements currently on the board (used to resolve the tag catalog). */
