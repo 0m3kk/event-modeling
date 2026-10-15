@@ -232,7 +232,10 @@ describe("run", () => {
     expect(file).toContain('"order_placed".to_string()');
     expect(file).toContain('format!("order:{}", self.order_id)');
     expect(file).toContain("pub async fn load<E, R>");
+    expect(file).toContain("use crate::DomainEvent;");
     expect(file).toContain("use crate::sales::events::{OrderPlaced};");
+    expect(file).toContain("if event.event_type == OrderPlaced::event_type() {");
+    expect(file).not.toContain("event.event_type.as_str()");
 
     const cargo = await read("Cargo.toml");
     expect(cargo).toContain('event-store = { git = "https://github.com/0m3kk/backend-kit.git" }');
@@ -287,6 +290,8 @@ describe("run", () => {
     );
     expect(file).toContain("OrderListViewError<E::Error, R::Error>");
     expect(file).toContain(".map_err(OrderListViewError::Reducer)?;");
+    expect(file).toContain("use crate::DomainEvent;");
+    expect(file).toContain("if event.event_type == OrderPlaced::event_type() {");
 
     expect(await read("Cargo.toml")).toContain('async-trait = { version = "0.1" }');
   });
@@ -323,6 +328,7 @@ describe("run", () => {
     expect(file).toContain("pub fn new(");
     expect(file).toContain("Query::from_items(Vec::<QueryItem>::new())");
     expect(file).toContain("let _ = reducer;");
+    expect(file).not.toContain("use crate::DomainEvent;");
   });
 
   it("uses the Rust struct name (not the spec name) in projection docs", async () => {

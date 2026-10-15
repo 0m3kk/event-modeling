@@ -34,6 +34,17 @@ function docComment(value: unknown): string {
     .join("\n");
 }
 
+/** Renders a value as one or more `//!` inner (module-level) doc lines. */
+function innerDocComment(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  const text = String(value).trim();
+  if (!text) return "";
+  return text
+    .split(/\r?\n/)
+    .map((line) => `//! ${line}`.trimEnd())
+    .join("\n");
+}
+
 /** Filters registered in every environment (and re-exported for reuse). */
 export const builtinFilters: Record<string, FilterFn> = {
   snake: (value: unknown) => snakeCase(value as string),
@@ -41,6 +52,7 @@ export const builtinFilters: Record<string, FilterFn> = {
   camel: (value: unknown) => camelCase(value as string),
   kebab: (value: unknown) => kebabCase(value as string),
   doccomment: (value: unknown) => docComment(value),
+  innerdoc: (value: unknown) => innerDocComment(value),
   /** `['a','b'] | joinlines` -> `a\nb`. */
   joinlines: (value: unknown) =>
     Array.isArray(value) ? value.join("\n") : String(value ?? ""),

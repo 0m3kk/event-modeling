@@ -237,7 +237,7 @@ them. Each job passes `crate` and, for per-item templates, `artifact` (or `dir`
 for `mod.rs`).
 
 Built-in filters: `snake`, `pascal`, `camel`, `kebab`, `doccomment`,
-`joinlines` — plus any `filters` you register in the config.
+`innerdoc`, `joinlines` — plus any `filters` you register in the config.
 
 Useful `artifact` fields: `rustName`, `fileName`, `modulePath`, `doc`, `fields`
 (each with `rustName`, `rustType`, `optional`, `array`, `needsRename`, `doc`),

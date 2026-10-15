@@ -41,7 +41,7 @@ export function starterTemplate(name: string): string {
   return `{#
   ${name} — a user template.
 
-  Available filters: snake, pascal, camel, kebab, doccomment, joinlines.
+  Available filters: snake, pascal, camel, kebab, doccomment, innerdoc, joinlines.
   The context typically carries \`crate\` and, for per-item templates,
   \`artifact\` (or \`dir\` for mod files).
 #}

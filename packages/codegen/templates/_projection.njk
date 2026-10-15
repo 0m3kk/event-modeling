@@ -1,4 +1,4 @@
-{% if artifact.doc %}{{ artifact.doc | doccomment }}
+{% if artifact.doc %}{{ artifact.doc | innerdoc }}
 {% endif -%}
 {% set name = artifact.rustName -%}
 {% if projectionAsync %}{% set errGenerics = "E, R" %}{% set errBounds = "E: std::fmt::Debug, R: std::fmt::Debug" %}{% else %}{% set errGenerics = "E" %}{% set errBounds = "E: std::fmt::Debug" %}{% endif -%}
@@ -6,6 +6,8 @@
 // note: {{ note }}
 {% endfor -%}
 {% if artifact.usesPrelude %}use crate::prelude::*;
+{% endif -%}
+{% if artifact.projectionEvents | length %}use crate::DomainEvent;
 {% endif -%}
 {% for imp in artifact.eventImports -%}
 use crate::{{ imp.modulePath | join("::") }}::{{ "{" }}{{ imp.names | join(", ") }}{{ "}" }};
@@ -131,21 +133,19 @@ impl {{ name }} {
         let mut stream = store.read(query, None).await.map_err({{ name }}Error::Store)?;
         while let Some(item) = stream.next().await {
             let event = item.map_err({{ name }}Error::Store)?.event;
-            match event.event_type.as_str() {
 {% for event in artifact.projectionEvents -%}
-                "{{ event.eventType }}" => {
-                    let typed: {{ event.rustName }} =
-                        serde_json::from_value(event.data).map_err({{ name }}Error::Decode)?;
-{% if projectionAsync %}                    reducer
-                        .on_{{ event.eventType }}(&mut self, &typed)
-                        .await
-                        .map_err({{ name }}Error::Reducer)?;
-{% else %}                    reducer.on_{{ event.eventType }}(&mut self, &typed);
+{% if loop.first %}            if{% else %}            } else if{% endif %} event.event_type == {{ event.rustName }}::event_type() {
+                let typed: {{ event.rustName }} =
+                    serde_json::from_value(event.data).map_err({{ name }}Error::Decode)?;
+{% if projectionAsync %}                reducer
+                    .on_{{ event.eventType }}(&mut self, &typed)
+                    .await
+                    .map_err({{ name }}Error::Reducer)?;
+{% else %}                reducer.on_{{ event.eventType }}(&mut self, &typed);
 {% endif -%}
-                }
 {% endfor -%}
-                _ => {}
-            }
+{% if artifact.projectionEvents | length %}            }
+{% endif -%}
         }
         Ok(self)
     }
