@@ -220,11 +220,17 @@ describe("run", () => {
     await run({ cwd: dir, rustfmt: false });
 
     const file = await read("src/sales/states/order_state.rs");
+    expect(file).toContain("#[async_trait::async_trait]");
     expect(file).toContain("pub struct OrderState");
     expect(file).toContain("pub order_id: String,");
     expect(file).toContain("pub trait OrderStateReducer");
-    expect(file).toContain("fn on_order_placed(&self, state: &mut OrderState, event: &OrderPlaced);");
+    expect(file).toContain("type Error;");
+    expect(file).toContain(
+      "async fn on_order_placed(&self, state: &mut OrderState, event: &OrderPlaced) -> Result<(), Self::Error>;",
+    );
     expect(file).toContain("pub fn new(");
+    expect(file).toContain("OrderStateError<E::Error, R::Error>");
+    expect(file).toContain(".map_err(OrderStateError::Reducer)?;");
     expect(file).toContain('"order_placed".to_string()');
     expect(file).toContain('format!("order:{}", self.order_id)');
     expect(file).toContain("pub async fn load<E, R>");
@@ -232,6 +238,7 @@ describe("run", () => {
 
     const cargo = await read("Cargo.toml");
     expect(cargo).toContain('event-store = { git = "https://github.com/0m3kk/backend-kit.git" }');
+    expect(cargo).toContain('async-trait = { version = "0.1" }');
     expect(cargo).toContain('futures-util = { version = "0.3" }');
     expect(cargo).toContain('serde_json = { version = "1" }');
   });

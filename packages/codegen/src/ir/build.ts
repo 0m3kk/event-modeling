@@ -580,6 +580,7 @@ function collectDeps(artifacts: IrArtifact[], extra: IrDep[]): IrDep[] {
   if (artifacts.some((artifact) => artifact.kind === "view" || artifact.kind === "state")) {
     // State/View projections read the event store and fold JSON payloads.
     deps.push({ name: "event-store", git: EVENT_STORE_GIT });
+    deps.push({ name: "async-trait", version: "0.1" });
     deps.push({ name: "futures-util", version: "0.3" });
     deps.push({ name: "serde_json", version: "1" });
   }

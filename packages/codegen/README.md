@@ -144,8 +144,16 @@ pub struct OrderState {          // params + projected fields share the struct
 }
 
 /// Implement this in your own module — the generated file is never edited.
+#[async_trait::async_trait]
 pub trait OrderStateReducer {
-    fn on_order_placed(&self, state: &mut OrderState, event: &OrderPlaced);
+    /// The project's own error (e.g. a database error).
+    type Error;
+
+    async fn on_order_placed(
+        &self,
+        state: &mut OrderState,
+        event: &OrderPlaced,
+    ) -> Result<(), Self::Error>;
 }
 ```
 
@@ -166,14 +174,20 @@ Use it as:
 let state = OrderState::new(order_id).load(&store, &app).await?;
 ```
 
-Projections add the `event-store`, `futures-util` and `serde_json` dependencies
-automatically; `event-store` is pulled from
-`https://github.com/0m3kk/backend-kit.git`. Override it (for example with a local
-checkout) through `crate.deps`:
+Projections add the `event-store`, `async-trait`, `futures-util` and
+`serde_json` dependencies automatically; `event-store` is pulled from
+`https://github.com/0m3kk/backend-kit.git`. Override it (for example with a
+local checkout) through `crate.deps`:
 
 ```ts
 crate: { deps: [{ name: "event-store", path: "../backend-kit/crates/event-store" }] }
 ```
+
+Reducer methods are `async` and fallible so a View can persist each projected
+row (or read extra state) while folding. Failures surface through the generated
+error enum — `<Name>Error<E, R>` with `Store`, `Decode` and `Reducer` variants —
+and an in-memory projection with no side effects just uses
+`type Error = std::convert::Infallible;`.
 
 Events named in a query that are not in the spec, and tags that do not bind to a
 param, are dropped and reported as `// note:` comments at the top of the file —

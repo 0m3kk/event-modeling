@@ -35,33 +35,42 @@ pub struct {{ name }} {
 /// Project-specific projection logic for `{{ name }}`.
 ///
 /// Implement this trait in your own module; the generated code is fixed and
-/// never edited by hand.
+/// never edited by hand. The methods may perform side effects (for example
+/// persisting a view to a database) and report failures through
+/// [`Self::Error`].
+#[async_trait::async_trait]
 pub trait {{ name }}Reducer {
+    /// Error produced by the project-specific logic (e.g. a database error).
+    type Error;
+
 {% for event in artifact.projectionEvents -%}
     /// Project a `{{ event.rustName }}` into the {{ projectionKind | lower }}.
-    fn on_{{ event.eventType }}(&self, state: &mut {{ name }}, event: &{{ event.rustName }});
+    async fn on_{{ event.eventType }}(&self, state: &mut {{ name }}, event: &{{ event.rustName }}) -> Result<(), Self::Error>;
 {% endfor -%}
 }
 
 /// Errors returned by [`{{ name }}::load`].
 #[derive(Debug)]
-pub enum {{ name }}Error<E> {
+pub enum {{ name }}Error<E, R> {
     /// The underlying event store failed.
     Store(event_store::Error<E>),
     /// An event payload could not be decoded.
     Decode(serde_json::Error),
+    /// The project's reducer logic failed.
+    Reducer(R),
 }
 
-impl<E: std::fmt::Debug> std::fmt::Display for {{ name }}Error<E> {
+impl<E: std::fmt::Debug, R: std::fmt::Debug> std::fmt::Display for {{ name }}Error<E, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Store(error) => write!(f, "event store error: {error:?}"),
             Self::Decode(error) => write!(f, "event decode error: {error}"),
+            Self::Reducer(error) => write!(f, "reducer error: {error:?}"),
         }
     }
 }
 
-impl<E: std::fmt::Debug> std::error::Error for {{ name }}Error<E> {}
+impl<E: std::fmt::Debug, R: std::fmt::Debug> std::error::Error for {{ name }}Error<E, R> {}
 
 impl {{ name }} {
     /// Create a projection with its params set and projected fields defaulted.
@@ -102,7 +111,7 @@ impl {{ name }} {
         mut self,
         store: &E,
         reducer: &R,
-    ) -> Result<Self, {{ name }}Error<E::Error>>
+    ) -> Result<Self, {{ name }}Error<E::Error, R::Error>>
     where
         E: EventStore,
         R: {{ name }}Reducer,
@@ -118,7 +127,10 @@ impl {{ name }} {
                 "{{ event.eventType }}" => {
                     let typed: {{ event.rustName }} =
                         serde_json::from_value(event.data).map_err({{ name }}Error::Decode)?;
-                    reducer.on_{{ event.eventType }}(&mut self, &typed);
+                    reducer
+                        .on_{{ event.eventType }}(&mut self, &typed)
+                        .await
+                        .map_err({{ name }}Error::Reducer)?;
                 }
 {% endfor -%}
                 _ => {}

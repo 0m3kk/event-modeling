@@ -319,6 +319,7 @@ states:
 
     const depNames = crate.deps.map((d) => d.name);
     expect(depNames).toContain("event-store");
+    expect(depNames).toContain("async-trait");
     expect(depNames).toContain("futures-util");
     expect(depNames).toContain("serde_json");
   });
