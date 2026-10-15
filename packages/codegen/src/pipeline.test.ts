@@ -83,6 +83,46 @@ describe("run", () => {
     );
   });
 
+  it("generates the DomainEvent trait and implements it per event", async () => {
+    const spec = [
+      "name: Shop",
+      "events:",
+      "  - name: OrderPlaced",
+      "    fields:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "        tag: order",
+      "      - name: placedAt",
+      "        type: string",
+      "  - name: OrderShipped",
+      "    fields:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+
+    await run({ cwd: dir, rustfmt: false });
+
+    const lib = await read("src/lib.rs");
+    expect(lib).toContain("pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static");
+    expect(lib).toContain("fn event_type() -> &'static str;");
+    expect(lib).toContain("fn tags(&self) -> Vec<String>;");
+
+    const placed = await read("src/common/events/order_placed.rs");
+    expect(placed).toContain("impl crate::DomainEvent for OrderPlaced");
+    expect(placed).toContain('"order_placed"');
+    // Tagged, required, scalar field -> a `tag:value` string.
+    expect(placed).toContain('vec![format!("order:{}", self.order_id), ]');
+
+    // Untagged event still implements the trait, with an empty tag list.
+    const shipped = await read("src/common/events/order_shipped.rs");
+    expect(shipped).toContain("impl crate::DomainEvent for OrderShipped");
+    expect(shipped).toContain("vec![]");
+  });
+
   it("is idempotent on a second run", async () => {
     await run({ cwd: dir, rustfmt: false });
     const second = await run({ cwd: dir, rustfmt: false });

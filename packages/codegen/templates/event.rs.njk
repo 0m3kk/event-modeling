@@ -6,3 +6,13 @@ use serde::{Deserialize, Serialize};
 {% if artifact.validates %}use validator::Validate;
 {% endif %}
 {% set structName = artifact.rustName %}{% set fields = artifact.fields %}{% include "_struct.njk" %}
+
+impl crate::DomainEvent for {{ structName }} {
+    fn event_type() -> &'static str {
+        "{{ artifact.fileName }}"
+    }
+
+    fn tags(&self) -> Vec<String> {
+        vec![{% for field in fields %}{% if field.tag and not field.optional and not field.array %}format!("{{ field.tag }}:{}", self.{{ field.rustName }}), {% endif %}{% endfor %}]
+    }
+}

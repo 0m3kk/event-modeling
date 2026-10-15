@@ -9,3 +9,15 @@ pub mod {{ dir.name }};
 {% if crate.validationHelpers | length %}pub mod validation;
 {% endif -%}
 pub mod prelude;
+
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+
+/// Contract for flattened domain event structs.
+pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
+    /// Identifier for the event type.
+    fn event_type() -> &'static str;
+
+    /// Tags associated with this event for stream filtering.
+    fn tags(&self) -> Vec<String>;
+}
