@@ -25,10 +25,14 @@ function modJobs(dir: IrModuleDir, prefix: string[]): RenderJob[] {
 export const libGenerator: Generator = {
   name: "lib",
   generate({ crate }): RenderJob[] {
-    return [
+    const jobs: RenderJob[] = [
       { template: "lib.rs.njk", outPath: "src/lib.rs", context: { crate } },
       { template: "prelude.rs.njk", outPath: "src/prelude.rs", context: { crate } },
       ...modJobs(crate.modules, []),
     ];
+    if (crate.validationHelpers.length > 0) {
+      jobs.push({ template: "validation.rs.njk", outPath: "src/validation.rs", context: { crate } });
+    }
+    return jobs;
   },
 };

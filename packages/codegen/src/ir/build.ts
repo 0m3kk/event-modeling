@@ -117,13 +117,40 @@ function fieldTypeName(field: Field): string {
   return typeof field.type === "string" ? field.type : dataTypeDefName(field.type);
 }
 
-/** `validator` format validators we can map directly from a field format preset. */
+/**
+ * `validator` format validators we can map directly from a field format preset.
+ * `email` and `url` ship with the crate; `ip` distinguishes v4/v6 through the
+ * `v4`/`v6` options of the derive attribute.
+ */
 const FORMAT_VALIDATORS: Record<string, string> = {
   email: "email",
   url: "url",
-  ipv4: "ip",
-  ipv6: "ip",
+  ipv4: "ip(v4 = true)",
+  ipv6: "ip(v6 = true)",
 };
+
+/**
+ * Format presets `validator` has no built-in check for. They are routed to
+ * hand-written helpers in the generated `validation` module instead, referenced
+ * from the derive as `custom(function = "crate::validation::<helper>")`.
+ */
+const CUSTOM_FORMAT_VALIDATORS: Record<string, string> = {
+  uuid: "validate_uuid",
+  date: "validate_date",
+  datetime: "validate_datetime",
+  time: "validate_time",
+};
+
+/** Prefix marking a `validator` attribute that calls a generated helper. */
+const CUSTOM_VALIDATOR_PREFIX = "custom(function = \"crate::validation::";
+
+/** Matches a `custom(function = "crate::validation::<helper>")` attribute. */
+const CUSTOM_VALIDATOR_RE = /^custom\(function = "crate::validation::(\w+)"\)$/;
+
+/** Builds the attribute that calls a generated validation helper. */
+function customValidatorAttr(helper: string): string {
+  return `${CUSTOM_VALIDATOR_PREFIX}${helper}")`;
+}
 
 /** Renders a numeric bound, keeping a decimal point for float fields. */
 function formatBound(value: number, isFloat: boolean): string {
@@ -143,8 +170,10 @@ function rangeArgs(
 
 /**
  * Turns a field's spec validation into `validator` attribute expressions.
- * Anything `validator` cannot express from the spec alone (a raw regex, a named
- * format, a free-text rule) is reported as a note and skipped.
+ * Named formats with no built-in check (uuid/date/datetime/time) become
+ * `custom(...)` attributes that call the generated `validation` helpers.
+ * Anything `validator` cannot express from the spec alone (a raw regex, a
+ * free-text rule) is reported as a note and skipped.
  */
 function buildValidations(
   field: Field,
@@ -177,9 +206,12 @@ function buildValidations(
     const max = num(validation.maxLength);
     if (min !== undefined || max !== undefined) attrs.push(`length(${rangeArgs(min, max, false)})`);
     if (validation.format) {
-      const mapped = FORMAT_VALIDATORS[validation.format.toLowerCase()];
-      if (mapped) attrs.push(mapped);
-      else notes.push(`custom format "${validation.format}" is not supported by validator`);
+      const format = validation.format.toLowerCase();
+      const native = FORMAT_VALIDATORS[format];
+      const custom = CUSTOM_FORMAT_VALIDATORS[format];
+      if (native) attrs.push(native);
+      else if (custom) attrs.push(customValidatorAttr(custom));
+      else notes.push(`custom format "${validation.format}" has no validator mapping`);
     }
   }
 
@@ -423,6 +455,23 @@ function needsValidator(artifacts: IrArtifact[]): boolean {
   );
 }
 
+/**
+ * Names of the generated `validation` helpers any field refers to, sorted.
+ * Drives both the crate-level `validation` module and the `pub mod` line.
+ */
+function collectValidationHelpers(artifacts: IrArtifact[]): string[] {
+  const helpers = new Set<string>();
+  for (const artifact of artifacts) {
+    for (const field of artifactFields(artifact)) {
+      for (const attr of field.validations) {
+        const match = CUSTOM_VALIDATOR_RE.exec(attr);
+        if (match) helpers.add(match[1]);
+      }
+    }
+  }
+  return Array.from(helpers).sort((a, b) => a.localeCompare(b));
+}
+
 function collectDeps(artifacts: IrArtifact[], extra: IrDep[]): IrDep[] {
   const deps: IrDep[] = [{ name: "serde", version: "1", features: ["derive"] }];
   if (needsValidator(artifacts)) {
@@ -558,6 +607,7 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
       typeModules,
       deps: collectDeps(artifacts, extraDeps),
       tags: spec.tags ?? [],
+      validationHelpers: collectValidationHelpers(artifacts),
     },
   };
 }

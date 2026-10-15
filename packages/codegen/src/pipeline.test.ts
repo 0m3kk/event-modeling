@@ -54,6 +54,35 @@ describe("run", () => {
     expect(Object.keys(manifest.files)).toContain("Cargo.toml");
   });
 
+  it("emits a validation module only for formats validator cannot express", async () => {
+    // The default SPEC carries no format validation.
+    await run({ cwd: dir, rustfmt: false });
+    expect(await read("src/lib.rs")).not.toContain("pub mod validation;");
+
+    const spec = [
+      "name: Val",
+      "events:",
+      "  - name: Item",
+      "    fields:",
+      "      - name: id",
+      "        type: string",
+      "        validation: { format: uuid }",
+      "      - name: email",
+      "        type: string",
+      "        validation: { format: email }",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+
+    const result = await run({ cwd: dir, rustfmt: false, force: true });
+    expect(result.written).toContain("src/validation.rs");
+    expect(await read("src/lib.rs")).toContain("pub mod validation;");
+    expect(await read("src/validation.rs")).toContain("pub fn validate_uuid");
+    expect(await read("src/common/events/item.rs")).toContain(
+      'custom(function = "crate::validation::validate_uuid")',
+    );
+  });
+
   it("is idempotent on a second run", async () => {
     await run({ cwd: dir, rustfmt: false });
     const second = await run({ cwd: dir, rustfmt: false });

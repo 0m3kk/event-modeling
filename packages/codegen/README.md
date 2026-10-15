@@ -72,6 +72,7 @@ crates/shop/
   src/
     lib.rs
     prelude.rs                 # flat re-exports of every data type
+    validation.rs              # helpers for formats validator has no check for
     <domain>/
       mod.rs
       events/    mod.rs + <event>.rs
@@ -108,13 +109,23 @@ needs it (the struct also derives `Validate`):
 | `minItems` / `maxItems` (array) | `#[validate(length(min = .., max = ..))]` |
 | `min` / `max` (integer / float) | `#[validate(range(min = .., max = ..))]` |
 | `format: email` / `url` | `#[validate(email)]` / `#[validate(url)]` |
-| `format: ipv4` / `ipv6` | `#[validate(ip)]` |
+| `format: ipv4` / `ipv6` | `#[validate(ip(v4 = true))]` / `#[validate(ip(v6 = true))]` |
+| `format: uuid` / `date` / `datetime` / `time` | `#[validate(custom(function = "crate::validation::validate_.."))]` |
+
+`validator` has no built-in check for `uuid`, `date`, `datetime` and `time`, so
+those presets are enforced by a small **self-support module** the generator
+writes to `src/validation.rs` (and exposes as `pub mod validation;` in `lib.rs`)
+whenever a field uses one of them. The module only depends on `validator` itself
+and validates real calendar dates, times with optional fractional seconds and
+zone offsets (`Z` / `±HH:MM`), and canonical UUIDs. Like every generated file it
+is tracked by the manifest, so you can adapt the bodies and the tool will leave
+your edits alone.
 
 Rules `validator` cannot express from the spec alone are **left as a comment and
 skipped**, never dropped silently:
 
 - `pattern` (needs a compiled `Regex`, so no inline pattern),
-- a `format` with no direct `validator` equivalent (e.g. `date`, `datetime`),
+- a `format` that is neither a built-in nor one of the presets above,
 - a free-text `rule`,
 - validation on an alias (`type X = String` cannot carry attributes).
 

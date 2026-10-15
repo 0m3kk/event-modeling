@@ -1,0 +1,170 @@
+//! Validation helpers for field formats the `validator` crate does not cover.
+//!
+//! `validator` ships `email`, `url` and `ip` natively; the formats below
+//! (`uuid`, `date`, `datetime`, `time`) are enforced through
+//! `#[validate(custom(function = "crate::validation::..."))]` instead.
+//!
+//! Generated because the spec declares: {{ crate.validationHelpers | join(", ") }}.
+//! The signatures are what `validator` expects (a borrowed value returning a
+//! [`ValidationError`]), so edit the bodies freely but keep them.
+
+use std::borrow::Cow;
+
+use validator::ValidationError;
+
+/// Builds a [`ValidationError`] carrying a human-readable message.
+fn invalid(code: &'static str, message: &'static str) -> ValidationError {
+    ValidationError::new(code).with_message(Cow::from(message))
+}
+
+/// Reads exactly `len` ASCII digits, or `None` when the shape does not match.
+fn digits(value: &str, len: usize) -> Option<u32> {
+    if value.len() == len && value.bytes().all(|byte| byte.is_ascii_digit()) {
+        value.parse().ok()
+    } else {
+        None
+    }
+}
+
+fn is_leap_year(year: u32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+fn days_in_month(year: u32, month: u32) -> u32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => 0,
+    }
+}
+
+/// `YYYY-MM-DD` describing a real calendar day.
+fn is_date(value: &str) -> bool {
+    let mut parts = value.split('-');
+    let (year, month, day) = match (parts.next(), parts.next(), parts.next()) {
+        (Some(year), Some(month), Some(day)) => (digits(year, 4), digits(month, 2), digits(day, 2)),
+        _ => return false,
+    };
+    if parts.next().is_some() {
+        return false;
+    }
+    match (year, month, day) {
+        (Some(year), Some(month), Some(day)) => {
+            (1..=12).contains(&month) && day >= 1 && day <= days_in_month(year, month)
+        }
+        _ => false,
+    }
+}
+
+/// `HH:MM` or `HH:MM:SS`, each with an optional fractional second.
+fn is_time(value: &str) -> bool {
+    let (clock, fraction) = match value.split_once('.') {
+        Some((clock, fraction)) => (clock, Some(fraction)),
+        None => (value, None),
+    };
+    if let Some(fraction) = fraction {
+        if fraction.is_empty()
+            || fraction.len() > 9
+            || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            return false;
+        }
+    }
+    let parts: Vec<&str> = clock.split(':').collect();
+    let (hour, minute, second) = match parts.as_slice() {
+        [hour, minute] => (digits(hour, 2), digits(minute, 2), Some(0)),
+        [hour, minute, second] => (digits(hour, 2), digits(minute, 2), digits(second, 2)),
+        _ => return false,
+    };
+    match (hour, minute, second) {
+        (Some(hour), Some(minute), Some(second)) => hour < 24 && minute < 60 && second < 60,
+        _ => false,
+    }
+}
+
+/// Splits a trailing `Z`/`z` or `±HH:MM` offset off a time string.
+fn split_offset(value: &str) -> (&str, Option<&str>) {
+    if let Some(time) = value.strip_suffix('Z').or_else(|| value.strip_suffix('z')) {
+        return (time, Some("Z"));
+    }
+    if let Some(index) = value.rfind(|c| c == '+' || c == '-') {
+        if index > 0 {
+            let (time, offset) = value.split_at(index);
+            return (time, Some(offset));
+        }
+    }
+    (value, None)
+}
+
+/// `Z`/`z`, or a `±HH:MM` offset within range.
+fn is_offset(value: &str) -> bool {
+    if value == "Z" || value == "z" {
+        return true;
+    }
+    if value.as_bytes().first() != Some(&b'+') && value.as_bytes().first() != Some(&b'-') {
+        return false;
+    }
+    match value[1..].split_once(':') {
+        Some((hours, minutes)) => {
+            matches!(digits(hours, 2), Some(hours) if hours < 24)
+                && matches!(digits(minutes, 2), Some(minutes) if minutes < 60)
+        }
+        None => false,
+    }
+}
+
+/// `YYYY-MM-DDThh:mm[:ss[.fff]]` with an optional `Z`/offset (the `T` may be
+/// written as a space).
+fn is_datetime(value: &str) -> bool {
+    let index = match value.find(|c| c == 'T' || c == ' ') {
+        Some(index) => index,
+        None => return false,
+    };
+    let (date, rest) = value.split_at(index);
+    let (time, offset) = split_offset(&rest[1..]);
+    is_date(date) && is_time(time) && offset.map_or(true, is_offset)
+}
+
+/// `uuid` preset: a canonical 8-4-4-4-12 hexadecimal UUID.
+pub fn validate_uuid(value: &str) -> Result<(), ValidationError> {
+    const GROUPS: [usize; 5] = [8, 4, 4, 4, 12];
+    let mut parts = value.split('-');
+    let shaped = GROUPS.iter().all(|&size| {
+        parts
+            .next()
+            .is_some_and(|part| part.len() == size && part.bytes().all(|b| b.is_ascii_hexdigit()))
+    });
+    if !shaped || parts.next().is_some() {
+        return Err(invalid("uuid", "value is not a valid UUID"));
+    }
+    Ok(())
+}
+
+/// `date` preset: an ISO-8601 calendar date (`YYYY-MM-DD`).
+pub fn validate_date(value: &str) -> Result<(), ValidationError> {
+    if is_date(value) {
+        Ok(())
+    } else {
+        Err(invalid("date", "value is not a valid ISO-8601 date"))
+    }
+}
+
+/// `datetime` preset: an ISO-8601 date-time, with an optional `Z`/offset.
+pub fn validate_datetime(value: &str) -> Result<(), ValidationError> {
+    if is_datetime(value) {
+        Ok(())
+    } else {
+        Err(invalid("datetime", "value is not a valid ISO-8601 date-time"))
+    }
+}
+
+/// `time` preset: an ISO-8601 wall-clock time (`HH:MM[:SS[.fff]]`).
+pub fn validate_time(value: &str) -> Result<(), ValidationError> {
+    if is_time(value) {
+        Ok(())
+    } else {
+        Err(invalid("time", "value is not a valid ISO-8601 time"))
+    }
+}

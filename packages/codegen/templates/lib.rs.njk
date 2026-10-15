@@ -6,4 +6,6 @@
 {% for dir in crate.modules.dirs -%}
 pub mod {{ dir.name }};
 {% endfor -%}
+{% if crate.validationHelpers | length %}pub mod validation;
+{% endif -%}
 pub mod prelude;

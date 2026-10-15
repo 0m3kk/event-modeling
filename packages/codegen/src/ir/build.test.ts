@@ -210,13 +210,53 @@ events:
     expect(field("total").validations).toEqual(["range(min = 0.0)"]);
     expect(field("count").validations).toEqual(["range(min = 0, max = 10)"]);
     expect(field("tags").validations).toEqual(["length(min = 1)"]);
-    // Unsupported: a named format and a raw pattern/rule -> notes, no attribute.
-    expect(field("born").validations).toEqual([]);
-    expect(field("born").validationNotes).toHaveLength(1);
+    // No built-in check for `date`: routed to the generated validation helper.
+    expect(field("born").validations).toEqual([
+      'custom(function = "crate::validation::validate_date")',
+    ]);
+    expect(field("born").validationNotes).toEqual([]);
+    // Unsupported: a raw pattern/rule -> notes, no attribute.
     expect(field("code").validations).toEqual([]);
     expect(field("code").validationNotes).toHaveLength(2);
 
     expect(item.validates).toBe(true);
     expect(crate.deps.map((d) => d.name)).toContain("validator");
+    expect(crate.validationHelpers).toEqual(["validate_date"]);
+  });
+
+  it("maps ipv4/ipv6 to the versioned ip validator and collects helper names", () => {
+    const source = `
+name: Val
+events:
+  - name: Item
+    fields:
+      - name: host4
+        type: string
+        validation: { format: ipv4 }
+      - name: host6
+        type: string
+        validation: { format: ipv6 }
+      - name: id
+        type: string
+        validation: { format: uuid }
+      - name: at
+        type: string
+        validation: { format: datetime }
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
+    const item = crate.artifacts.find((a) => a.name === "Item")!;
+    const field = (name: string) => item.fields!.find((f) => f.rustName === name)!;
+
+    expect(field("host4").validations).toEqual(["ip(v4 = true)"]);
+    expect(field("host6").validations).toEqual(["ip(v6 = true)"]);
+    expect(field("id").validations).toEqual([
+      'custom(function = "crate::validation::validate_uuid")',
+    ]);
+    expect(field("at").validations).toEqual([
+      'custom(function = "crate::validation::validate_datetime")',
+    ]);
+    expect(crate.validationHelpers).toEqual(["validate_datetime", "validate_uuid"]);
   });
 });

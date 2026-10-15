@@ -139,4 +139,10 @@ export interface IrCrate {
   typeModules: string[];
   deps: IrDep[];
   tags: TagDef[];
+  /**
+   * Names of custom validation helpers the generated `validation` module must
+   * provide, e.g. `["validate_date", "validate_uuid"]`. Empty when no field
+   * uses a format `validator` cannot express on its own.
+   */
+  validationHelpers: string[];
 }
