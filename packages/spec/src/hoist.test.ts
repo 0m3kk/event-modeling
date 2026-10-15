@@ -1,0 +1,83 @@
+import { describe, it, expect } from "vitest";
+import { hoistTypes } from "./hoist";
+import type { ObjectTypeDef, Specification } from "./types";
+
+function defName(def: unknown): string {
+  const d = def as ObjectTypeDef & { enum?: string; alias?: string };
+  return d.object ?? d.enum ?? d.alias ?? "";
+}
+
+describe("hoistTypes", () => {
+  it("lifts inline definitions and rewrites field types to plain names", () => {
+    const spec: Specification = {
+      name: "Shop",
+      events: [
+        {
+          name: "OrderPlaced",
+          fields: [
+            {
+              name: "order",
+              type: {
+                object: "Order",
+                fields: [
+                  { name: "id", type: { alias: "OrderId", of: "string" } },
+                  { name: "status", type: { enum: "Status", values: ["pending", "paid"] } },
+                ],
+              },
+            },
+          ],
+        },
+        { name: "OrderShipped", fields: [{ name: "orderId", type: "OrderId" }] },
+      ],
+    };
+
+    const { spec: out, types } = hoistTypes(spec);
+
+    expect(out.events?.[0].fields?.[0].type).toBe("Order");
+    expect(out.events?.[1].fields?.[0].type).toBe("OrderId");
+    expect(types.map(defName)).toEqual(["Order", "OrderId", "Status"]);
+    // The input object is not mutated.
+    expect(typeof spec.events?.[0].fields?.[0].type).toBe("object");
+  });
+
+  it("de-duplicates definitions and survives cyclic references", () => {
+    const spec: Specification = {
+      name: "Cycle",
+      events: [
+        {
+          name: "E",
+          fields: [
+            {
+              name: "a",
+              type: {
+                object: "A",
+                fields: [
+                  { name: "b", type: { object: "B", fields: [{ name: "a", type: "A" }] } },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { types } = hoistTypes(spec);
+    expect(types.map(defName)).toEqual(["A", "B"]);
+  });
+
+  it("hoists definitions from command/services/state field lists", () => {
+    const spec: Specification = {
+      name: "Mixed",
+      services: [
+        {
+          name: "S",
+          methods: [{ name: "m", params: [{ name: "x", type: { alias: "X", of: "string" } }] }],
+        },
+      ],
+      states: [{ name: "St", params: [{ name: "y", type: { object: "Y", fields: [] } }] }],
+    };
+
+    const { types } = hoistTypes(spec);
+    expect(types.map(defName).sort()).toEqual(["X", "Y"]);
+  });
+});

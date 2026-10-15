@@ -15,7 +15,8 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@em/spec": ["./packages/spec/src/index.ts"]
     }
   },
   "include": ["src"]

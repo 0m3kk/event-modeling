@@ -17,12 +17,15 @@
  * Reference copies share the name of the card they mirror, so definitions
  * de-duplicate by name while Slice lanes still reference the copies that appear
  * inside them.
+ *
+ * The document contract (types, emitter) lives in `@em/spec`; this module wires
+ * the board builder to it.
  */
+import { toYaml } from "@em/spec";
 import { buildSpecification, type SpecificationInput } from "./build";
 import { downloadSpecification } from "./file";
-import { toYaml } from "./yaml";
 
-export * from "./yaml";
+export * from "@em/spec";
 export * from "./build";
 export { specFileName, downloadSpecification } from "./file";
 

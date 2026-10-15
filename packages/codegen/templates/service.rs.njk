@@ -1,0 +1,12 @@
+{% if artifact.doc %}{{ artifact.doc | doccomment }}
+{% endif -%}
+{% if artifact.usesPrelude %}use crate::prelude::*;
+{% endif -%}
+/// Service contract for `{{ artifact.name }}`.
+pub trait {{ artifact.rustName }} {
+{% for method in artifact.methods -%}
+{% if method.doc %}{{ method.doc | doccomment }}
+{% endif -%}
+fn {{ method.rustName }}(&self{% for param in method.params %}, {{ param.rustName }}: {{ param.rustType }}{% endfor %}){% if method.returns | length == 1 %} -> {{ method.returns[0].rustType }}{% else %} -> (){% endif %};
+{% endfor -%}
+}

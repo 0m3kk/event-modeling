@@ -1,0 +1,8 @@
+{% if artifact.doc %}{{ artifact.doc | doccomment }}
+{% endif -%}
+{% if artifact.usesPrelude %}use crate::prelude::*;
+{% endif -%}
+use serde::{Deserialize, Serialize};
+{% if artifact.validates %}use validator::Validate;
+{% endif %}
+{% set structName = artifact.rustName %}{% set fields = artifact.fields %}{% include "_struct.njk" %}

@@ -1,0 +1,13 @@
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize{% if artifact.validates %}, Validate{% endif %})]
+#[serde(rename_all = "snake_case")]
+pub struct {{ structName }} {
+{% for field in fields -%}
+{% if field.doc %}{{ field.doc | doccomment }}
+{% endif -%}
+{% for note in field.validationNotes %}// validator: {{ note }}
+{% endfor -%}
+{% if field.validations | length %}#[validate({{ field.validations | join(", ") }})]
+{% endif -%}
+pub {{ field.rustName }}: {{ field.rustType }},
+{% endfor -%}
+}

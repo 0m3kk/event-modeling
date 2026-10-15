@@ -1,0 +1,15 @@
+{% if artifact.doc %}{{ artifact.doc | doccomment }}
+{% endif -%}
+{% if artifact.usesPrelude %}use crate::prelude::*;
+{% endif -%}
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum {{ artifact.rustName }} {
+{% for variant in artifact.variants -%}
+{% if variant.doc %}{{ variant.doc | doccomment }}
+{% endif -%}
+{{ variant.rustName }},
+{% endfor -%}
+}

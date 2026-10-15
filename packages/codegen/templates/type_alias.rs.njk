@@ -1,0 +1,7 @@
+{% if artifact.doc %}{{ artifact.doc | doccomment }}
+{% endif -%}
+{% if artifact.usesPrelude %}use crate::prelude::*;
+{% endif -%}
+{% for note in artifact.validationNotes %}// validator: {{ note }}
+{% endfor -%}
+pub type {{ artifact.rustName }} = {{ artifact.aliasOf }};

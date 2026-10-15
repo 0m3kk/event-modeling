@@ -1,0 +1,9 @@
+[package]
+name = "{{ crate.name }}"
+version = "{{ crate.version }}"
+edition = "{{ crate.edition }}"
+
+[dependencies]
+{% for dep in crate.deps -%}
+{{ dep.name }} = { version = "{{ dep.version }}"{% if dep.features %}, features = [{% for f in dep.features %}"{{ f }}"{% if not loop.last %}, {% endif %}{% endfor %}]{% endif %} }
+{% endfor -%}

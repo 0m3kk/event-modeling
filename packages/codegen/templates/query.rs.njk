@@ -1,0 +1,15 @@
+{% if artifact.doc %}{{ artifact.doc | doccomment }}
+{% endif -%}
+{% if artifact.action %}/// Action: `{{ artifact.action }}`
+{% endif -%}
+{% if artifact.usesPrelude %}use crate::prelude::*;
+{% endif -%}
+use serde::{Deserialize, Serialize};
+{% if artifact.validates %}use validator::Validate;
+{% endif %}
+{% set structName = artifact.rustName %}{% set fields = artifact.inputs %}{% include "_struct.njk" %}
+{% if artifact.responses | length %}
+
+/// Response for `{{ artifact.name }}`.
+{% set structName = artifact.rustName + "Response" %}{% set fields = artifact.responses %}{% include "_struct.njk" %}
+{% endif %}

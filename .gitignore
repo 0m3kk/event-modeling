@@ -3,3 +3,9 @@ dist
 .DS_Store
 *.local
 .env
+# Generated codegen output and tool state
+.codegen/
+packages/codegen/examples/**/crates
+
+codegen.config.ts
+packages/codegen/crates

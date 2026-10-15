@@ -1,0 +1,9 @@
+//! Generated crate: {{ crate.name }}.
+//!
+//! This crate is generated from a domain specification. Prefer editing the
+//! spec (or the templates) over editing these files by hand.
+
+{% for dir in crate.modules.dirs -%}
+pub mod {{ dir.name }};
+{% endfor -%}
+pub mod prelude;

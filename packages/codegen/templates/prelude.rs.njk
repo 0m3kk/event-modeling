@@ -1,0 +1,8 @@
+//! Flat re-exports of every generated data type.
+//!
+//! Generated items `use crate::prelude::*;` so they can refer to one another by
+//! bare name regardless of which domain folder a type landed in.
+
+{% for module in crate.typeModules -%}
+pub use crate::{{ module }}::types::*;
+{% endfor -%}
