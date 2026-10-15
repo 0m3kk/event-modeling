@@ -58,6 +58,47 @@ export type IrArtifactKind =
   | "service"
   | "type";
 
+/** A DCB tag binding inside a projection query item. */
+export interface IrQueryTag {
+  /** Tag name as declared on the event (e.g. `order`). */
+  tag: string;
+  /** Original name of the param the tag binds to (e.g. `orderId`). */
+  field: string;
+  /** snake_case accessor on the projection struct (e.g. `order_id`). */
+  rustName: string;
+}
+
+/** A reference from a projection query to a generated event. */
+export interface IrEventRef {
+  /** PascalCase Rust type of the event. */
+  rustName: string;
+  /** snake_case event type string, matching `DomainEvent::event_type()`. */
+  eventType: string;
+  /** Module path from the crate root, e.g. `["sales", "events"]`. */
+  modulePath: string[];
+}
+
+/**
+ * One DCB query item of a projection: event `types` (matched with OR) and
+ * `tags` (all required). Carries the resolved events and any resolution notes.
+ */
+export interface IrQueryItem {
+  /** Event type names as written in the spec. */
+  types: string[];
+  tags: IrQueryTag[];
+  doc?: string;
+  /** Events resolved from `types` (unresolved names are omitted). */
+  events: IrEventRef[];
+  /** Notes about types/tags that could not be resolved. */
+  notes: string[];
+}
+
+/** A grouped `use` of events a projection folds, e.g. `crate::sales::events::{A, B}`. */
+export interface IrEventImport {
+  modulePath: string[];
+  names: string[];
+}
+
 /** A single generated Rust item (one file). */
 export interface IrArtifact {
   kind: IrArtifactKind;
@@ -76,6 +117,16 @@ export interface IrArtifact {
   inputs?: IrField[];
   /** Command/query responses (a separate `...Response` struct). */
   responses?: IrField[];
+  /** Present for state/view projections: the identity/query params. */
+  params?: IrField[];
+  /** Present for state/view projections: the DCB query items. */
+  queryItems?: IrQueryItem[];
+  /** Present for state/view projections: unique events to fold, in first-seen order. */
+  projectionEvents?: IrEventRef[];
+  /** Present for state/view projections: grouped `use` paths of the folded events. */
+  eventImports?: IrEventImport[];
+  /** Present for state/view projections: notes about items that could not resolve. */
+  projectionNotes?: string[];
   /** Present for enum types. */
   variants?: IrEnumVariant[];
   /** Present for `type` artifacts. */
@@ -122,7 +173,18 @@ export interface IrModuleDir {
 
 export interface IrDep {
   name: string;
-  version: string;
+  /** Registry version; ignored when `path` or `git` is set. */
+  version?: string;
+  /** Local path dependency, relative to the generated `Cargo.toml`. */
+  path?: string;
+  /** Git repository URL. */
+  git?: string;
+  /** Git branch to pin. */
+  branch?: string;
+  /** Git tag to pin. */
+  tag?: string;
+  /** Git revision to pin. */
+  rev?: string;
   features?: string[];
 }
 

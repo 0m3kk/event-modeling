@@ -21,7 +21,18 @@ export type GeneratorName =
 /** A crate dependency, rendered into `Cargo.toml`. */
 export interface DepSpec {
   name: string;
-  version: string;
+  /** Registry version, e.g. `"0.1"`. Ignored when `path` or `git` is set. */
+  version?: string;
+  /** Local path dependency, relative to the generated `Cargo.toml`. */
+  path?: string;
+  /** Git repository URL, e.g. `"https://github.com/0m3kk/backend-kit.git"`. */
+  git?: string;
+  /** Git branch to pin. */
+  branch?: string;
+  /** Git tag to pin. */
+  tag?: string;
+  /** Git revision to pin. */
+  rev?: string;
   features?: string[];
 }
 

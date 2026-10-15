@@ -129,6 +129,56 @@ skipped**, never dropped silently:
 - a free-text `rule`,
 - validation on an alias (`type X = String` cannot carry attributes).
 
+## State and View projections
+
+A **State** card is an in-memory decision model and a **View** card is a read
+model; both are DCB projections over the same three sections — `params`
+(identity / query inputs), `query` (event `types` plus DCB `tags` bound to
+params) and `states` (the projected fields). The generator treats them the same
+way and emits one self-contained file per card:
+
+```rust
+pub struct OrderState {          // params + projected fields share the struct
+    pub order_id: OrderId,       // params are the identity, always required
+    pub status: Option<Status>,  // projected fields keep the spec's optionality
+}
+
+/// Implement this in your own module — the generated file is never edited.
+pub trait OrderStateReducer {
+    fn on_order_placed(&self, state: &mut OrderState, event: &OrderPlaced);
+}
+```
+
+Each file also carries an error enum and an `impl` with a factory, the DCB
+query, and a `load` driver:
+
+- `OrderState::new(<params>)` — factory that sets the params and defaults the
+  projected fields (generated data types derive `Default`).
+- `fn query(&self) -> event_store::Query` — one `QueryItem` per spec query item;
+  `types` become snake_case event types and each `tag` renders as
+  `format!("{tag}:{}", self.<param>)`.
+- `async fn load(self, store, reducer)` — reads every matching event from an
+  `event_store::EventStore` and folds it through the reducer.
+
+Use it as:
+
+```rust
+let state = OrderState::new(order_id).load(&store, &app).await?;
+```
+
+Projections add the `event-store`, `futures-util` and `serde_json` dependencies
+automatically; `event-store` is pulled from
+`https://github.com/0m3kk/backend-kit.git`. Override it (for example with a local
+checkout) through `crate.deps`:
+
+```ts
+crate: { deps: [{ name: "event-store", path: "../backend-kit/crates/event-store" }] }
+```
+
+Events named in a query that are not in the spec, and tags that do not bind to a
+param, are dropped and reported as `// note:` comments at the top of the file —
+never generated as broken code.
+
 ## Config reference
 
 ```ts
@@ -141,7 +191,9 @@ export default defineConfig({
     name: "shop",                  // defaults to spec name in snake_case
     edition: "2024",
     version: "0.1.0",
-    deps: [{ name: "tracing", version: "0.1" }], // merged with detected deps
+    // Merged with the detected deps. A dep may point at a local checkout with
+    // `path` instead of a registry `version`.
+    deps: [{ name: "tracing", version: "0.1" }],
   },
   typeMap: { uuid: "uuid::Uuid", datetime: "chrono::DateTime<chrono::Utc>" },
   generators: {
@@ -179,7 +231,9 @@ Built-in filters: `snake`, `pascal`, `camel`, `kebab`, `doccomment`,
 
 Useful `artifact` fields: `rustName`, `fileName`, `modulePath`, `doc`, `fields`
 (each with `rustName`, `rustType`, `optional`, `array`, `needsRename`, `doc`),
-`variants` (enums), `aliasOf` (aliases), `methods` (services), `action`.
+`variants` (enums), `aliasOf` (aliases), `methods` (services), `action`. State
+and View artifacts also expose `params`, `queryItems`, `projectionEvents`,
+`eventImports` and `projectionNotes`.
 
 ## Extending
 

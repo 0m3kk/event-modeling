@@ -5,5 +5,5 @@ edition = "{{ crate.edition }}"
 
 [dependencies]
 {% for dep in crate.deps -%}
-{{ dep.name }} = { version = "{{ dep.version }}"{% if dep.features %}, features = [{% for f in dep.features %}"{{ f }}"{% if not loop.last %}, {% endif %}{% endfor %}]{% endif %} }
+{{ dep.name }} = { {% if dep.path %}path = "{{ dep.path }}"{% elif dep.git %}git = "{{ dep.git }}"{% if dep.branch %}, branch = "{{ dep.branch }}"{% endif %}{% if dep.tag %}, tag = "{{ dep.tag }}"{% endif %}{% if dep.rev %}, rev = "{{ dep.rev }}"{% endif %}{% else %}version = "{{ dep.version }}"{% endif %}{% if dep.features %}, features = [{% for f in dep.features %}"{{ f }}"{% if not loop.last %}, {% endif %}{% endfor %}]{% endif %} }
 {% endfor -%}

@@ -17,6 +17,9 @@ export default defineConfig({
     edition: "2024",
     // Add dependencies the generated code needs and the detector cannot infer:
     // deps: [{ name: "tracing", version: "0.1" }],
+    // A git checkout uses "git" (optionally with "branch"/"tag"/"rev") instead
+    // of a registry "version":
+    // deps: [{ name: "event-store", git: "https://github.com/0m3kk/backend-kit.git" }],
   },
 
   // Generators off by default can be switched on here.

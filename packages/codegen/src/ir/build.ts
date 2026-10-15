@@ -15,6 +15,7 @@ import {
   snakeCase,
   type DataTypeDef,
   type Field,
+  type QueryItem as SpecQueryItem,
   type Specification,
 } from "@em/spec";
 import type { CodegenConfig } from "../config";
@@ -24,9 +25,13 @@ import type {
   IrDep,
   IrDomain,
   IrEnumVariant,
+  IrEventImport,
+  IrEventRef,
   IrField,
   IrMethod,
   IrModuleDir,
+  IrQueryItem,
+  IrQueryTag,
   RustType,
 } from "./types";
 
@@ -51,6 +56,9 @@ const KIND_FOLDER: Record<IrArtifact["kind"], string> = {
 
 /** Module used for artifacts that belong to no declared domain. */
 const COMMON_MODULE = "common";
+
+/** Git source of the `event-store` crate the generated projections depend on. */
+const EVENT_STORE_GIT = "https://github.com/0m3kk/backend-kit.git";
 
 export interface BuildIrInput {
   spec: Specification;
@@ -264,12 +272,28 @@ function makeFields(fields: Field[] | undefined, typeMap: Record<string, string>
   return (fields ?? []).map((field) => makeField(field, typeMap));
 }
 
+/**
+ * Projection params are the identity/query inputs, so they are always required
+ * (rendered as the bare type, never `Option`). This also lets a query tag format
+ * the param directly with `format!("tag:{}", self.param)`.
+ */
+function makeProjectionParams(
+  fields: Field[] | undefined,
+  typeMap: Record<string, string>,
+): IrField[] {
+  return makeFields(
+    (fields ?? []).map((field) => ({ ...field, required: true })),
+    typeMap,
+  );
+}
+
 /** Every field a generated item carries, across all of its field lists. */
 function artifactFields(artifact: IrArtifact): IrField[] {
   return [
     ...(artifact.fields ?? []),
     ...(artifact.inputs ?? []),
     ...(artifact.responses ?? []),
+    ...(artifact.params ?? []),
     ...((artifact.methods ?? []).flatMap((method) => [...method.params, ...method.returns])),
   ];
 }
@@ -285,6 +309,85 @@ function makeMethods(
     params: makeFields(method.params, typeMap),
     returns: makeFields(method.returns, typeMap),
   }));
+}
+
+/** Builds projection query items; event refs are resolved later (module paths unknown yet). */
+function makeRawQueryItems(query: SpecQueryItem[] | undefined): IrQueryItem[] {
+  return (query ?? []).map((item) => ({
+    types: item.types ?? [],
+    tags: (item.tags ?? []).map((tag) => ({
+      tag: tag.tag,
+      field: tag.field,
+      rustName: snakeCase(tag.field) || tag.field,
+    })),
+    doc: item.description,
+    events: [],
+    notes: [],
+  }));
+}
+
+/**
+ * Resolves a projection's query items against the generated events and params:
+ * collects the unique events to fold, groups their import paths, and drops
+ * tags that do not bind to a param (recording a note for each).
+ */
+function resolveProjection(artifact: IrArtifact, eventIndex: Map<string, IrArtifact>): void {
+  const params = artifact.params ?? [];
+  const paramByKey = new Map(params.map((field) => [nameKey(field.name), field]));
+  const events = new Map<string, IrEventRef>();
+  const imports = new Map<string, { modulePath: string[]; names: Set<string> }>();
+  const notes: string[] = [];
+
+  for (const item of artifact.queryItems ?? []) {
+    const seenTypes = new Set<string>();
+    for (const type of item.types) {
+      const key = nameKey(type);
+      if (seenTypes.has(key)) continue;
+      seenTypes.add(key);
+      const event = eventIndex.get(key);
+      if (!event) {
+        item.notes.push(`event \`${type}\` is not defined in the spec`);
+        continue;
+      }
+      const ref: IrEventRef = {
+        rustName: event.rustName,
+        eventType: event.fileName,
+        modulePath: event.modulePath,
+      };
+      item.events.push(ref);
+      if (!events.has(event.rustName)) events.set(event.rustName, ref);
+      const importKey = event.modulePath.join("/");
+      const entry =
+        imports.get(importKey) ?? { modulePath: event.modulePath, names: new Set<string>() };
+      entry.names.add(event.rustName);
+      imports.set(importKey, entry);
+    }
+
+    const resolvedTags: IrQueryTag[] = [];
+    for (const tag of item.tags) {
+      const param = paramByKey.get(nameKey(tag.field));
+      if (!param) {
+        item.notes.push(`tag \`${tag.tag}\` binds to unknown param \`${tag.field}\``);
+        continue;
+      }
+      resolvedTags.push({ tag: tag.tag, field: param.name, rustName: param.rustName });
+    }
+    item.tags = resolvedTags;
+  }
+
+  for (const item of artifact.queryItems ?? []) notes.push(...item.notes);
+  if ((artifact.queryItems ?? []).length === 0) {
+    notes.push("no query items declared; the query matches nothing");
+  }
+
+  artifact.projectionEvents = Array.from(events.values());
+  artifact.eventImports = Array.from(imports.values())
+    .map((entry) => ({
+      modulePath: entry.modulePath,
+      names: Array.from(entry.names).sort((a, b) => a.localeCompare(b)),
+    }))
+    .sort((a, b) => a.modulePath.join("/").localeCompare(b.modulePath.join("/")));
+  artifact.projectionNotes = notes.length > 0 ? notes : undefined;
 }
 
 /** Builds the `type` artifacts from the hoisted data-type registry. */
@@ -474,6 +577,12 @@ function collectValidationHelpers(artifacts: IrArtifact[]): string[] {
 
 function collectDeps(artifacts: IrArtifact[], extra: IrDep[]): IrDep[] {
   const deps: IrDep[] = [{ name: "serde", version: "1", features: ["derive"] }];
+  if (artifacts.some((artifact) => artifact.kind === "view" || artifact.kind === "state")) {
+    // State/View projections read the event store and fold JSON payloads.
+    deps.push({ name: "event-store", git: EVENT_STORE_GIT });
+    deps.push({ name: "futures-util", version: "0.3" });
+    deps.push({ name: "serde_json", version: "1" });
+  }
   if (needsValidator(artifacts)) {
     deps.push({ name: "validator", version: "0.18", features: ["derive"] });
   }
@@ -538,10 +647,20 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
     });
   }
   for (const view of spec.views ?? []) {
-    push("view", view.name, { doc: view.description, fields: makeFields(view.params, typeMap) });
+    push("view", view.name, {
+      doc: view.description,
+      params: makeProjectionParams(view.params, typeMap),
+      fields: makeFields(view.states, typeMap),
+      queryItems: makeRawQueryItems(view.query),
+    });
   }
   for (const state of spec.states ?? []) {
-    push("state", state.name, { doc: state.description, fields: makeFields(state.params, typeMap) });
+    push("state", state.name, {
+      doc: state.description,
+      params: makeProjectionParams(state.params, typeMap),
+      fields: makeFields(state.states, typeMap),
+      queryItems: makeRawQueryItems(state.query),
+    });
   }
   for (const service of spec.services ?? []) {
     push("service", service.name, {
@@ -566,6 +685,16 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
       module = cardDomain(artifact);
     }
     artifact.modulePath = [module, KIND_FOLDER[artifact.kind]];
+  }
+
+  // Resolve each projection's DCB query now that every module path is known.
+  const eventIndex = new Map(
+    artifacts.filter((a) => a.kind === "event").map((a) => [nameKey(a.name), a]),
+  );
+  for (const artifact of artifacts) {
+    if (artifact.kind === "view" || artifact.kind === "state") {
+      resolveProjection(artifact, eventIndex);
+    }
   }
 
   artifacts.sort((a, b) => {

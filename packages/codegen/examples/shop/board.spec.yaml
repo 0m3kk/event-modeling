@@ -6,10 +6,12 @@ domains:
       - OrderPlaced
       - OrderService
       - GetOrder
+      - OrderState
   - name: Shipping
     cards:
       - ShipOrder
       - OrderShipped
+      - OrderShippingView
 
 slices:
   - name: Place order
@@ -91,6 +93,41 @@ services:
         returns:
           - name: orderId
             type: OrderId
+
+views:
+  - name: OrderShippingView
+    description: Shipping details of an order.
+    params:
+      - name: orderId
+        type: OrderId
+    query:
+      - types:
+          - OrderShipped
+        tags:
+          - tag: order
+            field: orderId
+    states:
+      - name: shippedAt
+        type: Timestamp
+
+states:
+  - name: OrderState
+    description: Decision model for a single order.
+    params:
+      - name: orderId
+        type: OrderId
+    query:
+      - types:
+          - OrderPlaced
+          - OrderShipped
+        tags:
+          - tag: order
+            field: orderId
+    states:
+      - name: status
+        type: Status
+      - name: total
+        type: float
 
 tags:
   - tag: order

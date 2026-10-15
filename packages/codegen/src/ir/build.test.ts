@@ -259,4 +259,94 @@ events:
     ]);
     expect(crate.validationHelpers).toEqual(["validate_datetime", "validate_uuid"]);
   });
+
+  it("builds State/View projections from params, query and states", () => {
+    const source = `
+name: Shop
+domains:
+  - name: Sales
+    cards: [OrderPlaced, OrderState]
+  - name: Shipping
+    cards: [OrderShipped]
+events:
+  - name: OrderPlaced
+    fields:
+      - name: orderId
+        type: string
+        required: true
+        tag: order
+  - name: OrderShipped
+    fields:
+      - name: orderId
+        type: string
+        required: true
+        tag: order
+states:
+  - name: OrderState
+    params:
+      - name: orderId
+        type: string
+    query:
+      - types: [OrderPlaced, OrderShipped]
+        tags:
+          - tag: order
+            field: orderId
+    states:
+      - name: status
+        type: string
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
+    const state = crate.artifacts.find((a) => a.name === "OrderState")!;
+
+    // Params are the identity, so they are forced required; projected fields keep the spec shape.
+    expect(state.params!.map((f) => [f.rustName, f.rustType])).toEqual([["order_id", "String"]]);
+    expect(state.fields!.map((f) => f.rustName)).toEqual(["status"]);
+    expect(state.queryItems![0].tags).toEqual([
+      { tag: "order", field: "orderId", rustName: "order_id" },
+    ]);
+    // Query types resolve to snake_case event types (matching DomainEvent::event_type()).
+    expect(state.queryItems![0].events.map((e) => e.eventType)).toEqual([
+      "order_placed",
+      "order_shipped",
+    ]);
+    expect(state.projectionEvents!.map((e) => e.rustName)).toEqual(["OrderPlaced", "OrderShipped"]);
+    expect(state.eventImports).toEqual([
+      { modulePath: ["sales", "events"], names: ["OrderPlaced"] },
+      { modulePath: ["shipping", "events"], names: ["OrderShipped"] },
+    ]);
+
+    const depNames = crate.deps.map((d) => d.name);
+    expect(depNames).toContain("event-store");
+    expect(depNames).toContain("futures-util");
+    expect(depNames).toContain("serde_json");
+  });
+
+  it("records notes for unresolved projection events and tags", () => {
+    const source = `
+name: Shop
+states:
+  - name: Broken
+    params:
+      - name: orderId
+        type: string
+    query:
+      - types: [GhostEvent]
+        tags:
+          - tag: order
+            field: missingParam
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
+    const state = crate.artifacts.find((a) => a.name === "Broken")!;
+
+    expect(state.projectionNotes).toEqual([
+      "event `GhostEvent` is not defined in the spec",
+      "tag `order` binds to unknown param `missingParam`",
+    ]);
+    expect(state.queryItems![0].tags).toEqual([]);
+    expect(state.projectionEvents).toEqual([]);
+  });
 });

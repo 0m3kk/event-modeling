@@ -181,4 +181,146 @@ describe("run", () => {
     await run({ cwd: dir });
     expect(await read("Cargo.toml")).toBe('name = "SHOP"\n');
   });
+
+  it("renders a State projection wired to the event store", async () => {
+    const spec = [
+      "name: Shop",
+      "domains:",
+      "  - name: Sales",
+      "    cards: [OrderPlaced, OrderState]",
+      "events:",
+      "  - name: OrderPlaced",
+      "    fields:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "        tag: order",
+      "states:",
+      "  - name: OrderState",
+      "    params:",
+      "      - name: orderId",
+      "        type: string",
+      "    query:",
+      "      - types: [OrderPlaced]",
+      "        tags:",
+      "          - tag: order",
+      "            field: orderId",
+      "    states:",
+      "      - name: status",
+      "        type: string",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", generators: { states: true } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+
+    const file = await read("src/sales/states/order_state.rs");
+    expect(file).toContain("pub struct OrderState");
+    expect(file).toContain("pub order_id: String,");
+    expect(file).toContain("pub trait OrderStateReducer");
+    expect(file).toContain("fn on_order_placed(&self, state: &mut OrderState, event: &OrderPlaced);");
+    expect(file).toContain("pub fn new(");
+    expect(file).toContain('"order_placed".to_string()');
+    expect(file).toContain('format!("order:{}", self.order_id)');
+    expect(file).toContain("pub async fn load<E, R>");
+    expect(file).toContain("use crate::sales::events::{OrderPlaced};");
+
+    const cargo = await read("Cargo.toml");
+    expect(cargo).toContain('event-store = { git = "https://github.com/0m3kk/backend-kit.git" }');
+    expect(cargo).toContain('futures-util = { version = "0.3" }');
+    expect(cargo).toContain('serde_json = { version = "1" }');
+  });
+
+  it("renders path and git dependencies from the config", async () => {
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `crate: { deps: [` +
+        `{ name: "tracing", path: "../tracing" }, ` +
+        `{ name: "event-store", git: "https://github.com/0m3kk/backend-kit.git", branch: "main" } ] } };\n`,
+      "utf8",
+    );
+    await run({ cwd: dir });
+    const cargo = await read("Cargo.toml");
+    expect(cargo).toContain('tracing = { path = "../tracing" }');
+    expect(cargo).toContain(
+      'event-store = { git = "https://github.com/0m3kk/backend-kit.git", branch = "main" }',
+    );
+  });
+
+  it("renders an empty projection (no params, no query) safely", async () => {
+    const spec = ["name: Shop", "states:", "  - name: Empty", ""].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, generators: { states: true } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+
+    const file = await read("src/common/states/empty.rs");
+    expect(file).toContain("pub fn new(");
+    expect(file).toContain("Query::from_items(Vec::<QueryItem>::new())");
+    expect(file).toContain("let _ = reducer;");
+  });
+
+  it("uses the Rust struct name (not the spec name) in projection docs", async () => {
+    const spec = [
+      "name: Shop",
+      "states:",
+      "  - name: accountList",
+      "    params:",
+      "      - name: accountId",
+      "        type: string",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, generators: { states: true } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+
+    const file = await read("src/common/states/account_list.rs");
+    expect(file).toContain("pub struct AccountList");
+    expect(file).toContain("/// DCB projection for `AccountList`.");
+    expect(file).toContain("/// Project-specific projection logic for `AccountList`.");
+    expect(file).not.toContain("`accountList`");
+  });
+
+  it("derives Default for object and enum data types", async () => {
+    const spec = [
+      "name: Shop",
+      "events:",
+      "  - name: OrderPlaced",
+      "    fields:",
+      "      - name: order",
+      "        type:",
+      "          object: Order",
+      "          fields:",
+      "            - name: id",
+      "              type: string",
+      "      - name: status",
+      "        type:",
+      "          enum: Status",
+      "          values: [pending, paid]",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+
+    await run({ cwd: dir, rustfmt: false, force: true });
+
+    expect(await read("src/common/types/order.rs")).toContain("Default");
+    const status = await read("src/common/types/status.rs");
+    expect(status).toContain("Default");
+    expect(status).toContain("#[default]");
+  });
 });

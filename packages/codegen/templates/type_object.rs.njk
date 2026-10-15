@@ -5,4 +5,4 @@
 use serde::{Deserialize, Serialize};
 {% if artifact.validates %}use validator::Validate;
 {% endif %}
-{% set structName = artifact.rustName %}{% set fields = artifact.fields %}{% include "_struct.njk" %}
+{% set extraDerive = "Default" %}{% set structName = artifact.rustName %}{% set fields = artifact.fields %}{% include "_struct.njk" %}
