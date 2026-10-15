@@ -577,12 +577,15 @@ function collectValidationHelpers(artifacts: IrArtifact[]): string[] {
 
 function collectDeps(artifacts: IrArtifact[], extra: IrDep[]): IrDep[] {
   const deps: IrDep[] = [{ name: "serde", version: "1", features: ["derive"] }];
-  if (artifacts.some((artifact) => artifact.kind === "view" || artifact.kind === "state")) {
-    // State/View projections read the event store and fold JSON payloads.
+  const hasState = artifacts.some((artifact) => artifact.kind === "state");
+  const hasView = artifacts.some((artifact) => artifact.kind === "view");
+  if (hasState || hasView) {
+    // Projections read the event store and fold JSON payloads.
     deps.push({ name: "event-store", git: EVENT_STORE_GIT });
-    deps.push({ name: "async-trait", version: "0.1" });
     deps.push({ name: "futures-util", version: "0.3" });
     deps.push({ name: "serde_json", version: "1" });
+    // Only Views persist through async reducer methods, wired with async-trait.
+    if (hasView) deps.push({ name: "async-trait", version: "0.1" });
   }
   if (needsValidator(artifacts)) {
     deps.push({ name: "validator", version: "0.18", features: ["derive"] });

@@ -220,17 +220,15 @@ describe("run", () => {
     await run({ cwd: dir, rustfmt: false });
 
     const file = await read("src/sales/states/order_state.rs");
-    expect(file).toContain("#[async_trait::async_trait]");
+    expect(file).not.toContain("#[async_trait::async_trait]");
     expect(file).toContain("pub struct OrderState");
     expect(file).toContain("pub order_id: String,");
     expect(file).toContain("pub trait OrderStateReducer");
-    expect(file).toContain("type Error;");
-    expect(file).toContain(
-      "async fn on_order_placed(&self, state: &mut OrderState, event: &OrderPlaced) -> Result<(), Self::Error>;",
-    );
+    expect(file).not.toContain("type Error;");
+    expect(file).toContain("fn on_order_placed(&self, state: &mut OrderState, event: &OrderPlaced);");
     expect(file).toContain("pub fn new(");
-    expect(file).toContain("OrderStateError<E::Error, R::Error>");
-    expect(file).toContain(".map_err(OrderStateError::Reducer)?;");
+    expect(file).toContain("OrderStateError<E::Error>");
+    expect(file).not.toContain("Reducer(");
     expect(file).toContain('"order_placed".to_string()');
     expect(file).toContain('format!("order:{}", self.order_id)');
     expect(file).toContain("pub async fn load<E, R>");
@@ -238,9 +236,59 @@ describe("run", () => {
 
     const cargo = await read("Cargo.toml");
     expect(cargo).toContain('event-store = { git = "https://github.com/0m3kk/backend-kit.git" }');
-    expect(cargo).toContain('async-trait = { version = "0.1" }');
+    expect(cargo).not.toContain("async-trait");
     expect(cargo).toContain('futures-util = { version = "0.3" }');
     expect(cargo).toContain('serde_json = { version = "1" }');
+  });
+
+  it("renders a View projection with an async fallible reducer", async () => {
+    const spec = [
+      "name: Shop",
+      "domains:",
+      "  - name: Sales",
+      "    cards: [OrderPlaced, OrderListView]",
+      "events:",
+      "  - name: OrderPlaced",
+      "    fields:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "        tag: order",
+      "views:",
+      "  - name: OrderListView",
+      "    params:",
+      "      - name: orderId",
+      "        type: string",
+      "    query:",
+      "      - types: [OrderPlaced]",
+      "        tags:",
+      "          - tag: order",
+      "            field: orderId",
+      "    states:",
+      "      - name: status",
+      "        type: string",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", generators: { views: true } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+
+    const file = await read("src/sales/views/order_list_view.rs");
+    expect(file).toContain("#[async_trait::async_trait]");
+    expect(file).toContain("pub trait OrderListViewReducer");
+    expect(file).toContain("type Error;");
+    expect(file).toContain(
+      "async fn on_order_placed(&self, state: &mut OrderListView, event: &OrderPlaced) -> Result<(), Self::Error>;",
+    );
+    expect(file).toContain("OrderListViewError<E::Error, R::Error>");
+    expect(file).toContain(".map_err(OrderListViewError::Reducer)?;");
+
+    expect(await read("Cargo.toml")).toContain('async-trait = { version = "0.1" }');
   });
 
   it("renders path and git dependencies from the config", async () => {

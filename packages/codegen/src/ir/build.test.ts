@@ -319,9 +319,37 @@ states:
 
     const depNames = crate.deps.map((d) => d.name);
     expect(depNames).toContain("event-store");
-    expect(depNames).toContain("async-trait");
     expect(depNames).toContain("futures-util");
     expect(depNames).toContain("serde_json");
+    expect(depNames).not.toContain("async-trait");
+  });
+
+  it("adds async-trait only when a View projection exists", () => {
+    const stateOnly = `
+name: Shop
+states:
+  - name: SomeState
+    params:
+      - name: id
+        type: string
+`;
+    const withView = `${stateOnly}
+views:
+  - name: SomeView
+    params:
+      - name: id
+        type: string
+`;
+    const depNames = (source: string) => {
+      const spec = parseSpecification(source);
+      const { spec: hoisted, types } = hoistTypes(spec);
+      return buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } }).crate.deps.map(
+        (d) => d.name,
+      );
+    };
+
+    expect(depNames(stateOnly)).not.toContain("async-trait");
+    expect(depNames(withView)).toContain("async-trait");
   });
 
   it("records notes for unresolved projection events and tags", () => {

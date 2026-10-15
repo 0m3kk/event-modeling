@@ -1,6 +1,7 @@
 {% if artifact.doc %}{{ artifact.doc | doccomment }}
 {% endif -%}
 {% set name = artifact.rustName -%}
+{% if projectionAsync %}{% set errGenerics = "E, R" %}{% set errBounds = "E: std::fmt::Debug, R: std::fmt::Debug" %}{% else %}{% set errGenerics = "E" %}{% set errBounds = "E: std::fmt::Debug" %}{% endif -%}
 {% for note in artifact.projectionNotes -%}
 // note: {{ note }}
 {% endfor -%}
@@ -35,42 +36,50 @@ pub struct {{ name }} {
 /// Project-specific projection logic for `{{ name }}`.
 ///
 /// Implement this trait in your own module; the generated code is fixed and
-/// never edited by hand. The methods may perform side effects (for example
-/// persisting a view to a database) and report failures through
-/// [`Self::Error`].
-#[async_trait::async_trait]
+/// never edited by hand.
+{% if projectionAsync %}///
+/// The methods may perform side effects (for example persisting a view to a
+/// database) and report failures through [`Self::Error`].
+{% endif -%}
+{% if projectionAsync %}#[async_trait::async_trait]
+{% endif -%}
 pub trait {{ name }}Reducer {
-    /// Error produced by the project-specific logic (e.g. a database error).
+{% if projectionAsync %}    /// Error produced by the project-specific logic (e.g. a database error).
     type Error;
 
+{% endif -%}
 {% for event in artifact.projectionEvents -%}
     /// Project a `{{ event.rustName }}` into the {{ projectionKind | lower }}.
-    async fn on_{{ event.eventType }}(&self, state: &mut {{ name }}, event: &{{ event.rustName }}) -> Result<(), Self::Error>;
+{% if projectionAsync %}    async fn on_{{ event.eventType }}(&self, state: &mut {{ name }}, event: &{{ event.rustName }}) -> Result<(), Self::Error>;
+{% else %}    fn on_{{ event.eventType }}(&self, state: &mut {{ name }}, event: &{{ event.rustName }});
+{% endif -%}
 {% endfor -%}
 }
 
 /// Errors returned by [`{{ name }}::load`].
 #[derive(Debug)]
-pub enum {{ name }}Error<E, R> {
+pub enum {{ name }}Error<{{ errGenerics }}> {
     /// The underlying event store failed.
     Store(event_store::Error<E>),
     /// An event payload could not be decoded.
     Decode(serde_json::Error),
-    /// The project's reducer logic failed.
+{% if projectionAsync %}    /// The project's reducer logic failed.
     Reducer(R),
+{% endif -%}
 }
 
-impl<E: std::fmt::Debug, R: std::fmt::Debug> std::fmt::Display for {{ name }}Error<E, R> {
+impl<{{ errBounds }}> std::fmt::Display for {{ name }}Error<{{ errGenerics }}> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Store(error) => write!(f, "event store error: {error:?}"),
             Self::Decode(error) => write!(f, "event decode error: {error}"),
-            Self::Reducer(error) => write!(f, "reducer error: {error:?}"),
+{% if projectionAsync %}            Self::Reducer(error) => write!(f, "reducer error: {error:?}"),
+{% endif -%}
         }
     }
 }
 
-impl<E: std::fmt::Debug, R: std::fmt::Debug> std::error::Error for {{ name }}Error<E, R> {}
+impl<{{ errBounds }}> std::error::Error for {{ name }}Error<{{ errGenerics }}> {}
 
 impl {{ name }} {
     /// Create a projection with its params set and projected fields defaulted.
@@ -111,7 +120,7 @@ impl {{ name }} {
         mut self,
         store: &E,
         reducer: &R,
-    ) -> Result<Self, {{ name }}Error<E::Error, R::Error>>
+    ) -> Result<Self, {{ name }}Error<{% if projectionAsync %}E::Error, R::Error{% else %}E::Error{% endif %}>>
     where
         E: EventStore,
         R: {{ name }}Reducer,
@@ -127,10 +136,12 @@ impl {{ name }} {
                 "{{ event.eventType }}" => {
                     let typed: {{ event.rustName }} =
                         serde_json::from_value(event.data).map_err({{ name }}Error::Decode)?;
-                    reducer
+{% if projectionAsync %}                    reducer
                         .on_{{ event.eventType }}(&mut self, &typed)
                         .await
                         .map_err({{ name }}Error::Reducer)?;
+{% else %}                    reducer.on_{{ event.eventType }}(&mut self, &typed);
+{% endif -%}
                 }
 {% endfor -%}
                 _ => {}

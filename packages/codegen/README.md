@@ -134,8 +134,9 @@ skipped**, never dropped silently:
 A **State** card is an in-memory decision model and a **View** card is a read
 model; both are DCB projections over the same three sections — `params`
 (identity / query inputs), `query` (event `types` plus DCB `tags` bound to
-params) and `states` (the projected fields). The generator treats them the same
-way and emits one self-contained file per card:
+params) and `states` (the projected fields). The generator emits one
+self-contained file per card; State and View share the same shape and differ
+only in whether the reducer is async:
 
 ```rust
 pub struct OrderState {          // params + projected fields share the struct
@@ -144,16 +145,9 @@ pub struct OrderState {          // params + projected fields share the struct
 }
 
 /// Implement this in your own module — the generated file is never edited.
-#[async_trait::async_trait]
+/// A **State** folds in memory, so the reducer is a plain sync trait.
 pub trait OrderStateReducer {
-    /// The project's own error (e.g. a database error).
-    type Error;
-
-    async fn on_order_placed(
-        &self,
-        state: &mut OrderState,
-        event: &OrderPlaced,
-    ) -> Result<(), Self::Error>;
+    fn on_order_placed(&self, state: &mut OrderState, event: &OrderPlaced);
 }
 ```
 
@@ -174,20 +168,22 @@ Use it as:
 let state = OrderState::new(order_id).load(&store, &app).await?;
 ```
 
-Projections add the `event-store`, `async-trait`, `futures-util` and
-`serde_json` dependencies automatically; `event-store` is pulled from
-`https://github.com/0m3kk/backend-kit.git`. Override it (for example with a
-local checkout) through `crate.deps`:
+Projections add the `event-store`, `futures-util` and `serde_json` dependencies
+automatically (plus `async-trait` when a View is present); `event-store` is
+pulled from `https://github.com/0m3kk/backend-kit.git`. Override it (for example
+with a local checkout) through `crate.deps`:
 
 ```ts
 crate: { deps: [{ name: "event-store", path: "../backend-kit/crates/event-store" }] }
 ```
 
-Reducer methods are `async` and fallible so a View can persist each projected
-row (or read extra state) while folding. Failures surface through the generated
-error enum — `<Name>Error<E, R>` with `Store`, `Decode` and `Reducer` variants —
-and an in-memory projection with no side effects just uses
-`type Error = std::convert::Infallible;`.
+A **State** is folded in memory, so its reducer methods are plain, sync and
+infallible (`fn on_...(...)`), and its error enum is `<Name>Error<E>`. A
+**View** persists (or otherwise performs side effects) while folding, so its
+reducer is `#[async_trait::async_trait]` with an associated `Error` type and
+`async fn ... -> Result<(), Self::Error>` methods; its error enum is
+`<Name>Error<E, R>` with an extra `Reducer` variant, and `async-trait` is added
+to the crate.
 
 Events named in a query that are not in the spec, and tags that do not bind to a
 param, are dropped and reported as `// note:` comments at the top of the file —
