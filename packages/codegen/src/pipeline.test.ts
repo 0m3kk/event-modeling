@@ -229,7 +229,8 @@ describe("run", () => {
     expect(file).toContain("pub fn new(");
     expect(file).toContain("OrderStateError<E::Error>");
     expect(file).not.toContain("Reducer(");
-    expect(file).toContain('"order_placed".to_string()');
+    expect(file).toContain("OrderPlaced::event_type().to_string()");
+    expect(file).not.toContain('"order_placed".to_string()');
     expect(file).toContain('format!("order:{}", self.order_id)');
     expect(file).toContain("pub async fn load<E, R>");
     expect(file).toContain("use crate::DomainEvent;");

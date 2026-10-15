@@ -107,7 +107,7 @@ impl {{ name }} {
         Query::from_items([
 {% for item in artifact.queryItems -%}
             QueryItem::new(
-                vec![{% for type in item.types %}"{{ type | snake }}".to_string(){% if not loop.last %}, {% endif %}{% endfor %}],
+                vec![{% for t in item.typeRefs %}{% if t.rustName %}{{ t.rustName }}::event_type().to_string(){% else %}"{{ t.literal }}".to_string(){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}],
                 vec![{% for tag in item.tags %}format!("{{ tag.tag }}:{}", self.{{ tag.rustName }}){% if not loop.last %}, {% endif %}{% endfor %}],
             ),
 {% endfor -%}

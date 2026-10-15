@@ -157,8 +157,9 @@ query, and a `load` driver:
 - `OrderState::new(<params>)` — factory that sets the params and defaults the
   projected fields (generated data types derive `Default`).
 - `fn query(&self) -> event_store::Query` — one `QueryItem` per spec query item;
-  `types` become snake_case event types and each `tag` renders as
-  `format!("{tag}:{}", self.<param>)`.
+  each event `type` becomes `<Event>::event_type()` (falling back to a literal
+  snake_case string when it does not resolve to a generated event) and each
+  `tag` renders as `format!("{tag}:{}", self.<param>)`.
 - `async fn load(self, store, reducer)` — reads every matching event from an
   `event_store::EventStore` and folds it through the reducer.
 

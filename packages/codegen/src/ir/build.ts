@@ -315,6 +315,7 @@ function makeMethods(
 function makeRawQueryItems(query: SpecQueryItem[] | undefined): IrQueryItem[] {
   return (query ?? []).map((item) => ({
     types: item.types ?? [],
+    typeRefs: [],
     tags: (item.tags ?? []).map((tag) => ({
       tag: tag.tag,
       field: tag.field,
@@ -346,9 +347,11 @@ function resolveProjection(artifact: IrArtifact, eventIndex: Map<string, IrArtif
       seenTypes.add(key);
       const event = eventIndex.get(key);
       if (!event) {
+        item.typeRefs.push({ literal: snakeCase(type) || type });
         item.notes.push(`event \`${type}\` is not defined in the spec`);
         continue;
       }
+      item.typeRefs.push({ literal: event.fileName, rustName: event.rustName });
       const ref: IrEventRef = {
         rustName: event.rustName,
         eventType: event.fileName,

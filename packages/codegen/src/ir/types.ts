@@ -85,12 +85,22 @@ export interface IrEventRef {
 export interface IrQueryItem {
   /** Event type names as written in the spec. */
   types: string[];
+  /** Per-type resolution: an event type name or a literal fallback when unresolved. */
+  typeRefs: IrQueryTypeRef[];
   tags: IrQueryTag[];
   doc?: string;
   /** Events resolved from `types` (unresolved names are omitted). */
   events: IrEventRef[];
   /** Notes about types/tags that could not be resolved. */
   notes: string[];
+}
+
+/** A single event type inside a query item, resolved to a generated event when possible. */
+export interface IrQueryTypeRef {
+  /** snake_case event type literal (used when the type does not resolve to an event). */
+  literal: string;
+  /** PascalCase Rust event type, present when the type resolves to a generated event. */
+  rustName?: string;
 }
 
 /** A grouped `use` of events a projection folds, e.g. `crate::sales::events::{A, B}`. */

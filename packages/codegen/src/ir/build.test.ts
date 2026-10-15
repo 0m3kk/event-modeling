@@ -311,6 +311,10 @@ states:
       "order_placed",
       "order_shipped",
     ]);
+    expect(state.queryItems![0].typeRefs).toEqual([
+      { literal: "order_placed", rustName: "OrderPlaced" },
+      { literal: "order_shipped", rustName: "OrderShipped" },
+    ]);
     expect(state.projectionEvents!.map((e) => e.rustName)).toEqual(["OrderPlaced", "OrderShipped"]);
     expect(state.eventImports).toEqual([
       { modulePath: ["sales", "events"], names: ["OrderPlaced"] },
@@ -376,6 +380,7 @@ states:
       "tag `order` binds to unknown param `missingParam`",
     ]);
     expect(state.queryItems![0].tags).toEqual([]);
+    expect(state.queryItems![0].typeRefs).toEqual([{ literal: "ghost_event" }]);
     expect(state.projectionEvents).toEqual([]);
   });
 });
