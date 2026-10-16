@@ -97,5 +97,21 @@
   "common": {
     "close": "Đóng",
     "delete": "Xóa"
+  },
+  "changes": {
+    "title": "Thay đổi",
+    "empty": "Chưa có thay đổi mô hình nào.",
+    "actorUser": "Bạn",
+    "actorAI": "AI",
+    "created": "Tạo mới",
+    "updated": "Cập nhật",
+    "deleted": "Xóa",
+    "cleared": "Xóa toàn bộ bảng",
+    "imported": "Đã nhập bảng",
+    "field": "Trường",
+    "before": "Trước",
+    "after": "Sau",
+    "nothing": "—",
+    "focus": "Hiện trên bảng"
   }
 }

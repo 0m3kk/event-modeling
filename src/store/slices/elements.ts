@@ -1,6 +1,6 @@
 /** Element slice: board elements, their CRUD, container layout and persistence. */
 import type { StateCreator } from "zustand";
-import type { CanvasElement, ProjectFileV2 } from "@/types";
+import type { CanvasElement } from "@/types";
 import { ensureUniqueElement, resolveUniqueDataOnUpdate } from "@/utils/naming";
 import {
   createReferenceCopy as makeReferenceCopy,
@@ -16,6 +16,8 @@ import { applyRenameMappings, collectRenameMappings } from "@/utils/rename";
 import { planDomainArrange } from "@/tools/domainCard/arrange";
 import { planGroupArrange } from "@/tools/groupCard/arrange";
 import { setStoredDriveFile } from "@/utils/googleDrive";
+import { patchTouchesModeling } from "@/utils/modelDiff";
+import { changeRecorder } from "../recorder";
 import {
   MAX_HISTORY,
   applyContainerLayout,
@@ -61,6 +63,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       selectedField: null,
       inlineEdit: null,
     }));
+    changeRecorder.recordDiff(current, get().elements, "Add card");
   },
 
   addElements: (elements) => {
@@ -80,6 +83,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       selectedField: null,
       inlineEdit: null,
     }));
+    changeRecorder.recordDiff(current, get().elements, `Add ${processed.length} cards`);
   },
 
   createReferenceCopy: (id) => {
@@ -106,6 +110,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       selectedField: null,
       inlineEdit: null,
     }));
+    changeRecorder.recordDiff(current, get().elements, "Create reference copy");
     return copy;
   },
 
@@ -138,6 +143,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       selectedField: null,
       inlineEdit: null,
     }));
+    changeRecorder.recordDiff(current, get().elements, "Create method execution");
     return copy;
   },
 
@@ -171,6 +177,9 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       // keep the width/height the user set.
       elements: applyContainerLayout(finalPatch.data ? fitElementsToContent(renamed) : renamed),
     }));
+    if (patchTouchesModeling(patch)) {
+      changeRecorder.recordDiff(current, get().elements, "Update card");
+    }
   },
 
   updateElements: (patches) => {
@@ -205,6 +214,9 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
         finalPatches.some((p) => p.data) ? fitElementsToContent(updatedElements) : updatedElements,
       ),
     }));
+    if (finalPatches.some(patchTouchesModeling)) {
+      changeRecorder.recordDiff(current, get().elements, "Update cards");
+    }
   },
 
   arrangeDomain: (domainId) => {
@@ -250,6 +262,11 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       inlineEdit:
         state.inlineEdit && idSet.has(state.inlineEdit.elementId) ? null : state.inlineEdit,
     }));
+    changeRecorder.recordDiff(
+      current,
+      get().elements,
+      ids.length === 1 ? "Delete card" : `Delete ${ids.length} cards`,
+    );
   },
 
   clearBoard: () => {
@@ -263,14 +280,18 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       googleDriveFileId: null,
       googleDriveFileName: null,
     }));
+    changeRecorder.recordBoardCleared();
   },
 
-  loadProject: (project: ProjectFileV2) => {
+  loadProject: (project) => {
     // Existing board data is preserved as-is (no identifier rewriting); only
     // each tool's own reference repair runs.
     const normalized = project.elements.map((el) => repairElementData(el, project.elements));
+    changeRecorder.setLog(project.log);
     set({
       projectName: project.name,
+      projectId: project.projectId,
+      projectCreatedAt: project.createdAt,
       elements: applyContainerLayout(normalized),
       selectedIds: [],
       viewport: {

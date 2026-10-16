@@ -2,6 +2,7 @@
 import type { StateCreator } from "zustand";
 import type { CanvasStoreState } from "../types";
 import { snapshotState } from "../helpers";
+import { changeRecorder } from "../recorder";
 
 export type HistorySlice = Pick<
   CanvasStoreState,
@@ -22,6 +23,8 @@ export const createHistorySlice: StateCreator<CanvasStoreState, [], [], HistoryS
       elements: prev.elements,
       selectedIds: [],
     }));
+    // Keep the log in step with the board: an undo is itself a modeling change.
+    changeRecorder.recordDiff(elements, get().elements, "Undo");
   },
 
   redo: () => {
@@ -34,6 +37,7 @@ export const createHistorySlice: StateCreator<CanvasStoreState, [], [], HistoryS
       elements: next.elements,
       selectedIds: [],
     }));
+    changeRecorder.recordDiff(elements, get().elements, "Redo");
   },
 
   canUndo: () => get().undoStack.length > 0,

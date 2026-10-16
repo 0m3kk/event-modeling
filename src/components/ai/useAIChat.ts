@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createSessionId, type AISettings, type ChatMessage } from "@/ai/client";
 import { runAgentConversation } from "@/ai/agent";
+import { changeRecorder } from "@/store/recorder";
 
 interface UseAIChatOptions {
   settings: AISettings;
@@ -41,6 +42,10 @@ export function useAIChat({ settings, onRequireSettings }: UseAIChatOptions) {
     const controller = new AbortController();
     abortRef.current = controller;
     setIsLoading(true);
+    // Group every tool call this turn makes into a single change set, so the
+    // change log shows one entry per prompt instead of one per card touched.
+    const lastUser = [...history].reverse().find((m) => m.role === "user");
+    changeRecorder.openScope("ai", lastUser?.content?.slice(0, 120));
     try {
       const assistantId = `assistant-${Date.now()}`;
       const callbacks = {
@@ -92,6 +97,7 @@ export function useAIChat({ settings, onRequireSettings }: UseAIChatOptions) {
         { id: `err-${Date.now()}`, role: "assistant", content: `⚠️ Error: ${err.message}` },
       ]);
     } finally {
+      changeRecorder.closeScope();
       if (abortRef.current === controller) abortRef.current = null;
       if (sessionIdRef.current === sessionId) setIsLoading(false);
     }

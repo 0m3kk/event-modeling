@@ -282,7 +282,8 @@ export async function fetchGoogleUserProfile(accessToken: string): Promise<Googl
 }
 
 export async function listDriveFiles(accessToken: string): Promise<GoogleDriveFile[]> {
-  const q = "trashed = false and mimeType = 'application/json'";
+  const q =
+    "trashed = false and (mimeType = 'application/json' or mimeType = 'application/octet-stream')";
   const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`;
 
   const res = await fetch(url, {
@@ -297,23 +298,25 @@ export async function listDriveFiles(accessToken: string): Promise<GoogleDriveFi
 async function uploadDriveFile(
   accessToken: string,
   fileName: string,
-  fileContent: string,
+  fileBytes: Uint8Array,
   existingFileId: string | null,
 ): Promise<{ id: string; name: string }> {
   const boundary = "boundary_event_modeling_gdrive";
+  const name = fileName.endsWith(".eventmodel") ? fileName : `${fileName}.eventmodel`;
   const metadata = {
-    name: fileName.endsWith(".json") ? fileName : `${fileName}.eventmodel.json`,
-    mimeType: "application/json",
+    name,
+    mimeType: "application/octet-stream",
   };
 
-  const multipartBody =
-    `--${boundary}\r\n` +
-    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
-    `${JSON.stringify(metadata)}\r\n` +
-    `--${boundary}\r\n` +
-    `Content-Type: application/json\r\n\r\n` +
-    `${fileContent}\r\n` +
-    `--${boundary}--`;
+  const body = new Blob([
+    `--${boundary}\r\n`,
+    `Content-Type: application/json; charset=UTF-8\r\n\r\n`,
+    `${JSON.stringify(metadata)}\r\n`,
+    `--${boundary}\r\n`,
+    `Content-Type: application/octet-stream\r\n\r\n`,
+    fileBytes as BlobPart,
+    `\r\n--${boundary}--`,
+  ]);
 
   const isUpdate = Boolean(existingFileId);
   const url = isUpdate
@@ -326,7 +329,7 @@ async function uploadDriveFile(
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": `multipart/related; boundary=${boundary}`,
     },
-    body: multipartBody,
+    body,
   });
 
   if (!res.ok) throw await toGoogleDriveError(res, "Failed to save to Google Drive");
@@ -336,34 +339,34 @@ async function uploadDriveFile(
 export async function saveToGoogleDrive(
   accessToken: string,
   fileName: string,
-  fileContent: string,
+  fileBytes: Uint8Array,
   existingFileId?: string | null,
 ): Promise<{ id: string; name: string }> {
   if (existingFileId) {
     try {
-      return await uploadDriveFile(accessToken, fileName, fileContent, existingFileId);
+      return await uploadDriveFile(accessToken, fileName, fileBytes, existingFileId);
     } catch (err) {
       // The stored id may point to a file that was deleted, moved to the
       // trash, or created by a different client/session. Under the
       // `drive.file` scope that yields 403/404, so fall back to creating a
       // fresh file instead of failing the save.
       if (err instanceof GoogleDriveApiError && (err.status === 403 || err.status === 404)) {
-        return await uploadDriveFile(accessToken, fileName, fileContent, null);
+        return await uploadDriveFile(accessToken, fileName, fileBytes, null);
       }
       throw err;
     }
   }
-  return await uploadDriveFile(accessToken, fileName, fileContent, null);
+  return await uploadDriveFile(accessToken, fileName, fileBytes, null);
 }
 
 export async function downloadFromGoogleDrive(
   accessToken: string,
   fileId: string,
-): Promise<string> {
+): Promise<Uint8Array> {
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
   if (!res.ok) throw await toGoogleDriveError(res, "Failed to download from Google Drive");
-  return res.text();
+  return new Uint8Array(await res.arrayBuffer());
 }

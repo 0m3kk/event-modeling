@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import "@/tools";
 import { useCanvasStore } from "./index";
+import { changeRecorder } from "./recorder";
 import type { CanvasElement } from "@/types";
 
 describe("useCanvasStore", () => {
   beforeEach(() => {
+    changeRecorder.reset();
     useCanvasStore.setState({
       elements: [],
       selectedIds: [],
@@ -102,13 +104,11 @@ describe("useCanvasStore", () => {
 
   it("does not rewrite existing identifiers when loading a board", () => {
     useCanvasStore.getState().loadProject({
-      version: 2,
-      id: "proj-1",
       name: "Legacy",
+      projectId: "proj-1",
       createdAt: "2024-01-01T00:00:00.000Z",
-      updatedAt: "2024-01-01T00:00:00.000Z",
       viewport: { x: 0, y: 0, zoom: 1 },
-      groups: [],
+      log: [],
       elements: [
         {
           id: "el-1",

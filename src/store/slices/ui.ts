@@ -6,6 +6,8 @@ import type { CanvasStoreState } from "../types";
 export type UiSlice = Pick<
   CanvasStoreState,
   | "projectName"
+  | "projectId"
+  | "projectCreatedAt"
   | "googleDriveFileId"
   | "googleDriveFileName"
   | "selectedIds"
@@ -20,8 +22,10 @@ export type UiSlice = Pick<
   | "isGoogleDriveModalOpen"
   | "isAIPanelOpen"
   | "isExportModalOpen"
+  | "isChangesPanelOpen"
   | "driveModalTab"
   | "setProjectName"
+  | "setProjectMeta"
   | "setGoogleDriveFileId"
   | "setTool"
   | "setViewport"
@@ -36,10 +40,13 @@ export type UiSlice = Pick<
   | "setGoogleDriveModalOpen"
   | "setAIPanelOpen"
   | "setExportModalOpen"
+  | "setChangesPanelOpen"
 >;
 
 export const createUiSlice: StateCreator<CanvasStoreState, [], [], UiSlice> = (set, get) => ({
   projectName: "Untitled Board",
+  projectId: `project-${Date.now().toString(36)}`,
+  projectCreatedAt: new Date().toISOString(),
   googleDriveFileId: null,
   googleDriveFileName: null,
 
@@ -62,9 +69,11 @@ export const createUiSlice: StateCreator<CanvasStoreState, [], [], UiSlice> = (s
   isGoogleDriveModalOpen: false,
   isAIPanelOpen: false,
   isExportModalOpen: false,
+  isChangesPanelOpen: false,
   driveModalTab: "save",
 
   setProjectName: (name) => set({ projectName: name }),
+  setProjectMeta: (id, createdAt) => set({ projectId: id, projectCreatedAt: createdAt }),
   setGoogleDriveFileId: (id, name) => {
     set({ googleDriveFileId: id, googleDriveFileName: id ? name ?? get().projectName : null });
     // Remember the linked Drive file so a later save overwrites it even after
@@ -101,4 +110,5 @@ export const createUiSlice: StateCreator<CanvasStoreState, [], [], UiSlice> = (s
     set({ isGoogleDriveModalOpen: open, driveModalTab: tab }),
   setAIPanelOpen: (open) => set({ isAIPanelOpen: open }),
   setExportModalOpen: (open) => set({ isExportModalOpen: open }),
+  setChangesPanelOpen: (open) => set({ isChangesPanelOpen: open }),
 });

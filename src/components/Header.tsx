@@ -18,9 +18,11 @@ import {
   Check,
   Languages,
   ChevronDown,
+  History,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore, undo, redo } from "@/store";
+import { changeRecorder } from "@/store/recorder";
 import { useTheme } from "@/hooks/useTheme";
 import type { ThemeMode } from "@/types";
 import { saveProjectToFile, openProjectFromFile } from "@/utils/fileIO";
@@ -50,6 +52,9 @@ export function Header() {
 
   const isAIPanelOpen = useCanvasStore((s) => s.isAIPanelOpen);
   const setAIPanelOpen = useCanvasStore((s) => s.setAIPanelOpen);
+
+  const isChangesPanelOpen = useCanvasStore((s) => s.isChangesPanelOpen);
+  const setChangesPanelOpen = useCanvasStore((s) => s.setChangesPanelOpen);
 
   const setSearchOpen = useCanvasStore((s) => s.setSearchOpen);
   const setGoogleDriveModalOpen = useCanvasStore((s) => s.setGoogleDriveModalOpen);
@@ -123,8 +128,18 @@ export function Header() {
 
   const handleSaveLocal = async () => {
     setIsFileMenuOpen(false);
-    const { projectName, elements, viewport } = useCanvasStore.getState();
-    await saveProjectToFile({ name: projectName, elements, viewport });
+    const { projectName, elements, viewport, projectId, projectCreatedAt } =
+      useCanvasStore.getState();
+    // Commit buffered modeling edits so the saved change log is complete.
+    changeRecorder.flush();
+    await saveProjectToFile({
+      name: projectName,
+      elements,
+      viewport,
+      log: changeRecorder.getLog(),
+      id: projectId,
+      createdAt: projectCreatedAt,
+    });
   };
 
   const handleExportSpec = () => {
@@ -151,6 +166,11 @@ export function Header() {
     setIsFileMenuOpen(false);
     if (confirm(t("modal.newBoardDesc"))) {
       useCanvasStore.getState().clearBoard();
+      // A new board starts a fresh change log and project identity.
+      changeRecorder.reset();
+      useCanvasStore
+        .getState()
+        .setProjectMeta(`project-${Date.now().toString(36)}`, new Date().toISOString());
       setProjectName("Untitled Board");
     }
   };
@@ -409,6 +429,19 @@ export function Header() {
         </div>
 
         <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
+
+        <button
+          onClick={() => setChangesPanelOpen(!isChangesPanelOpen)}
+          title={t("changes.title")}
+          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+            isChangesPanelOpen
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "border border-gray-200/80 text-gray-700 hover:bg-gray-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          }`}
+        >
+          <History size={14} />
+          <span className="hidden sm:inline">{t("changes.title")}</span>
+        </button>
 
         <button
           onClick={() => setAIPanelOpen(!isAIPanelOpen)}

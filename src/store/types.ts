@@ -1,13 +1,13 @@
 import type {
   CanvasElement,
   Viewport,
-  ProjectFileV2,
   ThemeMode,
   SelectedField,
   InlineEditState,
   DescHoverTarget,
 } from "@/types";
 import type { FieldValidation } from "@/utils/fieldValidation";
+import type { LoadedProject } from "@/utils/projectFile";
 
 export interface HistoryEntry {
   elements: CanvasElement[];
@@ -16,6 +16,8 @@ export interface HistoryEntry {
 export interface CanvasStoreState {
   // Project info
   projectName: string;
+  projectId: string;
+  projectCreatedAt: string;
   googleDriveFileId: string | null;
   googleDriveFileName: string | null;
 
@@ -35,6 +37,7 @@ export interface CanvasStoreState {
   isGoogleDriveModalOpen: boolean;
   isAIPanelOpen: boolean;
   isExportModalOpen: boolean;
+  isChangesPanelOpen: boolean;
   driveModalTab: "open" | "save";
 
   // History stacks
@@ -58,6 +61,7 @@ export interface CanvasStoreState {
   setGoogleDriveModalOpen: (open: boolean, tab?: "open" | "save") => void;
   setAIPanelOpen: (open: boolean) => void;
   setExportModalOpen: (open: boolean) => void;
+  setChangesPanelOpen: (open: boolean) => void;
 
   // Element CRUD with Undo
   addElement: (element: CanvasElement) => void;
@@ -80,7 +84,8 @@ export interface CanvasStoreState {
   updateSelectedFieldValidation: (validation: FieldValidation | null) => void;
   navigateSelectedField: (direction: "up" | "down") => void;
   clearBoard: () => void;
-  loadProject: (project: ProjectFileV2) => void;
+  loadProject: (project: LoadedProject) => void;
+  setProjectMeta: (id: string, createdAt: string) => void;
 
   // History operations
   undo: () => void;

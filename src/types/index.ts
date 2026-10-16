@@ -1,4 +1,5 @@
 export * from "./schema";
+export * from "./changelog";
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";

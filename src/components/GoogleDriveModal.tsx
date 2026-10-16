@@ -14,7 +14,8 @@ import {
   type GoogleDriveFile,
   type GoogleUserProfile,
 } from "@/utils/googleDrive";
-import { serializeProject, parseProjectFile } from "@/utils/fileIO";
+import { serializeProjectV3, parseProjectBytes } from "@/utils/projectFile";
+import { changeRecorder } from "@/store/recorder";
 
 export function GoogleDriveModal() {
   const { t } = useTranslation();
@@ -26,6 +27,8 @@ export function GoogleDriveModal() {
   const setProjectName = useCanvasStore((s) => s.setProjectName);
   const elements = useCanvasStore((s) => s.elements);
   const viewport = useCanvasStore((s) => s.viewport);
+  const projectId = useCanvasStore((s) => s.projectId);
+  const projectCreatedAt = useCanvasStore((s) => s.projectCreatedAt);
   const googleDriveFileId = useCanvasStore((s) => s.googleDriveFileId);
   const googleDriveFileName = useCanvasStore((s) => s.googleDriveFileName);
   const setGoogleDriveFileId = useCanvasStore((s) => s.setGoogleDriveFileId);
@@ -117,11 +120,20 @@ export function GoogleDriveModal() {
     setIsLoading(true);
     setStatusMessage(null);
     try {
-      const json = serializeProject({ name: saveFileName, elements, viewport });
+      changeRecorder.flush();
+      const bytes = serializeProjectV3({
+        name: saveFileName,
+        elements,
+        viewport,
+        log: changeRecorder.getLog(),
+        id: projectId,
+        createdAt: projectCreatedAt,
+        withCheckpoint: true,
+      });
       const res = await saveToGoogleDrive(
         auth.accessToken,
         saveFileName,
-        json,
+        bytes,
         googleDriveFileId,
       );
       setGoogleDriveFileId(res.id, saveFileName);
@@ -140,8 +152,8 @@ export function GoogleDriveModal() {
     setIsLoading(true);
     setStatusMessage(null);
     try {
-      const json = await downloadFromGoogleDrive(auth.accessToken, file.id);
-      const project = parseProjectFile(json);
+      const bytes = await downloadFromGoogleDrive(auth.accessToken, file.id);
+      const project = parseProjectBytes(bytes);
       useCanvasStore.getState().loadProject(project);
       setGoogleDriveFileId(file.id, file.name);
       setStatusMessage(t("drive.openSuccess", { name: file.name }));

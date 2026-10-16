@@ -97,5 +97,21 @@
   "common": {
     "close": "Close",
     "delete": "Delete"
+  },
+  "changes": {
+    "title": "Changes",
+    "empty": "No modeling changes yet.",
+    "actorUser": "You",
+    "actorAI": "AI",
+    "created": "Created",
+    "updated": "Updated",
+    "deleted": "Deleted",
+    "cleared": "Board cleared",
+    "imported": "Imported board",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "nothing": "—",
+    "focus": "Show on canvas"
   }
 }
