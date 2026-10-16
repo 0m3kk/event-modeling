@@ -13,6 +13,7 @@ import {
   pruneDanglingReferences,
 } from "@/utils/reference";
 import { applyRenameMappings, collectRenameMappings } from "@/utils/rename";
+import { cloneElementForPaste, PASTE_OFFSET_STEP } from "@/utils/clipboard";
 import { planDomainArrange } from "@/tools/domainCard/arrange";
 import { planGroupArrange } from "@/tools/groupCard/arrange";
 import { setStoredDriveFile } from "@/utils/googleDrive";
@@ -30,13 +31,23 @@ import {
 } from "../helpers";
 import type { CanvasStoreState } from "../types";
 
+/**
+ * How far the next paste is nudged so repeated pastes cascade instead of
+ * stacking exactly. Module-scoped because it is transient UI bookkeeping and
+ * should not live in the persisted project state.
+ */
+let pasteOffset = 0;
+
 export type ElementSlice = Pick<
   CanvasStoreState,
   | "elements"
+  | "clipboard"
   | "addElement"
   | "addElements"
   | "createReferenceCopy"
   | "createMethodCopy"
+  | "copySelection"
+  | "pasteClipboard"
   | "updateElement"
   | "updateElements"
   | "arrangeDomain"
@@ -51,6 +62,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
   get,
 ) => ({
   elements: [],
+  clipboard: [],
 
   addElement: (element) => {
     const current = get().elements;
@@ -145,6 +157,27 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
     }));
     changeRecorder.recordDiff(current, get().elements, "Create method execution");
     return copy;
+  },
+
+  copySelection: () => {
+    const { elements, selectedIds } = get();
+    if (selectedIds.length === 0) return;
+    const idSet = new Set(selectedIds);
+    const picked = elements.filter((el) => idSet.has(el.id));
+    if (picked.length === 0) return;
+    // Reset the cascade so the first paste lands a fixed step from the source.
+    pasteOffset = 0;
+    set({
+      clipboard: picked.map((el) => JSON.parse(JSON.stringify(el)) as CanvasElement),
+    });
+  },
+
+  pasteClipboard: () => {
+    const clipboard = get().clipboard;
+    if (clipboard.length === 0) return;
+    pasteOffset += PASTE_OFFSET_STEP;
+    const copies = clipboard.map((el) => cloneElementForPaste(el, pasteOffset));
+    get().addElements(copies);
   },
 
   updateElement: (id, patch) => {
@@ -277,6 +310,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       redoStack: [],
       elements: [],
       selectedIds: [],
+      clipboard: [],
       googleDriveFileId: null,
       googleDriveFileName: null,
     }));
@@ -294,6 +328,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       projectCreatedAt: project.createdAt,
       elements: applyContainerLayout(normalized),
       selectedIds: [],
+      clipboard: [],
       viewport: {
         x: project.viewport.x,
         y: project.viewport.y,

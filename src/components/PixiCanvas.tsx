@@ -70,6 +70,20 @@ export function PixiCanvas() {
         return;
       }
 
+      // Copy selection into the clipboard
+      if (isCmdOrCtrl && e.code === "KeyC") {
+        e.preventDefault();
+        useCanvasStore.getState().copySelection();
+        return;
+      }
+
+      // Paste the clipboard as independent copies
+      if (isCmdOrCtrl && e.code === "KeyV") {
+        e.preventDefault();
+        useCanvasStore.getState().pasteClipboard();
+        return;
+      }
+
       // Select tool
       if (e.code === "KeyV" && !isCmdOrCtrl) {
         useCanvasStore.getState().setTool("select");

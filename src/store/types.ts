@@ -24,6 +24,8 @@ export interface CanvasStoreState {
   // Canvas data
   elements: CanvasElement[];
   selectedIds: string[];
+  /** Deep-cloned elements captured by the last copy, awaiting paste. */
+  clipboard: CanvasElement[];
   selectedField: SelectedField | null;
   inlineEdit: InlineEditState | null;
   descHover: DescHoverTarget | null;
@@ -68,6 +70,10 @@ export interface CanvasStoreState {
   addElements: (elements: CanvasElement[]) => void;
   createReferenceCopy: (id: string) => CanvasElement | null;
   createMethodCopy: (sourceId: string, methodId: string) => CanvasElement | null;
+  /** Copies the current selection into the in-memory clipboard. */
+  copySelection: () => void;
+  /** Pastes the clipboard as independent copies, selecting the new elements. */
+  pasteClipboard: () => void;
   updateElement: (id: string, patch: Partial<CanvasElement>) => void;
   updateElements: (patches: Array<{ id: string } & Partial<CanvasElement>>) => void;
   /** Auto-arranges a Domain: Groups stacked left, Slices in a row beside them. */
