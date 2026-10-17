@@ -596,4 +596,137 @@ describe("run", () => {
     expect(cargo).toContain('time = { version = "0.3" }');
     expect(cargo).toContain('event-store = { git = "https://github.com/0m3kk/backend-kit.git" }');
   });
+
+  it("generates an axum API with an Api trait and an OpenAPI document", async () => {
+    const spec = [
+      "name: Shop",
+      "domains:",
+      "  - name: Sales",
+      "    cards: [PlaceOrder, OrderPlaced, GetOrder, Order]",
+      "events:",
+      "  - name: OrderPlaced",
+      "    fields:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "commands:",
+      "  - name: PlaceOrder",
+      "    action: sales:placeOrder",
+      "    inputs:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "    responses:",
+      "      - name: order",
+      "        type: Order",
+      "        required: true",
+      "queries:",
+      "  - name: GetOrder",
+      "    action: sales:getOrder",
+      "    params:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "types:",
+      "  - object: Order",
+      "    fields:",
+      "      - name: id",
+      "        type: string",
+      "        required: true",
+      "      - name: status",
+      "        type: Status",
+      "        required: true",
+      "  - enum: Status",
+      "    values: [pending, paid]",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, generators: { api: true, queries: true } };\n`,
+      "utf8",
+    );
+
+    const result = await run({ cwd: dir, rustfmt: false });
+
+    expect(await read("src/lib.rs")).toContain("pub mod api;");
+
+    const mod = await read("src/api/mod.rs");
+    expect(mod).toContain("pub trait Api: Send + Sync + 'static {");
+    expect(mod).toContain("type Error: axum::response::IntoResponse + Send + Sync + 'static;");
+    expect(mod).toContain("async fn place_order(");
+    expect(mod).toContain("command: PlaceOrder,");
+    expect(mod).toContain("-> Result<PlaceOrderResponse, Self::Error>;");
+    // A query with no responses returns the unit type.
+    expect(mod).toContain("async fn get_order(");
+    expect(mod).toContain("query: GetOrder,");
+    expect(mod).toContain("-> Result<(), Self::Error>;");
+
+    const router = await read("src/api/router.rs");
+    expect(router).toContain("pub fn router<A>(api: A) -> Router");
+    expect(router).toContain('.route("/api/sales/place-order", post(place_order::<A>))');
+    expect(router).toContain('.route("/api/sales/get-order", post(get_order::<A>))');
+    expect(router).toContain("#[utoipa::path(");
+    expect(router).toContain('path = "/api/sales/place-order"');
+    expect(router).toContain("request_body = PlaceOrder,");
+    expect(router).toContain("(status = 200, body = PlaceOrderResponse)");
+    expect(router).toContain("(status = 204)");
+    expect(router).toContain("StatusCode::NO_CONTENT");
+
+    const openapi = await read("src/api/openapi.rs");
+    expect(openapi).toContain("#[derive(utoipa::OpenApi)]");
+    expect(openapi).toContain("paths(super::router::place_order, super::router::get_order)");
+    expect(openapi).toContain("pub struct ApiDoc;");
+
+    expect(await read("src/api/extract.rs")).toContain(
+      "impl<S> FromRequestParts<S> for ExecutionContext",
+    );
+    expect(await read("src/api/error.rs")).toContain("pub enum ApiError");
+
+    // Requests/responses and every data type carry a utoipa schema.
+    expect(await read("src/sales/commands/place_order.rs")).toContain("utoipa::ToSchema");
+    expect(await read("src/sales/types/status.rs")).toContain("utoipa::ToSchema");
+
+    const cargo = await read("Cargo.toml");
+    expect(cargo).toContain('axum = { version = "0.8" }');
+    expect(cargo).toContain("tokio");
+    expect(cargo).toContain('utoipa = { version = "5", features = ["axum_extras"] }');
+    expect(result.files.map((file) => file.path)).toContain("src/api/openapi.rs");
+  });
+
+  it("applies a custom API prefix and falls back to a kind route without action", async () => {
+    const spec = [
+      "name: Shop",
+      "domains:",
+      "  - name: Sales",
+      "    cards: [PlaceOrder]",
+      "commands:",
+      "  - name: PlaceOrder",
+      "    inputs:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `generators: { api: { enabled: true, prefix: "/billing", openapi: false } } };\n`,
+      "utf8",
+    );
+
+    const result = await run({ cwd: dir, rustfmt: false });
+
+    const router = await read("src/api/router.rs");
+    expect(router).toContain('.route("/billing/commands/place-order", post(place_order::<A>))');
+    // `openapi: false` drops the utoipa derive and the document.
+    expect(router).not.toContain("utoipa::path");
+    expect(await read("src/sales/commands/place_order.rs")).not.toContain("utoipa::ToSchema");
+    expect(result.files.map((file) => file.path)).not.toContain("src/api/openapi.rs");
+
+    const cargo = await read("Cargo.toml");
+    expect(cargo).toContain("axum");
+    expect(cargo).not.toContain("utoipa");
+  });
 });

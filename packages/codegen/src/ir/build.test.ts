@@ -467,6 +467,52 @@ views:
     expect(depNames(withView)).toContain("async-trait");
   });
 
+  it("adds axum/tokio/utoipa deps only when the API generator is on", () => {
+    expect(ir().crate.api).toBe(false);
+    expect(ir().crate.deps.map((d) => d.name)).not.toContain("axum");
+
+    const { crate } = ir({ spec: "s", out: "o", generators: { api: true } });
+    expect(crate.api).toBe(true);
+    expect(crate.openapi).toBe(true);
+    const names = crate.deps.map((d) => d.name);
+    expect(names).toContain("axum");
+    expect(names).toContain("tokio");
+    expect(names).toContain("utoipa");
+
+    const withoutOpenapi = ir({
+      spec: "s",
+      out: "o",
+      generators: { api: { enabled: true, openapi: false } },
+    }).crate;
+    expect(withoutOpenapi.openapi).toBe(false);
+    const withoutOpenapiNames = withoutOpenapi.deps.map((d) => d.name);
+    expect(withoutOpenapiNames).toContain("axum");
+    expect(withoutOpenapiNames).not.toContain("utoipa");
+  });
+
+  it("keeps the API generator off when there is no command or query", () => {
+    const source = `
+name: Shop
+events:
+  - name: OrderPlaced
+    fields:
+      - name: orderId
+        type: string
+        required: true
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({
+      spec: hoisted,
+      types,
+      config: { spec: "s", out: "o", generators: { api: true } },
+    });
+
+    // No command/query means no ExecutionContext, so the module is not emitted.
+    expect(crate.api).toBe(false);
+    expect(crate.deps.map((d) => d.name)).not.toContain("axum");
+  });
+
   it("records notes for unresolved projection events and tags", () => {
     const source = `
 name: Shop

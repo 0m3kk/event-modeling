@@ -1,0 +1,57 @@
+//! Axum transport for the generated API.
+//!
+//! Implement [`Api`](super::Api) with your command and query logic; this module
+//! deserializes requests, builds the [`ExecutionContext`] from headers and
+//! serializes responses.
+
+use axum::Json;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::routing::post;
+use axum::Router;
+use crate::ExecutionContext;
+use super::Api;
+{% for imp in imports -%}
+use {{ imp.path }}::{{ "{" }}{{ imp.names | join(", ") }}{{ "}" }};
+{% endfor %}
+
+/// Build the axum router serving every command and query.
+///
+/// Implement [`Api`](super::Api) on your application type and pass it in:
+///
+/// ```ignore
+/// let app = shop::api::router(my_app);
+/// ```
+pub fn router<A>(api: A) -> Router
+where
+    A: Api + Clone + Send + Sync + 'static,
+{
+    Router::new()
+{% for route in routes -%}
+        .route("{{ route.path }}", post({{ route.method }}::<A>))
+{% endfor -%}
+        .with_state(api)
+}
+{% for route in routes %}
+
+{% if route.doc %}{{ route.doc | doccomment }}
+{% endif -%}
+{% if crate.openapi %}#[utoipa::path(
+    post,
+    path = "{{ route.path }}",
+    tag = "{{ route.tag }}",
+    request_body = {{ route.requestType }},
+    responses({% if route.responseType %}(status = 200, body = {{ route.responseType }}){% else %}(status = 204){% endif %})
+)]
+{% endif -%}
+pub(crate) async fn {{ route.method }}<A: Api>(
+    State(api): State<A>,
+    ctx: ExecutionContext,
+    Json({{ route.argName }}): Json<{{ route.requestType }}>,
+) -> Result<{% if route.responseType %}Json<{{ route.responseType }}>{% else %}StatusCode{% endif %}, A::Error> {
+{% if route.responseType %}    let response = api.{{ route.method }}(ctx, {{ route.argName }}).await?;
+    Ok(Json(response))
+{% else %}    api.{{ route.method }}(ctx, {{ route.argName }}).await?;
+    Ok(StatusCode::NO_CONTENT)
+{% endif %}}
+{% endfor -%}

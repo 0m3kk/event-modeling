@@ -9,7 +9,7 @@
 {%- set separator = ", " -%}
 {%- endif -%}
 {%- endfor -%}
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize{% if extraDerive %}, {{ extraDerive }}{% endif %}{% if artifact.validates %}, Validate{% endif %})]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize{% if extraDerive %}, {{ extraDerive }}{% endif %}{% if crate.openapi %}, utoipa::ToSchema{% endif %}{% if artifact.validates %}, Validate{% endif %})]
 #[serde(rename_all = "snake_case")]
 pub struct {{ structName }} {
 {% for field in fields -%}

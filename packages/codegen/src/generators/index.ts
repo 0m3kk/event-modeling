@@ -7,6 +7,7 @@
  * would add new generators.
  */
 import type { CodegenConfig, GeneratorName } from "../config";
+import { apiGenerator } from "./api";
 import { cargoGenerator } from "./cargo";
 import { commandsGenerator } from "./commands";
 import { eventsGenerator } from "./events";
@@ -29,6 +30,7 @@ export const generators: Record<GeneratorName, Generator> = {
   views: viewsGenerator,
   states: statesGenerator,
   services: servicesGenerator,
+  api: apiGenerator,
 };
 
 /** Which generators run when the config does not say. */
@@ -42,6 +44,7 @@ export const DEFAULT_ENABLED: Record<GeneratorName, boolean> = {
   views: false,
   states: false,
   services: false,
+  api: false,
 };
 
 /** Stable generation order (also roughly the reading order of the crate). */
@@ -55,6 +58,7 @@ const ORDER: GeneratorName[] = [
   "views",
   "states",
   "services",
+  "api",
 ];
 
 /** Resolves which generators are enabled from the config. */

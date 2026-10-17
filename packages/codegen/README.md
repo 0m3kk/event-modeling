@@ -174,6 +174,103 @@ let events = ctx.create_store_events([&event])?;
 crate pulls in `event-store`, `serde_json` and `time` whenever the execution
 context is generated.
 
+## HTTP API (axum)
+
+Turn on the `api` generator to get an axum transport for every command and
+query, plus an [utoipa](https://docs.rs/utoipa) OpenAPI document. You implement
+one trait; the generator writes the routing, JSON I/O, header extraction and
+OpenAPI wiring.
+
+```ts
+generators: {
+  queries: true, // queries are off by default
+  api: true,     // or { enabled: true, prefix: "/api", openapi: true }
+}
+```
+
+The generator writes:
+
+```
+src/api/
+  mod.rs       # the Api trait you implement
+  router.rs    # axum::Router + one handler per command/query
+  extract.rs   # ExecutionContext from request headers
+  error.rs     # ApiError (default error type)
+  openapi.rs   # utoipa ApiDoc + openapi() (when openapi is on)
+```
+
+### The `Api` trait
+
+```rust
+#[async_trait::async_trait]
+pub trait Api: Send + Sync + 'static {
+    type Error: axum::response::IntoResponse + Send + Sync + 'static;
+
+    async fn place_order(&self, ctx: ExecutionContext, command: PlaceOrder)
+        -> Result<PlaceOrderResponse, Self::Error>;
+    async fn ship_order(&self, ctx: ExecutionContext, command: ShipOrder)
+        -> Result<(), Self::Error>;
+    async fn get_order(&self, ctx: ExecutionContext, query: GetOrder)
+        -> Result<GetOrderResponse, Self::Error>;
+}
+```
+
+Return the generated `...Response` struct, or `()` when the spec declares no
+responses. The `ExecutionContext` is built from the request headers
+(`x-actor-id`, `x-tenant-id`, `x-correlation-id`, `x-causation-id`,
+`traceparent` / `x-trace-id` / `x-span-id`, `x-forwarded-for` / `x-real-ip`,
+`user-agent`). Use [`ApiError`](#errors) or your own error type.
+
+Build the router by implementing `Api` on your application type:
+
+```rust
+struct App { /* stores, services, ... */ }
+
+#[async_trait::async_trait]
+impl shop::api::Api for App {
+    type Error = shop::api::ApiError;
+    async fn place_order(&self, ctx: ExecutionContext, command: PlaceOrder)
+        -> Result<PlaceOrderResponse, Self::Error> { /* ... */ }
+    // ...
+}
+
+let app = shop::api::router(App { /* ... */ });
+// axum::serve(listener, app).await?;
+```
+
+### Routes
+
+Commands and queries are `POST` endpoints with a JSON body. The path comes from
+the item's `action`, so `action: sales:placeOrder` becomes
+`POST /api/sales/place-order` (the `prefix`, default `/api`, is configurable).
+When an item has no `action`, the path falls back to `/api/commands/<name>` or
+`/api/queries/<name>`. Colliding paths get a numeric suffix. Command and query
+routes without responses answer `204 No Content`.
+
+### OpenAPI
+
+With `openapi` on (the default) every generated request, response, event and
+data type derives `utoipa::ToSchema`, and the crate exposes the document:
+
+```rust
+let doc = shop::api::openapi(); // utoipa::openapi::OpenApi (3.1)
+```
+
+Serve or dump it wherever you like (for example mount the `utoipa-swagger-ui`
+router in your own `main`). Set `api: { openapi: false }` to skip the utoipa
+derive and the document.
+
+### Errors
+
+`src/api/error.rs` defines a ready-to-use `ApiError` with `bad_request`,
+`not_found`, `conflict` and `internal` constructors. It renders as JSON
+`{"error":{"code":"...","message":"..."}}` with the matching status code. Change
+`Api::Error` to any type implementing `axum::response::IntoResponse` to use your
+own.
+
+The API generator pulls in `axum`, `tokio` and (with `openapi`) `utoipa`
+automatically.
+
 ## Validation
 
 Field validation from the spec is turned into [`validator`](https://docs.rs/validator)
@@ -287,6 +384,7 @@ export default defineConfig({
   generators: {
     queries: true,                 // false by default
     services: true,
+    api: { prefix: "/api" },       // axum transport + OpenAPI; false by default
     // every generator can take an options object instead of a boolean
   },
   templatesDir: ".codegen/templates",

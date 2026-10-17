@@ -16,7 +16,8 @@ export type GeneratorName =
   | "queries"
   | "views"
   | "states"
-  | "services";
+  | "services"
+  | "api";
 
 /** A crate dependency, rendered into `Cargo.toml`. */
 export interface DepSpec {
@@ -50,6 +51,20 @@ export interface CrateOptions {
 /** Either a bare on/off switch or an options object for a generator. */
 export type GeneratorConfig = boolean | ({ enabled?: boolean } & Record<string, unknown>);
 
+/** Options for the HTTP API generator (axum transport + OpenAPI). */
+export interface ApiGeneratorConfig {
+  enabled?: boolean;
+  /** HTTP framework. Only `"axum"` is supported. Defaults to `"axum"`. */
+  framework?: "axum";
+  /** Route prefix applied to every generated route. Defaults to `"/api"`. */
+  prefix?: string;
+  /**
+   * Generate the utoipa `ToSchema` derives and the OpenAPI document.
+   * Defaults to `true`.
+   */
+  openapi?: boolean;
+}
+
 /** A Nunjucks filter: `value | myFilter(arg)`. */
 export type FilterFn = (...args: unknown[]) => unknown;
 
@@ -71,7 +86,9 @@ export interface CodegenConfig {
   /** Primitive type mapping, e.g. `{ string: "String", integer: "i64" }`. */
   typeMap?: Record<string, string>;
   /** Toggle or configure each built-in generator. */
-  generators?: Partial<Record<GeneratorName, GeneratorConfig>>;
+  generators?: Omit<Partial<Record<GeneratorName, GeneratorConfig>>, "api"> & {
+    api?: boolean | ApiGeneratorConfig;
+  };
   /** Directory of user templates, searched before the built-in ones. */
   templatesDir?: string;
   /** Run `rustfmt` over generated `.rs` files. Defaults to true. */

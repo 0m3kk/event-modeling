@@ -220,6 +220,16 @@ export interface IrCrate {
    * emit the `execution_context` module and thread it through handler traits.
    */
   executionContext: boolean;
+  /**
+   * True when the `api` generator is enabled and the crate has at least one
+   * command or query, which makes the generator emit the `src/api` module.
+   */
+  api: boolean;
+  /**
+   * True when the generated API also emits utoipa `ToSchema` derives and the
+   * OpenAPI document (the `api` generator's `openapi` option, on by default).
+   */
+  openapi: boolean;
   deps: IrDep[];
   tags: TagDef[];
   /**

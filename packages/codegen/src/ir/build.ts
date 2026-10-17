@@ -19,6 +19,7 @@ import {
   type Specification,
 } from "@em/spec";
 import type { CodegenConfig } from "../config";
+import { resolveApiOptions } from "../generators/api";
 import type {
   IrArtifact,
   IrCrate,
@@ -589,7 +590,11 @@ function collectValidationHelpers(artifacts: IrArtifact[]): string[] {
   return Array.from(helpers).sort((a, b) => a.localeCompare(b));
 }
 
-function collectDeps(artifacts: IrArtifact[], extra: IrDep[]): IrDep[] {
+function collectDeps(
+  artifacts: IrArtifact[],
+  extra: IrDep[],
+  api: { enabled: boolean; openapi: boolean },
+): IrDep[] {
   const deps: IrDep[] = [{ name: "serde", version: "1", features: ["derive"] }];
   const hasState = artifacts.some((artifact) => artifact.kind === "state");
   const hasView = artifacts.some((artifact) => artifact.kind === "view");
@@ -612,6 +617,30 @@ function collectDeps(artifacts: IrArtifact[], extra: IrDep[]): IrDep[] {
     deps.push({ name: "event-store", git: EVENT_STORE_GIT });
     deps.push({ name: "serde_json", version: "1" });
     deps.push({ name: "time", version: "0.3" });
+  }
+  if (api.enabled) {
+    // The generated HTTP transport is axum; tokio runs the resulting server.
+    deps.push({ name: "axum", version: "0.8" });
+    deps.push({
+      name: "tokio",
+      version: "1",
+      features: ["macros", "rt-multi-thread", "net"],
+    });
+    if (api.openapi) {
+      // utoipa derives OpenAPI schemas; the feature set follows the field types.
+      const features = ["axum_extras"];
+      if (hasRustMarker(artifacts, "Uuid")) features.push("uuid");
+      if (hasRustMarker(artifacts, "Decimal")) features.push("decimal");
+      if (
+        hasRustMarker(artifacts, "DateTime") ||
+        hasRustMarker(artifacts, "NaiveDate") ||
+        hasRustMarker(artifacts, "NaiveTime")
+      ) {
+        features.push("chrono");
+      }
+      if (hasRustMarker(artifacts, "OffsetDateTime")) features.push("time");
+      deps.push({ name: "utoipa", version: "5", features });
+    }
   }
   if (needsValidator(artifacts)) {
     deps.push({ name: "validator", version: "0.18", features: ["derive"] });
@@ -755,6 +784,12 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
     (artifact) => artifact.kind === "command" || artifact.kind === "query",
   );
 
+  // The API generator needs the execution context, so it only turns on when the
+  // crate actually declares a command or query.
+  const apiOptions = resolveApiOptions(config);
+  const api = apiOptions.enabled && executionContext;
+  const openapi = api && apiOptions.openapi;
+
   const domains: IrDomain[] = (spec.domains ?? []).map((domain) => ({
     name: domain.name,
     module: snakeCase(domain.name) || COMMON_MODULE,
@@ -773,7 +808,9 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
       modules: buildModuleTree(artifacts),
       typeModules,
       executionContext,
-      deps: collectDeps(artifacts, extraDeps),
+      api,
+      openapi,
+      deps: collectDeps(artifacts, extraDeps, { enabled: api, openapi }),
       tags: spec.tags ?? [],
       validationHelpers: collectValidationHelpers(artifacts),
     },

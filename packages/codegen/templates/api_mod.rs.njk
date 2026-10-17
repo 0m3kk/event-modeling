@@ -1,0 +1,42 @@
+//! HTTP API (axum) generated from the specification.
+//!
+//! Implement [`Api`] with your command and query logic. The generated transport
+//! in [`router`] deserializes requests, builds the
+//! [`ExecutionContext`](crate::ExecutionContext) from request headers, and
+//! serializes responses.
+
+mod error;
+mod extract;
+mod router;
+{% if crate.openapi %}mod openapi;
+{% endif %}
+pub use error::ApiError;
+pub use router::router;
+{% if crate.openapi %}pub use openapi::{openapi, ApiDoc};
+{% endif %}
+use crate::ExecutionContext;
+{% for imp in imports -%}
+use {{ imp.path }}::{{ "{" }}{{ imp.names | join(", ") }}{{ "}" }};
+{% endfor %}
+
+/// Implement this trait with your command and query logic.
+///
+/// Each method receives the request [`ExecutionContext`](crate::ExecutionContext),
+/// built from the HTTP headers, and the deserialized request struct. Return the
+/// generated response struct (or `()` when the spec declares no responses).
+#[async_trait::async_trait]
+pub trait Api: Send + Sync + 'static {
+    /// Error returned by any command or query handler.
+    ///
+    /// Use the generated [`ApiError`] or provide your own type that implements
+    /// [`axum::response::IntoResponse`].
+    type Error: axum::response::IntoResponse + Send + Sync + 'static;
+{% for route in routes %}
+    /// Handle the `{{ route.requestType }}` {{ route.subject }}.
+    async fn {{ route.method }}(
+        &self,
+        ctx: ExecutionContext,
+        {{ route.argName }}: {{ route.requestType }},
+    ) -> Result<{% if route.responseType %}{{ route.responseType }}{% else %}(){% endif %}, Self::Error>;
+{%- endfor %}
+}
