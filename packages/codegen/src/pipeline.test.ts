@@ -649,10 +649,10 @@ describe("run", () => {
 
     const result = await run({ cwd: dir, rustfmt: false });
 
-    expect(await read("src/lib.rs")).toContain("pub mod api;");
+    expect(await read("src/lib.rs")).toContain("pub mod apis;");
 
     // The registry stores one handler trait object per command/query.
-    const mod = await read("src/api/mod.rs");
+    const mod = await read("src/apis/mod.rs");
     expect(mod).toContain("pub struct Api<E> {");
     expect(mod).toContain("use crate::sales::commands::{PlaceOrderHandler};");
     expect(mod).toContain("use crate::sales::queries::{GetOrderHandler};");
@@ -670,7 +670,7 @@ describe("run", () => {
     expect(mod).toContain("impl<E> Clone for Api<E> {");
 
     // The router dispatches each route to its registered handler.
-    const router = await read("src/api/router.rs");
+    const router = await read("src/apis/router.rs");
     expect(router).toContain("pub fn router<E>(api: Api<E>) -> Router");
     expect(router).toContain('.route("/api/sales/place-order", post(place_order::<E>))');
     expect(router).toContain('.route("/api/sales/get-order", post(get_order::<E>))');
@@ -679,7 +679,7 @@ describe("run", () => {
       'let Some(handler) = api.place_order.as_ref() else {',
     );
     expect(router).toContain("Ok(response) => Json(response).into_response(),");
-    expect(router).toContain("Ok(()) => StatusCode::NO_CONTENT.into_response(),");
+    expect(router).toContain("Ok(()) => axum::http::StatusCode::NO_CONTENT.into_response(),");
     expect(router).toContain("Err(error) => error.into_response(),");
     expect(router).toContain("#[utoipa::path(");
     expect(router).toContain('path = "/api/sales/place-order"');
@@ -687,15 +687,15 @@ describe("run", () => {
     expect(router).toContain("(status = 200, body = PlaceOrderResponse)");
     expect(router).toContain("(status = 204)");
 
-    const openapi = await read("src/api/openapi.rs");
+    const openapi = await read("src/apis/openapi.rs");
     expect(openapi).toContain("#[derive(utoipa::OpenApi)]");
     expect(openapi).toContain("paths(super::router::place_order, super::router::get_order)");
     expect(openapi).toContain("pub struct ApiDoc;");
 
-    expect(await read("src/api/extract.rs")).toContain(
+    expect(await read("src/apis/extract.rs")).toContain(
       "impl<S> FromRequestParts<S> for ExecutionContext",
     );
-    expect(await read("src/api/error.rs")).toContain("pub enum ApiError");
+    expect(await read("src/apis/error.rs")).toContain("pub enum ApiError");
 
     // Requests/responses and every data type carry a utoipa schema.
     expect(await read("src/sales/commands/place_order.rs")).toContain("utoipa::ToSchema");
@@ -705,7 +705,7 @@ describe("run", () => {
     expect(cargo).toContain('axum = { version = "0.8" }');
     expect(cargo).toContain("tokio");
     expect(cargo).toContain('utoipa = { version = "5", features = ["axum_extras"] }');
-    expect(result.files.map((file) => file.path)).toContain("src/api/openapi.rs");
+    expect(result.files.map((file) => file.path)).toContain("src/apis/openapi.rs");
   });
 
   it("applies a custom API prefix and falls back to a kind route without action", async () => {
@@ -732,12 +732,12 @@ describe("run", () => {
 
     const result = await run({ cwd: dir, rustfmt: false });
 
-    const router = await read("src/api/router.rs");
+    const router = await read("src/apis/router.rs");
     expect(router).toContain('.route("/billing/commands/place-order", post(place_order::<E>))');
     // `openapi: false` drops the utoipa derive and the document.
     expect(router).not.toContain("utoipa::path");
     expect(await read("src/sales/commands/place_order.rs")).not.toContain("utoipa::ToSchema");
-    expect(result.files.map((file) => file.path)).not.toContain("src/api/openapi.rs");
+    expect(result.files.map((file) => file.path)).not.toContain("src/apis/openapi.rs");
 
     const cargo = await read("Cargo.toml");
     expect(cargo).toContain("axum");

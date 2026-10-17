@@ -6,7 +6,6 @@
 
 use axum::Json;
 use axum::extract::State;
-use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::Router;
@@ -21,7 +20,7 @@ use {{ imp.path }}::{{ "{" }}{{ imp.names | join(", ") }}{{ "}" }};
 /// Register the handlers on the [`Api`](super::Api) registry first:
 ///
 /// ```ignore
-/// let app = shop::api::router(my_api);
+/// let app = shop::apis::router(my_api);
 /// ```
 pub fn router<E>(api: Api<E>) -> Router
 where
@@ -58,7 +57,7 @@ where
     };
     match handler.handle(&ctx, {{ route.argName }}).await {
 {% if route.responseType %}        Ok(response) => Json(response).into_response(),
-{% else %}        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+{% else %}        Ok(()) => axum::http::StatusCode::NO_CONTENT.into_response(),
 {% endif %}        Err(error) => error.into_response(),
     }
 }

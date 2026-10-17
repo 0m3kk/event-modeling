@@ -191,7 +191,7 @@ generators: {
 The generator writes:
 
 ```
-src/api/
+src/apis/
   mod.rs       # the Api handler registry (build it, then pass it to router)
   router.rs    # axum::Router + one dispatch handler per command/query
   extract.rs   # ExecutionContext from request headers
@@ -208,16 +208,16 @@ the generated registry:
 ```rust
 // Implement the generated traits — one per command/query.
 impl PlaceOrderHandler for PlaceOrderImpl {
-    type Error = shop::api::ApiError;
+    type Error = shop::apis::ApiError;
     async fn handle(&self, ctx: &ExecutionContext, command: PlaceOrder)
         -> Result<PlaceOrderResponse, Self::Error> { /* ... */ }
 }
 
-let api = shop::api::Api::new()
+let api = shop::apis::Api::new()
     .with_place_order(PlaceOrderImpl { /* ... */ })
     .with_get_order(GetOrderImpl { /* ... */ });
 
-let app = shop::api::router(api);
+let app = shop::apis::router(api);
 // axum::serve(listener, app).await?;
 ```
 
@@ -245,7 +245,7 @@ With `openapi` on (the default) every generated request, response, event and
 data type derives `utoipa::ToSchema`, and the crate exposes the document:
 
 ```rust
-let doc = shop::api::openapi(); // utoipa::openapi::OpenApi (3.1)
+let doc = shop::apis::openapi(); // utoipa::openapi::OpenApi (3.1)
 ```
 
 Serve or dump it wherever you like (for example mount the `utoipa-swagger-ui`
@@ -254,7 +254,7 @@ derive and the document.
 
 ### Errors
 
-`src/api/error.rs` defines a ready-to-use `ApiError` with `bad_request`,
+`src/apis/error.rs` defines a ready-to-use `ApiError` with `bad_request`,
 `not_found`, `conflict` and `internal` constructors. It renders as JSON
 `{"error":{"code":"...","message":"..."}}` with the matching status code. Use it
 as the handlers' `Error` type, or set the registry's error type to any type

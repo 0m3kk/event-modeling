@@ -222,7 +222,7 @@ export interface IrCrate {
   executionContext: boolean;
   /**
    * True when the `api` generator is enabled and the crate has at least one
-   * command or query, which makes the generator emit the `src/api` module.
+   * command or query, which makes the generator emit the `src/apis` module.
    */
   api: boolean;
   /**

@@ -174,13 +174,13 @@ export const apiGenerator: Generator = {
       ),
     };
     const jobs: RenderJob[] = [
-      { template: "api_mod.rs.njk", outPath: "src/api/mod.rs", context },
-      { template: "api_router.rs.njk", outPath: "src/api/router.rs", context },
-      { template: "api_extract.rs.njk", outPath: "src/api/extract.rs", context },
-      { template: "api_error.rs.njk", outPath: "src/api/error.rs", context },
+      { template: "api_mod.rs.njk", outPath: "src/apis/mod.rs", context },
+      { template: "api_router.rs.njk", outPath: "src/apis/router.rs", context },
+      { template: "api_extract.rs.njk", outPath: "src/apis/extract.rs", context },
+      { template: "api_error.rs.njk", outPath: "src/apis/error.rs", context },
     ];
     if (crate.openapi) {
-      jobs.push({ template: "api_openapi.rs.njk", outPath: "src/api/openapi.rs", context });
+      jobs.push({ template: "api_openapi.rs.njk", outPath: "src/apis/openapi.rs", context });
     }
     return jobs;
   },
