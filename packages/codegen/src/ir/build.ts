@@ -495,13 +495,15 @@ function domainIndex(spec: Specification): Map<string, string> {
 }
 
 /**
- * Assigns a domain to every data type by usage: a type used by exactly one
- * domain lives in that domain; a type used by several (or none) goes to
- * `common`. Usage propagates through nested type references.
+ * Assigns a domain to every data type by usage: an explicitly placed type (one
+ * listed in a domain's or group's cards) keeps its domain; the rest live in the
+ * single domain that uses them, or `common` when used by several (or none).
+ * Usage propagates through nested type references.
  */
 function inferTypeDomains(
   artifacts: IrArtifact[],
   cardDomain: (artifact: IrArtifact) => string,
+  explicitDomain: (artifact: IrArtifact) => string | undefined,
 ): Map<string, Set<string>> {
   const domainsByName = new Map<string, Set<string>>();
   const typeNames = new Set(
@@ -515,10 +517,12 @@ function inferTypeDomains(
     return names;
   };
 
-  // Seed from cards (events/commands/...), which already know their domain.
+  // Seed from cards (events/commands/...), which already know their domain, and
+  // from types that are explicitly placed in a domain/group.
   for (const artifact of artifacts) {
-    if (artifact.kind === "type") continue;
-    const module = cardDomain(artifact);
+    const module =
+      artifact.kind === "type" ? explicitDomain(artifact) : cardDomain(artifact);
+    if (!module) continue;
     for (const ref of refs(artifact)) {
       const key = nameKey(ref);
       if (!typeNames.has(key)) continue;
@@ -695,18 +699,22 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
     });
   }
 
-  // Module assignment: cards come from the domain membership lists; types are
-  // inferred from usage.
+  // Module assignment: cards come from the domain membership lists; an
+  // explicitly placed type keeps that domain, otherwise it is inferred from use.
   const byName = domainIndex(spec);
+  const explicitTypeDomain = (artifact: IrArtifact): string | undefined =>
+    byName.get(nameKey(artifact.name));
   const cardDomain = (artifact: IrArtifact): string =>
     byName.get(nameKey(artifact.name)) ?? COMMON_MODULE;
-  const typeDomains = inferTypeDomains(artifacts, cardDomain);
+  const typeDomains = inferTypeDomains(artifacts, cardDomain, explicitTypeDomain);
 
   for (const artifact of artifacts) {
     let module: string;
     if (artifact.kind === "type") {
       const domains = typeDomains.get(nameKey(artifact.name));
-      module = domains && domains.size === 1 ? Array.from(domains)[0] : COMMON_MODULE;
+      module =
+        explicitTypeDomain(artifact) ??
+        (domains && domains.size === 1 ? Array.from(domains)[0] : COMMON_MODULE);
     } else {
       module = cardDomain(artifact);
     }

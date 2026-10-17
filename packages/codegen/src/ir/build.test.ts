@@ -78,6 +78,74 @@ describe("buildIr", () => {
     expect(crate.typeModules).toEqual(["common", "sales"]);
   });
 
+  it("keeps an explicitly placed type in its domain", () => {
+    const source = `
+name: Shop
+domains:
+  - name: Sales
+    cards: [OrderPlaced, Order, OrderId]
+  - name: Shipping
+    cards: [OrderShipped, Invoice]
+types:
+  - object: Order
+    fields:
+      - name: id
+        type: OrderId
+  - alias: OrderId
+    of: string
+  - object: Invoice
+    fields:
+      - name: id
+        type: string
+events:
+  - name: OrderPlaced
+    fields:
+      - name: order
+        type: Order
+  - name: OrderShipped
+    fields:
+      - name: orderId
+        type: OrderId
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
+    const module = (name: string) => artifact(crate, name).modulePath;
+
+    // Explicitly placed, so it stays in Sales even though Shipping uses it too.
+    expect(module("OrderId")).toEqual(["sales", "types"]);
+    // Placed but unused: explicit placement still wins over "common by default".
+    expect(module("Invoice")).toEqual(["shipping", "types"]);
+  });
+
+  it("resolves a type's domain from the group that holds it", () => {
+    const source = `
+name: Shop
+domains:
+  - name: Sales
+    groups: [SalesTypes]
+groups:
+  - name: SalesTypes
+    domain: Sales
+    cards: [OrderId]
+types:
+  - alias: OrderId
+    of: string
+events:
+  - name: OrderShipped
+    fields:
+      - name: orderId
+        type: OrderId
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
+
+    // The event has no domain, so usage alone would send OrderId to `common`;
+    // its group placement under Sales wins.
+    expect(artifact(crate, "OrderId").modulePath).toEqual(["sales", "types"]);
+  });
+
   it("renders required/array/optional fields and flags prelude usage", () => {
     const { crate } = ir();
     const placed = artifact(crate, "OrderPlaced");

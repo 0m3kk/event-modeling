@@ -27,7 +27,7 @@ const TOOL_LABELS: Record<string, string> = {
   stickyNote: "Sticky Note",
 };
 
-/** Card types that hold reusable data definitions (listed once under `types`, excluded from membership lists). */
+/** Card types that hold reusable data definitions (collected once under `types`). */
 const DATA_CARD_TYPES = new Set(["objectCard", "enumCard", "aliasCard"]);
 
 export interface SpecificationInput {
@@ -103,8 +103,7 @@ export function buildSpecification({
         (el) =>
           el.domainId === domain.id &&
           el.type !== "groupCard" &&
-          el.type !== "sliceCard" &&
-          !DATA_CARD_TYPES.has(el.type),
+          el.type !== "sliceCard",
       )
       .map(nameOf);
     if (childGroups.length > 0) out.groups = childGroups;
@@ -118,7 +117,7 @@ export function buildSpecification({
     const domain = group.domainId ? domainIdToName.get(group.domainId) : undefined;
     if (domain) out.domain = domain;
     const cards = elements
-      .filter((el) => el.groupId === group.id && !DATA_CARD_TYPES.has(el.type))
+      .filter((el) => el.groupId === group.id)
       .map(nameOf);
     if (cards.length > 0) out.cards = cards;
     return out;

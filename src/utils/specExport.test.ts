@@ -71,7 +71,9 @@ describe("buildSpecification", () => {
     expect(spec.specVersion).toBeUndefined();
     expect(spec.generatedAt).toBeUndefined();
 
-    expect(spec.domains).toEqual([{ name: "Sales", cards: ["OrderPlaced", "PlaceOrder"] }]);
+    expect(spec.domains).toEqual([
+      { name: "Sales", cards: ["OrderPlaced", "PlaceOrder", "Order"] },
+    ]);
     expect(spec.events).toEqual([
       { name: "OrderPlaced", fields: [{ name: "orderId", type: "string" }] },
     ]);
@@ -184,19 +186,38 @@ describe("buildSpecification", () => {
     ]);
   });
 
-  it("omits data containers from domain and group membership lists", () => {
+  it("lists a type card in its domain's cards", () => {
     const elements: CanvasElement[] = [
       el("d1", "domainCard", { name: "Sales" }),
-      el("g1", "groupCard", { name: "Sales Types" }, { domainId: "d1" }),
-      el("o1", "objectCard", { name: "Order", fields: [{ name: "id", type: "string" }] }, { domainId: "d1", groupId: "g1" }),
-      el("svc", "serviceCard", { name: "OrderService", methods: [] }, { domainId: "d1", groupId: "g1" }),
+      el("o1", "objectCard", { name: "Order", fields: [{ name: "id", type: "string" }] }, { domainId: "d1" }),
       el("e1", "eventCard", { name: "OrderPlaced", fields: [{ name: "order", type: "Order" }] }, { domainId: "d1" }),
     ];
 
     const spec = buildSpecification({ name: "Shop", elements });
 
-    expect(spec.domains).toEqual([{ name: "Sales", groups: ["Sales Types"], cards: ["OrderService", "OrderPlaced"] }]);
-    expect(spec.groups).toEqual([{ name: "Sales Types", domain: "Sales", cards: ["OrderService"] }]);
+    expect(spec.domains).toEqual([{ name: "Sales", cards: ["Order", "OrderPlaced"] }]);
+    expect(spec.types).toEqual([
+      { object: "Order", fields: [{ name: "id", type: "string" }] },
+    ]);
+  });
+
+  it("lists a type card in the group that holds it", () => {
+    const elements: CanvasElement[] = [
+      el("d1", "domainCard", { name: "Sales" }),
+      el("g1", "groupCard", { name: "Sales Types" }, { domainId: "d1" }),
+      // A card in a group carries the group, not the domain.
+      el("o1", "objectCard", { name: "Order", fields: [{ name: "id", type: "string" }] }, { groupId: "g1" }),
+      el("e1", "eventCard", { name: "OrderPlaced", fields: [{ name: "order", type: "Order" }] }, { domainId: "d1" }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+
+    expect(spec.domains).toEqual([
+      { name: "Sales", groups: ["Sales Types"], cards: ["OrderPlaced"] },
+    ]);
+    expect(spec.groups).toEqual([
+      { name: "Sales Types", domain: "Sales", cards: ["Order"] },
+    ]);
   });
 
   it("de-duplicates mirror copies but keeps them in slice lanes", () => {

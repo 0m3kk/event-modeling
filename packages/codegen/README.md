@@ -85,12 +85,13 @@ crates/shop/
     common/  ...                 # items that belong to no domain / are shared
 ```
 
-A data type is placed in the single domain that uses it; a type used by several
-domains (or none) goes to `common/types`. A card's domain is resolved from, in
-order: `domains[].cards`, the cards of a group that belongs to a domain
-(`groups[].cards`), then the cards named in a slice lane
-(`slices[].lanes[].cards`) — because boards usually attach cards to slices and
-groups rather than to the domain directly.
+A data type is placed in the domain that lists it — in `domains[].cards` or,
+through a group, in `groups[].cards`. A type that is not listed anywhere falls
+back to the single domain that uses it, or `common/types` when used by several
+(or none). A card's domain is resolved from, in order: `domains[].cards`, the
+cards of a group that belongs to a domain (`groups[].cards`), then the cards
+named in a slice lane (`slices[].lanes[].cards`) — because boards usually attach
+cards to slices and groups rather than to the domain directly.
 
 Commands and queries generate two structs: the request (`PlaceOrder`) from the
 inputs/params and, when the spec declares responses, a `PlaceOrderResponse`.

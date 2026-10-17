@@ -43,6 +43,10 @@ references it**. `hoistTypes` accepts both: it lifts inline definitions into
 `types`, de-duplicates by name, and rewrites fields to plain names, so a
 generator always sees `field.type` as a string.
 
+A type's domain is recorded in the usual membership lists: list its name in a
+domain's `cards`, or in a group's `cards` for the domain that group belongs to.
+A type that is not listed anywhere is placed by usage (see `@em/codegen`).
+
 ```ts
 import { parseSpecification, hoistTypes } from "@em/spec";
 

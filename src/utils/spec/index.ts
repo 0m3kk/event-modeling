@@ -10,8 +10,9 @@
  * either — the document is just the model.
  *
  * Data containers (Object / Enum / Alias cards) are collected once in the
- * top-level `types` registry; fields reference them by name. They are not
- * listed in the Domain/Group membership lists.
+ * top-level `types` registry; fields reference them by name. Their Domain/Group
+ * placement is recorded in the usual membership lists (`domains[].cards`,
+ * `groups[].cards`), so a generator can tell which domain owns a type.
  *
  * Reference copies share the name of the card they mirror, so definitions
  * de-duplicate by name while Slice lanes still reference the copies that appear
