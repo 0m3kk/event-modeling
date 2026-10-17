@@ -49,13 +49,15 @@ export function resolveApiOptions(config: CodegenConfig): ApiOptions {
 
 /** A single HTTP route planned from a command or query artifact. */
 export interface ApiRoute {
-  /** snake_case Rust handler function name (also the `Api` trait method). */
+  /** snake_case route handler function name (also the registry setter suffix). */
   method: string;
   subject: "command" | "query";
   /** Trait method parameter name (`command` / `query`). */
   argName: string;
   /** Request struct type. */
   requestType: string;
+  /** Generated handler trait for this item, e.g. `PlaceOrderHandler`. */
+  handlerType: string;
   /** Response struct type, absent when the spec declares no responses. */
   responseType?: string;
   /** Full route path, including the prefix. */
@@ -121,6 +123,7 @@ export function planRoutes(crate: IrCrate, options: ApiOptions): ApiRoute[] {
       subject,
       argName: subject,
       requestType: artifact.rustName,
+      handlerType: `${artifact.rustName}Handler`,
       responseType,
       path: uniquePath(options.prefix, routePath(artifact, subject), usedPaths),
       tag: artifact.modulePath[0] ?? "common",
@@ -132,20 +135,19 @@ export function planRoutes(crate: IrCrate, options: ApiOptions): ApiRoute[] {
   return routes;
 }
 
-/** A grouped `use crate::...::{A, B};` for the request/response types. */
+/** A grouped `use crate::...::{A, B};`. */
 export interface ApiImport {
   path: string;
   names: string[];
 }
 
-/** Groups the request/response types by module for imports. */
-function collectImports(routes: ApiRoute[]): ApiImport[] {
+/** Groups names selected from each route by their module, for imports. */
+function collectImports(routes: ApiRoute[], select: (route: ApiRoute) => string[]): ApiImport[] {
   const byModule = new Map<string, Set<string>>();
   for (const route of routes) {
     const path = `crate::${route.modulePath.join("::")}`;
     const names = byModule.get(path) ?? new Set<string>();
-    names.add(route.requestType);
-    if (route.responseType) names.add(route.responseType);
+    for (const name of select(route)) names.add(name);
     byModule.set(path, names);
   }
   return Array.from(byModule.entries())
@@ -161,7 +163,16 @@ export const apiGenerator: Generator = {
     const routes = planRoutes(crate, options);
     if (routes.length === 0) return [];
 
-    const context = { crate, routes, imports: collectImports(routes) };
+    const context = {
+      crate,
+      routes,
+      // The registry stores handler trait objects; the router also names the
+      // request/response structs it deserializes and serializes.
+      handlerImports: collectImports(routes, (route) => [route.handlerType]),
+      typeImports: collectImports(routes, (route) =>
+        route.responseType ? [route.requestType, route.responseType] : [route.requestType],
+      ),
+    };
     const jobs: RenderJob[] = [
       { template: "api_mod.rs.njk", outPath: "src/api/mod.rs", context },
       { template: "api_router.rs.njk", outPath: "src/api/router.rs", context },

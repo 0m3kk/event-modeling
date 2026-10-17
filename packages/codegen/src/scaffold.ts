@@ -28,8 +28,8 @@ export default defineConfig({
     views: false,
     states: false,
     services: false,
-    // The HTTP API (axum) generates a developer-facing \`Api\` trait plus the
-    // transport, and an OpenAPI document via utoipa.
+    // The HTTP API (axum) generates a handler registry plus the transport,
+    // and an OpenAPI document via utoipa.
     // api: { enabled: true, prefix: "/api", openapi: true },
   },
 

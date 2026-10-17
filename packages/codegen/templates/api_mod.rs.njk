@@ -1,9 +1,9 @@
 //! HTTP API (axum) generated from the specification.
 //!
-//! Implement [`Api`] with your command and query logic. The generated transport
-//! in [`router`] deserializes requests, builds the
-//! [`ExecutionContext`](crate::ExecutionContext) from request headers, and
-//! serializes responses.
+//! Register a handler for every command and query on [`Api`], then pass the
+//! registry to [`router`]. The generated transport deserializes requests,
+//! builds the [`ExecutionContext`](crate::ExecutionContext) from request
+//! headers, and serializes responses.
 
 mod error;
 mod extract;
@@ -14,29 +14,64 @@ pub use error::ApiError;
 pub use router::router;
 {% if crate.openapi %}pub use openapi::{openapi, ApiDoc};
 {% endif %}
-use crate::ExecutionContext;
-{% for imp in imports -%}
+use std::sync::Arc;
+{% for imp in handlerImports -%}
 use {{ imp.path }}::{{ "{" }}{{ imp.names | join(", ") }}{{ "}" }};
 {% endfor %}
 
-/// Implement this trait with your command and query logic.
+/// Registry of the command and query handlers the HTTP API dispatches to.
 ///
-/// Each method receives the request [`ExecutionContext`](crate::ExecutionContext),
-/// built from the HTTP headers, and the deserialized request struct. Return the
-/// generated response struct (or `()` when the spec declares no responses).
-#[async_trait::async_trait]
-pub trait Api: Send + Sync + 'static {
-    /// Error returned by any command or query handler.
-    ///
-    /// Use the generated [`ApiError`] or provide your own type that implements
-    /// [`axum::response::IntoResponse`].
-    type Error: axum::response::IntoResponse + Send + Sync + 'static;
+/// Build it with [`Api::new`] and register each handler with its `with_*`
+/// method:
+///
+/// ```ignore
+/// let api = shop::api::Api::new()
+///     .with_place_order(PlaceOrderImpl)
+///     .with_get_order(GetOrderImpl);
+/// let app = shop::api::router(api);
+/// ```
+///
+/// A route whose handler is not registered answers `500`, so register every
+/// route the spec declares.
+pub struct Api<E> {
+{% for route in routes -%}
+    {{ route.method }}: Option<Arc<dyn {{ route.handlerType }}<Error = E> + Send + Sync>>,
+{% endfor -%}
+}
+
+impl<E> Api<E> {
+    /// Create a registry with no handlers registered.
+    pub fn new() -> Self {
+        Self::default()
+    }
 {% for route in routes %}
-    /// Handle the `{{ route.requestType }}` {{ route.subject }}.
-    async fn {{ route.method }}(
-        &self,
-        ctx: ExecutionContext,
-        {{ route.argName }}: {{ route.requestType }},
-    ) -> Result<{% if route.responseType %}{{ route.responseType }}{% else %}(){% endif %}, Self::Error>;
+    /// Register the `{{ route.requestType }}` {{ route.subject }} handler.
+    pub fn with_{{ route.method }}(
+        mut self,
+        handler: impl {{ route.handlerType }}<Error = E> + Send + Sync + 'static,
+    ) -> Self {
+        self.{{ route.method }} = Some(Arc::new(handler));
+        self
+    }
 {%- endfor %}
+}
+
+impl<E> Default for Api<E> {
+    fn default() -> Self {
+        Self {
+{% for route in routes -%}
+            {{ route.method }}: None,
+{% endfor -%}
+        }
+    }
+}
+
+impl<E> Clone for Api<E> {
+    fn clone(&self) -> Self {
+        Self {
+{% for route in routes -%}
+            {{ route.method }}: self.{{ route.method }}.clone(),
+{% endfor -%}
+        }
+    }
 }

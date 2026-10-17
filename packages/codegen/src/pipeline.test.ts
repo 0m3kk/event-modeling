@@ -597,7 +597,7 @@ describe("run", () => {
     expect(cargo).toContain('event-store = { git = "https://github.com/0m3kk/backend-kit.git" }');
   });
 
-  it("generates an axum API with an Api trait and an OpenAPI document", async () => {
+  it("generates an axum handler registry and an OpenAPI document", async () => {
     const spec = [
       "name: Shop",
       "domains:",
@@ -651,27 +651,41 @@ describe("run", () => {
 
     expect(await read("src/lib.rs")).toContain("pub mod api;");
 
+    // The registry stores one handler trait object per command/query.
     const mod = await read("src/api/mod.rs");
-    expect(mod).toContain("pub trait Api: Send + Sync + 'static {");
-    expect(mod).toContain("type Error: axum::response::IntoResponse + Send + Sync + 'static;");
-    expect(mod).toContain("async fn place_order(");
-    expect(mod).toContain("command: PlaceOrder,");
-    expect(mod).toContain("-> Result<PlaceOrderResponse, Self::Error>;");
-    // A query with no responses returns the unit type.
-    expect(mod).toContain("async fn get_order(");
-    expect(mod).toContain("query: GetOrder,");
-    expect(mod).toContain("-> Result<(), Self::Error>;");
+    expect(mod).toContain("pub struct Api<E> {");
+    expect(mod).toContain("use crate::sales::commands::{PlaceOrderHandler};");
+    expect(mod).toContain("use crate::sales::queries::{GetOrderHandler};");
+    expect(mod).toContain(
+      "place_order: Option<Arc<dyn PlaceOrderHandler<Error = E> + Send + Sync>>,",
+    );
+    expect(mod).toContain(
+      "pub fn with_place_order(",
+    );
+    expect(mod).toContain(
+      "handler: impl PlaceOrderHandler<Error = E> + Send + Sync + 'static,",
+    );
+    expect(mod).toContain("pub fn with_get_order(");
+    expect(mod).toContain("impl<E> Default for Api<E> {");
+    expect(mod).toContain("impl<E> Clone for Api<E> {");
 
+    // The router dispatches each route to its registered handler.
     const router = await read("src/api/router.rs");
-    expect(router).toContain("pub fn router<A>(api: A) -> Router");
-    expect(router).toContain('.route("/api/sales/place-order", post(place_order::<A>))');
-    expect(router).toContain('.route("/api/sales/get-order", post(get_order::<A>))');
+    expect(router).toContain("pub fn router<E>(api: Api<E>) -> Router");
+    expect(router).toContain('.route("/api/sales/place-order", post(place_order::<E>))');
+    expect(router).toContain('.route("/api/sales/get-order", post(get_order::<E>))');
+    expect(router).toContain("State(api): State<Api<E>>");
+    expect(router).toContain(
+      'let Some(handler) = api.place_order.as_ref() else {',
+    );
+    expect(router).toContain("Ok(response) => Json(response).into_response(),");
+    expect(router).toContain("Ok(()) => StatusCode::NO_CONTENT.into_response(),");
+    expect(router).toContain("Err(error) => error.into_response(),");
     expect(router).toContain("#[utoipa::path(");
     expect(router).toContain('path = "/api/sales/place-order"');
     expect(router).toContain("request_body = PlaceOrder,");
     expect(router).toContain("(status = 200, body = PlaceOrderResponse)");
     expect(router).toContain("(status = 204)");
-    expect(router).toContain("StatusCode::NO_CONTENT");
 
     const openapi = await read("src/api/openapi.rs");
     expect(openapi).toContain("#[derive(utoipa::OpenApi)]");
@@ -719,7 +733,7 @@ describe("run", () => {
     const result = await run({ cwd: dir, rustfmt: false });
 
     const router = await read("src/api/router.rs");
-    expect(router).toContain('.route("/billing/commands/place-order", post(place_order::<A>))');
+    expect(router).toContain('.route("/billing/commands/place-order", post(place_order::<E>))');
     // `openapi: false` drops the utoipa derive and the document.
     expect(router).not.toContain("utoipa::path");
     expect(await read("src/sales/commands/place_order.rs")).not.toContain("utoipa::ToSchema");

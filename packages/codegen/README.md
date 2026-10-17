@@ -177,9 +177,9 @@ context is generated.
 ## HTTP API (axum)
 
 Turn on the `api` generator to get an axum transport for every command and
-query, plus an [utoipa](https://docs.rs/utoipa) OpenAPI document. You implement
-one trait; the generator writes the routing, JSON I/O, header extraction and
-OpenAPI wiring.
+query, plus an [utoipa](https://docs.rs/utoipa) OpenAPI document. You register a
+handler for each command and query; the generator writes the routing, JSON I/O,
+header extraction and OpenAPI wiring.
 
 ```ts
 generators: {
@@ -192,51 +192,43 @@ The generator writes:
 
 ```
 src/api/
-  mod.rs       # the Api trait you implement
-  router.rs    # axum::Router + one handler per command/query
+  mod.rs       # the Api handler registry (build it, then pass it to router)
+  router.rs    # axum::Router + one dispatch handler per command/query
   extract.rs   # ExecutionContext from request headers
   error.rs     # ApiError (default error type)
   openapi.rs   # utoipa ApiDoc + openapi() (when openapi is on)
 ```
 
-### The `Api` trait
+### Registering handlers
+
+Each command and query already has a generated handler trait (see
+[Handler traits](#handler-traits)). Implement those traits, then register them on
+the generated registry:
 
 ```rust
-#[async_trait::async_trait]
-pub trait Api: Send + Sync + 'static {
-    type Error: axum::response::IntoResponse + Send + Sync + 'static;
-
-    async fn place_order(&self, ctx: ExecutionContext, command: PlaceOrder)
-        -> Result<PlaceOrderResponse, Self::Error>;
-    async fn ship_order(&self, ctx: ExecutionContext, command: ShipOrder)
-        -> Result<(), Self::Error>;
-    async fn get_order(&self, ctx: ExecutionContext, query: GetOrder)
-        -> Result<GetOrderResponse, Self::Error>;
-}
-```
-
-Return the generated `...Response` struct, or `()` when the spec declares no
-responses. The `ExecutionContext` is built from the request headers
-(`x-actor-id`, `x-tenant-id`, `x-correlation-id`, `x-causation-id`,
-`traceparent` / `x-trace-id` / `x-span-id`, `x-forwarded-for` / `x-real-ip`,
-`user-agent`). Use [`ApiError`](#errors) or your own error type.
-
-Build the router by implementing `Api` on your application type:
-
-```rust
-struct App { /* stores, services, ... */ }
-
-#[async_trait::async_trait]
-impl shop::api::Api for App {
+// Implement the generated traits — one per command/query.
+impl PlaceOrderHandler for PlaceOrderImpl {
     type Error = shop::api::ApiError;
-    async fn place_order(&self, ctx: ExecutionContext, command: PlaceOrder)
+    async fn handle(&self, ctx: &ExecutionContext, command: PlaceOrder)
         -> Result<PlaceOrderResponse, Self::Error> { /* ... */ }
-    // ...
 }
 
-let app = shop::api::router(App { /* ... */ });
+let api = shop::api::Api::new()
+    .with_place_order(PlaceOrderImpl { /* ... */ })
+    .with_get_order(GetOrderImpl { /* ... */ });
+
+let app = shop::api::router(api);
 // axum::serve(listener, app).await?;
 ```
+
+`Api` is generic over the error type the handlers return (default it to
+`ApiError` or use your own `IntoResponse` type). Every registered handler must
+share that error type. A route whose handler was not registered answers
+`500 Internal Server Error`, so register every route the spec declares. The
+`ExecutionContext` is built from the request headers
+(`x-actor-id`, `x-tenant-id`, `x-correlation-id`, `x-causation-id`,
+`traceparent` / `x-trace-id` / `x-span-id`, `x-forwarded-for` / `x-real-ip`,
+`user-agent`).
 
 ### Routes
 
@@ -264,9 +256,9 @@ derive and the document.
 
 `src/api/error.rs` defines a ready-to-use `ApiError` with `bad_request`,
 `not_found`, `conflict` and `internal` constructors. It renders as JSON
-`{"error":{"code":"...","message":"..."}}` with the matching status code. Change
-`Api::Error` to any type implementing `axum::response::IntoResponse` to use your
-own.
+`{"error":{"code":"...","message":"..."}}` with the matching status code. Use it
+as the handlers' `Error` type, or set the registry's error type to any type
+implementing `axum::response::IntoResponse`.
 
 The API generator pulls in `axum`, `tokio` and (with `openapi`) `utoipa`
 automatically.
