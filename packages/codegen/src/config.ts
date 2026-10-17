@@ -51,6 +51,21 @@ export interface CrateOptions {
 /** Either a bare on/off switch or an options object for a generator. */
 export type GeneratorConfig = boolean | ({ enabled?: boolean } & Record<string, unknown>);
 
+/** Options for the View generator (DCB read models) and the SQL migrations derived from it. */
+export interface ViewsGeneratorConfig {
+  enabled?: boolean;
+  /**
+   * Generate reversible sqlx SQL migrations for the View read models.
+   *
+   * When true, each View renders `CREATE TABLE` migrations under
+   * `<out>/migrations/` in sqlx's `<version>_create_<table>.up.sql` /
+   * `.down.sql` layout. The schema mirrors the generated Rust struct: objects
+   * are flattened into prefixed columns and an array of objects becomes a child
+   * table. Off by default, like the views themselves.
+   */
+  migrations?: boolean;
+}
+
 /** Options for the HTTP API generator (axum transport + OpenAPI). */
 export interface ApiGeneratorConfig {
   enabled?: boolean;
@@ -86,8 +101,9 @@ export interface CodegenConfig {
   /** Primitive type mapping, e.g. `{ string: "String", integer: "i64" }`. */
   typeMap?: Record<string, string>;
   /** Toggle or configure each built-in generator. */
-  generators?: Omit<Partial<Record<GeneratorName, GeneratorConfig>>, "api"> & {
+  generators?: Omit<Partial<Record<GeneratorName, GeneratorConfig>>, "api" | "views"> & {
     api?: boolean | ApiGeneratorConfig;
+    views?: boolean | ViewsGeneratorConfig;
   };
   /** Directory of user templates, searched before the built-in ones. */
   templatesDir?: string;

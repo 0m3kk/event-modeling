@@ -2,7 +2,8 @@
  * The generation pipeline.
  *
  *   load config -> read + parse spec -> hoist types -> build IR -> run passes
- *   -> plan render jobs -> render templates -> rustfmt -> write + manifest
+ *   -> plan render jobs -> render templates -> stamp banner -> rustfmt
+ *   -> write + manifest
  *
  * `run` is the single entry point used by the CLI and by tests.
  */
@@ -14,6 +15,7 @@ import { planJobs } from "./generators";
 import { buildIr } from "./ir/build";
 import { loadConfig, type LoadedConfig } from "./load";
 import { hashContent, readManifest, writeManifest, type Manifest } from "./manifest";
+import { withBanner } from "./postprocess/banner";
 import { formatRust, rustfmtAvailable } from "./postprocess/rustfmt";
 import { builtinTemplatesDir, createRenderEnv } from "./render/env";
 
@@ -92,6 +94,7 @@ export async function run(options: RunOptions): Promise<RunResult> {
     const outPath = job.outPath.split(path.sep).join("/");
     let content = renderEnv.render(job.template, job.context);
     if (!content.endsWith("\n")) content += "\n";
+    content = withBanner(outPath, content);
     byPath.set(outPath, { path: outPath, content });
   }
 

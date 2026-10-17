@@ -1,0 +1,14 @@
+{#
+  The `up` half of a sqlx migration: one `CREATE TABLE` mirroring a View (or a
+  child table for an array of objects). `version` is the sqlx version prefix,
+  `table` the table name and `lines` the pre-rendered column/constraint defs.
+#}
+{%- if artifact.doc %}-- {{ artifact.doc }}
+{% endif -%}
+-- Generated from the `{{ artifact.name }}` view by @em/codegen.
+-- The schema mirrors the generated read model; tracked in the manifest.
+{% for note in notes %}-- note: {{ note }}
+{% endfor %}
+CREATE TABLE IF NOT EXISTS "{{ table }}" (
+{% for line in lines %}    {{ line }}{% if not loop.last %},{% endif %}
+{% endfor %});

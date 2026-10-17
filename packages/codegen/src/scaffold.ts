@@ -22,15 +22,16 @@ export default defineConfig({
     // deps: [{ name: "event-store", git: "https://github.com/0m3kk/backend-kit.git" }],
   },
 
-  // Generators off by default can be switched on here.
+  // Every built-in generator runs by default; disable any of them here.
   generators: {
-    queries: false,
-    views: false,
-    states: false,
-    services: false,
+    queries: true,
+    // View read models. Add \`migrations: true\` to also emit sqlx SQL migrations:
+    views: { enabled: true, migrations: true },
+    states: true,
+    services: true,
     // The HTTP API (axum) generates a handler registry plus the transport,
     // and an OpenAPI document via utoipa.
-    // api: { enabled: true, prefix: "/api", openapi: true },
+    api: { enabled: true, prefix: "/api", openapi: true },
   },
 
   // Drop templates into ".codegen/templates" (see \`em-codegen eject\`) to
