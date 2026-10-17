@@ -19,34 +19,36 @@ slices:
   - name: Ship order
     domain: Shipping
 
+types:
+  - object: Order
+    fields:
+      - name: id
+        type: OrderId
+      - name: status
+        type: Status
+      - name: total
+        type: float
+        required: true
+        validation:
+          min: 0
+  - alias: OrderId
+    of: string
+  - alias: Timestamp
+    of: string
+  - enum: Status
+    values:
+      - pending
+      - paid
+      - shipped
+
 events:
   - name: OrderPlaced
     description: Emitted when a customer places an order.
     fields:
       - name: order
-        type:
-          object: Order
-          fields:
-            - name: id
-              type:
-                alias: OrderId
-                of: string
-            - name: status
-              type:
-                enum: Status
-                values:
-                  - pending
-                  - paid
-                  - shipped
-            - name: total
-              type: float
-              required: true
-              validation:
-                min: 0
+        type: Order
       - name: placedAt
-        type:
-          alias: Timestamp
-          of: string
+        type: Timestamp
         tag: order
   - name: OrderShipped
     fields:

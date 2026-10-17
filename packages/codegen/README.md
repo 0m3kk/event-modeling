@@ -52,8 +52,8 @@ spec.yaml -> parse (zod) -> hoist types -> build IR -> run passes
 ```
 
 - **parse** uses `@em/spec`: YAML -> validated document.
-- **hoist** lifts the inline Object/Enum/Alias definitions the document expands
-  at first reference into a single `types` registry, so downstream everything
+- **hoist** normalises the Object/Enum/Alias definitions into a single `types`
+  registry (lifting any legacy inline definitions), so downstream everything
   refers to a type by name.
 - **build IR** maps spec primitives to Rust types, renders field types and
   identifiers, decides each item's module path and detects crate dependencies.

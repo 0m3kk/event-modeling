@@ -60,6 +60,12 @@ export const aliasTypeDefSchema = z.object({
   validation: fieldValidationSchema.optional(),
 });
 
+export const dataTypeDefSchema = z.union([
+  objectTypeDefSchema,
+  enumTypeDefSchema,
+  aliasTypeDefSchema,
+]);
+
 export const fieldSchema: z.ZodType<Field> = z.lazy(() =>
   z.object({
     name: z.string(),
@@ -174,6 +180,7 @@ export const specificationSchema: z.ZodType<Specification> = z.object({
   domains: z.array(domainSchema).optional(),
   groups: z.array(groupSchema).optional(),
   slices: z.array(sliceSchema).optional(),
+  types: z.array(dataTypeDefSchema).optional(),
   events: z.array(eventSchema).optional(),
   commands: z.array(commandSchema).optional(),
   queries: z.array(querySchema).optional(),

@@ -1,15 +1,13 @@
 /**
- * Hoists inline data definitions (Object / Enum / Alias) out of fields.
+ * Normalises a spec's data definitions (Object / Enum / Alias).
  *
- * The board spec expands a data type *inline* at the first field that
- * references it; later references stay as the plain name. That reads well in a
- * document but is awkward to generate from, because a field's `type` is either
- * a name or an arbitrary nested object.
- *
- * {@link hoistTypes} walks every field list, lifts each inline definition into
- * a single de-duplicated `types` registry, and rewrites the field to reference
- * it by name. The result is a spec whose field types are always strings, ready
- * for the IR builder.
+ * A document may either declare its data types once in the top-level `types`
+ * registry, with fields referencing them by name, or (legacy) expand a type
+ * inline at the first field that references it. {@link hoistTypes} accepts both:
+ * it seeds from an existing `types` registry, lifts every remaining inline
+ * definition into it, de-duplicates by name, and rewrites fields to reference
+ * the definition by name. The result is a spec whose field types are always
+ * strings, ready for the IR builder.
  */
 import { nameKey } from "./naming";
 import {
@@ -30,7 +28,7 @@ export interface HoistResult {
 
 /**
  * Lifts inline data definitions out of a spec. Pure: the input spec is not
- * mutated (nested field arrays that are rewritten are copied).
+ * mutated (definitions and the field arrays that are rewritten are copied).
  */
 export function hoistTypes(spec: Specification): HoistResult {
   const byKey = new Map<string, DataTypeDef>();
@@ -39,15 +37,21 @@ export function hoistTypes(spec: Specification): HoistResult {
   function register(def: DataTypeDef): string {
     const key = nameKey(dataTypeDefName(def));
     if (!byKey.has(key)) {
-      // Register before descending so a (pathological) self-reference
-      // terminates instead of recursing forever.
-      byKey.set(key, def);
       order.push(key);
-      if ("fields" in def && Array.isArray(def.fields)) {
-        def.fields = def.fields.map(hoistField);
-      }
+      // Register a placeholder before descending so a (pathological)
+      // self-reference terminates instead of recursing forever.
+      byKey.set(key, def);
+      byKey.set(key, hoistDef(def));
     }
     return dataTypeDefName(def);
+  }
+
+  /** Returns a hoisted copy of a definition (its field types are rewired). */
+  function hoistDef(def: DataTypeDef): DataTypeDef {
+    if ("fields" in def && Array.isArray(def.fields)) {
+      return { ...def, fields: def.fields.map(hoistField) };
+    }
+    return { ...def };
   }
 
   function hoistField(field: Field): Field {
@@ -59,6 +63,10 @@ export function hoistTypes(spec: Specification): HoistResult {
     fields ? fields.map(hoistField) : fields;
 
   const out: Specification = { ...spec };
+
+  // Seed with the explicit `types` registry, if the document has one, so that
+  // its definitions and any field references to them are normalised too.
+  if (spec.types) for (const def of spec.types) register(def);
 
   if (spec.events) {
     out.events = spec.events.map((e) => ({ ...e, fields: hoistFields(e.fields) }));
@@ -95,5 +103,8 @@ export function hoistTypes(spec: Specification): HoistResult {
     }));
   }
 
-  return { spec: out, types: order.map((key) => byKey.get(key)!) };
+  const types = order.map((key) => byKey.get(key)!);
+  if (types.length > 0) out.types = types;
+
+  return { spec: out, types };
 }

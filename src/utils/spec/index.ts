@@ -9,10 +9,9 @@
  * and internal ids are deliberately omitted. There is no bookkeeping summary
  * either — the document is just the model.
  *
- * Data containers (Object / Enum / Alias cards) are never listed as standalone
- * entries — not in a section of their own, nor in the Domain/Group membership
- * lists. Each definition is expanded inline at the first field that references
- * its type; later references stay as the plain type name.
+ * Data containers (Object / Enum / Alias cards) are collected once in the
+ * top-level `types` registry; fields reference them by name. They are not
+ * listed in the Domain/Group membership lists.
  *
  * Reference copies share the name of the card they mirror, so definitions
  * de-duplicate by name while Slice lanes still reference the copies that appear

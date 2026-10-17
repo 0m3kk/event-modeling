@@ -27,7 +27,7 @@ const TOOL_LABELS: Record<string, string> = {
   stickyNote: "Sticky Note",
 };
 
-/** Card types that hold reusable data definitions (expanded inline, not listed). */
+/** Card types that hold reusable data definitions (listed once under `types`, excluded from membership lists). */
 const DATA_CARD_TYPES = new Set(["objectCard", "enumCard", "aliasCard"]);
 
 export interface SpecificationInput {
@@ -61,9 +61,8 @@ export function buildSpecification({
   const services = uniqueByName(
     byType("serviceCard").filter((el) => !(el.data as { methodRef?: unknown })?.methodRef),
   );
-  const objects = uniqueByName(byType("objectCard"));
-  const enums = uniqueByName(byType("enumCard"));
-  const aliases = uniqueByName(byType("aliasCard"));
+  // Object / Enum / Alias cards, in board order; the mapper de-duplicates them.
+  const dataCards = elements.filter((el) => DATA_CARD_TYPES.has(el.type));
   const actors = uniqueByName(byType("actorCard"));
   const notes = byType("stickyNote");
 
@@ -90,9 +89,9 @@ export function buildSpecification({
 
   const domainIdToName = new Map(domains.map((d) => [d.id, nameOf(d)]));
 
-  // Data containers (Object/Enum/Alias) are expanded inline at the first field
-  // that references them; the mapper carries that bookkeeping for the document.
-  const { mapFields } = createFieldMapper({ objects, enums, aliases, nameOf });
+  // Data containers (Object/Enum/Alias) are defined once in the document's
+  // `types` registry; fields reference them by their plain name.
+  const { mapFields, dataTypes } = createFieldMapper({ dataCards, nameOf });
 
   // ---- Structure: Domains, Groups, Slices ----------------------------------
   const domainsSpec = domains.map((domain) => {
@@ -284,6 +283,8 @@ export function buildSpecification({
   if (domainsSpec.length > 0) spec.domains = domainsSpec;
   if (groupsSpec.length > 0) spec.groups = groupsSpec;
   if (slicesSpec.length > 0) spec.slices = slicesSpec;
+  const typesSpec = dataTypes();
+  if (typesSpec.length > 0) spec.types = typesSpec;
   if (eventsSpec.length > 0) spec.events = eventsSpec;
   if (commandsSpec.length > 0) spec.commands = commandsSpec;
   if (queriesSpec.length > 0) spec.queries = queriesSpec;

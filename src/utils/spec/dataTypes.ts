@@ -1,15 +1,14 @@
 /**
- * Inline expansion of data containers (Object / Enum / Alias) for the spec
- * export.
+ * Data containers (Object / Enum / Alias) for the spec export.
  *
- * Data definitions are never listed in a section of their own: each is expanded
- * inline at the first field that references its type; later references stay as
- * the plain type name. The mapField/mapFields pair returned here carries the
- * "already expanded" bookkeeping across the whole document.
+ * Every data card is defined once in the spec's top-level `types` registry;
+ * fields that use one reference it by its plain name. This mirrors the document
+ * contract in `@em/spec`: definitions are collected (de-duplicated by name, in
+ * board order), and field mapping is a plain copy of the row — a field never
+ * carries a nested definition.
  */
 import type { CanvasElement } from "@/types";
 import { nameKey } from "../naming";
-import { normalizeTypeName } from "../typeCatalog";
 import { cleanValidation, hasValidation, type FieldValidation } from "../fieldValidation";
 import { listNamed } from "./helpers";
 
@@ -24,36 +23,36 @@ export interface RawField {
   validation?: FieldValidation;
 }
 
-interface DataType {
-  kind: "object" | "enum" | "alias";
-  element: CanvasElement;
-}
-
 interface FieldMapperOptions {
-  objects: CanvasElement[];
-  enums: CanvasElement[];
-  aliases: CanvasElement[];
+  /** Object / Enum / Alias cards, in board order (mirror copies included). */
+  dataCards: CanvasElement[];
   nameOf: (el: CanvasElement) => string;
 }
 
 export interface FieldMapper {
   mapField: (field: RawField | undefined | null) => Record<string, unknown>;
   mapFields: (fields: unknown) => Record<string, unknown>[] | undefined;
+  /** Every data definition, de-duplicated by name, in board order. */
+  dataTypes: () => Record<string, unknown>[];
 }
 
-export function createFieldMapper({ objects, enums, aliases, nameOf }: FieldMapperOptions): FieldMapper {
-  const dataTypes = new Map<string, DataType>();
-  for (const el of objects) dataTypes.set(nameKey(nameOf(el)), { kind: "object", element: el });
-  for (const el of enums) dataTypes.set(nameKey(nameOf(el)), { kind: "enum", element: el });
-  for (const el of aliases) dataTypes.set(nameKey(nameOf(el)), { kind: "alias", element: el });
-  /** Names of data types already expanded inline, so each is expanded once. */
-  const expandedData = new Set<string>();
+export function createFieldMapper({ dataCards, nameOf }: FieldMapperOptions): FieldMapper {
+  // Keep the first card seen for each name (mirror copies collapse), preserving
+  // board order across Object / Enum / Alias cards.
+  const byKey = new Map<string, CanvasElement>();
+  const order: string[] = [];
+  for (const el of dataCards) {
+    const key = nameKey(nameOf(el));
+    if (byKey.has(key)) continue;
+    byKey.set(key, el);
+    order.push(key);
+  }
 
-  /** Expands a data definition (its fields may reference further data types). */
-  function expandData(data: DataType): Record<string, unknown> {
-    const el = data.element;
+  /** Expands one data card into its definition form. */
+  function expandData(el: CanvasElement): Record<string, unknown> {
     const typeName = nameOf(el);
-    if (data.kind === "object") {
+
+    if (el.type === "objectCard") {
       const out: Record<string, unknown> = { object: typeName };
       if (el.data?.description) out.description = el.data.description;
       const fields = Array.isArray(el.data?.fields) ? el.data.fields : [];
@@ -61,13 +60,16 @@ export function createFieldMapper({ objects, enums, aliases, nameOf }: FieldMapp
       if (mapped.length > 0) out.fields = mapped;
       return out;
     }
-    if (data.kind === "enum") {
+
+    if (el.type === "enumCard") {
       const out: Record<string, unknown> = { enum: typeName };
       if (el.data?.description) out.description = el.data.description;
       const values = listNamed(el.data?.fields);
       if (values.length > 0) out.values = values;
       return out;
     }
+
+    // aliasCard
     const out: Record<string, unknown> = {
       alias: typeName,
       of: el.data?.aliasedType ?? "",
@@ -91,13 +93,6 @@ export function createFieldMapper({ objects, enums, aliases, nameOf }: FieldMapp
     if (field?.validation && hasValidation(field.validation)) {
       out.validation = cleanValidation(field.validation) ?? field.validation;
     }
-
-    const typeKey = field?.type ? nameKey(normalizeTypeName(field.type)) : "";
-    const data = typeKey ? dataTypes.get(typeKey) : undefined;
-    if (data && !expandedData.has(typeKey)) {
-      expandedData.add(typeKey);
-      out.type = expandData(data);
-    }
     return out;
   }
 
@@ -106,5 +101,8 @@ export function createFieldMapper({ objects, enums, aliases, nameOf }: FieldMapp
     return fields.map((f) => mapField(f as RawField));
   }
 
-  return { mapField, mapFields };
+  const dataTypes = (): Record<string, unknown>[] =>
+    order.map((key) => expandData(byKey.get(key)!));
+
+  return { mapField, mapFields, dataTypes };
 }

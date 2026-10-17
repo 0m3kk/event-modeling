@@ -6,11 +6,11 @@
  * deliberately independent of the canvas: it holds meaning (events, commands,
  * domains, slices, data types...) and never geometry or internal ids.
  *
- * Data containers (Object / Enum / Alias) are expanded *inline* at the first
- * field that references them, so a field's {@link Field.type} can be either a
- * plain type name (a string) or an inline definition object. Use
- * {@link hoistTypes} to move every inline definition into a single `types`
- * registry before handing the spec to a generator.
+ * Data containers (Object / Enum / Alias) are defined *once* in the top-level
+ * {@link Specification.types} registry, and every field references them by name
+ * (a plain string). For backward compatibility a field's {@link Field.type} may
+ * still be an inline definition object; {@link hoistTypes} lifts those into the
+ * `types` registry so field types are always strings.
  */
 
 /** A named item that may optionally carry a description (enum members, state refs). */
@@ -33,21 +33,21 @@ export interface FieldValidation {
   rule?: string;
 }
 
-/** An inline Object definition, serialized as `{ object, fields }`. */
+/** An Object definition, serialized as `{ object, fields }`. */
 export interface ObjectTypeDef {
   object: string;
   description?: string;
   fields?: Field[];
 }
 
-/** An inline Enum definition, serialized as `{ enum, values }`. */
+/** An Enum definition, serialized as `{ enum, values }`. */
 export interface EnumTypeDef {
   enum: string;
   description?: string;
   values?: NamedRef[];
 }
 
-/** An inline Alias definition, serialized as `{ alias, of }`. */
+/** An Alias definition, serialized as `{ alias, of }`. */
 export interface AliasTypeDef {
   alias: string;
   of: string;
@@ -56,10 +56,13 @@ export interface AliasTypeDef {
   validation?: FieldValidation;
 }
 
-/** Any inline data definition. */
+/** Any data definition (Object / Enum / Alias). */
 export type DataTypeDef = ObjectTypeDef | EnumTypeDef | AliasTypeDef;
 
-/** The `type` of a field: a name, or an inline definition object. */
+/**
+ * The `type` of a field: a plain type name, or — for documents written before
+ * the `types` registry — an inline definition object.
+ */
 export type FieldType = string | DataTypeDef;
 
 export interface Field {
@@ -181,6 +184,8 @@ export interface Specification {
   domains?: Domain[];
   groups?: Group[];
   slices?: Slice[];
+  /** Data containers (Object / Enum / Alias), each defined once and referenced by name. */
+  types?: DataTypeDef[];
   events?: EventDef[];
   commands?: CommandDef[];
   queries?: QueryDef[];

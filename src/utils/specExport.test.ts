@@ -82,8 +82,10 @@ describe("buildSpecification", () => {
         inputs: [{ name: "orderId", type: "string" }],
       },
     ]);
-    // Data containers are not listed in their own section.
-    expect(spec.types).toBeUndefined();
+    // Data containers are collected in the `types` registry, not inline.
+    expect(spec.types).toEqual([
+      { object: "Order", fields: [{ name: "id", type: "string", required: true }] },
+    ]);
     // Geometry is intentionally absent from every definition.
     const yaml = serializeSpecification({ name: "Shop", elements });
     expect(yaml).not.toMatch(/\bx:\s/);
@@ -91,7 +93,7 @@ describe("buildSpecification", () => {
     expect(yaml).not.toMatch(/^summary:/m);
   });
 
-  it("inlines a data definition at its first reference, then references by name", () => {
+  it("defines a data type once in `types` and references it by name", () => {
     const elements: CanvasElement[] = [
       el("o1", "objectCard", {
         name: "Order",
@@ -106,27 +108,22 @@ describe("buildSpecification", () => {
 
     const spec = buildSpecification({ name: "Shop", elements });
 
-    expect(spec.events).toEqual([
+    expect(spec.types).toEqual([
       {
-        name: "OrderPlaced",
+        object: "Order",
         fields: [
-          {
-            name: "order",
-            type: {
-              object: "Order",
-              fields: [
-                { name: "id", type: "string" },
-                { name: "total", type: "float" },
-              ],
-            },
-          },
+          { name: "id", type: "string" },
+          { name: "total", type: "float" },
         ],
       },
+    ]);
+    expect(spec.events).toEqual([
+      { name: "OrderPlaced", fields: [{ name: "order", type: "Order" }] },
       { name: "OrderShipped", fields: [{ name: "order", type: "Order" }] },
     ]);
   });
 
-  it("inlines enum and alias definitions and expands nested references once", () => {
+  it("collects enum and alias definitions, keeping each reference a plain name", () => {
     const elements: CanvasElement[] = [
       el("en", "enumCard", { name: "Status", fields: [{ name: "pending" }, { name: "paid" }] }),
       el("al", "aliasCard", { name: "OrderId", aliasedType: "string" }),
@@ -142,26 +139,24 @@ describe("buildSpecification", () => {
 
     const spec = buildSpecification({ name: "Shop", elements });
 
-    expect(spec.events).toEqual([
+    // Board order is preserved across Object / Enum / Alias cards.
+    expect(spec.types).toEqual([
+      { enum: "Status", values: ["pending", "paid"] },
+      { alias: "OrderId", of: "string" },
       {
-        name: "OrderPlaced",
+        object: "Order",
         fields: [
-          {
-            name: "order",
-            type: {
-              object: "Order",
-              fields: [
-                { name: "id", type: { alias: "OrderId", of: "string" } },
-                { name: "status", type: { enum: "Status", values: ["pending", "paid"] } },
-              ],
-            },
-          },
+          { name: "id", type: "OrderId" },
+          { name: "status", type: "Status" },
         ],
       },
     ]);
+    expect(spec.events).toEqual([
+      { name: "OrderPlaced", fields: [{ name: "order", type: "Order" }] },
+    ]);
   });
 
-  it("survives cyclic data references", () => {
+  it("defines types that reference each other, even cyclically, by name", () => {
     const elements: CanvasElement[] = [
       el("a", "objectCard", { name: "A", fields: [{ name: "b", type: "B" }] }),
       el("b", "objectCard", { name: "B", fields: [{ name: "a", type: "A" }] }),
@@ -170,27 +165,22 @@ describe("buildSpecification", () => {
 
     const spec = buildSpecification({ name: "Shop", elements });
 
-    expect(spec.events).toEqual([
-      {
-        name: "E",
-        fields: [
-          {
-            name: "a",
-            type: {
-              object: "A",
-              fields: [
-                {
-                  name: "b",
-                  type: {
-                    object: "B",
-                    fields: [{ name: "a", type: "A" }],
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
+    expect(spec.types).toEqual([
+      { object: "A", fields: [{ name: "b", type: "B" }] },
+      { object: "B", fields: [{ name: "a", type: "A" }] },
+    ]);
+    expect(spec.events).toEqual([{ name: "E", fields: [{ name: "a", type: "A" }] }]);
+  });
+
+  it("lists every data card in `types`, even when no field references it", () => {
+    const elements: CanvasElement[] = [
+      el("o1", "objectCard", { name: "Unused", fields: [{ name: "id", type: "string" }] }),
+      el("e1", "eventCard", { name: "E", fields: [{ name: "id", type: "string" }] }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+    expect(spec.types).toEqual([
+      { object: "Unused", fields: [{ name: "id", type: "string" }] },
     ]);
   });
 

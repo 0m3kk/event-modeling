@@ -80,4 +80,52 @@ describe("hoistTypes", () => {
     const { types } = hoistTypes(spec);
     expect(types.map(defName).sort()).toEqual(["X", "Y"]);
   });
+
+  it("keeps an explicit `types` registry and normalises its field types", () => {
+    const spec: Specification = {
+      name: "Account",
+      types: [
+        {
+          object: "Profile",
+          fields: [{ name: "id", type: { alias: "AccountId", of: "string" } }],
+        },
+      ],
+      events: [
+        {
+          name: "AccountCreated",
+          // The definition is already hoisted, so the field references it by name.
+          fields: [{ name: "profile", type: "Profile" }],
+        },
+      ],
+    };
+
+    const { spec: out, types } = hoistTypes(spec);
+
+    expect(types.map(defName)).toEqual(["Profile", "AccountId"]);
+    expect(out.types?.map(defName)).toEqual(["Profile", "AccountId"]);
+    expect(out.events?.[0].fields?.[0].type).toBe("Profile");
+    // The nested inline alias was lifted and rewrite to a name.
+    const profile = out.types?.[0] as ObjectTypeDef;
+    expect(profile.fields?.[0].type).toBe("AccountId");
+    // The input is not mutated.
+    const inputProfile = spec.types?.[0] as ObjectTypeDef;
+    expect(typeof inputProfile.fields?.[0].type).toBe("object");
+  });
+
+  it("de-duplicates a definition declared both in `types` and inline", () => {
+    const spec: Specification = {
+      name: "Shop",
+      types: [{ alias: "OrderId", of: "string" }],
+      events: [
+        {
+          name: "OrderPlaced",
+          fields: [{ name: "orderId", type: { alias: "OrderId", of: "string" } }],
+        },
+      ],
+    };
+
+    const { spec: out, types } = hoistTypes(spec);
+    expect(types.map(defName)).toEqual(["OrderId"]);
+    expect(out.events?.[0].fields?.[0].type).toBe("OrderId");
+  });
 });
