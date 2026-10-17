@@ -1,0 +1,13 @@
+[package]
+name = "{{ serverCrate }}"
+version = "{{ crate.version }}"
+edition = "{{ crate.edition }}"
+
+[dependencies]
+{{ appCrate }} = { path = "{{ appFromServer }}" }
+{{ crate.name }} = { path = "{{ baseFromServer }}" }
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
+{% for dep in serverDeps -%}
+{{ dep }}
+{% endfor -%}

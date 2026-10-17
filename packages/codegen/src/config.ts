@@ -17,7 +17,8 @@ export type GeneratorName =
   | "views"
   | "states"
   | "services"
-  | "api";
+  | "api"
+  | "scaffold";
 
 /** A crate dependency, rendered into `Cargo.toml`. */
 export interface DepSpec {
@@ -46,6 +47,44 @@ export interface CrateOptions {
   version?: string;
   /** Extra dependencies, merged with the ones detected from the IR. */
   deps?: DepSpec[];
+  /**
+   * How an Alias data type is rendered. `"newtype"` (default) wraps the target
+   * in a transparent newtype struct (`pub struct OrderId(String)`) so the id is
+   * type-safe and alias validation is enforceable; `"alias"` renders a bare
+   * `pub type OrderId = String;`.
+   */
+  aliases?: "newtype" | "alias";
+}
+
+/** A crate the scaffold generator emits next to the generated contract crate. */
+export interface ScaffoldCrateConfig {
+  /** Crate name. Defaults to `<spec>-app` / `<spec>-server` or the given default. */
+  crate?: string;
+  /** Extra dependencies merged into the scaffolded crate's `Cargo.toml`. */
+  deps?: DepSpec[];
+}
+
+/**
+ * Options for the repository scaffold.
+ *
+ * When enabled, the generator emits a Cargo workspace around the contract
+ * crate: a workspace `Cargo.toml`, an application crate (handler/reducer/service
+ * implementations) and a server binary crate. Structural files are regenerated
+ * and drift-checked like the contract crate; implementation files are written
+ * once and then owned by the project (never overwritten or reported).
+ */
+export interface ScaffoldConfig {
+  enabled?: boolean;
+  /** Emit the workspace root (`Cargo.toml`, `rust-toolchain.toml`, `.gitignore`). */
+  workspace?: boolean;
+  /** Emit the application crate; an object overrides its name and deps. */
+  app?: boolean | ScaffoldCrateConfig;
+  /** Emit the server binary crate; an object overrides its name and deps. */
+  server?: boolean | ScaffoldCrateConfig;
+  /** Eject the built-in templates into `templatesDir` so they can be edited. */
+  templates?: boolean;
+  /** Body of an unimplemented stub: `"todo"` (default) or `"unimplemented"`. */
+  stubs?: "todo" | "unimplemented";
 }
 
 /** Either a bare on/off switch or an options object for a generator. */
@@ -107,6 +146,8 @@ export interface CodegenConfig {
   };
   /** Directory of user templates, searched before the built-in ones. */
   templatesDir?: string;
+  /** Emit a Cargo workspace + application/server crates around the contract crate. */
+  scaffold?: ScaffoldConfig;
   /** Run `rustfmt` over generated `.rs` files. Defaults to true. */
   rustfmt?: boolean;
   /** Custom Nunjucks filters, available in every template. */

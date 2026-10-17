@@ -13,6 +13,7 @@
 import process from "node:process";
 import path from "node:path";
 import { ejectTemplates } from "./eject";
+import { loadConfig } from "./load";
 import { run } from "./pipeline";
 import { builtinTemplatesPath, initConfig, newTemplate } from "./scaffold";
 
@@ -21,6 +22,7 @@ const HELP = `em-codegen — generate a Rust crate from a domain specification.
 Usage:
   em-codegen init [dir]                 Create codegen.config.ts
   em-codegen gen [spec] [options]       Generate the crate
+  em-codegen scaffold [options]         Generate the crate + workspace scaffold
   em-codegen eject [dir]                Copy the built-in templates out
   em-codegen new-template <name>        Create a starter user template
 
@@ -145,6 +147,28 @@ async function cmdGen(parsed: ParsedArgs, cwd: string): Promise<number> {
   return 0;
 }
 
+async function cmdScaffold(parsed: ParsedArgs, cwd: string): Promise<number> {
+  const code = await cmdGen(parsed, cwd);
+  try {
+    const loaded = await loadConfig({
+      cwd,
+      configPath: flagString(parsed.flags, "c", "config"),
+    });
+    if (loaded.config.scaffold?.templates) {
+      const target = loaded.config.templatesDir
+        ? path.resolve(loaded.configDir, loaded.config.templatesDir)
+        : path.join(loaded.configDir, ".codegen", "templates");
+      const copied = await ejectTemplates(target, { skipExisting: true });
+      console.log(
+        `Ejected ${copied.length} templates to ${path.relative(cwd, target) || target}`,
+      );
+    }
+  } catch {
+    // Config could not be loaded; the gen step already reported the reason.
+  }
+  return code;
+}
+
 async function cmdInit(parsed: ParsedArgs, cwd: string): Promise<number> {
   const dir = parsed.positionals[0] ? path.resolve(cwd, parsed.positionals[0]) : cwd;
   const target = await initConfig(dir);
@@ -187,6 +211,9 @@ async function main(): Promise<number> {
     case "gen":
     case "generate":
       return cmdGen(parsed, cwd);
+    case "scaffold":
+    case "workspace":
+      return cmdScaffold(parsed, cwd);
     case "init":
       return cmdInit(parsed, cwd);
     case "eject":

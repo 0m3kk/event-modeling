@@ -1,0 +1,16 @@
+use {{ crate.name }}::apis::Api;
+{% for handler in handlers -%}
+use crate::{{ handler.modulePath | join("::") }}::{{ handler.useCaseName }};
+{% endfor -%}
+use crate::{AppError, AppState};
+
+/// Register every command and query handler on the generated API registry.
+///
+/// Regenerated from the spec: a new command/query adds a `with_*` call here, so
+/// a route never silently answers `500` because its handler was forgotten.
+pub fn register(api: Api<AppError>, state: AppState) -> Api<AppError> {
+    api
+{% for handler in handlers -%}
+        .with_{{ handler.method }}({{ handler.useCaseName }}::new(state.clone()))
+{% endfor -%}
+}

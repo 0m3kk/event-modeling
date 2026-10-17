@@ -305,16 +305,30 @@ function artifactFields(artifact: IrArtifact): IrField[] {
 }
 
 function makeMethods(
+  serviceName: string,
   methods: NonNullable<Specification["services"]>[number]["methods"],
   typeMap: Record<string, string>,
 ): IrMethod[] {
-  return (methods ?? []).map((method) => ({
-    name: method.name,
-    rustName: snakeCase(method.name) || method.name,
-    doc: method.description,
-    params: makeFields(method.params, typeMap),
-    returns: makeFields(method.returns, typeMap),
-  }));
+  return (methods ?? []).map((method) => {
+    const returns = makeFields(method.returns, typeMap);
+    let returnType = "()";
+    let resultTypeName: string | undefined;
+    if (returns.length === 1) {
+      returnType = returns[0].rustType;
+    } else if (returns.length > 1) {
+      resultTypeName = `${pascalCase(serviceName)}${pascalCase(method.name)}Result`;
+      returnType = resultTypeName;
+    }
+    return {
+      name: method.name,
+      rustName: snakeCase(method.name) || method.name,
+      doc: method.description,
+      params: makeFields(method.params, typeMap),
+      returns,
+      returnType,
+      resultTypeName,
+    };
+  });
 }
 
 /** Builds projection query items; event refs are resolved later (module paths unknown yet). */
@@ -435,19 +449,27 @@ function buildTypeArtifacts(types: DataTypeDef[], typeMap: Record<string, string
     const inner: RustType = isPrimitive
       ? { kind: "primitive", name: typeMap[normalized.toLowerCase()] }
       : { kind: "named", name: pascalCase(normalized) };
-    const wrapped: RustType = def.array ? { kind: "vec", inner } : inner;
-    const hasAliasValidation =
-      def.validation !== undefined &&
-      Object.values(def.validation).some((value) => value !== undefined && value !== "");
+    const array = Boolean(def.array);
+    const wrapped: RustType = array ? { kind: "vec", inner } : inner;
+    const { attrs, notes } = buildValidations(
+      { name, type: def.of, array, required: true, validation: def.validation },
+      typeMap,
+      array,
+    );
+    const isUuid = inner.kind === "primitive" && /Uuid$/.test(inner.name);
+    const isFloat = inner.kind === "primitive" && /f32|f64/.test(inner.name);
     return {
       ...base,
       doc: def.description,
       typeKind: "alias" as const,
       aliasOf: renderRustType(wrapped),
       aliasRefName: isPrimitive ? undefined : inner.kind === "named" ? inner.name : undefined,
-      validationNotes: hasAliasValidation
-        ? ["alias validation is not enforceable on a type alias; use a newtype to enforce it"]
-        : undefined,
+      aliasIsUuid: isUuid && !array,
+      aliasEqHash: !isFloat,
+      aliasDisplay: inner.kind === "primitive" && !array,
+      validations: attrs,
+      validates: attrs.length > 0,
+      validationNotes: notes.length > 0 ? notes : undefined,
     };
   });
 }
@@ -568,8 +590,10 @@ function hasRustMarker(artifacts: IrArtifact[], marker: string): boolean {
 }
 
 function needsValidator(artifacts: IrArtifact[]): boolean {
-  return artifacts.some((artifact) =>
-    artifactFields(artifact).some((field) => field.validations.length > 0),
+  return artifacts.some(
+    (artifact) =>
+      (artifact.validations?.length ?? 0) > 0 ||
+      artifactFields(artifact).some((field) => field.validations.length > 0),
   );
 }
 
@@ -579,13 +603,15 @@ function needsValidator(artifacts: IrArtifact[]): boolean {
  */
 function collectValidationHelpers(artifacts: IrArtifact[]): string[] {
   const helpers = new Set<string>();
-  for (const artifact of artifacts) {
-    for (const field of artifactFields(artifact)) {
-      for (const attr of field.validations) {
-        const match = CUSTOM_VALIDATOR_RE.exec(attr);
-        if (match) helpers.add(match[1]);
-      }
+  const collect = (attrs: string[]): void => {
+    for (const attr of attrs) {
+      const match = CUSTOM_VALIDATOR_RE.exec(attr);
+      if (match) helpers.add(match[1]);
     }
+  };
+  for (const artifact of artifacts) {
+    collect(artifact.validations ?? []);
+    for (const field of artifactFields(artifact)) collect(field.validations);
   }
   return Array.from(helpers).sort((a, b) => a.localeCompare(b));
 }
@@ -605,11 +631,12 @@ function collectDeps(
     deps.push({ name: "serde_json", version: "1" });
   }
   // Views fold through async reducer methods; command/query handlers are async
-  // traits. Both are wired with async-trait.
+  // traits; service contracts are async traits too. All are wired with async-trait.
   const hasAsyncHandlers = artifacts.some(
     (artifact) => artifact.kind === "command" || artifact.kind === "query",
   );
-  if (hasView || hasAsyncHandlers) {
+  const hasService = artifacts.some((artifact) => artifact.kind === "service");
+  if (hasView || hasAsyncHandlers || hasService) {
     deps.push({ name: "async-trait", version: "0.1" });
   }
   if (hasAsyncHandlers) {
@@ -645,7 +672,7 @@ function collectDeps(
   if (needsValidator(artifacts)) {
     deps.push({ name: "validator", version: "0.18", features: ["derive"] });
   }
-  if (hasRustMarker(artifacts, "Uuid")) deps.push({ name: "uuid", version: "1", features: ["serde"] });
+  if (hasRustMarker(artifacts, "Uuid")) deps.push({ name: "uuid", version: "1", features: ["serde", "v7"] });
   if (hasRustMarker(artifacts, "Decimal")) deps.push({ name: "rust_decimal", version: "1" });
   if (
     hasRustMarker(artifacts, "NaiveDate") ||
@@ -724,7 +751,7 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
   for (const service of spec.services ?? []) {
     push("service", service.name, {
       doc: service.description,
-      methods: makeMethods(service.methods, typeMap),
+      methods: makeMethods(service.name, service.methods, typeMap),
     });
   }
 

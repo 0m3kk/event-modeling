@@ -28,6 +28,7 @@ node packages/codegen/bin/em-codegen.mjs gen
 ```
 em-codegen init [dir]                  Create codegen.config.ts
 em-codegen gen [spec] [options]        Generate the crate
+em-codegen scaffold [options]          Generate the crate + workspace scaffold
 em-codegen eject [dir]                 Copy the built-in templates out for editing
 em-codegen new-template <name>         Create a starter user template
 ```
@@ -127,6 +128,52 @@ as parameters and leaves the optional ones `None`. A `with_<field>` method is
 generated for every field: for optional fields it accepts the unwrapped type and
 stores `Some(value)`, for required fields it replaces the value directly. A
 request then reads as `PlaceOrder::new(order_id).with_items(items)`.
+
+### Data types and aliases
+
+Object types render as structs and enum types as enums (both derive `Default`,
+which projections rely on). An **Alias** renders as a transparent **newtype** by
+default, so an id stays distinct from any other string and alias validation is
+enforceable:
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct OrderId(pub String);
+
+impl OrderId {
+    pub fn new(value: impl Into<String>) -> Self { /* … */ }
+    pub fn as_inner(&self) -> &String { /* … */ }
+    pub fn into_inner(self) -> String { /* … */ }
+}
+// Plus From<inner>/From<OrderId> for inner, AsRef, Deref and Display.
+```
+
+An alias of `uuid` (with `typeMap: { uuid: "uuid::Uuid" }`) gets a time-ordered
+constructor: `OrderId::new()` returns `OrderId(Uuid::now_v7())` (the crate then
+depends on `uuid` with the `v7` feature). Set `crate.aliases: "alias"` to render
+a bare `pub type OrderId = String;` instead.
+
+### Services
+
+Each Service method becomes an **async** trait method. The return type follows
+the declared `returns`:
+
+- none -> `()`;
+- one -> that field's type;
+- more than one -> a generated `<Service><Method>Result` struct (with the same
+  constructor/`with_*` builders as every other generated struct), returned by
+  the method.
+
+```rust
+#[async_trait::async_trait]
+pub trait OrderService {
+    async fn place(&self, order_id: OrderId) -> OrderId;
+    async fn quote(&self) -> OrderServiceQuoteResult;
+}
+```
+
+`async-trait` is added to the crate whenever a Service exists.
 
 ### Handler traits
 
@@ -238,12 +285,15 @@ share that error type. A route whose handler was not registered answers
 
 ### Routes
 
-Commands and queries are `POST` endpoints with a JSON body. The path comes from
-the item's `action`, so `action: sales:placeOrder` becomes
-`POST /api/sales/place-order` (the `prefix`, default `/api`, is configurable).
-When an item has no `action`, the path falls back to `/api/commands/<name>` or
-`/api/queries/<name>`. Colliding paths get a numeric suffix. Command and query
-routes without responses answer `204 No Content`.
+Commands are `POST` endpoints with a JSON body. Queries are `GET` endpoints and
+receive their params from the query string (axum `Query<T>`); a query whose
+params cannot round-trip through a URL (an array or an object field) falls back
+to `POST` with a JSON body. The path comes from the item's `action`, so
+`action: sales:placeOrder` becomes `POST /api/sales/place-order` (the `prefix`,
+default `/api`, is configurable). When an item has no `action`, the path falls
+back to `/api/commands/<name>` or `/api/queries/<name>`. Colliding paths get a
+numeric suffix. Command and query routes without responses answer
+`204 No Content`.
 
 ### OpenAPI
 
@@ -299,7 +349,9 @@ skipped**, never dropped silently:
 - `pattern` (needs a compiled `Regex`, so no inline pattern),
 - a `format` that is neither a built-in nor one of the presets above,
 - a free-text `rule`,
-- validation on an alias (`type X = String` cannot carry attributes).
+- validation on an alias **is** enforced, because aliases render as newtypes
+  (with `crate.aliases: "alias"` the alias is a bare `type X = String` again and
+  its validation is skipped with a note).
 
 ## State and View projections
 
@@ -333,12 +385,18 @@ query, and a `load` driver:
   snake_case string when it does not resolve to a generated event) and each
   `tag` (normalized to snake_case) renders as `format!("{tag}:{}", self.<param>)`.
 - `async fn load(self, store, reducer)` — reads every matching event from an
-  `event_store::EventStore` and folds it through the reducer.
+  `event_store::EventStore`, folds it through the reducer, and returns the
+  projection **and the [`SequencePosition`] of the last event folded** so the
+  caller can build an `AppendCondition` for optimistic concurrency.
 
 Use it as:
 
 ```rust
-let state = OrderState::new(order_id).load(&store, &app).await?;
+let (state, position) = OrderState::new(order_id).load(&store, &app).await?;
+let events = ctx.create_store_events([&OrderPlaced::new(/* … */)])?;
+store
+    .append(events, Some(AppendCondition::new(state.query(), position)))
+    .await?;
 ```
 
 Projections add the `event-store`, `futures-util` and `serde_json` dependencies
@@ -437,6 +495,46 @@ before the parent it references. Like every generated file, migrations are
 tracked by the manifest: edit one by hand and the generator will report the
 drift instead of clobbering it.
 
+## Workspace scaffold
+
+Set `scaffold.enabled` to have the generator emit a Cargo workspace around the
+contract crate: a workspace `Cargo.toml`, an **application crate** (the command,
+query, state, view and service implementations) and a **server binary**.
+
+```ts
+scaffold: {
+  enabled: true,
+  workspace: true,                 // workspace Cargo.toml + rust-toolchain + .gitignore
+  app: { crate: "shop-app" },      // defaults to "<crate>-app"
+  server: { crate: "shop-server" },// defaults to "<crate>-server"
+  templates: true,                 // eject the templates into templatesDir
+  stubs: "todo",                   // "todo" (default) or "unimplemented"
+}
+```
+
+Files come in two ownership classes:
+
+- **managed** — structural files derived from the spec (the workspace and crate
+  manifests, `lib.rs`, `mod.rs`, the `register` glue, the contract crate). They
+  are regenerated and reported by `--check`.
+- **create-only** — the implementation files: one `todo!()` stub per command and
+  query, a reducer stub per state/view, a service stub, `AppState`, `AppError`
+  and the server `main`. They are written **once**, then owned by the project:
+  never overwritten and never reported as drift. Adding a command to the spec
+  creates its stub and wires it into `register`; existing stubs are left alone.
+
+The application crate's `register` lists every command and query, so a route can
+never silently answer `500` because its handler was forgotten:
+
+```rust
+pub fn register(api: Api<AppError>, state: AppState) -> Api<AppError> {
+    api.with_place_order(PlaceOrderUseCase::new(state.clone()))
+}
+```
+
+Run `em-codegen scaffold` (or `em-codegen gen` with `scaffold.enabled`) to write
+the workspace, and `em-codegen gen --check` in CI to catch structural drift.
+
 ## Config reference
 
 ```ts
@@ -449,6 +547,7 @@ export default defineConfig({
     name: "shop",                  // defaults to spec name in snake_case
     edition: "2024",
     version: "0.1.0",
+    aliases: "newtype",            // "newtype" (default) or "alias"
     // Merged with the detected deps. A dep may point at a local checkout with
     // `path` instead of a registry `version`.
     deps: [{ name: "tracing", version: "0.1" }],
@@ -461,6 +560,7 @@ export default defineConfig({
     api: { prefix: "/api" },       // axum transport + OpenAPI; false by default
     // every generator can take an options object instead of a boolean
   },
+  scaffold: { enabled: true },      // Cargo workspace + app/server crates
   templatesDir: ".codegen/templates",
   rustfmt: true,
   filters: { shout: (s) => String(s).toUpperCase() },

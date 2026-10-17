@@ -12,7 +12,7 @@
 {% for imp in artifact.eventImports -%}
 use crate::{{ imp.modulePath | join("::") }}::{{ "{" }}{{ imp.names | join(", ") }}{{ "}" }};
 {% endfor -%}
-use event_store::{EventStore, Query, QueryItem};
+use event_store::{EventStore, Query, QueryItem, SequencePosition};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 
@@ -118,11 +118,16 @@ impl {{ name }} {
     }
 
     /// Read every matching event and fold it into this projection.
+    ///
+    /// Returns the projection and the [`SequencePosition`] of the last event it
+    /// folded (if any), so a caller can pass it to an
+    /// [`AppendCondition`](event_store::AppendCondition) when appending the
+    /// events that follow the decision.
     pub async fn load<E, R>(
         mut self,
         store: &E,
         reducer: &R,
-    ) -> Result<Self, {{ name }}Error<{% if projectionAsync %}E::Error, R::Error{% else %}E::Error{% endif %}>>
+    ) -> Result<(Self, Option<SequencePosition>), {{ name }}Error<{% if projectionAsync %}E::Error, R::Error{% else %}E::Error{% endif %}>>
     where
         E: EventStore,
         R: {{ name }}Reducer,
@@ -131,8 +136,11 @@ impl {{ name }} {
 {% endif -%}
         let query = self.query();
         let mut stream = store.read(query, None).await.map_err({{ name }}Error::Store)?;
+        let mut position: Option<SequencePosition> = None;
         while let Some(item) = stream.next().await {
-            let event = item.map_err({{ name }}Error::Store)?.event;
+            let sequenced = item.map_err({{ name }}Error::Store)?;
+            position = Some(sequenced.position);
+            let event = sequenced.event;
 {% for event in artifact.projectionEvents -%}
 {% if loop.first %}            if{% else %}            } else if{% endif %} event.event_type == {{ event.rustName }}::event_type() {
                 let typed: {{ event.rustName }} =
@@ -147,6 +155,6 @@ impl {{ name }} {
 {% if artifact.projectionEvents | length %}            }
 {% endif -%}
         }
-        Ok(self)
+        Ok((self, position))
     }
 }

@@ -1,0 +1,25 @@
+{% if crate.api -%}
+/// Application error returned by command and query handlers.
+///
+/// Defaults to the generated `ApiError`, which already renders as JSON.
+/// Replace it with your own `axum::response::IntoResponse` type for richer
+/// errors.
+pub type AppError = {{ crate.name }}::apis::ApiError;
+{% else -%}
+/// Application error returned by command and query handlers.
+#[derive(Debug)]
+pub enum AppError {
+    /// An unexpected internal failure.
+    Internal(String),
+}
+
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Internal(message) => write!(f, "internal error: {message}"),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+{% endif -%}

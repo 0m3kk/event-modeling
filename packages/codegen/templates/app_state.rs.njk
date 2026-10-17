@@ -1,0 +1,11 @@
+/// Shared application state handed to every command and query handler.
+///
+/// Add the dependencies your handlers need here (event store, database pool,
+/// services) and pass them from `main`. For example:
+///
+/// ```ignore
+/// pub store: std::sync::Arc<MyEventStore>,
+/// pub notifier: std::sync::Arc<dyn NotificationService>,
+/// ```
+#[derive(Clone, Default)]
+pub struct AppState {}

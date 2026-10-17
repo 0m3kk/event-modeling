@@ -1,0 +1,19 @@
+//! State reducers.
+//!
+//! Generated once; edit freely — the generator will not overwrite this file.
+{% for artifact in artifacts %}
+/// Reducer for `{{ artifact.rustName }}`.
+pub struct {{ artifact.rustName }}ReducerImpl;
+
+impl {{ crate.name }}::{{ artifact.modulePath | join("::") }}::{{ artifact.rustName }}Reducer for {{ artifact.rustName }}ReducerImpl {
+{% for event in artifact.projectionEvents -%}
+    fn on_{{ event.eventType }}(
+        &self,
+        _state: &mut {{ crate.name }}::{{ artifact.modulePath | join("::") }}::{{ artifact.rustName }},
+        _event: &{{ crate.name }}::{{ event.modulePath | join("::") }}::{{ event.rustName }},
+    ) {
+        {{ stubs }}!("project {{ event.rustName }} into {{ artifact.rustName }}")
+    }
+{% endfor -%}
+}
+{% endfor -%}

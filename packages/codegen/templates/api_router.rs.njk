@@ -7,9 +7,10 @@
 use axum::Json;
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::routing::{% if hasGet and hasPost %}{get, post}{% elif hasGet %}get{% else %}post{% endif %};
 use axum::Router;
-use crate::ExecutionContext;
+{% if hasGet %}use axum::extract::Query;
+{% endif %}use crate::ExecutionContext;
 use super::{Api, ApiError};
 {% for imp in typeImports -%}
 use {{ imp.path }}::{{ "{" }}{{ imp.names | join(", ") }}{{ "}" }};
@@ -28,7 +29,7 @@ where
 {
     Router::new()
 {% for route in routes -%}
-        .route("{{ route.path }}", post({{ route.method }}::<E>))
+        .route("{{ route.path }}", {{ route.httpMethod | lower }}({{ route.method }}::<E>))
 {% endfor -%}
         .with_state(api)
 }
@@ -37,17 +38,20 @@ where
 {% if route.doc %}{{ route.doc | doccomment }}
 {% endif -%}
 {% if crate.openapi %}#[utoipa::path(
-    post,
+    {{ route.httpMethod | lower }},
     path = "{{ route.path }}",
     tag = "{{ route.tag }}",
-    request_body = {{ route.requestType }},
-    responses({% if route.responseType %}(status = 200, body = {{ route.responseType }}){% else %}(status = 204){% endif %})
+{% if route.httpMethod == "POST" %}    request_body = {{ route.requestType }},
+{% elif route.queryParams | length %}    params(
+{% for param in route.queryParams %}        ("{{ param.name }}" = {{ param.rustType }}, Query),
+{% endfor %}    ),
+{% endif %}    responses({% if route.responseType %}(status = 200, body = {{ route.responseType }}){% else %}(status = 204){% endif %})
 )]
 {% endif -%}
 pub(crate) async fn {{ route.method }}<E>(
     State(api): State<Api<E>>,
     ctx: ExecutionContext,
-    Json({{ route.argName }}): Json<{{ route.requestType }}>,
+    {{ route.extract }}({{ route.argName }}): {{ route.extract }}<{{ route.requestType }}>,
 ) -> Response
 where
     E: IntoResponse + Send + Sync + 'static,

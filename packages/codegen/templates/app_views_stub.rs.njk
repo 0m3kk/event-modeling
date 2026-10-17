@@ -1,0 +1,24 @@
+//! View reducers (async, fallible — persist the read model here).
+//!
+//! Generated once; edit freely — the generator will not overwrite this file.
+use crate::AppError;
+
+{% for artifact in artifacts %}
+/// Reducer for `{{ artifact.rustName }}`.
+pub struct {{ artifact.rustName }}ReducerImpl;
+
+#[async_trait::async_trait]
+impl {{ crate.name }}::{{ artifact.modulePath | join("::") }}::{{ artifact.rustName }}Reducer for {{ artifact.rustName }}ReducerImpl {
+    type Error = AppError;
+
+{% for event in artifact.projectionEvents -%}
+    async fn on_{{ event.eventType }}(
+        &self,
+        _state: &mut {{ crate.name }}::{{ artifact.modulePath | join("::") }}::{{ artifact.rustName }},
+        _event: &{{ crate.name }}::{{ event.modulePath | join("::") }}::{{ event.rustName }},
+    ) -> Result<(), AppError> {
+        {{ stubs }}!("project {{ event.rustName }} into {{ artifact.rustName }}")
+    }
+{% endfor -%}
+}
+{% endfor -%}

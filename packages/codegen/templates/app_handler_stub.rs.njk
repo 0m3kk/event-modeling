@@ -1,0 +1,31 @@
+use {{ crate.name }}::{{ handler.modulePath | join("::") }}::{{ "{" }}{{ handler.rustName }}, {{ handler.handlerType }}{% if handler.responseType %}, {{ handler.responseType }}{% endif %}{{ "}" }};
+use {{ crate.name }}::ExecutionContext;
+use crate::{AppError, AppState};
+
+/// Implementation of the `{{ handler.rustName }}` {{ handler.subject }}.
+///
+/// Generated once; edit freely — the generator will not overwrite this file.
+#[allow(dead_code)]
+pub struct {{ handler.useCaseName }} {
+    state: AppState,
+}
+
+impl {{ handler.useCaseName }} {
+    /// Create the handler with the shared application state.
+    pub fn new(state: AppState) -> Self {
+        Self { state }
+    }
+}
+
+#[async_trait::async_trait]
+impl {{ handler.handlerType }} for {{ handler.useCaseName }} {
+    type Error = AppError;
+
+    async fn handle(
+        &self,
+        _ctx: &ExecutionContext,
+        _{{ handler.subject }}: {{ handler.rustName }},
+    ) -> Result<{% if handler.responseType %}{{ handler.responseType }}{% else %}(){% endif %}, AppError> {
+        {{ stubs }}!("implement {{ handler.rustName }}")
+    }
+}

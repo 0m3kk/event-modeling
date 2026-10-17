@@ -13,6 +13,7 @@ import { commandsGenerator } from "./commands";
 import { eventsGenerator } from "./events";
 import { libGenerator } from "./lib";
 import { queriesGenerator } from "./queries";
+import { scaffoldGenerator } from "./scaffold";
 import { servicesGenerator } from "./services";
 import { statesGenerator } from "./states";
 import { typesGenerator } from "./types";
@@ -31,6 +32,7 @@ export const generators: Record<GeneratorName, Generator> = {
   states: statesGenerator,
   services: servicesGenerator,
   api: apiGenerator,
+  scaffold: scaffoldGenerator,
 };
 
 /** Which generators run when the config does not say. */
@@ -45,6 +47,7 @@ export const DEFAULT_ENABLED: Record<GeneratorName, boolean> = {
   states: false,
   services: false,
   api: false,
+  scaffold: false,
 };
 
 /** Stable generation order (also roughly the reading order of the crate). */
@@ -59,12 +62,18 @@ const ORDER: GeneratorName[] = [
   "states",
   "services",
   "api",
+  "scaffold",
 ];
 
 /** Resolves which generators are enabled from the config. */
 export function resolveEnabled(config: CodegenConfig): Set<GeneratorName> {
   const enabled = new Set<GeneratorName>();
   for (const name of ORDER) {
+    if (name === "scaffold") {
+      // The scaffold is driven by the top-level `scaffold` option, not `generators`.
+      if (config.scaffold?.enabled === true) enabled.add(name);
+      continue;
+    }
     const setting = config.generators?.[name];
     if (typeof setting === "boolean") {
       if (setting) enabled.add(name);

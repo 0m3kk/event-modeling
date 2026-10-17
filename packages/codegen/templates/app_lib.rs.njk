@@ -1,0 +1,18 @@
+//! Application crate: implementations of the generated domain traits.
+//!
+//! Every `todo!()` here is a stub the generator created once. Fill it in; the
+//! generator will not overwrite it. Structural files (`lib.rs`, `mod.rs`, the
+//! handler registry) are regenerated from the spec.
+
+pub mod error;
+pub mod state;
+{% if crate.api %}pub mod register;
+
+{% endif -%}
+{% for domain in domains -%}
+pub mod {{ domain.module }};
+{% endfor %}
+pub use error::AppError;
+pub use state::AppState;
+{% if crate.api %}pub use register::register;
+{% endif -%}

@@ -541,6 +541,92 @@ states:
     expect(state.projectionEvents).toEqual([]);
   });
 
+  it("builds alias metadata for newtypes (uuid, plain, array)", () => {
+    const source = `
+name: Shop
+types:
+  - alias: OrderId
+    of: uuid
+  - alias: CustomerId
+    of: string
+  - alias: Labels
+    of: string
+    array: true
+  - alias: Total
+    of: float
+events:
+  - name: OrderPlaced
+    fields:
+      - name: orderId
+        type: OrderId
+        required: true
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({
+      spec: hoisted,
+      types,
+      config: { spec: "s", out: "o", typeMap: { uuid: "uuid::Uuid" } },
+    });
+    const orderId = artifact(crate, "OrderId");
+    expect(orderId.aliasOf).toBe("uuid::Uuid");
+    expect(orderId.aliasIsUuid).toBe(true);
+    expect(orderId.aliasEqHash).toBe(true);
+    expect(orderId.aliasDisplay).toBe(true);
+
+    const labels = artifact(crate, "Labels");
+    expect(labels.aliasOf).toBe("Vec<String>");
+    expect(labels.aliasIsUuid).toBe(false);
+    expect(labels.aliasDisplay).toBe(false);
+
+    const total = artifact(crate, "Total");
+    expect(total.aliasEqHash).toBe(false);
+
+    // The uuid marker in the alias target pulls the uuid dependency in.
+    expect(crate.deps.map((d) => d.name)).toContain("uuid");
+  });
+
+  it("computes service method return types and result structs", () => {
+    const source = `
+name: Shop
+services:
+  - name: OrderService
+    methods:
+      - name: ping
+      - name: place
+        params:
+          - name: orderId
+            type: string
+            required: true
+        returns:
+          - name: orderId
+            type: string
+            required: true
+      - name: quote
+        returns:
+          - name: total
+            type: float
+            required: true
+          - name: currency
+            type: string
+            required: true
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
+    const service = artifact(crate, "OrderService");
+    const method = (name: string) => service.methods!.find((m) => m.rustName === name)!;
+
+    expect(method("ping").returnType).toBe("()");
+    expect(method("ping").resultTypeName).toBeUndefined();
+    expect(method("place").returnType).toBe("String");
+    expect(method("quote").returnType).toBe("OrderServiceQuoteResult");
+    expect(method("quote").resultTypeName).toBe("OrderServiceQuoteResult");
+
+    // Async service traits need async-trait.
+    expect(crate.deps.map((d) => d.name)).toContain("async-trait");
+  });
+
   it("normalizes DCB tags to snake_case on events and query items", () => {
     const source = `
 name: Shop

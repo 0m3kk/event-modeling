@@ -22,6 +22,15 @@ export default defineConfig({
     // deps: [{ name: "event-store", git: "https://github.com/0m3kk/backend-kit.git" }],
   },
 
+  // Map spec primitives/format presets to Rust types. uuid and time are
+  // pre-wired so ids and timestamps are typed from the start.
+  typeMap: {
+    uuid: "uuid::Uuid",
+    datetime: "time::OffsetDateTime",
+    date: "time::Date",
+    time: "time::Time",
+  },
+
   // Every built-in generator runs by default; disable any of them here.
   generators: {
     queries: true,
@@ -37,6 +46,16 @@ export default defineConfig({
   // Drop templates into ".codegen/templates" (see \`em-codegen eject\`) to
   // override the built-ins, then point this at them.
   // templatesDir: ".codegen/templates",
+
+  // Emit a Cargo workspace around the crate: a workspace manifest, an
+  // application crate (handler/reducer/service implementations) and a server
+  // binary. Structure is regenerated; implementation stubs are written once.
+  scaffold: {
+    enabled: true,
+    // app: { crate: "domain-app" },
+    // server: { crate: "domain-server" },
+    // templates: true,
+  },
 });
 `;
 

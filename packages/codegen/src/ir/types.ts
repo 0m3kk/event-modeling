@@ -147,10 +147,18 @@ export interface IrArtifact {
   variants?: IrEnumVariant[];
   /** Present for `type` artifacts. */
   typeKind?: "object" | "enum" | "alias";
-  /** Rendered Rust type an alias points at. */
+  /** Rendered Rust type an alias points at (the full wrapped type, e.g. `Vec<String>`). */
   aliasOf?: string;
   /** Referenced data type name an alias points at, if non-primitive. */
   aliasRefName?: string;
+  /** True when the alias target is `uuid::Uuid` (so `new()` can use `now_v7`). */
+  aliasIsUuid?: boolean;
+  /** True when the alias target can derive `Eq + Hash` (i.e. is not a float/array-of-float). */
+  aliasEqHash?: boolean;
+  /** True when the alias target can implement `Display` (a scalar, non-array target). */
+  aliasDisplay?: boolean;
+  /** `validator` attributes on a newtype alias. */
+  validations?: string[];
   /** Present for services. */
   methods?: IrMethod[];
   /** Command / query action token. */
@@ -169,6 +177,10 @@ export interface IrMethod {
   doc?: string;
   params: IrField[];
   returns: IrField[];
+  /** Rendered return type: `()`, the single field type, or the result struct name. */
+  returnType: string;
+  /** Name of the generated result struct when the method returns more than one field. */
+  resultTypeName?: string;
 }
 
 export interface IrDomain {

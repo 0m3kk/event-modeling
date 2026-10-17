@@ -857,12 +857,15 @@ describe("run", () => {
     expect(mod).toContain("impl<E> Default for Api<E> {");
     expect(mod).toContain("impl<E> Clone for Api<E> {");
 
-    // The router dispatches each route to its registered handler.
+    // The router dispatches each route to its registered handler. Commands are
+    // POST with a JSON body; queries default to GET with query-string params.
     const router = await read("src/apis/router.rs");
     expect(router).toContain("pub fn router<E>(api: Api<E>) -> Router");
     expect(router).toContain('.route("/api/sales/place-order", post(place_order::<E>))');
-    expect(router).toContain('.route("/api/sales/get-order", post(get_order::<E>))');
+    expect(router).toContain('.route("/api/sales/get-order", get(get_order::<E>))');
     expect(router).toContain("State(api): State<Api<E>>");
+    expect(router).toContain("Json(command): Json<PlaceOrder>");
+    expect(router).toContain("Query(query): Query<GetOrder>");
     expect(router).toContain(
       'let Some(handler) = api.place_order.as_ref() else {',
     );
@@ -930,5 +933,205 @@ describe("run", () => {
     const cargo = await read("Cargo.toml");
     expect(cargo).toContain("axum");
     expect(cargo).not.toContain("utoipa");
+  });
+
+  it("renders aliases as newtypes by default and as `pub type` when configured", async () => {
+    const spec = [
+      "name: Shop",
+      "types:",
+      "  - alias: OrderId",
+      "    of: uuid",
+      "",
+      "events:",
+      "  - name: OrderPlaced",
+      "    fields:",
+      "      - name: orderId",
+      "        type: OrderId",
+      "        required: true",
+      "        tag: order",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `typeMap: { uuid: "uuid::Uuid" } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+    const newtype = await read("src/common/types/order_id.rs");
+    expect(newtype).toContain("#[serde(transparent)]");
+    expect(newtype).toContain("pub struct OrderId(pub uuid::Uuid);");
+    expect(newtype).toContain("pub fn new() -> Self {");
+    expect(newtype).toContain("uuid::Uuid::now_v7()");
+    expect(newtype).toContain("impl std::fmt::Display for OrderId");
+    expect(await read("Cargo.toml")).toContain('uuid = { version = "1", features = ["serde", "v7"] }');
+
+    // Opting out renders a bare type alias instead (fresh dir: the config is
+    // cached per process, so a rewrite in place may not be picked up).
+    const aliasDir = await fs.mkdtemp(path.join(os.tmpdir(), "em-codegen-alias-"));
+    try {
+      await fs.writeFile(path.join(aliasDir, "board.spec.yaml"), spec, "utf8");
+      await fs.writeFile(
+        path.join(aliasDir, "codegen.config.ts"),
+        `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+          `crate: { aliases: "alias" }, typeMap: { uuid: "uuid::Uuid" } };\n`,
+        "utf8",
+      );
+      await run({ cwd: aliasDir, rustfmt: false });
+      const alias = await fs.readFile(
+        path.join(aliasDir, "crates/shop/src/common/types/order_id.rs"),
+        "utf8",
+      );
+      expect(alias).toContain("pub type OrderId = uuid::Uuid;");
+    } finally {
+      await fs.rm(aliasDir, { recursive: true, force: true });
+    }
+  });
+
+  it("renders async service contracts with result structs for multiple returns", async () => {
+    const spec = [
+      "name: Shop",
+      "services:",
+      "  - name: OrderService",
+      "    methods:",
+      "      - name: place",
+      "        params:",
+      "          - name: orderId",
+      "            type: string",
+      "            required: true",
+      "        returns:",
+      "          - name: orderId",
+      "            type: string",
+      "            required: true",
+      "      - name: quote",
+      "        returns:",
+      "          - name: total",
+      "            type: float",
+      "            required: true",
+      "          - name: currency",
+      "            type: string",
+      "            required: true",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, generators: { services: true } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+    const file = await read("src/common/services/order_service.rs");
+    expect(file).toContain("#[async_trait::async_trait]");
+    expect(file).toContain("pub trait OrderService {");
+    expect(file).toContain("async fn place(&self, order_id: String) -> String;");
+    expect(file).toContain("pub struct OrderServiceQuoteResult {");
+    expect(file).toContain("pub total: f64,");
+    expect(file).toContain("async fn quote(&self) -> OrderServiceQuoteResult;");
+
+    expect(await read("Cargo.toml")).toContain('async-trait = { version = "0.1" }');
+  });
+
+  it("returns the sequence position from a projection load", async () => {
+    const spec = [
+      "name: Shop",
+      "domains:",
+      "  - name: Sales",
+      "    cards: [OrderPlaced, OrderState]",
+      "events:",
+      "  - name: OrderPlaced",
+      "    fields:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "        tag: order",
+      "states:",
+      "  - name: OrderState",
+      "    params:",
+      "      - name: orderId",
+      "        type: string",
+      "    query:",
+      "      - types: [OrderPlaced]",
+      "        tags:",
+      "          - tag: order",
+      "            field: orderId",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, generators: { states: true } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+    const file = await read("src/sales/states/order_state.rs");
+    expect(file).toContain("use event_store::{EventStore, Query, QueryItem, SequencePosition};");
+    expect(file).toContain("Result<(Self, Option<SequencePosition>), OrderStateError<E::Error>>");
+    expect(file).toContain("let mut position: Option<SequencePosition> = None;");
+    expect(file).toContain("position = Some(sequenced.position);");
+    expect(file).toContain("Ok((self, position))");
+  });
+
+  it("scaffolds a workspace, an application crate and a server crate", async () => {
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `generators: { api: true }, scaffold: { enabled: true } };\n`,
+      "utf8",
+    );
+
+    const result = await run({ cwd: dir, rustfmt: false });
+    const paths = result.files.map((file) => file.path);
+    expect(paths).toContain("Cargo.toml");
+    expect(paths).toContain("crates/shop-app/Cargo.toml");
+    expect(paths).toContain("crates/shop-app/src/lib.rs");
+    expect(paths).toContain("crates/shop-app/src/register.rs");
+    expect(paths).toContain("crates/shop-app/src/sales/commands/place_order.rs");
+    expect(paths).toContain("crates/shop-server/src/main.rs");
+
+    const workspace = await readFromRoot("Cargo.toml");
+    expect(workspace).toContain("[workspace]");
+    expect(workspace).toContain(
+      'members = ["crates/shop", "crates/shop-app", "crates/shop-server"]',
+    );
+
+    const appCargo = await readFromRoot("crates/shop-app/Cargo.toml");
+    expect(appCargo).toContain('shop = { path = "../shop" }');
+    expect(appCargo).toContain("async-trait");
+
+    const register = await readFromRoot("crates/shop-app/src/register.rs");
+    expect(register).toContain("pub fn register(api: Api<AppError>, state: AppState) -> Api<AppError>");
+    expect(register).toContain(".with_place_order(PlaceOrderUseCase::new(state.clone()))");
+
+    const stub = await readFromRoot("crates/shop-app/src/sales/commands/place_order.rs");
+    expect(stub).toContain("impl PlaceOrderHandler for PlaceOrderUseCase {");
+    expect(stub).toContain('todo!("implement PlaceOrder")');
+  });
+
+  it("keeps hand-edited scaffold implementation files across runs", async () => {
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `generators: { api: true }, scaffold: { enabled: true } };\n`,
+      "utf8",
+    );
+    await run({ cwd: dir, rustfmt: false });
+
+    const impl = path.join(dir, "crates/shop-app/src/sales/commands/place_order.rs");
+    await fs.appendFile(impl, "// implemented\n", "utf8");
+
+    const second = await run({ cwd: dir, rustfmt: false });
+    expect(second.skipped).toEqual([]);
+    expect(second.drifted).toEqual([]);
+    expect(await fs.readFile(impl, "utf8")).toContain("// implemented");
+
+    // Structural files ARE drift-checked.
+    const workspace = path.join(dir, "Cargo.toml");
+    await fs.appendFile(workspace, "# drift\n", "utf8");
+    const check = await run({ cwd: dir, rustfmt: false, check: true });
+    expect(check.drifted).toContain("@root/Cargo.toml");
   });
 });

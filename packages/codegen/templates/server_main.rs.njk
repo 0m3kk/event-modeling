@@ -1,0 +1,30 @@
+//! Server binary: wire the application handlers onto the generated API and serve.
+//!
+//! Generated once; edit freely — add configuration, the event store, database
+//! pool and migrations here.
+{% if crate.api %}
+use std::net::SocketAddr;
+
+use {{ appCratePath }}::{AppError, AppState, register};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let state = AppState::default();
+
+    let api = {{ crate.name }}::apis::Api::<AppError>::new();
+    let app = {{ crate.name }}::apis::router(register(api, state));
+
+    let address: SocketAddr = "0.0.0.0:3000".parse()?;
+    let listener = tokio::net::TcpListener::bind(address).await?;
+    println!("listening on http://{address}");
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+{% else %}
+#[tokio::main]
+async fn main() {
+    // The API generator is disabled in `codegen.config.ts`; enable it to serve
+    // the generated transport, or dispatch commands and queries directly.
+    println!("no HTTP API generated");
+}
+{% endif %}

@@ -1,0 +1,7 @@
+{% for dir in modDir.dirs -%}
+pub mod {{ dir.name }};
+{% endfor -%}
+{% for file in modDir.files -%}
+pub mod {{ file }};
+pub use {{ file }}::*;
+{% endfor -%}
