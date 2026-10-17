@@ -83,11 +83,14 @@ describe("buildIr", () => {
     const placed = artifact(crate, "OrderPlaced");
     const order = placed.fields!.find((f) => f.rustName === "order")!;
     expect(order.rustType).toBe("Option<Order>");
+    // The builder accepts the inner type so it can wrap it in `Some`.
+    expect(order.valueType).toBe("Order");
     expect(placed.usesPrelude).toBe(true);
 
     const place = artifact(crate, "PlaceOrder");
     const orderId = place.inputs!.find((f) => f.rustName === "order_id")!;
     expect(orderId.rustType).toBe("OrderId");
+    expect(orderId.valueType).toBe("OrderId");
     expect(orderId.optional).toBe(false);
     expect(orderId.needsRename).toBe(true);
   });

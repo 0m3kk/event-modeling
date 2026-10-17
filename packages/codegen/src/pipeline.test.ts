@@ -425,4 +425,91 @@ describe("run", () => {
     expect(status).toContain("Default");
     expect(status).toContain("#[default]");
   });
+
+  it("generates a factory and with_ builders for commands, queries, events and types", async () => {
+    const spec = [
+      "name: Shop",
+      "domains:",
+      "  - name: Sales",
+      "    cards: [PlaceOrder, OrderPlaced, GetOrder, Order]",
+      "events:",
+      "  - name: OrderPlaced",
+      "    fields:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "      - name: order",
+      "        type:",
+      "          object: Order",
+      "          fields:",
+      "            - name: id",
+      "              type: string",
+      "              required: true",
+      "            - name: total",
+      "              type: float",
+      "commands:",
+      "  - name: PlaceOrder",
+      "    inputs:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "      - name: items",
+      "        type: string",
+      "        array: true",
+      "    responses:",
+      "      - name: total",
+      "        type: float",
+      "        required: true",
+      "queries:",
+      "  - name: GetOrder",
+      "    params:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, generators: { queries: true } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+
+    // Command: required fields are params, optional/array fields default to `None`.
+    const command = await read("src/sales/commands/place_order.rs");
+    expect(command).toContain("pub fn new(order_id: String) -> Self {");
+    expect(command).toContain("items: None,");
+    // `with_` for a required field replaces the value.
+    expect(command).toContain("pub fn with_order_id(mut self, value: String) -> Self {");
+    expect(command).toContain("self.order_id = value;");
+    // `with_` for an optional field takes the inner type and wraps it in `Some`.
+    expect(command).toContain("pub fn with_items(mut self, value: Vec<String>) -> Self {");
+    expect(command).toContain("self.items = Some(value);");
+    // The response struct gets its own factory.
+    const response = command.slice(command.indexOf("pub struct PlaceOrderResponse"));
+    expect(response).toContain("pub fn new(total: f64) -> Self {");
+    expect(response).toContain("pub fn with_total(mut self, value: f64) -> Self {");
+
+    // Query.
+    expect(await read("src/sales/queries/get_order.rs")).toContain(
+      "pub fn new(order_id: String) -> Self {",
+    );
+
+    // Event: mixes a required field with optional ones.
+    const event = await read("src/sales/events/order_placed.rs");
+    expect(event).toContain("pub fn new(order_id: String) -> Self {");
+    expect(event).toContain("pub fn with_order(mut self, value: Order) -> Self {");
+    expect(event).toContain("self.order = Some(value);");
+    // The `DomainEvent` impl still follows the generated factory.
+    expect(event).toContain("impl crate::DomainEvent for OrderPlaced");
+
+    // Object type.
+    const type = await read("src/sales/types/order.rs");
+    expect(type).toContain("pub fn new(id: String) -> Self {");
+    expect(type).toContain("total: None,");
+    expect(type).toContain("pub fn with_total(mut self, value: f64) -> Self {");
+    expect(type).toContain("self.total = Some(value);");
+  });
 });

@@ -24,6 +24,12 @@ export interface IrField {
   rustName: string;
   /** Rendered Rust type, e.g. `Option<Vec<String>>`. */
   rustType: string;
+  /**
+   * Rust type accepted by the generated `with_<field>` builder. Equal to
+   * `rustType` for required fields; for optional fields it is the unwrapped
+   * inner type, so `with_<field>` can wrap the value in `Some` for the caller.
+   */
+  valueType: string;
   /** Structural type, for dependency detection. */
   type: RustType;
   /** True when `rustName` differs from `name` (informational for custom templates). */

@@ -1,3 +1,14 @@
+{%- set separator = "" -%}
+{%- set params = "" -%}
+{%- set hasOptional = false -%}
+{%- for field in fields -%}
+{%- if field.optional -%}
+{%- set hasOptional = true -%}
+{%- else -%}
+{%- set params = params + separator + field.rustName + ": " + field.rustType -%}
+{%- set separator = ", " -%}
+{%- endif -%}
+{%- endfor -%}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize{% if extraDerive %}, {{ extraDerive }}{% endif %}{% if artifact.validates %}, Validate{% endif %})]
 #[serde(rename_all = "snake_case")]
 pub struct {{ structName }} {
@@ -9,5 +20,22 @@ pub struct {{ structName }} {
 {% if field.validations | length %}#[validate({{ field.validations | join(", ") }})]
 {% endif -%}
 pub {{ field.rustName }}: {{ field.rustType }},
+{% endfor -%}
+}
+
+impl {{ structName }} {
+    /// Create a new `{{ structName }}`{% if hasOptional %} with the required fields set and the optional fields left as `None`{% endif %}.
+    pub fn new({{ params }}) -> Self {
+{% if fields | length %}        Self {
+{% for field in fields %}            {{ field.rustName }}{% if field.optional %}: None{% endif %},
+{% endfor %}        }
+{% else %}        Self {}
+{% endif %}    }
+{% for field in fields %}
+    /// Set `{{ field.rustName }}`.
+    pub fn with_{{ field.rustName }}(mut self, value: {{ field.valueType }}) -> Self {
+        self.{{ field.rustName }} = {% if field.optional %}Some(value){% else %}value{% endif %};
+        self
+    }
 {% endfor -%}
 }

@@ -97,6 +97,30 @@ inputs/params and, when the spec declares responses, a `PlaceOrderResponse`.
 Generated `struct`s and `enum`s serialize with `#[serde(rename_all =
 "snake_case")]`, so field and variant names are snake_case on the wire.
 
+Every generated struct — command/query requests and responses, events and object
+types — also carries a constructor and fluent setters:
+
+```rust
+pub struct PlaceOrder {
+    pub order_id: OrderId,          // required: true in the spec
+    pub items: Option<Vec<String>>, // optional in the spec
+}
+
+impl PlaceOrder {
+    /// Create with the required fields set and the optional fields `None`.
+    pub fn new(order_id: OrderId) -> Self { /* … */ }
+
+    /// Set `items` (takes the inner `Vec<String>` and wraps it in `Some`).
+    pub fn with_items(mut self, value: Vec<String>) -> Self { /* … */ }
+}
+```
+
+`new` takes the required fields (a field without `required: true` is optional)
+as parameters and leaves the optional ones `None`. A `with_<field>` method is
+generated for every field: for optional fields it accepts the unwrapped type and
+stores `Some(value)`, for required fields it replaces the value directly. A
+request then reads as `PlaceOrder::new(order_id).with_items(items)`.
+
 ## Validation
 
 Field validation from the spec is turned into [`validator`](https://docs.rs/validator)
@@ -241,8 +265,9 @@ Built-in filters: `snake`, `pascal`, `camel`, `kebab`, `doccomment`,
 `innerdoc`, `joinlines` — plus any `filters` you register in the config.
 
 Useful `artifact` fields: `rustName`, `fileName`, `modulePath`, `doc`, `fields`
-(each with `rustName`, `rustType`, `optional`, `array`, `needsRename`, `doc`),
-`variants` (enums), `aliasOf` (aliases), `methods` (services), `action`. State
+(each with `rustName`, `rustType`, `valueType`, `optional`, `array`,
+`needsRename`, `doc`), `variants` (enums), `aliasOf` (aliases), `methods`
+(services), `action`. State
 and View artifacts also expose `params`, `queryItems`, `projectionEvents`,
 `eventImports` and `projectionNotes`.
 

@@ -246,8 +246,10 @@ function makeField(field: Field, typeMap: Record<string, string>): IrField {
 
   const array = Boolean(field.array);
   const optional = !field.required;
-  let type: RustType = array ? { kind: "vec", inner: base } : base;
-  if (optional) type = { kind: "option", inner: type };
+  // The value a builder method accepts: the field type with `Option` stripped,
+  // so `with_<field>` can wrap it in `Some` on the caller's behalf.
+  const valueType: RustType = array ? { kind: "vec", inner: base } : base;
+  const type: RustType = optional ? { kind: "option", inner: valueType } : valueType;
 
   const rustName = snakeCase(field.name) || field.name;
   const { attrs, notes } = buildValidations(field, typeMap, array);
@@ -256,6 +258,7 @@ function makeField(field: Field, typeMap: Record<string, string>): IrField {
     name: field.name,
     rustName,
     rustType: renderRustType(type),
+    valueType: renderRustType(valueType),
     type,
     needsRename: rustName !== field.name,
     optional,
