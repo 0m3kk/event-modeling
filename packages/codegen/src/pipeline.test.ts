@@ -123,6 +123,46 @@ describe("run", () => {
     expect(shipped).toContain("vec![]");
   });
 
+  it("normalizes DCB tags to snake_case in generated code", async () => {
+    const spec = [
+      "name: Shop",
+      "domains:",
+      "  - name: Sales",
+      "    cards: [OrderPlaced, OrderState]",
+      "events:",
+      "  - name: OrderPlaced",
+      "    fields:",
+      "      - name: orderItemId",
+      "        type: string",
+      "        required: true",
+      "        tag: orderItem",
+      "states:",
+      "  - name: OrderState",
+      "    params:",
+      "      - name: orderItemId",
+      "        type: string",
+      "    query:",
+      "      - types: [OrderPlaced]",
+      "        tags:",
+      "          - tag: orderItem",
+      "            field: orderItemId",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", generators: { states: true } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+
+    const placed = await read("src/sales/events/order_placed.rs");
+    expect(placed).toContain('vec![format!("order_item:{}", self.order_item_id), ]');
+    const state = await read("src/sales/states/order_state.rs");
+    expect(state).toContain('format!("order_item:{}", self.order_item_id)');
+  });
+
   it("is idempotent on a second run", async () => {
     await run({ cwd: dir, rustfmt: false });
     const second = await run({ cwd: dir, rustfmt: false });

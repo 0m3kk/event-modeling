@@ -30,7 +30,7 @@ export interface IrField {
   needsRename: boolean;
   optional: boolean;
   array: boolean;
-  /** DCB tag attached to this field, if any. */
+  /** snake_case DCB tag attached to this field, if any (e.g. `order`, `order_item`). */
   tag?: string;
   doc?: string;
   /** `validator` attribute expressions, e.g. `["length(min = 1, max = 100)", "email"]`. */
@@ -60,7 +60,7 @@ export type IrArtifactKind =
 
 /** A DCB tag binding inside a projection query item. */
 export interface IrQueryTag {
-  /** Tag name as declared on the event (e.g. `order`). */
+  /** snake_case tag name as declared on the event (e.g. `order`, `order_item`). */
   tag: string;
   /** Original name of the param the tag binds to (e.g. `orderId`). */
   field: string;

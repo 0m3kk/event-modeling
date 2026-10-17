@@ -383,4 +383,41 @@ states:
     expect(state.queryItems![0].typeRefs).toEqual([{ literal: "ghost_event" }]);
     expect(state.projectionEvents).toEqual([]);
   });
+
+  it("normalizes DCB tags to snake_case on events and query items", () => {
+    const source = `
+name: Shop
+domains:
+  - name: Sales
+    cards: [OrderPlaced, OrderState]
+events:
+  - name: OrderPlaced
+    fields:
+      - name: orderItemId
+        type: string
+        required: true
+        tag: orderItem
+states:
+  - name: OrderState
+    params:
+      - name: orderItemId
+        type: string
+    query:
+      - types: [OrderPlaced]
+        tags:
+          - tag: orderItem
+            field: orderItemId
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
+    const event = crate.artifacts.find((a) => a.name === "OrderPlaced")!;
+    const state = crate.artifacts.find((a) => a.name === "OrderState")!;
+
+    // Event-side tag and query-side tag must normalize to the same stream key.
+    expect(event.fields![0].tag).toBe("order_item");
+    expect(state.queryItems![0].tags).toEqual([
+      { tag: "order_item", field: "orderItemId", rustName: "order_item_id" },
+    ]);
+  });
 });

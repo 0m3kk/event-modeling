@@ -260,7 +260,9 @@ function makeField(field: Field, typeMap: Record<string, string>): IrField {
     needsRename: rustName !== field.name,
     optional,
     array,
-    tag: field.tag,
+    // DCB tags are stream keys, so they use snake_case regardless of how the
+    // spec writes them (e.g. `orderItem` -> `order_item`).
+    tag: field.tag ? snakeCase(field.tag) || field.tag : undefined,
     doc: field.description,
     validations: attrs,
     validationNotes: notes,
@@ -317,7 +319,9 @@ function makeRawQueryItems(query: SpecQueryItem[] | undefined): IrQueryItem[] {
     types: item.types ?? [],
     typeRefs: [],
     tags: (item.tags ?? []).map((tag) => ({
-      tag: tag.tag,
+      // Normalize like the event-side tag so the query filter matches the
+      // value emitted by `DomainEvent::tags`.
+      tag: snakeCase(tag.tag) || tag.tag,
       field: tag.field,
       rustName: snakeCase(tag.field) || tag.field,
     })),

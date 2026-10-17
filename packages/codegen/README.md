@@ -159,7 +159,7 @@ query, and a `load` driver:
 - `fn query(&self) -> event_store::Query` — one `QueryItem` per spec query item;
   each event `type` becomes `<Event>::event_type()` (falling back to a literal
   snake_case string when it does not resolve to a generated event) and each
-  `tag` renders as `format!("{tag}:{}", self.<param>)`.
+  `tag` (normalized to snake_case) renders as `format!("{tag}:{}", self.<param>)`.
 - `async fn load(self, store, reducer)` — reads every matching event from an
   `event_store::EventStore` and folds it through the reducer.
 
