@@ -153,7 +153,15 @@ states:
   });
 
   it("always depends on serde and detects chrono/uuid from the type map", () => {
-    expect(ir().crate.deps.map((d) => d.name)).toEqual(["serde"]);
+    // The fixture declares commands: handler traits need async-trait, and the
+    // generated ExecutionContext needs event-store, serde_json and time.
+    expect(ir().crate.deps.map((d) => d.name)).toEqual([
+      "async-trait",
+      "event-store",
+      "serde",
+      "serde_json",
+      "time",
+    ]);
 
     const { crate } = ir({
       spec: "s",
@@ -161,7 +169,13 @@ states:
       typeMap: { datetime: "chrono::DateTime<chrono::Utc>", uuid: "uuid::Uuid" },
     });
     // Nothing uses those types here, so no extra deps.
-    expect(crate.deps.map((d) => d.name)).toEqual(["serde"]);
+    expect(crate.deps.map((d) => d.name)).toEqual([
+      "async-trait",
+      "event-store",
+      "serde",
+      "serde_json",
+      "time",
+    ]);
   });
 
   it("merges extra dependencies from the config", () => {
@@ -170,7 +184,33 @@ states:
       out: "o",
       crate: { deps: [{ name: "tracing", version: "0.1" }] },
     });
-    expect(crate.deps.map((d) => d.name)).toEqual(["serde", "tracing"]);
+    expect(crate.deps.map((d) => d.name)).toEqual([
+      "async-trait",
+      "event-store",
+      "serde",
+      "serde_json",
+      "time",
+      "tracing",
+    ]);
+  });
+
+  it("flags the execution context only for crates with commands or queries", () => {
+    expect(ir().crate.executionContext).toBe(true);
+
+    const source = `
+name: Shop
+events:
+  - name: OrderPlaced
+    fields:
+      - name: orderId
+        type: string
+        required: true
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
+    expect(crate.executionContext).toBe(false);
+    expect(crate.deps.map((d) => d.name)).toEqual(["serde"]);
   });
 
   it("generates validator attributes and skips what validator cannot express", () => {

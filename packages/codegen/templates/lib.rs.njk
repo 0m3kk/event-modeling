@@ -8,6 +8,9 @@ pub mod {{ dir.name }};
 {% endfor -%}
 {% if crate.validationHelpers | length %}pub mod validation;
 {% endif -%}
+{% if crate.executionContext %}pub mod execution_context;
+pub use execution_context::ExecutionContext;
+{% endif -%}
 pub mod prelude;
 
 use serde::Serialize;
@@ -20,4 +23,18 @@ pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
 
     /// Tags associated with this event for stream filtering.
     fn tags(&self) -> Vec<String>;
+{% if crate.executionContext %}
+    /// Encodes this event as an event-store [`Event`](event_store::Event) carrying `metadata`.
+    fn to_store_event_with_metadata(
+        &self,
+        metadata: &event_store::EventMetadata,
+    ) -> Result<event_store::Event, serde_json::Error> {
+        Ok(event_store::Event {
+            event_type: Self::event_type().to_string(),
+            data: serde_json::to_value(self)?,
+            metadata: serde_json::to_value(metadata)?,
+            tags: self.tags(),
+        })
+    }
+{% endif -%}
 }

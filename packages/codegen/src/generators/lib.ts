@@ -33,6 +33,13 @@ export const libGenerator: Generator = {
     if (crate.validationHelpers.length > 0) {
       jobs.push({ template: "validation.rs.njk", outPath: "src/validation.rs", context: { crate } });
     }
+    if (crate.executionContext) {
+      jobs.push({
+        template: "execution_context.rs.njk",
+        outPath: "src/execution_context.rs",
+        context: { crate },
+      });
+    }
     return jobs;
   },
 };

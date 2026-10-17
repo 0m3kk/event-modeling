@@ -121,6 +121,58 @@ generated for every field: for optional fields it accepts the unwrapped type and
 stores `Some(value)`, for required fields it replaces the value directly. A
 request then reads as `PlaceOrder::new(order_id).with_items(items)`.
 
+### Handler traits
+
+Each command and query file also declares an async handler trait to implement in
+your own module:
+
+```rust
+/// Implement this in your own module; the generated request and response types
+/// are fixed and never edited by hand.
+#[async_trait::async_trait]
+pub trait PlaceOrderHandler {
+    /// Error returned when the command cannot be handled.
+    type Error;
+
+    async fn handle(
+        &self,
+        ctx: &ExecutionContext,
+        command: PlaceOrder,
+    ) -> Result<PlaceOrderResponse, Self::Error>;
+}
+```
+
+The request struct is passed by value (as `command` for a command and `query`
+for a query), alongside a borrowed [`ExecutionContext`](#execution-context); the
+result is the generated `...Response` struct, or `()` when the spec declares no
+responses. `async-trait` is added to the crate whenever a command or query
+exists (the same dependency Views use).
+
+### Execution context
+
+When the crate declares at least one command or query, the generator emits
+`src/execution_context.rs` (re-exported as `crate::ExecutionContext`): request
+metadata (actor, tenant, correlation/causation ids, trace/span ids, client IP,
+user-agent, plus free-form `extra`) carried into handlers. It is a builder with
+`with_*` setters and bridges to the event store:
+
+```rust
+let ctx = ExecutionContext::new()
+    .with_actor_id("user-1")
+    .with_correlation_id("corr-1");
+
+let event = OrderPlaced::new().with_order(order);
+let store_event = ctx.create_store_event(&event)?;   // event + EventMetadata
+let events = ctx.create_store_events([&event])?;
+```
+
+`to_metadata()` / `to_metadata_at(ts)` produce an `event-store::EventMetadata`;
+`create_store_event` / `create_store_events` wrap one or more `DomainEvent`s into
+`event-store::Event`s carrying that metadata. To support this, the generated
+`DomainEvent` trait gains a default `to_store_event_with_metadata` method. The
+crate pulls in `event-store`, `serde_json` and `time` whenever the execution
+context is generated.
+
 ## Validation
 
 Field validation from the spec is turned into [`validator`](https://docs.rs/validator)

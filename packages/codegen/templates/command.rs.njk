@@ -2,6 +2,7 @@
 {% endif -%}
 {% if artifact.action %}/// Action: `{{ artifact.action }}`
 {% endif -%}
+use crate::ExecutionContext;
 {% if artifact.usesPrelude %}use crate::prelude::*;
 {% endif -%}
 use serde::{Deserialize, Serialize};
@@ -13,3 +14,6 @@ use serde::{Deserialize, Serialize};
 /// Response for `{{ artifact.name }}`.
 {% set structName = artifact.rustName + "Response" %}{% set fields = artifact.responses %}{% include "_struct.njk" %}
 {% endif %}
+
+{% set subject = "command" %}{% include "_handler.njk" %}
+

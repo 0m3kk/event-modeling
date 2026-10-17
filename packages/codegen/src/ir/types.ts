@@ -215,6 +215,11 @@ export interface IrCrate {
   modules: IrModuleDir;
   /** Domain module names that contain a `types` folder (for the prelude). */
   typeModules: string[];
+  /**
+   * True when the crate declares a command or query, which makes the generator
+   * emit the `execution_context` module and thread it through handler traits.
+   */
+  executionContext: boolean;
   deps: IrDep[];
   tags: TagDef[];
   /**

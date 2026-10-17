@@ -594,8 +594,20 @@ function collectDeps(artifacts: IrArtifact[], extra: IrDep[]): IrDep[] {
     deps.push({ name: "event-store", git: EVENT_STORE_GIT });
     deps.push({ name: "futures-util", version: "0.3" });
     deps.push({ name: "serde_json", version: "1" });
-    // Only Views persist through async reducer methods, wired with async-trait.
-    if (hasView) deps.push({ name: "async-trait", version: "0.1" });
+  }
+  // Views fold through async reducer methods; command/query handlers are async
+  // traits. Both are wired with async-trait.
+  const hasAsyncHandlers = artifacts.some(
+    (artifact) => artifact.kind === "command" || artifact.kind === "query",
+  );
+  if (hasView || hasAsyncHandlers) {
+    deps.push({ name: "async-trait", version: "0.1" });
+  }
+  if (hasAsyncHandlers) {
+    // The generated ExecutionContext builds event-store metadata and events.
+    deps.push({ name: "event-store", git: EVENT_STORE_GIT });
+    deps.push({ name: "serde_json", version: "1" });
+    deps.push({ name: "time", version: "0.3" });
   }
   if (needsValidator(artifacts)) {
     deps.push({ name: "validator", version: "0.18", features: ["derive"] });
@@ -731,6 +743,10 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
     new Set(artifacts.filter((a) => a.kind === "type").map((a) => a.modulePath[0])),
   ).sort((a, b) => a.localeCompare(b));
 
+  const executionContext = artifacts.some(
+    (artifact) => artifact.kind === "command" || artifact.kind === "query",
+  );
+
   const domains: IrDomain[] = (spec.domains ?? []).map((domain) => ({
     name: domain.name,
     module: snakeCase(domain.name) || COMMON_MODULE,
@@ -748,6 +764,7 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
       artifacts,
       modules: buildModuleTree(artifacts),
       typeModules,
+      executionContext,
       deps: collectDeps(artifacts, extraDeps),
       tags: spec.tags ?? [],
       validationHelpers: collectValidationHelpers(artifacts),

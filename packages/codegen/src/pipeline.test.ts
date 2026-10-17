@@ -512,4 +512,88 @@ describe("run", () => {
     expect(type).toContain("pub fn with_total(mut self, value: f64) -> Self {");
     expect(type).toContain("self.total = Some(value);");
   });
+
+  it("generates async handler traits for commands and queries", async () => {
+    const spec = [
+      "name: Shop",
+      "domains:",
+      "  - name: Sales",
+      "    cards: [PlaceOrder, CancelOrder, GetOrder]",
+      "commands:",
+      "  - name: PlaceOrder",
+      "    inputs:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "    responses:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "  - name: CancelOrder",
+      "    inputs:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "queries:",
+      "  - name: GetOrder",
+      "    params:",
+      "      - name: orderId",
+      "        type: string",
+      "        required: true",
+      "    responses:",
+      "      - name: total",
+      "        type: float",
+      "        required: true",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), spec, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, generators: { queries: true } };\n`,
+      "utf8",
+    );
+
+    await run({ cwd: dir, rustfmt: false });
+
+    // A command with responses returns its response struct.
+    const command = await read("src/sales/commands/place_order.rs");
+    expect(command).toContain("use crate::ExecutionContext;");
+    expect(command).toContain("#[async_trait::async_trait]");
+    expect(command).toContain("pub trait PlaceOrderHandler {");
+    expect(command).toContain("type Error;");
+    expect(command).toContain("ctx: &ExecutionContext,");
+    expect(command).toContain("command: PlaceOrder,");
+    expect(command).toContain("-> Result<PlaceOrderResponse, Self::Error>;");
+
+    // A command without responses returns the unit type.
+    const cancel = await read("src/sales/commands/cancel_order.rs");
+    expect(cancel).toContain("pub trait CancelOrderHandler {");
+    expect(cancel).toContain("-> Result<(), Self::Error>;");
+
+    // Queries get the same shape, with the query as the argument.
+    const query = await read("src/sales/queries/get_order.rs");
+    expect(query).toContain("#[async_trait::async_trait]");
+    expect(query).toContain("pub trait GetOrderHandler {");
+    expect(query).toContain("ctx: &ExecutionContext,");
+    expect(query).toContain("query: GetOrder,");
+    expect(query).toContain("-> Result<GetOrderResponse, Self::Error>;");
+
+    // The execution context module is generated and wired through the crate.
+    expect(await read("src/lib.rs")).toContain("pub mod execution_context;");
+    expect(await read("src/lib.rs")).toContain("pub use execution_context::ExecutionContext;");
+    const context = await read("src/execution_context.rs");
+    expect(context).toContain("pub struct ExecutionContext {");
+    expect(context).toContain("pub fn with_tenant_id(mut self, tenant_id: impl Into<String>) -> Self {");
+    expect(context).toContain("pub fn to_metadata_at(&self, timestamp: OffsetDateTime) -> EventMetadata {");
+    expect(context).toContain("pub fn create_store_events<'a, E: DomainEvent + 'a>(");
+    // No HTTP extraction in the generated context.
+    expect(context).not.toContain("from_headers");
+    expect(await read("src/lib.rs")).toContain("fn to_store_event_with_metadata(");
+
+    // Async handler traits and the context pull in their dependencies.
+    const cargo = await read("Cargo.toml");
+    expect(cargo).toContain('async-trait = { version = "0.1" }');
+    expect(cargo).toContain('time = { version = "0.3" }');
+    expect(cargo).toContain('event-store = { git = "https://github.com/0m3kk/backend-kit.git" }');
+  });
 });
