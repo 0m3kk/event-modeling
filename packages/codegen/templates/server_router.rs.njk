@@ -7,11 +7,9 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::middleware::from_fn_with_state;
-use axum::routing::get;
 use http_server::HttpConfig;
 use jwt::JwtService;
 
-use crate::handlers::me;
 use crate::middleware::require_auth;
 use crate::state::State;
 
@@ -25,10 +23,7 @@ pub fn create_router(state: State, config: &HttpConfig, jwt: Arc<JwtService>) ->
         state,
     ));
 
-    // The example `me` route reports the authenticated caller's identity.
-    let protected = Router::new()
-        .route(me::ME_PATH, get(me::me))
-        .route_layer(from_fn_with_state(jwt, require_auth));
+    let protected = Router::new().route_layer(from_fn_with_state(jwt, require_auth));
 
     let routes = Router::new().merge(api).merge(protected);
     http_server::apply_middleware(http_server::init_router().merge(routes), config)

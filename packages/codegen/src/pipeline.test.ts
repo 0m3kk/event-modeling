@@ -1097,7 +1097,7 @@ describe("run", () => {
     expect(paths).toContain("crates/shop-server/src/state.rs");
     expect(paths).toContain("crates/shop-server/src/router.rs");
     expect(paths).toContain("crates/shop-server/src/middleware/auth.rs");
-    expect(paths).toContain("crates/shop-server/src/handlers/me.rs");
+    expect(paths).toContain("crates/shop-server/src/handlers/mod.rs");
     expect(paths).toContain("crates/shop-server/src/main.rs");
 
     const workspace = await readFromRoot("Cargo.toml");
@@ -1137,7 +1137,7 @@ describe("run", () => {
     expect(serverMain).toContain("JwtService::new");
     const serverRouter = await readFromRoot("crates/shop-server/src/router.rs");
     expect(serverRouter).toContain("http_server::apply_middleware");
-    expect(serverRouter).toContain(".route(me::ME_PATH, get(me::me))");
+    expect(serverRouter).toContain("from_fn_with_state(jwt, require_auth)");
     const authMiddleware = await readFromRoot("crates/shop-server/src/middleware/auth.rs");
     expect(authMiddleware).toContain("pub async fn require_auth");
     expect(authMiddleware).toContain("jwt.verify_token");

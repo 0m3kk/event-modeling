@@ -405,7 +405,6 @@ export const scaffoldGenerator: Generator = {
         server("server_middleware_mod.rs.njk", "src/middleware/mod.rs");
         server("server_middleware_auth.rs.njk", "src/middleware/auth.rs");
         server("server_handlers_mod.rs.njk", "src/handlers/mod.rs");
-        server("server_handler_me.rs.njk", "src/handlers/me.rs");
         server("server_router.rs.njk", "src/router.rs");
       }
       server("server_main.rs.njk", "src/main.rs");

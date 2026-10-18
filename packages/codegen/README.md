@@ -551,11 +551,10 @@ The technical plumbing is generated too, and is kept free of domain logic:
   - `middleware/auth.rs` — `require_auth`, which verifies the bearer token with
     the configured `JwtService` (rejecting invalid/expired tokens) and forwards
     the verified `sub` claim to the generated `ExecutionContext`.
-  - `handlers/me.rs` — an example authenticated handler (`GET /api/v1/me`) that
-    reports the caller's identity.
+  - `handlers/mod.rs` — a place for your own server-level handlers.
   - `router.rs` — `create_router`, which merges the generated API routes and the
-    base routes, applies `require_auth` to the `protected` router (the example
-    `me` route lives there), and wraps everything in
+    base routes, applies `require_auth` to the `protected` router (add the
+    routes that need an authenticated caller there), and wraps everything in
     `http_server::apply_middleware` (request id, tracing, metrics, timeouts,
     compression, CORS, security headers).
   - `main.rs` — initializes telemetry, builds the JWT service and the state,
