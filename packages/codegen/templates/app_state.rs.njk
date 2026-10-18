@@ -2,26 +2,33 @@ use std::sync::Arc;
 
 /// Shared application state handed to every command and query handler.
 ///
-/// Generic over the event store `E`, so the same handlers run against the
-/// PostgreSQL store in production and a mock store in tests. Add the other
-/// dependencies handlers need (a database pool, service clients, policies) as
-/// fields here and thread them through `new`.
-pub struct AppState<E> {
+/// Generic over the event store `E` and the snapshot store `S`, so the same
+/// handlers run against the PostgreSQL stores in production and mock stores in
+/// tests. Add the other dependencies handlers need (a database pool, service
+/// clients, policies) as fields here and thread them through `new`.
+pub struct AppState<E, S = ()> {
     /// The event store every handler reads and appends to.
     pub event_store: Arc<E>,
+
+    /// Optional snapshot store used to speed up model/projection loading.
+    pub snapshot_store: Option<Arc<S>>,
 }
 
-impl<E> AppState<E> {
-    /// Create the state from an owned event store.
+impl<E, S> AppState<E, S> {
+    /// Create the state from an owned event store, without snapshots.
     pub fn new(event_store: E) -> Self {
         Self {
             event_store: Arc::new(event_store),
+            snapshot_store: None,
         }
     }
 
-    /// Create the state from an already shared event store.
+    /// Create the state from an already shared event store, without snapshots.
     pub fn from_arc(event_store: Arc<E>) -> Self {
-        Self { event_store }
+        Self {
+            event_store,
+            snapshot_store: None,
+        }
     }
 
     /// Replace the event store.
@@ -29,12 +36,30 @@ impl<E> AppState<E> {
         self.event_store = Arc::new(event_store);
         self
     }
+
+    /// Set the snapshot store.
+    pub fn with_snapshot_store(mut self, snapshot_store: S) -> Self {
+        self.snapshot_store = Some(Arc::new(snapshot_store));
+        self
+    }
+
+    /// Set the snapshot store from an already shared handle.
+    pub fn with_snapshot_store_arc(mut self, snapshot_store: Arc<S>) -> Self {
+        self.snapshot_store = Some(snapshot_store);
+        self
+    }
+
+    /// Borrow the snapshot store, if one is configured.
+    pub fn snapshots(&self) -> Option<&S> {
+        self.snapshot_store.as_deref()
+    }
 }
 
-impl<E> Clone for AppState<E> {
+impl<E, S> Clone for AppState<E, S> {
     fn clone(&self) -> Self {
         Self {
             event_store: Arc::clone(&self.event_store),
+            snapshot_store: self.snapshot_store.clone(),
         }
     }
 }

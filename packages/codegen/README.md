@@ -535,8 +535,9 @@ implementation file is a `todo!()`.
 
 The technical plumbing is generated too, and is kept free of domain logic:
 
-- `AppState<E>` holds the shared event store (`Arc<E>`) and is generic over it,
-  so the same handlers run against PostgreSQL in production and a mock store in
+- `AppState<E, S = ()>` holds the shared event store (`Arc<E>`) and an optional
+  snapshot store (`Option<Arc<S>>`) and is generic over both, so the same
+  handlers run against the PostgreSQL stores in production and mock stores in
   tests.
 - The **server binary** ships the infrastructure wiring:
   - `config.rs` — `AppConfig` (`http`, `telemetry`, `jwt`, `postgres`) and
@@ -544,9 +545,9 @@ The technical plumbing is generated too, and is kept free of domain logic:
     `CONFIG_FILE`/`SECRET_FILE` or the environment; `DATABASE_URL` overrides the
     connection host/port/database and credentials.
   - `state.rs` — builds the pool with `postgres_db::init_pool` (which also
-    starts the background pool-metrics monitor), applies the pending
-    event-store migrations, and builds the concrete `PostgresEventStore` and the
-    shared state.
+    starts the background pool-metrics monitor), applies the pending event-store
+    and snapshot-store migrations, and builds the concrete `PostgresEventStore`
+    and `PostgresSnapshotStore` into the shared state.
   - `middleware/auth.rs` — `require_auth`, which verifies the bearer token with
     the configured `JwtService` (rejecting invalid/expired tokens) and forwards
     the verified `sub` claim to the generated `ExecutionContext`.
@@ -564,9 +565,9 @@ The technical plumbing is generated too, and is kept free of domain logic:
 
 The app and server manifests get the infrastructure dependencies they need —
 `event-store`; on the server also `http-server`, `jwt`, `postgres-db`,
-`telemetry` and `url` — merged in automatically. An entry you list in
-`app.deps` / `server.deps` with the same name wins, so a local checkout can
-replace the git source.
+`snapshot-store`, `telemetry` and `url` — merged in automatically. An entry you
+list in `app.deps` / `server.deps` with the same name wins, so a local checkout
+can replace the git source.
 
 The workspace also ships example infrastructure files to copy and edit:
 `config.example.yaml` (HTTP/CORS/security headers, telemetry, JWT, database),

@@ -1111,21 +1111,23 @@ describe("run", () => {
     expect(appCargo).toContain("async-trait");
 
     const register = await readFromRoot("crates/shop-app/src/register.rs");
-    expect(register).toContain("pub fn register<E>(api: Api<AppError>, state: AppState<E>)");
+    expect(register).toContain("pub fn register<E, S>(api: Api<AppError>, state: AppState<E, S>)");
     expect(register).toContain(".with_place_order(PlaceOrderUseCase::new(state.clone()))");
 
     const stub = await readFromRoot("crates/shop-app/src/commands/sales/place_order/handler.rs");
     expect(stub).toContain(
-      "impl<E: Send + Sync + 'static> PlaceOrderHandler for PlaceOrderUseCase<E> {",
+      "impl<E, S> PlaceOrderHandler for PlaceOrderUseCase<E, S>",
     );
     expect(stub).toContain('todo!("implement PlaceOrder")');
 
     // The server initializes the event store and builds the shared state.
     const serverState = await readFromRoot("crates/shop-server/src/state.rs");
-    expect(serverState).toContain("pub type State = AppState<Store>;");
+    expect(serverState).toContain("pub type State = AppState<Store, Snapshots>;");
     expect(serverState).toContain("config.postgres.init_pool(&secret.postgres)");
-    expect(serverState).toContain("PostgresEventStore::new(pool)");
+    expect(serverState).toContain("PostgresEventStore::new(pool.clone())");
+    expect(serverState).toContain("PostgresSnapshotStore::new(pool)");
     expect(serverState).toContain("EVENT_STORE_MIGRATOR.run(&pool)");
+    expect(serverState).toContain("SNAPSHOT_STORE_MIGRATOR.run(&pool)");
     const serverConfig = await readFromRoot("crates/shop-server/src/config.rs");
     expect(serverConfig).toContain("pub struct AppConfig {");
     expect(serverConfig).toContain("pub struct AppSecret {");

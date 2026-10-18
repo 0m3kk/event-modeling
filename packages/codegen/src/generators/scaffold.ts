@@ -37,6 +37,7 @@ const SERVER_DEFAULT_DEPS: DepSpec[] = [
   { name: "http-server", git: EVENT_STORE_GIT },
   { name: "jwt", git: EVENT_STORE_GIT },
   { name: "postgres-db", git: EVENT_STORE_GIT },
+  { name: "snapshot-store", git: EVENT_STORE_GIT },
   { name: "telemetry", git: EVENT_STORE_GIT },
   { name: "url", version: "2" },
 ];

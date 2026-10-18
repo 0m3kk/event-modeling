@@ -1,27 +1,29 @@
-//! Shared server state and event-store initialization.
+//! Shared server state and store initialization.
 //!
-//! Generated once; edit freely — swap `Store` for another [`EventStore`]
-//! implementation (a mock in tests, a different backend in production) and the
+//! Generated once; edit freely — swap `Store`/`Snapshots` for other
+//! implementations (mocks in tests, different backends in production) and the
 //! application handlers keep working unchanged.
-//!
-//! [`EventStore`]: event_store::EventStore
 
 use {{ appCratePath }}::AppState;
 use event_store::PostgresEventStore;
+use snapshot_store::PostgresSnapshotStore;
 
 use crate::config::{AppConfig, AppSecret};
 
 /// The concrete event store the server runs against.
 pub type Store = PostgresEventStore;
 
-/// Shared application state passed to every handler.
-pub type State = AppState<Store>;
+/// The concrete snapshot store the server runs against.
+pub type Snapshots = PostgresSnapshotStore;
 
-/// Connect to PostgreSQL, provision the event-store schema, and build the
-/// shared application state.
+/// Shared application state passed to every handler.
+pub type State = AppState<Store, Snapshots>;
+
+/// Connect to PostgreSQL, provision the store schemas, and build the shared
+/// application state.
 ///
 /// The pool is created with [`PostgresConfig::init_pool`], which also starts the
-/// background pool-metrics monitor.
+/// background pool-metrics monitor. Both stores share it.
 ///
 /// [`PostgresConfig::init_pool`]: postgres_db::PostgresConfig::init_pool
 pub async fn build_state(
@@ -29,7 +31,13 @@ pub async fn build_state(
     secret: &AppSecret,
 ) -> Result<State, Box<dyn std::error::Error + Send + Sync>> {
     let pool = config.postgres.init_pool(&secret.postgres).await?;
-    // Applies every pending event-store migration (idempotent on repeat runs).
+
+    // Applies every pending store migration (idempotent on repeat runs).
     event_store::EVENT_STORE_MIGRATOR.run(&pool).await?;
-    Ok(AppState::new(PostgresEventStore::new(pool)))
+    snapshot_store::SNAPSHOT_STORE_MIGRATOR.run(&pool).await?;
+
+    let event_store = PostgresEventStore::new(pool.clone());
+    let snapshot_store = PostgresSnapshotStore::new(pool);
+
+    Ok(AppState::new(event_store).with_snapshot_store(snapshot_store))
 }
