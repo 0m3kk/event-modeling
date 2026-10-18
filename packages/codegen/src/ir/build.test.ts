@@ -65,16 +65,16 @@ describe("buildIr", () => {
 
   it("maps cards to their domain folder and kind folder", () => {
     const { crate } = ir();
-    expect(artifact(crate, "OrderPlaced").modulePath).toEqual(["sales", "events"]);
-    expect(artifact(crate, "ShipOrder").modulePath).toEqual(["shipping", "commands"]);
+    expect(artifact(crate, "OrderPlaced").modulePath).toEqual(["domains", "sales", "events"]);
+    expect(artifact(crate, "ShipOrder").modulePath).toEqual(["domains", "shipping", "commands"]);
   });
 
   it("assigns a type to the domain that uses it, or common when shared", () => {
     const { crate } = ir();
-    expect(artifact(crate, "Order").modulePath).toEqual(["sales", "types"]);
-    expect(artifact(crate, "Status").modulePath).toEqual(["sales", "types"]);
-    expect(artifact(crate, "OrderId").modulePath).toEqual(["common", "types"]);
-    expect(artifact(crate, "Timestamp").modulePath).toEqual(["common", "types"]);
+    expect(artifact(crate, "Order").modulePath).toEqual(["domains", "sales", "types"]);
+    expect(artifact(crate, "Status").modulePath).toEqual(["domains", "sales", "types"]);
+    expect(artifact(crate, "OrderId").modulePath).toEqual(["domains", "common", "types"]);
+    expect(artifact(crate, "Timestamp").modulePath).toEqual(["domains", "common", "types"]);
     expect(crate.typeModules).toEqual(["common", "sales"]);
   });
 
@@ -113,9 +113,9 @@ events:
     const module = (name: string) => artifact(crate, name).modulePath;
 
     // Explicitly placed, so it stays in Sales even though Shipping uses it too.
-    expect(module("OrderId")).toEqual(["sales", "types"]);
+    expect(module("OrderId")).toEqual(["domains", "sales", "types"]);
     // Placed but unused: explicit placement still wins over "common by default".
-    expect(module("Invoice")).toEqual(["shipping", "types"]);
+    expect(module("Invoice")).toEqual(["domains", "shipping", "types"]);
   });
 
   it("resolves a type's domain from the group that holds it", () => {
@@ -143,7 +143,7 @@ events:
 
     // The event has no domain, so usage alone would send OrderId to `common`;
     // its group placement under Sales wins.
-    expect(artifact(crate, "OrderId").modulePath).toEqual(["sales", "types"]);
+    expect(artifact(crate, "OrderId").modulePath).toEqual(["domains", "sales", "types"]);
   });
 
   it("renders required/array/optional fields and flags prelude usage", () => {
@@ -214,10 +214,10 @@ states:
     const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
     const module = (name: string) => crate.artifacts.find((a) => a.name === name)!.modulePath;
 
-    expect(module("registerAccount")).toEqual(["account", "commands"]);
-    expect(module("accountRegistered")).toEqual(["account", "events"]);
-    expect(module("accountState")).toEqual(["account", "states"]);
-    expect(module("notificationService")).toEqual(["shared", "services"]);
+    expect(module("registerAccount")).toEqual(["domains", "account", "commands"]);
+    expect(module("accountRegistered")).toEqual(["domains", "account", "events"]);
+    expect(module("accountState")).toEqual(["domains", "account", "states"]);
+    expect(module("notificationService")).toEqual(["domains", "shared", "services"]);
   });
 
   it("always depends on serde and detects chrono/uuid from the type map", () => {
@@ -428,8 +428,8 @@ states:
     ]);
     expect(state.projectionEvents!.map((e) => e.rustName)).toEqual(["OrderPlaced", "OrderShipped"]);
     expect(state.eventImports).toEqual([
-      { modulePath: ["sales", "events"], names: ["OrderPlaced"] },
-      { modulePath: ["shipping", "events"], names: ["OrderShipped"] },
+      { modulePath: ["domains", "sales", "events"], names: ["OrderPlaced"] },
+      { modulePath: ["domains", "shipping", "events"], names: ["OrderShipped"] },
     ]);
 
     const depNames = crate.deps.map((d) => d.name);

@@ -25,10 +25,10 @@ use {{ imp.path }}::{{ "{" }}{{ imp.names | join(", ") }}{{ "}" }};
 /// method:
 ///
 /// ```ignore
-/// let api = shop::apis::Api::new()
+/// let api = shop::transports::Api::new()
 ///     .with_place_order(PlaceOrderImpl)
 ///     .with_get_order(GetOrderImpl);
-/// let app = shop::apis::router(api);
+/// let app = shop::transports::router(api);
 /// ```
 ///
 /// A route whose handler is not registered answers `500`, so register every

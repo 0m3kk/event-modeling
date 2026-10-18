@@ -18,8 +18,8 @@ use crate::state::State;
 /// Routes that need an authenticated caller go on the `protected` router,
 /// which runs `require_auth`; everything else is public.
 pub fn create_router(state: State, config: &HttpConfig, jwt: Arc<JwtService>) -> Router {
-    let api = {{ crate.name }}::apis::router({{ appCratePath }}::register(
-        {{ crate.name }}::apis::Api::<{{ appCratePath }}::AppError>::new(),
+    let api = {{ crate.name }}::transports::router({{ appCratePath }}::register(
+        {{ crate.name }}::transports::Api::<{{ appCratePath }}::AppError>::new(),
         state,
     ));
 

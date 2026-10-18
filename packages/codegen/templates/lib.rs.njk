@@ -11,7 +11,7 @@ pub mod {{ dir.name }};
 {% if crate.executionContext %}pub mod execution_context;
 pub use execution_context::ExecutionContext;
 {% endif -%}
-{% if crate.api %}pub mod apis;
+{% if crate.api %}pub mod transports;
 {% endif -%}
 pub mod prelude;
 

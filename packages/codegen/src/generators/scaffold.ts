@@ -19,7 +19,7 @@
  */
 import path from "node:path";
 import type { CodegenConfig, DepSpec, ScaffoldCrateConfig } from "../config";
-import { EVENT_STORE_GIT } from "../ir/build";
+import { EVENT_STORE_GIT, artifactDomain } from "../ir/build";
 import type { IrArtifact, IrCrate, IrEventRef, IrMethod } from "../ir/types";
 import { planRoutes, resolveApiOptions } from "./api";
 import type { Generator, RenderJob } from "./contract";
@@ -101,7 +101,7 @@ interface UseCaseItem {
   handlerType: string;
   /** Scaffolded use-case struct, e.g. `PlaceOrderUseCase`. */
   useCaseType: string;
-  /** Contract module path re-exported by the use case, e.g. `["sales","commands"]`. */
+  /** Contract module path re-exported by the use case, e.g. `["domains","sales","commands"]`. */
   contractModulePath: string[];
   /** Request file name inside the use-case directory. */
   typeFile: "command" | "query";
@@ -151,7 +151,7 @@ interface AppDomain {
 
 /** Builds a command/query use-case entry from its artifact. */
 function toUseCase(artifact: IrArtifact, config: CodegenConfig): UseCaseItem {
-  const domain = artifact.modulePath[0] ?? "common";
+  const domain = artifactDomain(artifact);
   const typeFile = artifact.kind === "command" ? "command" : "query";
   const group = typeFile === "command" ? "commands" : "queries";
   return {
@@ -171,7 +171,7 @@ function toUseCase(artifact: IrArtifact, config: CodegenConfig): UseCaseItem {
 
 /** Builds a state/view projection entry from its artifact. */
 function toProjection(artifact: IrArtifact, kind: "view" | "state"): ProjectionItem {
-  const domain = artifact.modulePath[0] ?? "common";
+  const domain = artifactDomain(artifact);
   return {
     domain,
     fileName: artifact.fileName,
@@ -189,7 +189,7 @@ function toProjection(artifact: IrArtifact, kind: "view" | "state"): ProjectionI
 /** Builds a service entry from its artifact. */
 function toService(artifact: IrArtifact): ServiceItem {
   return {
-    domain: artifact.modulePath[0] ?? "common",
+    domain: artifactDomain(artifact),
     fileName: artifact.fileName,
     rustName: artifact.rustName,
     implType: `${artifact.rustName}Impl`,
@@ -213,7 +213,7 @@ function buildDomains(crate: IrCrate, config: CodegenConfig): AppDomain[] {
   };
 
   for (const artifact of crate.artifacts) {
-    const module = artifact.modulePath[0] ?? "common";
+    const module = artifactDomain(artifact);
     switch (artifact.kind) {
       case "command":
         domain(module).commands.push(toUseCase(artifact, config));

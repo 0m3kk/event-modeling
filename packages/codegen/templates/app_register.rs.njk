@@ -1,4 +1,4 @@
-use {{ crate.name }}::apis::Api;
+use {{ crate.name }}::transports::Api;
 {% for handler in handlers -%}
 use crate::{{ handler.appPath }}::{{ handler.useCaseType }};
 {% endfor -%}

@@ -66,7 +66,9 @@ spec.yaml -> parse (zod) -> hoist types -> build IR -> run passes
 
 ## Output layout
 
-One folder per domain (plus `common`), one folder per kind, one file per item:
+Every domain module lives under `domains/`, one folder per domain (plus
+`common`), one folder per kind, one file per item. The axum HTTP transport, when
+generated, lives under `transports/`:
 
 ```
 crates/shop/
@@ -76,25 +78,33 @@ crates/shop/
     lib.rs
     prelude.rs                 # flat re-exports of every data type
     validation.rs              # helpers for formats validator has no check for
-    <domain>/
+    domains/                   # every domain module lives under here
       mod.rs
-      events/    mod.rs + <event>.rs
-      commands/  mod.rs + <command>.rs
-      queries/   mod.rs + <query>.rs
-      views/     mod.rs + <view>.rs
-      states/    mod.rs + <state>.rs
-      services/  mod.rs + <service>.rs
-      types/     mod.rs + <type>.rs
-    common/  ...                 # items that belong to no domain / are shared
-  migrations/                    # sqlx up/down migrations, with `views.migrations` on
+      <domain>/
+        mod.rs
+        events/    mod.rs + <event>.rs
+        commands/  mod.rs + <command>.rs
+        queries/   mod.rs + <query>.rs
+        views/     mod.rs + <view>.rs
+        states/    mod.rs + <state>.rs
+        services/  mod.rs + <service>.rs
+        types/     mod.rs + <type>.rs
+      common/  ...             # items that belong to no domain / are shared
+    transports/                # the axum HTTP transport (api generator)
+      mod.rs                   # the Api handler registry
+      router.rs                # axum::Router + one dispatch handler per item
+      extract.rs               # ExecutionContext from request headers
+      error.rs                 # ApiError (default error type)
+      openapi.rs               # utoipa ApiDoc + openapi() (when openapi is on)
+  migrations/                  # sqlx up/down migrations, with `views.migrations` on
     <version>_create_<table>.up.sql
     <version>_create_<table>.down.sql
 ```
 
 A data type is placed in the domain that lists it — in `domains[].cards` or,
 through a group, in `groups[].cards`. A type that is not listed anywhere falls
-back to the single domain that uses it, or `common/types` when used by several
-(or none). A card's domain is resolved from, in order: `domains[].cards`, the
+back to the single domain that uses it, or `domains/common/types` when used by
+several (or none). A card's domain is resolved from, in order: `domains[].cards`, the
 cards of a group that belongs to a domain (`groups[].cards`), then the cards
 named in a slice lane (`slices[].lanes[].cards`) — because boards usually attach
 cards to slices and groups rather than to the domain directly.
@@ -243,7 +253,7 @@ generators: {
 The generator writes:
 
 ```
-src/apis/
+src/transports/
   mod.rs       # the Api handler registry (build it, then pass it to router)
   router.rs    # axum::Router + one dispatch handler per command/query
   extract.rs   # ExecutionContext from request headers
@@ -260,16 +270,16 @@ the generated registry:
 ```rust
 // Implement the generated traits — one per command/query.
 impl PlaceOrderHandler for PlaceOrderImpl {
-    type Error = shop::apis::ApiError;
+    type Error = shop::transports::ApiError;
     async fn handle(&self, ctx: &ExecutionContext, command: PlaceOrder)
         -> Result<PlaceOrderResponse, Self::Error> { /* ... */ }
 }
 
-let api = shop::apis::Api::new()
+let api = shop::transports::Api::new()
     .with_place_order(PlaceOrderImpl { /* ... */ })
     .with_get_order(GetOrderImpl { /* ... */ });
 
-let app = shop::apis::router(api);
+let app = shop::transports::router(api);
 // axum::serve(listener, app).await?;
 ```
 
@@ -300,7 +310,7 @@ With `openapi` on (the default) every generated request, response, event and
 data type derives `utoipa::ToSchema`, and the crate exposes the document:
 
 ```rust
-let doc = shop::apis::openapi(); // utoipa::openapi::OpenApi (3.1)
+let doc = shop::transports::openapi(); // utoipa::openapi::OpenApi (3.1)
 ```
 
 Serve or dump it wherever you like (for example mount the `utoipa-swagger-ui`
@@ -309,7 +319,7 @@ derive and the document.
 
 ### Errors
 
-`src/apis/error.rs` defines a ready-to-use `ApiError` with `bad_request`,
+`src/transports/error.rs` defines a ready-to-use `ApiError` with `bad_request`,
 `not_found`, `conflict` and `internal` constructors. It renders as JSON
 `{"error":{"code":"...","message":"..."}}` with the matching status code. Use it
 as the handlers' `Error` type, or set the registry's error type to any type

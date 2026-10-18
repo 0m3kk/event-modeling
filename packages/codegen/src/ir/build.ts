@@ -58,6 +58,9 @@ const KIND_FOLDER: Record<IrArtifact["kind"], string> = {
 /** Module used for artifacts that belong to no declared domain. */
 const COMMON_MODULE = "common";
 
+/** Root folder that holds every generated domain module (`src/domains/`). */
+const DOMAINS_FOLDER = "domains";
+
 /** Git source of the `event-store` crate the generated projections depend on. */
 export const EVENT_STORE_GIT = "https://github.com/0m3kk/backend-kit.git";
 
@@ -71,6 +74,15 @@ export interface BuildIrResult {
   crate: IrCrate;
   /** The effective primitive map (defaults merged with config). */
   typeMap: Record<string, string>;
+}
+
+/**
+ * The domain segment of an artifact's module path — the folder under
+ * `domains/` (e.g. `sales`). Artifacts that belong to no domain live in
+ * `common`.
+ */
+export function artifactDomain(artifact: IrArtifact): string {
+  return artifact.modulePath[1] ?? COMMON_MODULE;
 }
 
 function normalizeTypeName(type: string): string {
@@ -774,7 +786,7 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
     } else {
       module = cardDomain(artifact);
     }
-    artifact.modulePath = [module, KIND_FOLDER[artifact.kind]];
+    artifact.modulePath = [DOMAINS_FOLDER, module, KIND_FOLDER[artifact.kind]];
   }
 
   // Resolve each projection's DCB query now that every module path is known.
@@ -804,7 +816,11 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
   }
 
   const typeModules = Array.from(
-    new Set(artifacts.filter((a) => a.kind === "type").map((a) => a.modulePath[0])),
+    new Set(
+      artifacts
+        .filter((a) => a.kind === "type")
+        .map((a) => artifactDomain(a)),
+    ),
   ).sort((a, b) => a.localeCompare(b));
 
   const executionContext = artifacts.some(
@@ -844,4 +860,4 @@ export function buildIr({ spec, types, config }: BuildIrInput): BuildIrResult {
   };
 }
 
-export { DEFAULT_TYPE_MAP, COMMON_MODULE, KIND_FOLDER };
+export { DEFAULT_TYPE_MAP, COMMON_MODULE, KIND_FOLDER, DOMAINS_FOLDER };

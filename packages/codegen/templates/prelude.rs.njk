@@ -4,5 +4,5 @@
 //! bare name regardless of which domain folder a type landed in.
 
 {% for module in crate.typeModules -%}
-pub use crate::{{ module }}::types::*;
+pub use crate::domains::{{ module }}::types::*;
 {% endfor -%}

@@ -7,7 +7,15 @@
  */
 export * from "./config";
 export * from "./ir/types";
-export { buildIr, renderRustType, DEFAULT_TYPE_MAP, COMMON_MODULE, KIND_FOLDER } from "./ir/build";
+export {
+  buildIr,
+  renderRustType,
+  artifactDomain,
+  DEFAULT_TYPE_MAP,
+  COMMON_MODULE,
+  KIND_FOLDER,
+  DOMAINS_FOLDER,
+} from "./ir/build";
 export * from "./generators";
 export * from "./render/env";
 export { run, type GeneratedFile, type RunOptions, type RunResult } from "./pipeline";

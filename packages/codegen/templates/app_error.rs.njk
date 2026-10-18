@@ -4,7 +4,7 @@
 /// Defaults to the generated `ApiError`, which already renders as JSON.
 /// Replace it with your own `axum::response::IntoResponse` type for richer
 /// errors.
-pub type AppError = {{ crate.name }}::apis::ApiError;
+pub type AppError = {{ crate.name }}::transports::ApiError;
 {% else -%}
 /// Application error returned by command and query handlers.
 #[derive(Debug)]

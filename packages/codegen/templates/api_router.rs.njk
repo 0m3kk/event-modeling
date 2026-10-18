@@ -21,7 +21,7 @@ use {{ imp.path }}::{{ "{" }}{{ imp.names | join(", ") }}{{ "}" }};
 /// Register the handlers on the [`Api`](super::Api) registry first:
 ///
 /// ```ignore
-/// let app = shop::apis::router(my_api);
+/// let app = shop::transports::router(my_api);
 /// ```
 pub fn router<E>(api: Api<E>) -> Router
 where

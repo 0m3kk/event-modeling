@@ -9,6 +9,7 @@
  */
 import { kebabCase } from "@em/spec";
 import type { ApiGeneratorConfig, CodegenConfig } from "../config";
+import { artifactDomain } from "../ir/build";
 import type { IrArtifact, IrCrate, RustType } from "../ir/types";
 import type { Generator, RenderJob } from "./contract";
 
@@ -189,7 +190,7 @@ export function planRoutes(crate: IrCrate, options: ApiOptions): ApiRoute[] {
       extract: httpMethod === "GET" ? "Query" : "Json",
       queryParams,
       paramImports,
-      tag: artifact.modulePath[0] ?? "common",
+      tag: artifactDomain(artifact),
       modulePath: artifact.modulePath,
       doc: artifact.doc,
     });
@@ -258,13 +259,13 @@ export const apiGenerator: Generator = {
         .sort((a, b) => a.path.localeCompare(b.path)),
     };
     const jobs: RenderJob[] = [
-      { template: "api_mod.rs.njk", outPath: "src/apis/mod.rs", context },
-      { template: "api_router.rs.njk", outPath: "src/apis/router.rs", context },
-      { template: "api_extract.rs.njk", outPath: "src/apis/extract.rs", context },
-      { template: "api_error.rs.njk", outPath: "src/apis/error.rs", context },
+      { template: "api_mod.rs.njk", outPath: "src/transports/mod.rs", context },
+      { template: "api_router.rs.njk", outPath: "src/transports/router.rs", context },
+      { template: "api_extract.rs.njk", outPath: "src/transports/extract.rs", context },
+      { template: "api_error.rs.njk", outPath: "src/transports/error.rs", context },
     ];
     if (crate.openapi) {
-      jobs.push({ template: "api_openapi.rs.njk", outPath: "src/apis/openapi.rs", context });
+      jobs.push({ template: "api_openapi.rs.njk", outPath: "src/transports/openapi.rs", context });
     }
     return jobs;
   },

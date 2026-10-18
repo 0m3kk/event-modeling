@@ -80,7 +80,7 @@ export interface IrEventRef {
   rustName: string;
   /** snake_case event type string, matching `DomainEvent::event_type()`. */
   eventType: string;
-  /** Module path from the crate root, e.g. `["sales", "events"]`. */
+  /** Module path from the crate root, e.g. `["domains", "sales", "events"]`. */
   modulePath: string[];
 }
 
@@ -109,7 +109,7 @@ export interface IrQueryTypeRef {
   rustName?: string;
 }
 
-/** A grouped `use` of events a projection folds, e.g. `crate::sales::events::{A, B}`. */
+/** A grouped `use` of events a projection folds, e.g. `crate::domains::sales::events::{A, B}`. */
 export interface IrEventImport {
   modulePath: string[];
   names: string[];
@@ -124,7 +124,7 @@ export interface IrArtifact {
   rustName: string;
   /** snake_case file name (without extension). */
   fileName: string;
-  /** Module path from the crate root, e.g. `["sales", "events"]`. */
+  /** Module path from the crate root, e.g. `["domains", "sales", "events"]`. */
   modulePath: string[];
   doc?: string;
   /** Present for event/view/state and object types (a single struct's fields). */
@@ -234,7 +234,7 @@ export interface IrCrate {
   executionContext: boolean;
   /**
    * True when the `api` generator is enabled and the crate has at least one
-   * command or query, which makes the generator emit the `src/apis` module.
+   * command or query, which makes the generator emit the `src/transports` module.
    */
   api: boolean;
   /**
