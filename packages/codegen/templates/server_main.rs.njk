@@ -1,30 +1,44 @@
-//! Server binary: wire the application handlers onto the generated API and serve.
+//! Server binary: initialize infrastructure, wire the handlers, and serve.
 //!
-//! Generated once; edit freely — add configuration, the event store, database
-//! pool and migrations here.
+//! Generated once; edit freely — the configuration, event store and router
+//! wiring live in the sibling modules.
 {% if crate.api %}
-use std::net::SocketAddr;
+mod config;
+mod state;
 
-use {{ appCratePath }}::{AppError, AppState, register};
+use {{ appCratePath }}::{AppError, register};
+use config::AppConfig;
+use state::build_state;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let state = AppState::default();
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let config = AppConfig::load(None)?;
+    let state = build_state(&config.database_url).await?;
 
     let api = {{ crate.name }}::apis::Api::<AppError>::new();
     let app = {{ crate.name }}::apis::router(register(api, state));
 
-    let address: SocketAddr = "0.0.0.0:3000".parse()?;
-    let listener = tokio::net::TcpListener::bind(address).await?;
-    println!("listening on http://{address}");
+    let address = config.socket_addr();
+    let listener = tokio::net::TcpListener::bind(&address).await?;
+    tracing::info!("listening on http://{address}");
     axum::serve(listener, app).await?;
     Ok(())
 }
 {% else %}
+mod config;
+mod state;
+
+use config::AppConfig;
+use state::build_state;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let config = AppConfig::load(None)?;
+    let _state = build_state(&config.database_url).await?;
+
     // The API generator is disabled in `codegen.config.ts`; enable it to serve
     // the generated transport, or dispatch commands and queries directly.
     println!("no HTTP API generated");
+    Ok(())
 }
-{% endif %}
+{% endif -%}

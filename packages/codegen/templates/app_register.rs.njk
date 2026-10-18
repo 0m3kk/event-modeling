@@ -8,7 +8,11 @@ use crate::{AppError, AppState};
 ///
 /// Regenerated from the spec: a new command/query adds a `with_*` call here, so
 /// a route never silently answers `500` because its handler was forgotten.
-pub fn register(api: Api<AppError>, state: AppState) -> Api<AppError> {
+/// Generic over the event store so the server picks the concrete store.
+pub fn register<E>(api: Api<AppError>, state: AppState<E>) -> Api<AppError>
+where
+    E: Send + Sync + 'static,
+{
     api
 {% for handler in handlers -%}
         .with_{{ handler.method }}({{ handler.useCaseType }}::new(state.clone()))

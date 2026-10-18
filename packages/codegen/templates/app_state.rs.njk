@@ -1,11 +1,40 @@
+use std::sync::Arc;
+
 /// Shared application state handed to every command and query handler.
 ///
-/// Add the dependencies your handlers need here (event store, database pool,
-/// services) and pass them from `main`. For example:
-///
-/// ```ignore
-/// pub store: std::sync::Arc<MyEventStore>,
-/// pub notifier: std::sync::Arc<dyn NotificationService>,
-/// ```
-#[derive(Clone, Default)]
-pub struct AppState {}
+/// Generic over the event store `E`, so the same handlers run against the
+/// PostgreSQL store in production and a mock store in tests. Add the other
+/// dependencies handlers need (a database pool, service clients, policies) as
+/// fields here and thread them through `new`.
+pub struct AppState<E> {
+    /// The event store every handler reads and appends to.
+    pub event_store: Arc<E>,
+}
+
+impl<E> AppState<E> {
+    /// Create the state from an owned event store.
+    pub fn new(event_store: E) -> Self {
+        Self {
+            event_store: Arc::new(event_store),
+        }
+    }
+
+    /// Create the state from an already shared event store.
+    pub fn from_arc(event_store: Arc<E>) -> Self {
+        Self { event_store }
+    }
+
+    /// Replace the event store.
+    pub fn with_event_store(mut self, event_store: E) -> Self {
+        self.event_store = Arc::new(event_store);
+        self
+    }
+}
+
+impl<E> Clone for AppState<E> {
+    fn clone(&self) -> Self {
+        Self {
+            event_store: Arc::clone(&self.event_store),
+        }
+    }
+}

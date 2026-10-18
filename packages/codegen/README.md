@@ -519,12 +519,12 @@ crates/shop-app/src/
   lib.rs                 # module tree
   context.rs             # re-exports the generated ExecutionContext
   error.rs               # AppError (the generated ApiError)
-  state.rs               # AppState shared by every handler
+  state.rs               # AppState<E>, generic over the event store
   register.rs            # registers every handler on the generated Api
   commands/sales/place_order/
     mod.rs               # wiring + re-exports
     command.rs           # re-exports the generated request/response types
-    handler.rs           # PlaceOrderUseCase (the todo!() you fill in)
+    handler.rs           # PlaceOrderUseCase<E> (the todo!() you fill in)
   queries/... views/... states/... services/...   # same shape
 ```
 
@@ -532,6 +532,23 @@ Each directory re-exports the pieces the contract crate already generates (the
 request/response structs, the handler trait, the projection type), so the
 scaffold stays adapted to the core instead of duplicating it. Only the
 implementation file is a `todo!()`.
+
+The technical plumbing is generated too, and is kept free of domain logic:
+
+- `AppState<E>` holds the shared event store (`Arc<E>`) and is generic over it,
+  so the same handlers run against PostgreSQL in production and a mock store in
+  tests.
+- The **server binary** ships `config.rs` (host/port/`DATABASE_URL`, loaded from
+  a file or the environment), `state.rs` (connects to PostgreSQL and builds the
+  concrete `PostgresEventStore` and the shared state) and `main.rs` (loads the
+  config, builds the state, wires the router and serves).
+- `register` is generic over the store, so the server is what fixes the
+  concrete type.
+
+The app and server manifests get the infrastructure dependencies they need —
+`event-store` and (on the server) `sqlx` — merged in automatically. An entry you
+list in `app.deps` / `server.deps` with the same name wins, so a local checkout
+can replace the git source.
 
 Every scaffold file is **create-only**. `em-codegen gen` writes each one only
 when it is missing, then the project owns it: existing files are never
@@ -545,7 +562,10 @@ The application crate's `register` lists every command and query, so a route can
 never silently answer `500` because its handler was forgotten:
 
 ```rust
-pub fn register(api: Api<AppError>, state: AppState) -> Api<AppError> {
+pub fn register<E>(api: Api<AppError>, state: AppState<E>) -> Api<AppError>
+where
+    E: Send + Sync + 'static,
+{
     api.with_place_order(PlaceOrderUseCase::new(state.clone()))
 }
 ```

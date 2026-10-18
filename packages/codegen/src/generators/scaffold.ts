@@ -19,9 +19,32 @@
  */
 import path from "node:path";
 import type { CodegenConfig, DepSpec, ScaffoldCrateConfig } from "../config";
+import { EVENT_STORE_GIT } from "../ir/build";
 import type { IrArtifact, IrCrate, IrEventRef, IrMethod } from "../ir/types";
 import { planRoutes, resolveApiOptions } from "./api";
 import type { Generator, RenderJob } from "./contract";
+
+/**
+ * Infrastructure dependencies the application crate needs, merged into
+ * `scaffold.app.deps`. An entry the config names explicitly wins, so a local
+ * path checkout can replace the git source.
+ */
+const APP_DEFAULT_DEPS: DepSpec[] = [{ name: "event-store", git: EVENT_STORE_GIT }];
+
+/** Infrastructure dependencies the server crate needs, merged into `server.deps`. */
+const SERVER_DEFAULT_DEPS: DepSpec[] = [
+  { name: "event-store", git: EVENT_STORE_GIT },
+  { name: "sqlx", version: "0.9", features: ["runtime-tokio", "postgres"] },
+];
+
+/** Merges `defaults` under `userDeps`; a dependency the user names wins. */
+function mergeDeps(userDeps: DepSpec[], defaults: DepSpec[]): DepSpec[] {
+  const byName = new Map(userDeps.map((dep) => [dep.name, dep]));
+  for (const dep of defaults) {
+    if (!byName.has(dep.name)) byName.set(dep.name, dep);
+  }
+  return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
 
 /** Resolved scaffold options. */
 interface ScaffoldOptions {
@@ -292,8 +315,8 @@ export const scaffoldGenerator: Generator = {
       appCratePath,
       serverCrate: options.serverCrate,
       serverCratePath,
-      appDeps: options.appDeps.map(depLine),
-      serverDeps: options.serverDeps.map(depLine),
+      appDeps: mergeDeps(options.appDeps, APP_DEFAULT_DEPS).map(depLine),
+      serverDeps: mergeDeps(options.serverDeps, SERVER_DEFAULT_DEPS).map(depLine),
       baseFromApp: relative(appDir, baseDir),
       baseFromServer: relative(serverDir, baseDir),
       appFromServer: relative(serverDir, appDir),
@@ -366,6 +389,8 @@ export const scaffoldGenerator: Generator = {
     // The server wires the application crate, so it only exists alongside it.
     if (options.server && options.app) {
       server("server_cargo.toml.njk", "Cargo.toml");
+      server("server_config.rs.njk", "src/config.rs");
+      server("server_state.rs.njk", "src/state.rs");
       server("server_main.rs.njk", "src/main.rs");
     }
 

@@ -5,20 +5,21 @@ use crate::{AppError, AppState};
 /// Implementation of the `{{ item.rustName }}` {{ item.typeFile }}.
 ///
 /// Generated once; edit freely — the generator will not overwrite this file.
+/// `E` is the event store type threaded in through [`AppState`].
 #[allow(dead_code)]
-pub struct {{ item.useCaseType }} {
-    state: AppState,
+pub struct {{ item.useCaseType }}<E> {
+    state: AppState<E>,
 }
 
-impl {{ item.useCaseType }} {
+impl<E> {{ item.useCaseType }}<E> {
     /// Create the handler with the shared application state.
-    pub fn new(state: AppState) -> Self {
+    pub fn new(state: AppState<E>) -> Self {
         Self { state }
     }
 }
 
 #[async_trait::async_trait]
-impl {{ item.handlerType }} for {{ item.useCaseType }} {
+impl<E: Send + Sync + 'static> {{ item.handlerType }} for {{ item.useCaseType }}<E> {
     type Error = AppError;
 
     #[tracing::instrument(name = "{{ item.typeFile }}.{{ item.fileName }}", skip(self, ctx, payload))]

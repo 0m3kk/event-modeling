@@ -1,0 +1,26 @@
+//! Shared server state and event-store initialization.
+//!
+//! Generated once; edit freely — swap `Store` for another [`EventStore`]
+//! implementation (a mock in tests, a different backend in production) and the
+//! application handlers keep working unchanged.
+//!
+//! [`EventStore`]: event_store::EventStore
+
+use {{ appCratePath }}::AppState;
+use event_store::PostgresEventStore;
+
+/// The concrete event store the server runs against.
+pub type Store = PostgresEventStore;
+
+/// Shared application state passed to every handler.
+pub type State = AppState<Store>;
+
+/// Connect to PostgreSQL and build the shared application state.
+///
+/// The PostgreSQL event store provisions its own schema; run
+/// [`EVENT_STORE_MIGRATOR`](event_store::EVENT_STORE_MIGRATOR) against the pool
+/// before serving in production.
+pub async fn build_state(database_url: &str) -> Result<State, sqlx::Error> {
+    let pool = sqlx::PgPool::connect(database_url).await?;
+    Ok(AppState::new(PostgresEventStore::new(pool)))
+}

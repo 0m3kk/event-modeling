@@ -1,0 +1,87 @@
+//! Server configuration loaded from a file or environment variables.
+//!
+//! Generated once; edit freely — add the settings your deployment needs.
+
+use std::fs;
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+
+/// Environment variable naming the configuration file to load.
+pub const ENV_CONFIG_FILE: &str = "CONFIG_FILE";
+/// Environment variable holding the PostgreSQL connection string.
+pub const ENV_DATABASE_URL: &str = "DATABASE_URL";
+
+/// Server configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppConfig {
+    /// Address the HTTP server binds to.
+    #[serde(default = "default_host")]
+    pub host: String,
+
+    /// Port the HTTP server binds to.
+    #[serde(default = "default_port")]
+    pub port: u16,
+
+    /// PostgreSQL connection string. Overridden by `DATABASE_URL`.
+    #[serde(default)]
+    pub database_url: String,
+}
+
+fn default_host() -> String {
+    "0.0.0.0".to_string()
+}
+
+const fn default_port() -> u16 {
+    3000
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            host: default_host(),
+            port: default_port(),
+            database_url: String::new(),
+        }
+    }
+}
+
+impl AppConfig {
+    /// Load configuration from `path`, then `CONFIG_FILE`, then defaults.
+    ///
+    /// `DATABASE_URL` always wins for the connection string, so a deployment
+    /// secret never has to be written to the config file.
+    pub fn load(path: Option<&Path>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let mut config = if let Some(path) = path {
+            load_file(path)?
+        } else if let Ok(env_path) = std::env::var(ENV_CONFIG_FILE) {
+            load_file(Path::new(&env_path))?
+        } else {
+            Self::default()
+        };
+
+        if let Ok(url) = std::env::var(ENV_DATABASE_URL)
+            && !url.is_empty()
+        {
+            config.database_url = url;
+        }
+
+        Ok(config)
+    }
+
+    /// The `host:port` address the HTTP server binds to.
+    pub fn socket_addr(&self) -> String {
+        format!("{}:{}", self.host, self.port)
+    }
+}
+
+fn load_file<T: for<'de> Deserialize<'de>>(
+    path: &Path,
+) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
+    let content = fs::read_to_string(path)?;
+    let parsed: T = match path.extension().and_then(|ext| ext.to_str()) {
+        Some("json") => serde_json::from_str(&content)?,
+        _ => serde_yaml::from_str(&content)?,
+    };
+    Ok(parsed)
+}

@@ -8,6 +8,10 @@ edition = "{{ crate.edition }}"
 {{ crate.name }} = { path = "{{ baseFromServer }}" }
 axum = "0.8"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
 {% for dep in serverDeps -%}
 {{ dep }}
 {% endfor -%}

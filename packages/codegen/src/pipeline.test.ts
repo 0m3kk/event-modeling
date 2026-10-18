@@ -1093,6 +1093,8 @@ describe("run", () => {
     expect(paths).toContain("crates/shop-app/src/commands/sales/place_order/mod.rs");
     expect(paths).toContain("crates/shop-app/src/commands/sales/place_order/command.rs");
     expect(paths).toContain("crates/shop-app/src/commands/sales/place_order/handler.rs");
+    expect(paths).toContain("crates/shop-server/src/config.rs");
+    expect(paths).toContain("crates/shop-server/src/state.rs");
     expect(paths).toContain("crates/shop-server/src/main.rs");
 
     const workspace = await readFromRoot("Cargo.toml");
@@ -1106,12 +1108,21 @@ describe("run", () => {
     expect(appCargo).toContain("async-trait");
 
     const register = await readFromRoot("crates/shop-app/src/register.rs");
-    expect(register).toContain("pub fn register(api: Api<AppError>, state: AppState) -> Api<AppError>");
+    expect(register).toContain("pub fn register<E>(api: Api<AppError>, state: AppState<E>)");
     expect(register).toContain(".with_place_order(PlaceOrderUseCase::new(state.clone()))");
 
     const stub = await readFromRoot("crates/shop-app/src/commands/sales/place_order/handler.rs");
-    expect(stub).toContain("impl PlaceOrderHandler for PlaceOrderUseCase {");
+    expect(stub).toContain(
+      "impl<E: Send + Sync + 'static> PlaceOrderHandler for PlaceOrderUseCase<E> {",
+    );
     expect(stub).toContain('todo!("implement PlaceOrder")');
+
+    // The server initializes the event store and builds the shared state.
+    const serverState = await readFromRoot("crates/shop-server/src/state.rs");
+    expect(serverState).toContain("pub type State = AppState<Store>;");
+    expect(serverState).toContain("PostgresEventStore::new(pool)");
+    const serverConfig = await readFromRoot("crates/shop-server/src/config.rs");
+    expect(serverConfig).toContain("pub struct AppConfig {");
 
     // The use case re-exports the generated request/response types and wires
     // its own submodules, instead of re-declaring them.

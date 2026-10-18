@@ -59,7 +59,7 @@ const KIND_FOLDER: Record<IrArtifact["kind"], string> = {
 const COMMON_MODULE = "common";
 
 /** Git source of the `event-store` crate the generated projections depend on. */
-const EVENT_STORE_GIT = "https://github.com/0m3kk/backend-kit.git";
+export const EVENT_STORE_GIT = "https://github.com/0m3kk/backend-kit.git";
 
 export interface BuildIrInput {
   spec: Specification;
