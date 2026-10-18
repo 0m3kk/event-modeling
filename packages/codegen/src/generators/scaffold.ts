@@ -36,8 +36,9 @@ const SERVER_DEFAULT_DEPS: DepSpec[] = [
   { name: "event-store", git: EVENT_STORE_GIT },
   { name: "http-server", git: EVENT_STORE_GIT },
   { name: "jwt", git: EVENT_STORE_GIT },
+  { name: "postgres-db", git: EVENT_STORE_GIT },
   { name: "telemetry", git: EVENT_STORE_GIT },
-  { name: "sqlx", version: "0.9", features: ["runtime-tokio", "postgres"] },
+  { name: "url", version: "2" },
 ];
 
 /** Merges `defaults` under `userDeps`; a dependency the user names wins. */
@@ -398,9 +399,12 @@ export const scaffoldGenerator: Generator = {
       server("server_config.rs.njk", "src/config.rs");
       server("server_state.rs.njk", "src/state.rs");
       if (crate.api) {
-        // The router and middleware wrap the generated API transport.
+        // The router, middleware and server-level handlers wrap the generated
+        // API transport.
         server("server_middleware_mod.rs.njk", "src/middleware/mod.rs");
         server("server_middleware_auth.rs.njk", "src/middleware/auth.rs");
+        server("server_handlers_mod.rs.njk", "src/handlers/mod.rs");
+        server("server_handler_me.rs.njk", "src/handlers/me.rs");
         server("server_router.rs.njk", "src/router.rs");
       }
       server("server_main.rs.njk", "src/main.rs");

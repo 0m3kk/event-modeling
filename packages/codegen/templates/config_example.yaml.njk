@@ -1,6 +1,6 @@
 # Example server configuration. Copy to `config.yaml` (or point CONFIG_FILE at
-# a copy) and adjust to taste. `DATABASE_URL` overrides `database_url` at
-# runtime, so a deployment secret need not live here.
+# a copy) and adjust to taste. `DATABASE_URL` overrides the postgres host, port,
+# database and credentials at runtime, so a deployment secret need not live here.
 http:
   host: 0.0.0.0
   port: 3000
@@ -35,4 +35,14 @@ telemetry:
 jwt:
   expiration_secs: 86400
 
-database_url: postgres://postgres:postgres@localhost:5432/{{ crate.name }}
+postgres:
+  host: localhost
+  port: 5432
+  database: {{ crate.name }}
+  max_connections: 10
+  min_connections: 1
+  connect_timeout_secs: 30
+  idle_timeout_secs: 600
+  max_lifetime_secs: 1800
+# `DATABASE_URL` overrides the host, port, database and credentials above.
+

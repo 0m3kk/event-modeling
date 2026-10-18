@@ -9,6 +9,8 @@
 use {{ appCratePath }}::AppState;
 use event_store::PostgresEventStore;
 
+use crate::config::{AppConfig, AppSecret};
+
 /// The concrete event store the server runs against.
 pub type Store = PostgresEventStore;
 
@@ -17,10 +19,16 @@ pub type State = AppState<Store>;
 
 /// Connect to PostgreSQL, provision the event-store schema, and build the
 /// shared application state.
+///
+/// The pool is created with [`PostgresConfig::init_pool`], which also starts the
+/// background pool-metrics monitor.
+///
+/// [`PostgresConfig::init_pool`]: postgres_db::PostgresConfig::init_pool
 pub async fn build_state(
-    database_url: &str,
+    config: &AppConfig,
+    secret: &AppSecret,
 ) -> Result<State, Box<dyn std::error::Error + Send + Sync>> {
-    let pool = sqlx::PgPool::connect(database_url).await?;
+    let pool = config.postgres.init_pool(&secret.postgres).await?;
     // Applies every pending event-store migration (idempotent on repeat runs).
     event_store::EVENT_STORE_MIGRATOR.run(&pool).await?;
     Ok(AppState::new(PostgresEventStore::new(pool)))

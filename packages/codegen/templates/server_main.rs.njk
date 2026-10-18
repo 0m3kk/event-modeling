@@ -4,6 +4,7 @@
 //! the router wiring live in the sibling modules.
 {% if crate.api %}
 mod config;
+mod handlers;
 mod middleware;
 mod router;
 mod state;
@@ -26,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _telemetry_guard = init_telemetry(&config.telemetry, Some(&secret.telemetry))?;
 
     let jwt = Arc::new(JwtService::new(&secret.jwt.secret, config.jwt.clone()));
-    let state = build_state(&config.database_url).await?;
+    let state = build_state(&config, &secret).await?;
     let app = create_router(state, &config.http, jwt);
 
     http_server::serve(&config.http, app).await?;
@@ -46,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let secret = AppSecret::load(None)?;
     let _telemetry_guard = init_telemetry(&config.telemetry, Some(&secret.telemetry))?;
 
-    let _state = build_state(&config.database_url).await?;
+    let _state = build_state(&config, &secret).await?;
 
     // The API generator is disabled in `codegen.config.ts`; enable it to serve
     // the generated transport, or dispatch commands and queries directly.

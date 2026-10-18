@@ -1097,6 +1097,7 @@ describe("run", () => {
     expect(paths).toContain("crates/shop-server/src/state.rs");
     expect(paths).toContain("crates/shop-server/src/router.rs");
     expect(paths).toContain("crates/shop-server/src/middleware/auth.rs");
+    expect(paths).toContain("crates/shop-server/src/handlers/me.rs");
     expect(paths).toContain("crates/shop-server/src/main.rs");
 
     const workspace = await readFromRoot("Cargo.toml");
@@ -1122,16 +1123,19 @@ describe("run", () => {
     // The server initializes the event store and builds the shared state.
     const serverState = await readFromRoot("crates/shop-server/src/state.rs");
     expect(serverState).toContain("pub type State = AppState<Store>;");
+    expect(serverState).toContain("config.postgres.init_pool(&secret.postgres)");
     expect(serverState).toContain("PostgresEventStore::new(pool)");
     expect(serverState).toContain("EVENT_STORE_MIGRATOR.run(&pool)");
     const serverConfig = await readFromRoot("crates/shop-server/src/config.rs");
     expect(serverConfig).toContain("pub struct AppConfig {");
     expect(serverConfig).toContain("pub struct AppSecret {");
+    expect(serverConfig).toContain("pub postgres: PostgresConfig,");
     const serverMain = await readFromRoot("crates/shop-server/src/main.rs");
     expect(serverMain).toContain("init_telemetry");
     expect(serverMain).toContain("JwtService::new");
     const serverRouter = await readFromRoot("crates/shop-server/src/router.rs");
     expect(serverRouter).toContain("http_server::apply_middleware");
+    expect(serverRouter).toContain(".route(me::ME_PATH, get(me::me))");
     const authMiddleware = await readFromRoot("crates/shop-server/src/middleware/auth.rs");
     expect(authMiddleware).toContain("pub async fn require_auth");
     expect(authMiddleware).toContain("jwt.verify_token");

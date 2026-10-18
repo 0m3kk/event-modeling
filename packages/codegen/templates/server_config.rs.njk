@@ -8,6 +8,7 @@ use std::path::Path;
 
 use http_server::HttpConfig;
 use jwt::{JwtConfig, JwtSecret};
+use postgres_db::{PostgresConfig, PostgresSecret};
 use serde::{Deserialize, Serialize};
 use telemetry::{TelemetryConfig, TelemetrySecret};
 
@@ -33,9 +34,9 @@ pub struct AppConfig {
     #[serde(default)]
     pub jwt: JwtConfig,
 
-    /// PostgreSQL connection string. Overridden by `DATABASE_URL`.
+    /// PostgreSQL connection pool settings.
     #[serde(default)]
-    pub database_url: String,
+    pub postgres: PostgresConfig,
 }
 
 impl Default for AppConfig {
@@ -44,7 +45,7 @@ impl Default for AppConfig {
             http: HttpConfig::default(),
             telemetry: TelemetryConfig::default(),
             jwt: JwtConfig::default(),
-            database_url: String::new(),
+            postgres: PostgresConfig::default(),
         }
     }
 }
@@ -52,7 +53,7 @@ impl Default for AppConfig {
 impl AppConfig {
     /// Load configuration from `path`, then `CONFIG_FILE`, then defaults.
     ///
-    /// `DATABASE_URL` always wins for the connection string, so a deployment
+    /// `DATABASE_URL` overrides the host, port and database, so a deployment
     /// secret never has to be written to the config file.
     pub fn load(path: Option<&Path>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let mut config = if let Some(path) = path {
@@ -63,12 +64,7 @@ impl AppConfig {
             Self::default()
         };
 
-        if let Ok(url) = std::env::var(ENV_DATABASE_URL)
-            && !url.is_empty()
-        {
-            config.database_url = url;
-        }
-
+        apply_database_url_to_config(&mut config.postgres);
         Ok(config)
     }
 }
@@ -83,18 +79,60 @@ pub struct AppSecret {
     /// JWT signing secret.
     #[serde(default)]
     pub jwt: JwtSecret,
+
+    /// PostgreSQL credentials.
+    #[serde(default)]
+    pub postgres: PostgresSecret,
 }
 
 impl AppSecret {
     /// Load secrets from `path`, then `SECRET_FILE`, then defaults.
+    ///
+    /// `DATABASE_URL` overrides the username and password.
     pub fn load(path: Option<&Path>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        if let Some(path) = path {
-            return load_file(path);
+        let mut secret = if let Some(path) = path {
+            load_file(path)?
+        } else if let Ok(env_path) = std::env::var(ENV_SECRET_FILE) {
+            load_file(Path::new(&env_path))?
+        } else {
+            Self::default()
+        };
+
+        apply_database_url_to_secret(&mut secret.postgres);
+        Ok(secret)
+    }
+}
+
+/// Overrides the connection host, port and database from `DATABASE_URL`.
+fn apply_database_url_to_config(config: &mut PostgresConfig) {
+    if let Ok(url) = std::env::var(ENV_DATABASE_URL)
+        && let Ok(parsed) = url::Url::parse(&url)
+    {
+        if let Some(host) = parsed.host_str() {
+            config.host = host.to_string();
         }
-        if let Ok(env_path) = std::env::var(ENV_SECRET_FILE) {
-            return load_file(Path::new(&env_path));
+        if let Some(port) = parsed.port() {
+            config.port = port;
         }
-        Ok(Self::default())
+        let database = parsed.path().trim_start_matches('/');
+        if !database.is_empty() {
+            config.database = database.to_string();
+        }
+    }
+}
+
+/// Overrides the credentials from `DATABASE_URL`.
+fn apply_database_url_to_secret(secret: &mut PostgresSecret) {
+    if let Ok(url) = std::env::var(ENV_DATABASE_URL)
+        && let Ok(parsed) = url::Url::parse(&url)
+    {
+        let username = parsed.username();
+        if !username.is_empty() {
+            secret.username = username.to_string();
+        }
+        if let Some(password) = parsed.password() {
+            secret.password = password.to_string();
+        }
     }
 }
 

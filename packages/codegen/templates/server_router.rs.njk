@@ -7,23 +7,28 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::middleware::from_fn_with_state;
+use axum::routing::get;
 use http_server::HttpConfig;
 use jwt::JwtService;
 
+use crate::handlers::me;
 use crate::middleware::require_auth;
 use crate::state::State;
 
 /// Build the application router.
 ///
-/// `require_auth` is applied to the empty `protected` router; add the routes
-/// that need an authenticated caller there. Everything else is public.
+/// Routes that need an authenticated caller go on the `protected` router,
+/// which runs `require_auth`; everything else is public.
 pub fn create_router(state: State, config: &HttpConfig, jwt: Arc<JwtService>) -> Router {
     let api = {{ crate.name }}::apis::router({{ appCratePath }}::register(
         {{ crate.name }}::apis::Api::<{{ appCratePath }}::AppError>::new(),
         state,
     ));
 
-    let protected = Router::new().route_layer(from_fn_with_state(jwt, require_auth));
+    // The example `me` route reports the authenticated caller's identity.
+    let protected = Router::new()
+        .route(me::ME_PATH, get(me::me))
+        .route_layer(from_fn_with_state(jwt, require_auth));
 
     let routes = Router::new().merge(api).merge(protected);
     http_server::apply_middleware(http_server::init_router().merge(routes), config)
