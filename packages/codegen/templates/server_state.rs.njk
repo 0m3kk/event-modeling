@@ -15,12 +15,13 @@ pub type Store = PostgresEventStore;
 /// Shared application state passed to every handler.
 pub type State = AppState<Store>;
 
-/// Connect to PostgreSQL and build the shared application state.
-///
-/// The PostgreSQL event store provisions its own schema; run
-/// [`EVENT_STORE_MIGRATOR`](event_store::EVENT_STORE_MIGRATOR) against the pool
-/// before serving in production.
-pub async fn build_state(database_url: &str) -> Result<State, sqlx::Error> {
+/// Connect to PostgreSQL, provision the event-store schema, and build the
+/// shared application state.
+pub async fn build_state(
+    database_url: &str,
+) -> Result<State, Box<dyn std::error::Error + Send + Sync>> {
     let pool = sqlx::PgPool::connect(database_url).await?;
+    // Applies every pending event-store migration (idempotent on repeat runs).
+    event_store::EVENT_STORE_MIGRATOR.run(&pool).await?;
     Ok(AppState::new(PostgresEventStore::new(pool)))
 }

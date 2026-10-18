@@ -35,6 +35,7 @@ const APP_DEFAULT_DEPS: DepSpec[] = [{ name: "event-store", git: EVENT_STORE_GIT
 const SERVER_DEFAULT_DEPS: DepSpec[] = [
   { name: "event-store", git: EVENT_STORE_GIT },
   { name: "http-server", git: EVENT_STORE_GIT },
+  { name: "jwt", git: EVENT_STORE_GIT },
   { name: "telemetry", git: EVENT_STORE_GIT },
   { name: "sqlx", version: "0.9", features: ["runtime-tokio", "postgres"] },
 ];
@@ -352,8 +353,11 @@ export const scaffoldGenerator: Generator = {
     if (options.workspace) {
       root("workspace_cargo.toml.njk", "Cargo.toml");
       root("rust_toolchain.toml.njk", "rust-toolchain.toml");
-      root("gitignore.njk", ".gitignore");
+      root("workspace_gitignore.njk", ".gitignore");
       root("readme.md.njk", "README.md");
+      root("config_example.yaml.njk", "config.example.yaml");
+      root("secrets_example.yaml.njk", "secrets.example.yaml");
+      root("env_example.njk", ".env.example");
     }
 
     if (options.app) {

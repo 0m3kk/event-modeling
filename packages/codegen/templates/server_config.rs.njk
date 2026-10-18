@@ -7,6 +7,7 @@ use std::fs;
 use std::path::Path;
 
 use http_server::HttpConfig;
+use jwt::{JwtConfig, JwtSecret};
 use serde::{Deserialize, Serialize};
 use telemetry::{TelemetryConfig, TelemetrySecret};
 
@@ -28,6 +29,10 @@ pub struct AppConfig {
     #[serde(default)]
     pub telemetry: TelemetryConfig,
 
+    /// JWT token settings (token lifetime).
+    #[serde(default)]
+    pub jwt: JwtConfig,
+
     /// PostgreSQL connection string. Overridden by `DATABASE_URL`.
     #[serde(default)]
     pub database_url: String,
@@ -38,6 +43,7 @@ impl Default for AppConfig {
         Self {
             http: HttpConfig::default(),
             telemetry: TelemetryConfig::default(),
+            jwt: JwtConfig::default(),
             database_url: String::new(),
         }
     }
@@ -73,6 +79,10 @@ pub struct AppSecret {
     /// OpenTelemetry export credentials.
     #[serde(default)]
     pub telemetry: TelemetrySecret,
+
+    /// JWT signing secret.
+    #[serde(default)]
+    pub jwt: JwtSecret,
 }
 
 impl AppSecret {

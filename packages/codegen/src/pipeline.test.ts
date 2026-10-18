@@ -1123,15 +1123,23 @@ describe("run", () => {
     const serverState = await readFromRoot("crates/shop-server/src/state.rs");
     expect(serverState).toContain("pub type State = AppState<Store>;");
     expect(serverState).toContain("PostgresEventStore::new(pool)");
+    expect(serverState).toContain("EVENT_STORE_MIGRATOR.run(&pool)");
     const serverConfig = await readFromRoot("crates/shop-server/src/config.rs");
     expect(serverConfig).toContain("pub struct AppConfig {");
     expect(serverConfig).toContain("pub struct AppSecret {");
     const serverMain = await readFromRoot("crates/shop-server/src/main.rs");
     expect(serverMain).toContain("init_telemetry");
+    expect(serverMain).toContain("JwtService::new");
     const serverRouter = await readFromRoot("crates/shop-server/src/router.rs");
     expect(serverRouter).toContain("http_server::apply_middleware");
     const authMiddleware = await readFromRoot("crates/shop-server/src/middleware/auth.rs");
     expect(authMiddleware).toContain("pub async fn require_auth");
+    expect(authMiddleware).toContain("jwt.verify_token");
+
+    // Sample infrastructure config ships with the workspace.
+    expect(paths).toContain("config.example.yaml");
+    expect(paths).toContain("secrets.example.yaml");
+    expect(paths).toContain(".env.example");
 
     // The use case re-exports the generated request/response types and wires
     // its own submodules, instead of re-declaring them.

@@ -542,11 +542,12 @@ The technical plumbing is generated too, and is kept free of domain logic:
   - `config.rs` — `AppConfig` (`http`, `telemetry`, `database_url`) and
     `AppSecret` (`telemetry`), loaded from a file, `CONFIG_FILE`/`SECRET_FILE`
     or the environment; `DATABASE_URL` always wins for the connection string.
-  - `state.rs` — connects to PostgreSQL and builds the concrete
-    `PostgresEventStore` and the shared state.
-  - `middleware/auth.rs` — `require_auth`, which rejects requests without a
-    bearer token and forwards the caller's identity to the generated
-    `ExecutionContext`.
+  - `state.rs` — connects to PostgreSQL, applies the pending event-store
+    migrations, and builds the concrete `PostgresEventStore` and the shared
+    state.
+  - `middleware/auth.rs` — `require_auth`, which verifies the bearer token with
+    the configured `JwtService` (rejecting invalid/expired tokens) and forwards
+    the verified `sub` claim to the generated `ExecutionContext`.
   - `router.rs` — `create_router`, which merges the generated API routes and the
     base routes, applies `require_auth` to the (empty) `protected` router, and
     wraps everything in `http_server::apply_middleware` (request id, tracing,
@@ -557,9 +558,15 @@ The technical plumbing is generated too, and is kept free of domain logic:
   concrete type.
 
 The app and server manifests get the infrastructure dependencies they need —
-`event-store`; on the server also `http-server`, `telemetry` and `sqlx` — merged
-in automatically. An entry you list in `app.deps` / `server.deps` with the same
-name wins, so a local checkout can replace the git source.
+`event-store`; on the server also `http-server`, `jwt`, `telemetry` and `sqlx` —
+merged in automatically. An entry you list in `app.deps` / `server.deps` with
+the same name wins, so a local checkout can replace the git source.
+
+The workspace also ships example infrastructure files to copy and edit:
+`config.example.yaml` (HTTP/CORS/security headers, telemetry, JWT, database),
+`secrets.example.yaml` (JWT secret, OTLP credentials) and `.env.example`
+(`DATABASE_URL`, `CONFIG_FILE`, `SECRET_FILE`). The generated `.gitignore`
+already excludes `config.yaml`, `secrets.yaml` and `.env`.
 
 Every scaffold file is **create-only**. `em-codegen gen` writes each one only
 when it is missing, then the project owns it: existing files are never

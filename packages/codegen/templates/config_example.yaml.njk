@@ -1,0 +1,38 @@
+# Example server configuration. Copy to `config.yaml` (or point CONFIG_FILE at
+# a copy) and adjust to taste. `DATABASE_URL` overrides `database_url` at
+# runtime, so a deployment secret need not live here.
+http:
+  host: 0.0.0.0
+  port: 3000
+  body_limit_bytes: 2097152
+  timeout_secs: 30
+  compression: true
+  cors:
+    # `["*"]` allows any origin; list explicit origins in production.
+    allow_origins: ["http://localhost:5173"]
+    allow_methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    allow_headers: ["content-type", "authorization"]
+    expose_headers: []
+    allow_credentials: true
+    max_age_secs: 600
+  security_headers:
+    content_type_options: nosniff
+    frame_options: DENY
+    xss_protection: "0"
+    hsts: "max-age=31536000; includeSubDomains"
+    content_security_policy: null
+    referrer_policy: strict-origin-when-cross-origin
+
+telemetry:
+  service_name: {{ crate.name }}
+  service_version: {{ crate.version }}
+  environment: development
+  endpoint: http://localhost:4317
+  enabled: true
+  sample_ratio: 1.0
+  log_level: info
+
+jwt:
+  expiration_secs: 86400
+
+database_url: postgres://postgres:postgres@localhost:5432/{{ crate.name }}

@@ -8,7 +8,10 @@ mod middleware;
 mod router;
 mod state;
 
+use std::sync::Arc;
+
 use config::{AppConfig, AppSecret};
+use jwt::JwtService;
 use router::create_router;
 use state::build_state;
 use telemetry::init_telemetry;
@@ -22,8 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // down cleanly.
     let _telemetry_guard = init_telemetry(&config.telemetry, Some(&secret.telemetry))?;
 
+    let jwt = Arc::new(JwtService::new(&secret.jwt.secret, config.jwt.clone()));
     let state = build_state(&config.database_url).await?;
-    let app = create_router(state, &config.http);
+    let app = create_router(state, &config.http, jwt);
 
     http_server::serve(&config.http, app).await?;
     Ok(())
