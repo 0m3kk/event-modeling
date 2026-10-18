@@ -538,17 +538,28 @@ The technical plumbing is generated too, and is kept free of domain logic:
 - `AppState<E>` holds the shared event store (`Arc<E>`) and is generic over it,
   so the same handlers run against PostgreSQL in production and a mock store in
   tests.
-- The **server binary** ships `config.rs` (host/port/`DATABASE_URL`, loaded from
-  a file or the environment), `state.rs` (connects to PostgreSQL and builds the
-  concrete `PostgresEventStore` and the shared state) and `main.rs` (loads the
-  config, builds the state, wires the router and serves).
+- The **server binary** ships the infrastructure wiring:
+  - `config.rs` — `AppConfig` (`http`, `telemetry`, `database_url`) and
+    `AppSecret` (`telemetry`), loaded from a file, `CONFIG_FILE`/`SECRET_FILE`
+    or the environment; `DATABASE_URL` always wins for the connection string.
+  - `state.rs` — connects to PostgreSQL and builds the concrete
+    `PostgresEventStore` and the shared state.
+  - `middleware/auth.rs` — `require_auth`, which rejects requests without a
+    bearer token and forwards the caller's identity to the generated
+    `ExecutionContext`.
+  - `router.rs` — `create_router`, which merges the generated API routes and the
+    base routes, applies `require_auth` to the (empty) `protected` router, and
+    wraps everything in `http_server::apply_middleware` (request id, tracing,
+    metrics, timeouts, compression, CORS, security headers).
+  - `main.rs` — initializes telemetry, builds the state, assembles the router
+    and serves.
 - `register` is generic over the store, so the server is what fixes the
   concrete type.
 
 The app and server manifests get the infrastructure dependencies they need —
-`event-store` and (on the server) `sqlx` — merged in automatically. An entry you
-list in `app.deps` / `server.deps` with the same name wins, so a local checkout
-can replace the git source.
+`event-store`; on the server also `http-server`, `telemetry` and `sqlx` — merged
+in automatically. An entry you list in `app.deps` / `server.deps` with the same
+name wins, so a local checkout can replace the git source.
 
 Every scaffold file is **create-only**. `em-codegen gen` writes each one only
 when it is missing, then the project owns it: existing files are never

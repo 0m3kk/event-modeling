@@ -1,44 +1,52 @@
 //! Server binary: initialize infrastructure, wire the handlers, and serve.
 //!
-//! Generated once; edit freely — the configuration, event store and router
-//! wiring live in the sibling modules.
+//! Generated once; edit freely — configuration, telemetry, the event store and
+//! the router wiring live in the sibling modules.
 {% if crate.api %}
 mod config;
+mod middleware;
+mod router;
 mod state;
 
-use {{ appCratePath }}::{AppError, register};
-use config::AppConfig;
+use config::{AppConfig, AppSecret};
+use router::create_router;
 use state::build_state;
+use telemetry::init_telemetry;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = AppConfig::load(None)?;
+    let secret = AppSecret::load(None)?;
+
+    // Held for the lifetime of the process; flushing on drop shuts the exporters
+    // down cleanly.
+    let _telemetry_guard = init_telemetry(&config.telemetry, Some(&secret.telemetry))?;
+
     let state = build_state(&config.database_url).await?;
+    let app = create_router(state, &config.http);
 
-    let api = {{ crate.name }}::apis::Api::<AppError>::new();
-    let app = {{ crate.name }}::apis::router(register(api, state));
-
-    let address = config.socket_addr();
-    let listener = tokio::net::TcpListener::bind(&address).await?;
-    tracing::info!("listening on http://{address}");
-    axum::serve(listener, app).await?;
+    http_server::serve(&config.http, app).await?;
     Ok(())
 }
 {% else %}
 mod config;
 mod state;
 
-use config::AppConfig;
+use config::{AppConfig, AppSecret};
 use state::build_state;
+use telemetry::init_telemetry;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = AppConfig::load(None)?;
+    let secret = AppSecret::load(None)?;
+    let _telemetry_guard = init_telemetry(&config.telemetry, Some(&secret.telemetry))?;
+
     let _state = build_state(&config.database_url).await?;
 
     // The API generator is disabled in `codegen.config.ts`; enable it to serve
     // the generated transport, or dispatch commands and queries directly.
-    println!("no HTTP API generated");
+    tracing::info!("no HTTP API generated");
     Ok(())
 }
 {% endif -%}

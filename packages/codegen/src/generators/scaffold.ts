@@ -34,6 +34,8 @@ const APP_DEFAULT_DEPS: DepSpec[] = [{ name: "event-store", git: EVENT_STORE_GIT
 /** Infrastructure dependencies the server crate needs, merged into `server.deps`. */
 const SERVER_DEFAULT_DEPS: DepSpec[] = [
   { name: "event-store", git: EVENT_STORE_GIT },
+  { name: "http-server", git: EVENT_STORE_GIT },
+  { name: "telemetry", git: EVENT_STORE_GIT },
   { name: "sqlx", version: "0.9", features: ["runtime-tokio", "postgres"] },
 ];
 
@@ -391,6 +393,12 @@ export const scaffoldGenerator: Generator = {
       server("server_cargo.toml.njk", "Cargo.toml");
       server("server_config.rs.njk", "src/config.rs");
       server("server_state.rs.njk", "src/state.rs");
+      if (crate.api) {
+        // The router and middleware wrap the generated API transport.
+        server("server_middleware_mod.rs.njk", "src/middleware/mod.rs");
+        server("server_middleware_auth.rs.njk", "src/middleware/auth.rs");
+        server("server_router.rs.njk", "src/router.rs");
+      }
       server("server_main.rs.njk", "src/main.rs");
     }
 

@@ -1,46 +1,43 @@
-//! Server configuration loaded from a file or environment variables.
+//! Server configuration and secrets, loaded from a file or environment
+//! variables.
 //!
 //! Generated once; edit freely — add the settings your deployment needs.
 
 use std::fs;
 use std::path::Path;
 
+use http_server::HttpConfig;
 use serde::{Deserialize, Serialize};
+use telemetry::{TelemetryConfig, TelemetrySecret};
 
 /// Environment variable naming the configuration file to load.
 pub const ENV_CONFIG_FILE: &str = "CONFIG_FILE";
+/// Environment variable naming the secrets file to load.
+pub const ENV_SECRET_FILE: &str = "SECRET_FILE";
 /// Environment variable holding the PostgreSQL connection string.
 pub const ENV_DATABASE_URL: &str = "DATABASE_URL";
 
-/// Server configuration.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Server configuration. Safe to check into source control.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// Address the HTTP server binds to.
-    #[serde(default = "default_host")]
-    pub host: String,
+    /// HTTP server settings (bind address, timeouts, CORS, cookies).
+    #[serde(default)]
+    pub http: HttpConfig,
 
-    /// Port the HTTP server binds to.
-    #[serde(default = "default_port")]
-    pub port: u16,
+    /// OpenTelemetry and logging settings.
+    #[serde(default)]
+    pub telemetry: TelemetryConfig,
 
     /// PostgreSQL connection string. Overridden by `DATABASE_URL`.
     #[serde(default)]
     pub database_url: String,
 }
 
-fn default_host() -> String {
-    "0.0.0.0".to_string()
-}
-
-const fn default_port() -> u16 {
-    3000
-}
-
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            host: default_host(),
-            port: default_port(),
+            http: HttpConfig::default(),
+            telemetry: TelemetryConfig::default(),
             database_url: String::new(),
         }
     }
@@ -68,10 +65,26 @@ impl AppConfig {
 
         Ok(config)
     }
+}
 
-    /// The `host:port` address the HTTP server binds to.
-    pub fn socket_addr(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+/// Server secrets. Load from a file or the environment; never commit these.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct AppSecret {
+    /// OpenTelemetry export credentials.
+    #[serde(default)]
+    pub telemetry: TelemetrySecret,
+}
+
+impl AppSecret {
+    /// Load secrets from `path`, then `SECRET_FILE`, then defaults.
+    pub fn load(path: Option<&Path>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        if let Some(path) = path {
+            return load_file(path);
+        }
+        if let Ok(env_path) = std::env::var(ENV_SECRET_FILE) {
+            return load_file(Path::new(&env_path));
+        }
+        Ok(Self::default())
     }
 }
 

@@ -1,0 +1,67 @@
+//! Authentication middleware.
+//!
+//! Rejects requests without a bearer token and forwards the caller's identity
+//! to the generated [`ExecutionContext`] by setting the actor header the
+//! extractor reads. Replace [`decode_actor`] with real token verification (for
+//! example a JWT service) before serving production traffic.
+//!
+//! [`ExecutionContext`]: {{ crate.name }}::ExecutionContext
+
+use axum::extract::Request;
+use axum::http::{HeaderValue, StatusCode, header};
+use axum::middleware::Next;
+use axum::response::{IntoResponse, Response};
+use http_server::ErrorResponse;
+
+/// Header the generated `ExecutionContext` extractor reads the actor from.
+pub const ACTOR_HEADER: &str = "x-actor-id";
+
+/// Require a bearer token and expose its subject as the request actor.
+pub async fn require_auth(mut request: Request, next: Next) -> Result<Response, Response> {
+    let actor_id = match actor_from_headers(request.headers()) {
+        Some(actor_id) => actor_id,
+        None => {
+            return Err(ErrorResponse::new(
+                StatusCode::UNAUTHORIZED,
+                "UNAUTHORIZED",
+                "Authentication token is missing",
+            )
+            .into_response());
+        }
+    };
+
+    // TODO: verify the token and map it to its subject instead of forwarding it.
+    let actor_id = decode_actor(&actor_id);
+
+    if let Ok(value) = HeaderValue::from_str(&actor_id) {
+        request.headers_mut().insert(ACTOR_HEADER, value);
+    }
+
+    Ok(next.run(request).await)
+}
+
+/// Reads the actor id from an `Authorization: Bearer <token>` header, falling
+/// back to a pre-set [`ACTOR_HEADER`] (e.g. from an upstream gateway).
+fn actor_from_headers(headers: &axum::http::HeaderMap) -> Option<String> {
+    headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            headers
+                .get(ACTOR_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+        })
+}
+
+/// Maps a token to the actor id it authenticates.
+///
+/// The placeholder forwards the token as the actor id; replace it with real
+/// verification and return the verified subject.
+fn decode_actor(token: &str) -> String {
+    token.to_string()
+}
