@@ -49,7 +49,8 @@ export default defineConfig({
 
   // Emit a Cargo workspace around the crate: a workspace manifest, an
   // application crate (handler/reducer/service implementations) and a server
-  // binary. Structure is regenerated; implementation stubs are written once.
+  // binary. Files are written once and then owned by the project; existing
+  // files are never overwritten.
   scaffold: {
     enabled: true,
     // app: { crate: "domain-app" },

@@ -67,11 +67,11 @@ export interface ScaffoldCrateConfig {
 /**
  * Options for the repository scaffold.
  *
- * When enabled, the generator emits a Cargo workspace around the contract
- * crate: a workspace `Cargo.toml`, an application crate (handler/reducer/service
- * implementations) and a server binary crate. Structural files are regenerated
- * and drift-checked like the contract crate; implementation files are written
- * once and then owned by the project (never overwritten or reported).
+ * When enabled, `em-codegen gen` also emits a Cargo workspace around the
+ * contract crate: a workspace `Cargo.toml`, an application crate
+ * (handler/reducer/service implementations) and a server binary crate. Every
+ * scaffold file is written once, when missing, and then owned by the project:
+ * the generator never overwrites an existing file.
  */
 export interface ScaffoldConfig {
   enabled?: boolean;

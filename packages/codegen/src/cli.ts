@@ -3,7 +3,7 @@
  *
  * Commands:
  *   init [dir]              scaffold codegen.config.ts
- *   gen [spec]              generate the crate
+ *   gen [spec]              generate the crate (and the workspace scaffold when enabled)
  *   eject [dir]             copy the built-in templates out for editing
  *   new-template <name>     create a starter user template
  *
@@ -13,7 +13,7 @@
 import process from "node:process";
 import path from "node:path";
 import { ejectTemplates } from "./eject";
-import { loadConfig } from "./load";
+import type { LoadedConfig } from "./load";
 import { run } from "./pipeline";
 import { builtinTemplatesPath, initConfig, newTemplate } from "./scaffold";
 
@@ -22,7 +22,6 @@ const HELP = `em-codegen — generate a Rust crate from a domain specification.
 Usage:
   em-codegen init [dir]                 Create codegen.config.ts
   em-codegen gen [spec] [options]       Generate the crate
-  em-codegen scaffold [options]         Generate the crate + workspace scaffold
   em-codegen eject [dir]                Copy the built-in templates out
   em-codegen new-template <name>        Create a starter user template
 
@@ -108,6 +107,16 @@ function flagBool(flags: Map<string, string | boolean>, ...keys: string[]): bool
   return keys.some((key) => flags.get(key) === true);
 }
 
+/** Ejects the built-in templates when `scaffold.templates` is set. */
+async function ejectScaffoldTemplates(loaded: LoadedConfig, cwd: string): Promise<void> {
+  if (!loaded.config.scaffold?.templates) return;
+  const target = loaded.config.templatesDir
+    ? path.resolve(loaded.configDir, loaded.config.templatesDir)
+    : path.join(loaded.configDir, ".codegen", "templates");
+  const copied = await ejectTemplates(target, { skipExisting: true });
+  console.log(`Ejected ${copied.length} templates to ${path.relative(cwd, target) || target}`);
+}
+
 async function cmdGen(parsed: ParsedArgs, cwd: string): Promise<number> {
   const spec = flagString(parsed.flags, "spec") ?? parsed.positionals[0];
   const result = await run({
@@ -137,6 +146,7 @@ async function cmdGen(parsed: ParsedArgs, cwd: string): Promise<number> {
     for (const file of result.files) console.log(`  ${file.path}`);
     return 0;
   }
+  await ejectScaffoldTemplates(result.config, cwd);
   console.log(
     `Generated ${total} files in ${result.config.outDir} ` +
       `(${result.written.length} written, ${result.unchanged.length} unchanged, ${result.skipped.length} skipped).`,
@@ -145,28 +155,6 @@ async function cmdGen(parsed: ParsedArgs, cwd: string): Promise<number> {
     console.error(`  skipped (edited by hand, use --force): ${file}`);
   }
   return 0;
-}
-
-async function cmdScaffold(parsed: ParsedArgs, cwd: string): Promise<number> {
-  const code = await cmdGen(parsed, cwd);
-  try {
-    const loaded = await loadConfig({
-      cwd,
-      configPath: flagString(parsed.flags, "c", "config"),
-    });
-    if (loaded.config.scaffold?.templates) {
-      const target = loaded.config.templatesDir
-        ? path.resolve(loaded.configDir, loaded.config.templatesDir)
-        : path.join(loaded.configDir, ".codegen", "templates");
-      const copied = await ejectTemplates(target, { skipExisting: true });
-      console.log(
-        `Ejected ${copied.length} templates to ${path.relative(cwd, target) || target}`,
-      );
-    }
-  } catch {
-    // Config could not be loaded; the gen step already reported the reason.
-  }
-  return code;
 }
 
 async function cmdInit(parsed: ParsedArgs, cwd: string): Promise<number> {
@@ -211,9 +199,6 @@ async function main(): Promise<number> {
     case "gen":
     case "generate":
       return cmdGen(parsed, cwd);
-    case "scaffold":
-    case "workspace":
-      return cmdScaffold(parsed, cwd);
     case "init":
       return cmdInit(parsed, cwd);
     case "eject":

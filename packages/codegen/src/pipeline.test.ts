@@ -1111,7 +1111,7 @@ describe("run", () => {
     expect(stub).toContain('todo!("implement PlaceOrder")');
   });
 
-  it("keeps hand-edited scaffold implementation files across runs", async () => {
+  it("writes scaffold files once and never overwrites them", async () => {
     await fs.writeFile(
       path.join(dir, "codegen.config.ts"),
       `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
@@ -1120,18 +1120,20 @@ describe("run", () => {
     );
     await run({ cwd: dir, rustfmt: false });
 
+    // Hand-edit an implementation file and a structural file.
     const impl = path.join(dir, "crates/shop-app/src/sales/commands/place_order.rs");
     await fs.appendFile(impl, "// implemented\n", "utf8");
+    const workspace = path.join(dir, "Cargo.toml");
+    await fs.appendFile(workspace, "# hand edit\n", "utf8");
 
     const second = await run({ cwd: dir, rustfmt: false });
     expect(second.skipped).toEqual([]);
-    expect(second.drifted).toEqual([]);
+    expect(second.written).not.toContain("@root/Cargo.toml");
     expect(await fs.readFile(impl, "utf8")).toContain("// implemented");
+    expect(await fs.readFile(workspace, "utf8")).toContain("# hand edit");
 
-    // Structural files ARE drift-checked.
-    const workspace = path.join(dir, "Cargo.toml");
-    await fs.appendFile(workspace, "# drift\n", "utf8");
+    // Create-only scaffold files are never reported as drift.
     const check = await run({ cwd: dir, rustfmt: false, check: true });
-    expect(check.drifted).toContain("@root/Cargo.toml");
+    expect(check.drifted).not.toContain("@root/Cargo.toml");
   });
 });

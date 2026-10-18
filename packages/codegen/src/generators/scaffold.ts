@@ -5,14 +5,11 @@
  * workspace: a workspace `Cargo.toml`, an application crate (the command,
  * query, state, view and service implementations) and a server binary crate.
  *
- * The files split into two ownership classes (see {@link RenderJob}):
- *
- *  - **managed** — structural files derived from the spec (workspace manifest,
- *    crate manifests, `lib.rs`, `mod.rs`, the handler registry). They are
- *    regenerated and drift-checked like the contract crate.
- *  - **create-only** — the implementation files (handlers, reducers, services,
- *    `AppState`, `AppError`, the server `main`). Written once, then owned by the
- *    project; never overwritten or reported.
+ * Every file the scaffold emits is **create-only** (see {@link RenderJob}):
+ * written once, when missing, and from then on owned by the project. The
+ * generator never overwrites or reports them, so re-running `em-codegen gen`
+ * leaves an existing workspace untouched. New files (a handler stub for a
+ * command just added to the spec) are still created.
  */
 import type { CodegenConfig, DepSpec, ScaffoldCrateConfig } from "../config";
 import type { IrArtifact, IrCrate } from "../ir/types";
@@ -215,75 +212,65 @@ export const scaffoldGenerator: Generator = {
       workspaceMembers,
     };
 
+    // Every scaffold file is create-only: written once, then owned by the
+    // project.
     const jobs: RenderJob[] = [];
     const emit = (
       template: string,
       outPath: string,
-      ownership: "managed" | "create-only",
       extra: Record<string, unknown> = {},
     ) =>
       jobs.push({
         template,
         outPath,
         base: "root",
-        ownership,
+        ownership: "create-only",
         context: { ...context, ...extra },
       });
-    const root = (template: string, outPath: string, ownership: "managed" | "create-only") =>
-      emit(template, outPath, ownership);
-    const app = (
-      template: string,
-      outPath: string,
-      ownership: "managed" | "create-only",
-      extra: Record<string, unknown> = {},
-    ) => emit(template, `crates/${options.appCrate}/${outPath}`, ownership, extra);
-    const server = (template: string, outPath: string, ownership: "managed" | "create-only") =>
-      emit(template, `crates/${options.serverCrate}/${outPath}`, ownership);
+    const root = (template: string, outPath: string) => emit(template, outPath);
+    const app = (template: string, outPath: string, extra: Record<string, unknown> = {}) =>
+      emit(template, `crates/${options.appCrate}/${outPath}`, extra);
+    const server = (template: string, outPath: string) =>
+      emit(template, `crates/${options.serverCrate}/${outPath}`);
 
     if (options.workspace) {
-      root("workspace_cargo.toml.njk", "Cargo.toml", "managed");
-      root("rust_toolchain.toml.njk", "rust-toolchain.toml", "managed");
-      root("gitignore.njk", ".gitignore", "managed");
-      root("readme.md.njk", "README.md", "create-only");
+      root("workspace_cargo.toml.njk", "Cargo.toml");
+      root("rust_toolchain.toml.njk", "rust-toolchain.toml");
+      root("gitignore.njk", ".gitignore");
+      root("readme.md.njk", "README.md");
     }
 
     if (options.app) {
-      app("app_cargo.toml.njk", "Cargo.toml", "managed");
-      app("app_lib.rs.njk", "src/lib.rs", "managed");
-      app("app_error.rs.njk", "src/error.rs", "create-only");
-      app("app_state.rs.njk", "src/state.rs", "create-only");
-      if (crate.api) app("app_register.rs.njk", "src/register.rs", "managed");
+      app("app_cargo.toml.njk", "Cargo.toml");
+      app("app_lib.rs.njk", "src/lib.rs");
+      app("app_error.rs.njk", "src/error.rs");
+      app("app_state.rs.njk", "src/state.rs");
+      if (crate.api) app("app_register.rs.njk", "src/register.rs");
 
       for (const entry of domains) {
-        app("app_domain_mod.rs.njk", `src/${entry.module}/mod.rs`, "managed", { modDir: entry });
+        app("app_domain_mod.rs.njk", `src/${entry.module}/mod.rs`, { modDir: entry });
         for (const dir of entry.dirs) {
-          app(
-            "app_leaf_mod.rs.njk",
-            `src/${entry.module}/${dir.name}/mod.rs`,
-            "managed",
-            { modFiles: dir.files },
-          );
+          app("app_leaf_mod.rs.njk", `src/${entry.module}/${dir.name}/mod.rs`, {
+            modFiles: dir.files,
+          });
         }
         for (const handler of entry.handlers) {
-          app(
-            "app_handler_stub.rs.njk",
-            `src/${entry.module}/${handler.dir}/${handler.fileName}.rs`,
-            "create-only",
-            { handler },
-          );
+          app("app_handler_stub.rs.njk", `src/${entry.module}/${handler.dir}/${handler.fileName}.rs`, {
+            handler,
+          });
         }
         if (entry.states.length > 0) {
-          app("app_states_stub.rs.njk", `src/${entry.module}/states.rs`, "create-only", {
+          app("app_states_stub.rs.njk", `src/${entry.module}/states.rs`, {
             artifacts: entry.states,
           });
         }
         if (entry.views.length > 0) {
-          app("app_views_stub.rs.njk", `src/${entry.module}/views.rs`, "create-only", {
+          app("app_views_stub.rs.njk", `src/${entry.module}/views.rs`, {
             artifacts: entry.views,
           });
         }
         if (entry.services.length > 0) {
-          app("app_services_stub.rs.njk", `src/${entry.module}/services.rs`, "create-only", {
+          app("app_services_stub.rs.njk", `src/${entry.module}/services.rs`, {
             artifacts: entry.services,
             stubPrelude: entry.services.some((service) => service.usesPrelude),
           });
@@ -293,8 +280,8 @@ export const scaffoldGenerator: Generator = {
 
     // The server wires the application crate, so it only exists alongside it.
     if (options.server && options.app) {
-      server("server_cargo.toml.njk", "Cargo.toml", "managed");
-      server("server_main.rs.njk", "src/main.rs", "create-only");
+      server("server_cargo.toml.njk", "Cargo.toml");
+      server("server_main.rs.njk", "src/main.rs");
     }
 
     return jobs;

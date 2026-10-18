@@ -27,8 +27,7 @@ node packages/codegen/bin/em-codegen.mjs gen
 
 ```
 em-codegen init [dir]                  Create codegen.config.ts
-em-codegen gen [spec] [options]        Generate the crate
-em-codegen scaffold [options]          Generate the crate + workspace scaffold
+em-codegen gen [spec] [options]        Generate the crate (and the workspace scaffold when enabled)
 em-codegen eject [dir]                 Copy the built-in templates out for editing
 em-codegen new-template <name>         Create a starter user template
 ```
@@ -512,16 +511,13 @@ scaffold: {
 }
 ```
 
-Files come in two ownership classes:
-
-- **managed** — structural files derived from the spec (the workspace and crate
-  manifests, `lib.rs`, `mod.rs`, the `register` glue, the contract crate). They
-  are regenerated and reported by `--check`.
-- **create-only** — the implementation files: one `todo!()` stub per command and
-  query, a reducer stub per state/view, a service stub, `AppState`, `AppError`
-  and the server `main`. They are written **once**, then owned by the project:
-  never overwritten and never reported as drift. Adding a command to the spec
-  creates its stub and wires it into `register`; existing stubs are left alone.
+Every scaffold file is **create-only**. `em-codegen gen` writes each one only
+when it is missing, then the project owns it: existing files are never
+overwritten and never reported as drift. This covers the workspace and crate
+manifests, `lib.rs`, `mod.rs`, the `register` glue, one `todo!()` stub per
+command and query, a reducer stub per state/view, a service stub, `AppState`,
+`AppError` and the server `main`. Adding a command to the spec creates its stub
+but leaves already-written files alone.
 
 The application crate's `register` lists every command and query, so a route can
 never silently answer `500` because its handler was forgotten:
@@ -532,8 +528,10 @@ pub fn register(api: Api<AppError>, state: AppState) -> Api<AppError> {
 }
 ```
 
-Run `em-codegen scaffold` (or `em-codegen gen` with `scaffold.enabled`) to write
-the workspace, and `em-codegen gen --check` in CI to catch structural drift.
+Run `em-codegen gen` with `scaffold.enabled` to write the workspace. The
+contract crate (the `out` directory) is still manifest-managed, so
+`em-codegen gen --check` in CI catches drift there; scaffold files are skipped
+by the check because the project owns them.
 
 ## Config reference
 
