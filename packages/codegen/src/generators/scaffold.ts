@@ -5,17 +5,23 @@
  * workspace: a workspace `Cargo.toml`, an application crate (the command,
  * query, state, view and service implementations) and a server binary crate.
  *
+ * The layout follows the generated application style: each command and query
+ * is a self-contained module directory (`commands/<domain>/<use_case>/`) with
+ * the request/response re-export, the use-case struct and its `mod.rs`, rather
+ * than one flat file per item. Views, states and services follow the same
+ * shape. The pieces the contract crate already generates (request/response
+ * types, handler traits, projections) are reused and only re-exported, so the
+ * scaffold stays adapted to the core rather than duplicating it.
+ *
  * Every file the scaffold emits is **create-only** (see {@link RenderJob}):
  * written once, when missing, and from then on owned by the project. The
- * generator never overwrites or reports them, so re-running `em-codegen gen`
- * leaves an existing workspace untouched. New files (a handler stub for a
- * command just added to the spec) are still created.
+ * generator never overwrites or reports them.
  */
+import path from "node:path";
 import type { CodegenConfig, DepSpec, ScaffoldCrateConfig } from "../config";
-import type { IrArtifact, IrCrate } from "../ir/types";
+import type { IrArtifact, IrCrate, IrEventRef, IrMethod } from "../ir/types";
 import { planRoutes, resolveApiOptions } from "./api";
 import type { Generator, RenderJob } from "./contract";
-import path from "node:path";
 
 /** Resolved scaffold options. */
 interface ScaffoldOptions {
@@ -55,73 +61,124 @@ function resolveScaffold(config: CodegenConfig, crate: IrCrate): ScaffoldOptions
   };
 }
 
-/** Maps each command/query request type to its API registry setter suffix. */
-function methodToRoute(crate: IrCrate, config: CodegenConfig): Map<string, string> {
-  const map = new Map<string, string>();
-  if (!crate.api) return map;
-  for (const route of planRoutes(crate, resolveApiOptions(config))) {
-    map.set(route.requestType, route.method);
-  }
-  return map;
-}
-
-/** A handler (command/query) the application crate implements and registers. */
-export interface ScaffoldHandler {
+/** One command or query use case, rendered as its own module directory. */
+interface UseCaseItem {
   domain: string;
-  /** `"commands"` or `"queries"`. */
-  dir: "commands" | "queries";
-  subject: "command" | "query";
-  /** API registry setter suffix (`with_<method>`), unique per crate. */
-  method: string;
-  /** snake_case file name of the stub. */
+  /** Directory / module name (snake_case file name). */
   fileName: string;
   rustName: string;
-  useCaseName: string;
-  handlerType: string;
-  requestType: string;
+  /** Response struct name, absent when the spec declares no responses. */
   responseType?: string;
-  modulePath: string[];
+  /** Generated handler trait, e.g. `PlaceOrderHandler`. */
+  handlerType: string;
+  /** Scaffolded use-case struct, e.g. `PlaceOrderUseCase`. */
+  useCaseType: string;
+  /** Contract module path re-exported by the use case, e.g. `["sales","commands"]`. */
+  contractModulePath: string[];
+  /** Request file name inside the use-case directory. */
+  typeFile: "command" | "query";
+  /** App-crate module path, e.g. `commands::sales::place_order`. */
+  appPath: string;
   doc?: string;
 }
 
-/** One application module (mirrors a generated domain folder). */
-interface ScaffoldDomain {
-  module: string;
-  dirs: Array<{ name: "commands" | "queries"; files: string[] }>;
-  files: Array<"states" | "views" | "services">;
-  handlers: ScaffoldHandler[];
-  states: IrArtifact[];
-  views: IrArtifact[];
-  services: IrArtifact[];
+/** One state or view projection the app crate implements a reducer for. */
+interface ProjectionItem {
+  domain: string;
+  fileName: string;
+  rustName: string;
+  /** Generated reducer trait, e.g. `OrderStateReducer`. */
+  reducerType: string;
+  /** Scaffolded reducer implementation, e.g. `OrderStateReducerImpl`. */
+  implType: string;
+  contractModulePath: string[];
+  projectionEvents: IrEventRef[];
+  typeFile: "view" | "state";
+  /** Views are async and fallible; states are sync. */
+  async: boolean;
+  doc?: string;
 }
 
-/** Derives a handler entry from a command/query artifact. */
-function toHandler(artifact: IrArtifact, method: string): ScaffoldHandler {
-  const subject = artifact.kind as "command" | "query";
+/** One service the app crate implements. */
+interface ServiceItem {
+  domain: string;
+  fileName: string;
+  rustName: string;
+  implType: string;
+  contractModulePath: string[];
+  methods: IrMethod[];
+  usesPrelude?: boolean;
+  doc?: string;
+}
+
+/** Everything the app crate scaffolds for one domain module. */
+interface AppDomain {
+  module: string;
+  commands: UseCaseItem[];
+  queries: UseCaseItem[];
+  views: ProjectionItem[];
+  states: ProjectionItem[];
+  services: ServiceItem[];
+}
+
+/** Builds a command/query use-case entry from its artifact. */
+function toUseCase(artifact: IrArtifact, config: CodegenConfig): UseCaseItem {
+  const domain = artifact.modulePath[0] ?? "common";
+  const typeFile = artifact.kind === "command" ? "command" : "query";
+  const group = typeFile === "command" ? "commands" : "queries";
   return {
-    domain: artifact.modulePath[0] ?? "common",
-    dir: subject === "command" ? "commands" : "queries",
-    subject,
-    method,
+    domain,
     fileName: artifact.fileName,
     rustName: artifact.rustName,
-    useCaseName: `${artifact.rustName}UseCase`,
-    handlerType: `${artifact.rustName}Handler`,
-    requestType: artifact.rustName,
     responseType:
       (artifact.responses ?? []).length > 0 ? `${artifact.rustName}Response` : undefined,
-    modulePath: artifact.modulePath,
+    handlerType: `${artifact.rustName}Handler`,
+    useCaseType: `${artifact.rustName}UseCase`,
+    contractModulePath: artifact.modulePath,
+    typeFile,
+    appPath: `${group}::${domain}::${artifact.fileName}`,
+    doc: artifact.doc,
+  };
+}
+
+/** Builds a state/view projection entry from its artifact. */
+function toProjection(artifact: IrArtifact, kind: "view" | "state"): ProjectionItem {
+  const domain = artifact.modulePath[0] ?? "common";
+  return {
+    domain,
+    fileName: artifact.fileName,
+    rustName: artifact.rustName,
+    reducerType: `${artifact.rustName}Reducer`,
+    implType: `${artifact.rustName}ReducerImpl`,
+    contractModulePath: artifact.modulePath,
+    projectionEvents: artifact.projectionEvents ?? [],
+    typeFile: kind,
+    async: kind === "view",
+    doc: artifact.doc,
+  };
+}
+
+/** Builds a service entry from its artifact. */
+function toService(artifact: IrArtifact): ServiceItem {
+  return {
+    domain: artifact.modulePath[0] ?? "common",
+    fileName: artifact.fileName,
+    rustName: artifact.rustName,
+    implType: `${artifact.rustName}Impl`,
+    contractModulePath: artifact.modulePath,
+    methods: artifact.methods ?? [],
+    usesPrelude: artifact.usesPrelude,
     doc: artifact.doc,
   };
 }
 
 /** Groups the crate's app-facing artifacts by domain module. */
-function buildDomains(crate: IrCrate, methodByRustName: Map<string, string>): ScaffoldDomain[] {
-  const byModule = new Map<string, ScaffoldDomain>();
-  const domain = (module: string): ScaffoldDomain => {
+function buildDomains(crate: IrCrate, config: CodegenConfig): AppDomain[] {
+  const byModule = new Map<string, AppDomain>();
+  const domain = (module: string): AppDomain => {
     let entry = byModule.get(module);
     if (!entry) {
-      entry = { module, dirs: [], files: [], handlers: [], states: [], views: [], services: [] };
+      entry = { module, commands: [], queries: [], views: [], states: [], services: [] };
       byModule.set(module, entry);
     }
     return entry;
@@ -129,32 +186,36 @@ function buildDomains(crate: IrCrate, methodByRustName: Map<string, string>): Sc
 
   for (const artifact of crate.artifacts) {
     const module = artifact.modulePath[0] ?? "common";
-    if (artifact.kind === "command" || artifact.kind === "query") {
-      const entry = domain(module);
-      entry.handlers.push(
-        toHandler(artifact, methodByRustName.get(artifact.rustName) ?? artifact.fileName),
-      );
-    } else if (artifact.kind === "state") {
-      domain(module).states.push(artifact);
-    } else if (artifact.kind === "view") {
-      domain(module).views.push(artifact);
-    } else if (artifact.kind === "service") {
-      domain(module).services.push(artifact);
+    switch (artifact.kind) {
+      case "command":
+        domain(module).commands.push(toUseCase(artifact, config));
+        break;
+      case "query":
+        domain(module).queries.push(toUseCase(artifact, config));
+        break;
+      case "view":
+        domain(module).views.push(toProjection(artifact, "view"));
+        break;
+      case "state":
+        domain(module).states.push(toProjection(artifact, "state"));
+        break;
+      case "service":
+        domain(module).services.push(toService(artifact));
+        break;
+      default:
+        break;
     }
   }
 
+  const byFileName = (a: { fileName: string }, b: { fileName: string }) =>
+    a.fileName.localeCompare(b.fileName);
   for (const entry of byModule.values()) {
-    const commands = entry.handlers.filter((h) => h.dir === "commands").map((h) => h.fileName);
-    const queries = entry.handlers.filter((h) => h.dir === "queries").map((h) => h.fileName);
-    entry.dirs = [];
-    if (commands.length > 0) entry.dirs.push({ name: "commands", files: commands.sort() });
-    if (queries.length > 0) entry.dirs.push({ name: "queries", files: queries.sort() });
-    entry.files = [];
-    if (entry.states.length > 0) entry.files.push("states");
-    if (entry.views.length > 0) entry.files.push("views");
-    if (entry.services.length > 0) entry.files.push("services");
+    entry.commands.sort(byFileName);
+    entry.queries.sort(byFileName);
+    entry.views.sort(byFileName);
+    entry.states.sort(byFileName);
+    entry.services.sort(byFileName);
   }
-
   return Array.from(byModule.values()).sort((a, b) => a.module.localeCompare(b.module));
 }
 
@@ -174,16 +235,35 @@ function depLine(dep: DepSpec): string {
   return `${dep.name} = { ${parts.join(", ")} }`;
 }
 
+/** The exported names of a use case, for its domain `mod.rs`. */
+function useCaseExports(item: UseCaseItem): string[] {
+  const names = [item.rustName];
+  if (item.responseType) names.push(item.responseType);
+  names.push(item.useCaseType);
+  return names;
+}
+
 export const scaffoldGenerator: Generator = {
   name: "scaffold",
   generate({ crate, config }): RenderJob[] {
     const options = resolveScaffold(config, crate);
     if (!options) return [];
 
-    const domains = buildDomains(crate, methodToRoute(crate, config));
+    const domains = buildDomains(crate, config);
     const appCratePath = options.appCrate.replace(/-/g, "_");
     const serverCratePath = options.serverCrate.replace(/-/g, "_");
-    const handlers = domains.flatMap((entry) => entry.handlers);
+    const commands = domains.flatMap((entry) => entry.commands);
+    const queries = domains.flatMap((entry) => entry.queries);
+
+    // Map each command/query to the API registry setter suffix.
+    const methodByRustName = new Map<string, string>();
+    for (const route of planRoutes(crate, resolveApiOptions(config))) {
+      methodByRustName.set(route.requestType, route.method);
+    }
+    const handlers = [...commands, ...queries].map((item) => ({
+      ...item,
+      method: methodByRustName.get(item.rustName) ?? item.fileName,
+    }));
 
     const posix = (value: string) => value.split(path.sep).join("/");
     const relative = (from: string, to: string) => posix(path.relative(from, to)) || ".";
@@ -195,10 +275,18 @@ export const scaffoldGenerator: Generator = {
     if (options.app) workspaceMembers.push(appDir);
     if (options.server) workspaceMembers.push(serverDir);
 
+    const domainNames = domains.map((entry) => entry.module);
+    const hasGroup = (group: keyof AppDomain) =>
+      domains.some((entry) => (entry[group] as unknown[]).length > 0);
+
     const context = {
       crate,
       domains,
+      domainNames,
+      commands,
+      queries,
       handlers,
+      methodByRustName,
       stubs: options.stubs,
       appCrate: options.appCrate,
       appCratePath,
@@ -210,10 +298,13 @@ export const scaffoldGenerator: Generator = {
       baseFromServer: relative(serverDir, baseDir),
       appFromServer: relative(serverDir, appDir),
       workspaceMembers,
+      hasCommands: hasGroup("commands"),
+      hasQueries: hasGroup("queries"),
+      hasViews: hasGroup("views"),
+      hasStates: hasGroup("states"),
+      hasServices: hasGroup("services"),
     };
 
-    // Every scaffold file is create-only: written once, then owned by the
-    // project.
     const jobs: RenderJob[] = [];
     const emit = (
       template: string,
@@ -229,9 +320,9 @@ export const scaffoldGenerator: Generator = {
       });
     const root = (template: string, outPath: string) => emit(template, outPath);
     const app = (template: string, outPath: string, extra: Record<string, unknown> = {}) =>
-      emit(template, `crates/${options.appCrate}/${outPath}`, extra);
+      emit(template, `${appDir}/${outPath}`, extra);
     const server = (template: string, outPath: string) =>
-      emit(template, `crates/${options.serverCrate}/${outPath}`);
+      emit(template, `${serverDir}/${outPath}`);
 
     if (options.workspace) {
       root("workspace_cargo.toml.njk", "Cargo.toml");
@@ -245,35 +336,29 @@ export const scaffoldGenerator: Generator = {
       app("app_lib.rs.njk", "src/lib.rs");
       app("app_error.rs.njk", "src/error.rs");
       app("app_state.rs.njk", "src/state.rs");
+      app("app_context.rs.njk", "src/context.rs");
       if (crate.api) app("app_register.rs.njk", "src/register.rs");
 
-      for (const entry of domains) {
-        app("app_domain_mod.rs.njk", `src/${entry.module}/mod.rs`, { modDir: entry });
-        for (const dir of entry.dirs) {
-          app("app_leaf_mod.rs.njk", `src/${entry.module}/${dir.name}/mod.rs`, {
-            modFiles: dir.files,
+      // `commands/mod.rs`, `queries/mod.rs`, ... list the domain modules.
+      const groups: Array<{ key: keyof AppDomain; dir: string }> = [
+        { key: "commands", dir: "commands" },
+        { key: "queries", dir: "queries" },
+        { key: "views", dir: "views" },
+        { key: "states", dir: "states" },
+        { key: "services", dir: "services" },
+      ];
+      for (const group of groups) {
+        const populated = domains.filter((entry) => (entry[group.key] as unknown[]).length > 0);
+        if (populated.length === 0) continue;
+        app("app_group_mod.rs.njk", `src/${group.dir}/mod.rs`, {
+          groupModules: populated.map((entry) => entry.module),
+        });
+        for (const entry of populated) {
+          const items = entry[group.key] as Array<UseCaseItem | ProjectionItem | ServiceItem>;
+          app("app_domain_mod.rs.njk", `src/${group.dir}/${entry.module}/mod.rs`, {
+            modItems: items.map((item) => modItemFor(group.key, item)),
           });
-        }
-        for (const handler of entry.handlers) {
-          app("app_handler_stub.rs.njk", `src/${entry.module}/${handler.dir}/${handler.fileName}.rs`, {
-            handler,
-          });
-        }
-        if (entry.states.length > 0) {
-          app("app_states_stub.rs.njk", `src/${entry.module}/states.rs`, {
-            artifacts: entry.states,
-          });
-        }
-        if (entry.views.length > 0) {
-          app("app_views_stub.rs.njk", `src/${entry.module}/views.rs`, {
-            artifacts: entry.views,
-          });
-        }
-        if (entry.services.length > 0) {
-          app("app_services_stub.rs.njk", `src/${entry.module}/services.rs`, {
-            artifacts: entry.services,
-            stubPrelude: entry.services.some((service) => service.usesPrelude),
-          });
+          scaffoldGroup(group.key, group.dir, entry, items);
         }
       }
     }
@@ -285,5 +370,47 @@ export const scaffoldGenerator: Generator = {
     }
 
     return jobs;
+
+    /** The `{ fileName, exports }` an item contributes to its domain `mod.rs`. */
+    function modItemFor(
+      group: keyof AppDomain,
+      item: UseCaseItem | ProjectionItem | ServiceItem,
+    ): { fileName: string; exports: string[] } {
+      if (group === "commands" || group === "queries") {
+        return { fileName: item.fileName, exports: useCaseExports(item as UseCaseItem) };
+      }
+      const typed = item as ProjectionItem | ServiceItem;
+      return { fileName: item.fileName, exports: [typed.rustName, typed.implType] };
+    }
+
+    /** Emits the per-item files of one group within one domain. */
+    function scaffoldGroup(
+      group: keyof AppDomain,
+      dir: string,
+      entry: AppDomain,
+      items: Array<UseCaseItem | ProjectionItem | ServiceItem>,
+    ): void {
+      for (const item of items) {
+        const base = `src/${dir}/${entry.module}/${item.fileName}`;
+        if (group === "commands" || group === "queries") {
+          const useCase = item as UseCaseItem;
+          app("app_use_case_mod.rs.njk", `${base}/mod.rs`, { item: useCase });
+          app("app_use_case_type.rs.njk", `${base}/${useCase.typeFile}.rs`, { item: useCase });
+          app("app_use_case_handler.rs.njk", `${base}/handler.rs`, { item: useCase });
+        } else if (group === "views" || group === "states") {
+          const projection = item as ProjectionItem;
+          app("app_projection_mod.rs.njk", `${base}/mod.rs`, { item: projection });
+          app("app_type_reexport.rs.njk", `${base}/${projection.typeFile}.rs`, {
+            item: projection,
+          });
+          app("app_projection_handler.rs.njk", `${base}/handler.rs`, { item: projection });
+        } else {
+          const service = item as ServiceItem;
+          app("app_service_mod.rs.njk", `${base}/mod.rs`, { item: service });
+          app("app_type_reexport.rs.njk", `${base}/service.rs`, { item: service });
+          app("app_service_handler.rs.njk", `${base}/handler.rs`, { item: service });
+        }
+      }
+    }
   },
 };

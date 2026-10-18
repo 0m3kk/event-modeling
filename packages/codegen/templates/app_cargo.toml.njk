@@ -6,8 +6,7 @@ edition = "{{ crate.edition }}"
 [dependencies]
 {{ crate.name }} = { path = "{{ baseFromApp }}" }
 async-trait = "0.1"
-{% if crate.api %}axum = "0.8"
-{% endif -%}
+tracing = "0.1"
 {% for dep in appDeps -%}
 {{ dep }}
 {% endfor -%}

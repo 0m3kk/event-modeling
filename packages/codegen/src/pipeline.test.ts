@@ -1089,7 +1089,10 @@ describe("run", () => {
     expect(paths).toContain("crates/shop-app/Cargo.toml");
     expect(paths).toContain("crates/shop-app/src/lib.rs");
     expect(paths).toContain("crates/shop-app/src/register.rs");
-    expect(paths).toContain("crates/shop-app/src/sales/commands/place_order.rs");
+    expect(paths).toContain("crates/shop-app/src/commands/sales/mod.rs");
+    expect(paths).toContain("crates/shop-app/src/commands/sales/place_order/mod.rs");
+    expect(paths).toContain("crates/shop-app/src/commands/sales/place_order/command.rs");
+    expect(paths).toContain("crates/shop-app/src/commands/sales/place_order/handler.rs");
     expect(paths).toContain("crates/shop-server/src/main.rs");
 
     const workspace = await readFromRoot("Cargo.toml");
@@ -1106,9 +1109,22 @@ describe("run", () => {
     expect(register).toContain("pub fn register(api: Api<AppError>, state: AppState) -> Api<AppError>");
     expect(register).toContain(".with_place_order(PlaceOrderUseCase::new(state.clone()))");
 
-    const stub = await readFromRoot("crates/shop-app/src/sales/commands/place_order.rs");
+    const stub = await readFromRoot("crates/shop-app/src/commands/sales/place_order/handler.rs");
     expect(stub).toContain("impl PlaceOrderHandler for PlaceOrderUseCase {");
     expect(stub).toContain('todo!("implement PlaceOrder")');
+
+    // The use case re-exports the generated request/response types and wires
+    // its own submodules, instead of re-declaring them.
+    const commandType = await readFromRoot(
+      "crates/shop-app/src/commands/sales/place_order/command.rs",
+    );
+    expect(commandType).toContain("shop::sales::commands::{PlaceOrder}");
+    const useCaseMod = await readFromRoot(
+      "crates/shop-app/src/commands/sales/place_order/mod.rs",
+    );
+    expect(useCaseMod).toContain("mod command;");
+    expect(useCaseMod).toContain("mod handler;");
+    expect(useCaseMod).toContain("pub use handler::PlaceOrderUseCase;");
 
     // Create-only scaffold files are hand-editable, so they must not claim to
     // be do-not-edit generated files.
@@ -1132,7 +1148,10 @@ describe("run", () => {
     await run({ cwd: dir, rustfmt: false });
 
     // Hand-edit an implementation file and a structural file.
-    const impl = path.join(dir, "crates/shop-app/src/sales/commands/place_order.rs");
+    const impl = path.join(
+      dir,
+      "crates/shop-app/src/commands/sales/place_order/handler.rs",
+    );
     await fs.appendFile(impl, "// implemented\n", "utf8");
     const workspace = path.join(dir, "Cargo.toml");
     await fs.appendFile(workspace, "# hand edit\n", "utf8");

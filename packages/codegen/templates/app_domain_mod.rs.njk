@@ -1,7 +1,8 @@
-{% for dir in modDir.dirs -%}
-pub mod {{ dir.name }};
+//! Domain modules for this folder.
+
+{% for item in modItems -%}
+pub mod {{ item.fileName }};
 {% endfor -%}
-{% for file in modDir.files -%}
-pub mod {{ file }};
-pub use {{ file }}::*;
+{% for item in modItems -%}
+pub use {{ item.fileName }}::{{ "{" }}{{ item.exports | join(", ") }}{{ "}" }};
 {% endfor -%}

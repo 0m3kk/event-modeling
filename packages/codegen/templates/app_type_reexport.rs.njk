@@ -1,0 +1,5 @@
+//! `{{ item.rustName }}` — generated in the domain crate, re-exported here.
+//!
+//! The type is fixed and never edited by hand.
+
+pub use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ item.rustName }};

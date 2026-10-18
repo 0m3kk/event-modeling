@@ -1,0 +1,33 @@
+use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ "{" }}{{ item.rustName }}, {{ item.handlerType }}{% if item.responseType %}, {{ item.responseType }}{% endif %}{{ "}" }};
+use crate::context::ExecutionContext;
+use crate::{AppError, AppState};
+
+/// Implementation of the `{{ item.rustName }}` {{ item.typeFile }}.
+///
+/// Generated once; edit freely — the generator will not overwrite this file.
+#[allow(dead_code)]
+pub struct {{ item.useCaseType }} {
+    state: AppState,
+}
+
+impl {{ item.useCaseType }} {
+    /// Create the handler with the shared application state.
+    pub fn new(state: AppState) -> Self {
+        Self { state }
+    }
+}
+
+#[async_trait::async_trait]
+impl {{ item.handlerType }} for {{ item.useCaseType }} {
+    type Error = AppError;
+
+    #[tracing::instrument(name = "{{ item.typeFile }}.{{ item.fileName }}", skip(self, ctx, payload))]
+    async fn handle(
+        &self,
+        ctx: &ExecutionContext,
+        payload: {{ item.rustName }},
+    ) -> Result<{% if item.responseType %}{{ item.responseType }}{% else %}(){% endif %}, AppError> {
+        let _ = (ctx, &self.state, payload);
+        {{ stubs }}!("implement {{ item.rustName }}")
+    }
+}

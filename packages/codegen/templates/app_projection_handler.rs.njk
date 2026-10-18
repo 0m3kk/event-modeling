@@ -1,0 +1,27 @@
+{% if item.async %}use crate::AppError;
+{% endif -%}
+{% for event in item.projectionEvents -%}
+use {{ crate.name }}::{{ event.modulePath | join("::") }}::{{ event.rustName }};
+{% endfor -%}
+use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ "{" }}{{ item.rustName }}, {{ item.reducerType }}{{ "}" }};
+
+/// {% if item.async %}View{% else %}State{% endif %} reducer for `{{ item.rustName }}`.
+///
+/// Generated once; edit freely — the generator will not overwrite this file.
+pub struct {{ item.implType }};
+
+{% if item.async %}#[async_trait::async_trait]
+{% endif -%}
+impl {{ item.reducerType }} for {{ item.implType }} {
+{% if item.async %}    type Error = AppError;
+
+{% endif -%}
+{% for event in item.projectionEvents %}    {% if item.async %}async {% endif %}fn on_{{ event.eventType }}(
+        &self,
+        _state: &mut {{ item.rustName }},
+        _event: &{{ event.rustName }},
+    ){% if item.async %} -> Result<(), AppError>{% endif %} {
+        {{ stubs }}!("project {{ event.rustName }} into {{ item.rustName }}")
+    }
+{% endfor -%}
+}

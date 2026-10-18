@@ -511,13 +511,35 @@ scaffold: {
 }
 ```
 
+The application crate gives every command, query, state, view and service its
+own module directory rather than one flat file:
+
+```
+crates/shop-app/src/
+  lib.rs                 # module tree
+  context.rs             # re-exports the generated ExecutionContext
+  error.rs               # AppError (the generated ApiError)
+  state.rs               # AppState shared by every handler
+  register.rs            # registers every handler on the generated Api
+  commands/sales/place_order/
+    mod.rs               # wiring + re-exports
+    command.rs           # re-exports the generated request/response types
+    handler.rs           # PlaceOrderUseCase (the todo!() you fill in)
+  queries/... views/... states/... services/...   # same shape
+```
+
+Each directory re-exports the pieces the contract crate already generates (the
+request/response structs, the handler trait, the projection type), so the
+scaffold stays adapted to the core instead of duplicating it. Only the
+implementation file is a `todo!()`.
+
 Every scaffold file is **create-only**. `em-codegen gen` writes each one only
 when it is missing, then the project owns it: existing files are never
 overwritten and never reported as drift. This covers the workspace and crate
-manifests, `lib.rs`, `mod.rs`, the `register` glue, one `todo!()` stub per
-command and query, a reducer stub per state/view, a service stub, `AppState`,
-`AppError` and the server `main`. Adding a command to the spec creates its stub
-but leaves already-written files alone.
+manifests, `lib.rs`, every `mod.rs`, the `register` glue, one `todo!()` stub per
+use case, a reducer stub per state/view, a service stub, `AppState`, `AppError`
+and the server `main`. Adding a command to the spec creates its files but leaves
+already-written ones alone.
 
 The application crate's `register` lists every command and query, so a route can
 never silently answer `500` because its handler was forgotten:

@@ -1,17 +1,27 @@
-//! Application crate: implementations of the generated domain traits.
+//! Application crate: implementations of the generated domain contracts.
 //!
-//! Every `todo!()` here is a stub the generator created once. Fill it in; the
-//! generator will not overwrite it. Structural files (`lib.rs`, `mod.rs`, the
-//! handler registry) are regenerated from the spec.
+//! One module directory per command, query, state, view and service. Each
+//! directory re-exports the generated request/response or projection types and
+//! holds the implementation the generator created once. Fill in the `todo!()`
+//! stubs; the generator never overwrites these files.
 
+{% if hasCommands %}pub mod commands;
+{% endif -%}
+{% if hasQueries %}pub mod queries;
+{% endif -%}
+{% if hasViews %}pub mod views;
+{% endif -%}
+{% if hasStates %}pub mod states;
+{% endif -%}
+{% if hasServices %}pub mod services;
+{% endif -%}
+pub mod context;
 pub mod error;
 pub mod state;
 {% if crate.api %}pub mod register;
 
 {% endif -%}
-{% for domain in domains -%}
-pub mod {{ domain.module }};
-{% endfor %}
+pub use context::ExecutionContext;
 pub use error::AppError;
 pub use state::AppState;
 {% if crate.api %}pub use register::register;

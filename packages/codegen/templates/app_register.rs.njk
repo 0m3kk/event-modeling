@@ -1,6 +1,6 @@
 use {{ crate.name }}::apis::Api;
 {% for handler in handlers -%}
-use crate::{{ handler.modulePath | join("::") }}::{{ handler.useCaseName }};
+use crate::{{ handler.appPath }}::{{ handler.useCaseType }};
 {% endfor -%}
 use crate::{AppError, AppState};
 
@@ -11,6 +11,6 @@ use crate::{AppError, AppState};
 pub fn register(api: Api<AppError>, state: AppState) -> Api<AppError> {
     api
 {% for handler in handlers -%}
-        .with_{{ handler.method }}({{ handler.useCaseName }}::new(state.clone()))
+        .with_{{ handler.method }}({{ handler.useCaseType }}::new(state.clone()))
 {% endfor -%}
 }

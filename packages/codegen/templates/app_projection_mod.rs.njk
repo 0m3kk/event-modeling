@@ -1,0 +1,7 @@
+//! `{{ item.rustName }}` {{ item.typeFile }}.
+
+mod handler;
+mod {{ item.typeFile }};
+
+pub use handler::{{ item.implType }};
+pub use {{ item.typeFile }}::{{ item.rustName }};

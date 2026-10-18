@@ -1,0 +1,6 @@
+//! Execution context threaded through command and query handlers.
+//!
+//! The generated domain crate owns [`ExecutionContext`]; the application crate
+//! re-exports it so handlers can import it from `crate::context`.
+
+pub use {{ crate.name }}::ExecutionContext;

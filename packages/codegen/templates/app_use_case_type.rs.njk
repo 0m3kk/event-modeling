@@ -1,0 +1,6 @@
+//! Request and response types for the `{{ item.rustName }}` {{ item.typeFile }}.
+//!
+//! Generated in the domain crate; re-exported here so the use case reads as a
+//! self-contained module. The types are fixed and never edited by hand.
+
+pub use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ "{" }}{{ item.rustName }}{% if item.responseType %}, {{ item.responseType }}{% endif %}{{ "}" }};
