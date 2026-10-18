@@ -54,7 +54,7 @@ describe("run", () => {
     expect(Object.keys(manifest.files)).toContain("Cargo.toml");
   });
 
-  it("stamps every generated file with a do-not-edit banner", async () => {
+  it("stamps every managed file with a do-not-edit banner", async () => {
     await run({ cwd: dir, rustfmt: false });
 
     // Rust files use `//`, no matter what the template starts with.
@@ -1109,6 +1109,17 @@ describe("run", () => {
     const stub = await readFromRoot("crates/shop-app/src/sales/commands/place_order.rs");
     expect(stub).toContain("impl PlaceOrderHandler for PlaceOrderUseCase {");
     expect(stub).toContain('todo!("implement PlaceOrder")');
+
+    // Create-only scaffold files are hand-editable, so they must not claim to
+    // be do-not-edit generated files.
+    expect(stub).toContain("Scaffolded by @em/codegen. This file is yours to edit.");
+    expect(stub).not.toContain("Do not edit by hand");
+    const scaffoldCargo = await readFromRoot("crates/shop-app/Cargo.toml");
+    expect(scaffoldCargo).toContain("# Scaffolded by @em/codegen");
+    expect(scaffoldCargo).not.toContain("Do not edit by hand");
+
+    // The contract crate stays managed and keeps the do-not-edit banner.
+    expect(await readFromRoot("crates/shop/src/lib.rs")).toContain("Do not edit by hand");
   });
 
   it("writes scaffold files once and never overwrites them", async () => {

@@ -103,15 +103,16 @@ export async function run(options: RunOptions): Promise<RunResult> {
   for (const job of jobs) {
     const base = job.base ?? "out";
     const outPath = job.outPath.split(path.sep).join("/");
+    const ownership = job.ownership ?? "managed";
     let content = renderEnv.render(job.template, job.context);
     if (!content.endsWith("\n")) content += "\n";
-    content = withBanner(outPath, content);
+    content = withBanner(outPath, content, ownership);
     const key = fileKey(base, outPath);
     byKey.set(key, {
       path: outPath,
       content,
       base,
-      ownership: job.ownership ?? "managed",
+      ownership,
     });
   }
 
