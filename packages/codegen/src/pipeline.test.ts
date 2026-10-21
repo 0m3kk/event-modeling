@@ -26,6 +26,39 @@ const SPEC = [
 
 const CONFIG = `export default { spec: "board.spec.yaml", out: "crates/shop" };\n`;
 
+// A spec with one View, so the projection worker has something to project.
+const VIEW_SPEC = [
+  "name: Shop",
+  "domains:",
+  "  - name: Shipping",
+  "    cards: [OrderShipped, OrderShippingView]",
+  "events:",
+  "  - name: OrderShipped",
+  "    fields:",
+  "      - name: orderId",
+  "        type: string",
+  "        required: true",
+  "        tag: order",
+  "views:",
+  "  - name: OrderShippingView",
+  "    params:",
+  "      - name: orderId",
+  "        type: string",
+  "    query:",
+  "      - types: [OrderShipped]",
+  "        tags:",
+  "          - tag: order",
+  "            field: orderId",
+  "    states:",
+  "      - name: shippedAt",
+  "        type: string",
+  "tags:",
+  "  - tag: order",
+  "    types: [string]",
+  "    fromEvents: [OrderShipped]",
+  "",
+].join("\n");
+
 let dir: string;
 
 beforeEach(async () => {
@@ -1199,5 +1232,150 @@ describe("run", () => {
     // Create-only scaffold files are never reported as drift.
     const check = await run({ cwd: dir, rustfmt: false, check: true });
     expect(check.drifted).not.toContain("@root/Cargo.toml");
+  });
+
+  it("scaffolds a standalone projection worker for the View read models", async () => {
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), VIEW_SPEC, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `generators: { views: true }, scaffold: { enabled: true, worker: true } };\n`,
+      "utf8",
+    );
+
+    const result = await run({ cwd: dir, rustfmt: false });
+    const paths = result.files.map((file) => file.path);
+    expect(paths).toContain("crates/shop-worker/Cargo.toml");
+    expect(paths).toContain("crates/shop-worker/src/main.rs");
+    expect(paths).toContain("crates/shop-worker/src/worker/mod.rs");
+    expect(paths).toContain("crates/shop-worker/src/worker/leader.rs");
+    expect(paths).toContain("crates/shop-worker/README.md");
+    expect(paths).toContain("crates/shop-app/src/projections/mod.rs");
+    expect(paths).toContain(
+      "crates/shop-app/src/views/shipping/order_shipping_view/projection.rs",
+    );
+
+    const workspace = await readFromRoot("Cargo.toml");
+    expect(workspace).toContain('"crates/shop-worker"');
+
+    const registry = await readFromRoot("crates/shop-app/src/projections/mod.rs");
+    expect(registry).toContain("pub struct ProjectionRegistry<E, S = ()>");
+    expect(registry).toContain(
+      "crate::views::shipping::order_shipping_view::catchup(&self.state)",
+    );
+
+    const driver = await readFromRoot(
+      "crates/shop-app/src/views/shipping/order_shipping_view/projection.rs",
+    );
+    expect(driver).toContain("pub async fn catchup<E, S>");
+    expect(driver).toContain('todo!("project OrderShippingView")');
+
+    const viewMod = await readFromRoot(
+      "crates/shop-app/src/views/shipping/order_shipping_view/mod.rs",
+    );
+    expect(viewMod).toContain("mod projection;");
+    expect(viewMod).toContain("pub use projection::catchup;");
+
+    const appLib = await readFromRoot("crates/shop-app/src/lib.rs");
+    expect(appLib).toContain("pub mod projections;");
+    expect(appLib).toContain("pub use projections::ProjectionRegistry;");
+
+    const loop = await readFromRoot("crates/shop-worker/src/worker/mod.rs");
+    expect(loop).toContain("use shop_app::ProjectionRegistry;");
+    expect(loop).toContain("self.registry.catchup_all().await");
+    expect(loop).toContain("PgListener::connect_with");
+
+    const leader = await readFromRoot("crates/shop-worker/src/worker/leader.rs");
+    expect(leader).toContain("pg_try_advisory_lock");
+    expect(leader).toContain("pg_advisory_unlock");
+
+    const workerCargo = await readFromRoot("crates/shop-worker/Cargo.toml");
+    expect(workerCargo).toContain('shop-app = { path = "../shop-app" }');
+    expect(workerCargo).toContain('shop = { path = "../shop" }');
+    expect(workerCargo).toContain("sqlx");
+  });
+
+  it("folds the projection worker into the server with package: server", async () => {
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), VIEW_SPEC, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `generators: { views: true, api: true }, ` +
+        `scaffold: { enabled: true, worker: { package: "server" } } };\n`,
+      "utf8",
+    );
+
+    const result = await run({ cwd: dir, rustfmt: false });
+    const paths = result.files.map((file) => file.path);
+    expect(paths).not.toContain("crates/shop-worker/Cargo.toml");
+    expect(paths).toContain("crates/shop-server/src/worker/mod.rs");
+    expect(paths).toContain("crates/shop-server/src/worker/leader.rs");
+    expect(paths).toContain("crates/shop-app/src/projections/mod.rs");
+
+    const workspace = await readFromRoot("Cargo.toml");
+    expect(workspace).not.toContain("shop-worker");
+
+    const serverMain = await readFromRoot("crates/shop-server/src/main.rs");
+    expect(serverMain).toContain("mod worker;");
+    expect(serverMain).toContain("spawn_projection_worker(&config, &secret, state.clone())");
+    expect(serverMain).toContain("shop_app::ProjectionRegistry::new(state)");
+    expect(serverMain).toContain("tokio::signal::ctrl_c()");
+
+    const serverCargo = await readFromRoot("crates/shop-server/Cargo.toml");
+    expect(serverCargo).toContain("sqlx");
+    expect(serverCargo).toContain("thiserror");
+    expect(serverCargo).toContain('"signal"');
+  });
+
+  it("renders the configured worker options into the worker crate", async () => {
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), VIEW_SPEC, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `generators: { views: true }, scaffold: { enabled: true, worker: { ` +
+        `crate: "shop-projector", intervalMs: 1500, debounceMs: 0, ` +
+        `channel: "orders_appended", leaderLockId: 42 } } };\n`,
+      "utf8",
+    );
+
+    const result = await run({ cwd: dir, rustfmt: false });
+    expect(result.files.map((file) => file.path)).toContain(
+      "crates/shop-projector/src/worker/mod.rs",
+    );
+
+    const loop = await readFromRoot("crates/shop-projector/src/worker/mod.rs");
+    expect(loop).toContain("1500");
+    expect(loop).toContain("0\n}"); // debounce default
+    expect(loop).toContain('"orders_appended"');
+    expect(loop).toContain("42");
+
+    const workspace = await readFromRoot("Cargo.toml");
+    expect(workspace).toContain('"crates/shop-projector"');
+  });
+
+  it("skips the worker when disabled or when the spec has no View", async () => {
+    // A spec with a View but no `worker` config: nothing is emitted.
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), VIEW_SPEC, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `generators: { views: true }, scaffold: { enabled: true } };\n`,
+      "utf8",
+    );
+    let result = await run({ cwd: dir, rustfmt: false });
+    expect(result.files.some((file) => file.path.includes("shop-worker"))).toBe(false);
+    expect(await readFromRoot("crates/shop-app/src/lib.rs")).not.toContain("projections");
+
+    // Worker enabled but the (default) spec declares no View: still nothing.
+    await fs.writeFile(path.join(dir, "board.spec.yaml"), SPEC, "utf8");
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `generators: { api: true }, scaffold: { enabled: true, worker: true } };\n`,
+      "utf8",
+    );
+    result = await run({ cwd: dir, rustfmt: false });
+    expect(result.files.some((file) => file.path.includes("shop-worker"))).toBe(false);
+    expect(await readFromRoot("crates/shop-app/src/lib.rs")).not.toContain("projections");
   });
 });

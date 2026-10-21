@@ -1,0 +1,39 @@
+//! Projection registry the worker drives.
+//!
+//! Every View the spec declares has a `catchup` driver next to its reducer; the
+//! registry calls them in turn. Generated once; edit freely.
+
+use crate::{AppError, AppState};
+
+/// The set of read-model projections the worker catches up.
+pub struct ProjectionRegistry<E, S = ()> {
+    state: AppState<E, S>,
+}
+
+impl<E, S> ProjectionRegistry<E, S>
+where
+    E: Send + Sync + 'static,
+    S: Send + Sync + 'static,
+{
+    /// Create a registry over the shared application state.
+    pub fn new(state: AppState<E, S>) -> Self {
+        Self { state }
+    }
+
+    /// The shared application state the projections read from.
+    pub fn state(&self) -> &AppState<E, S> {
+        &self.state
+    }
+
+    /// Catch up every managed read model.
+    ///
+    /// Returns the total number of events projected. A failing view stops the
+    /// pass; the worker logs the error and retries on the next tick.
+    pub async fn catchup_all(&self) -> Result<u64, AppError> {
+        let mut total = 0u64;
+{% for view in projectionViews -%}
+        total += crate::views::{{ view.domain }}::{{ view.fileName }}::catchup(&self.state).await?;
+{% endfor -%}
+        Ok(total)
+    }
+}

@@ -1,0 +1,30 @@
+# {{ workerCrate }}
+
+Background projection worker for the `{{ crate.name }}` event-sourced read models.
+
+## Overview
+
+The worker continuously updates the View read models by listening to PostgreSQL
+`LISTEN`/`NOTIFY` events, with a periodic polling fallback ticker so a dropped
+notification is never lost.
+
+## Architecture
+
+- **Primary driver**: PostgreSQL `LISTEN events_appended` for near zero-latency sync.
+- **Polling fallback**: a configurable ticker (default 5s) catches up if a notification is dropped.
+- **Notification debounce**: coalesces bursts within a configurable window (default 50ms).
+- **Leader election**: active-passive coordination through a PostgreSQL advisory lock, so extra replicas stand by.
+
+## Running
+
+```bash
+# From the workspace root.
+cargo run -p {{ workerCrate }}
+```
+
+Configuration is read from `CONFIG_FILE` / `SECRET_FILE` (or the
+`config.yaml` / `secrets.yaml` copies in the workspace root), with
+`DATABASE_URL` overriding the connection settings. The runtime options live
+under the `worker` key and default to sane values. Every `catchup` driver the
+worker calls is a stub next to the View reducer in the `{{ appCrate }}` crate:
+implement `crate::views::<domain>::<view>::catchup` to project each View.

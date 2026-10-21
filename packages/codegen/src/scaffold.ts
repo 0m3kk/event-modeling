@@ -55,6 +55,10 @@ export default defineConfig({
     enabled: true,
     // app: { crate: "domain-app" },
     // server: { crate: "domain-server" },
+    // Catch up the View read models with a projection worker. Emitted only
+    // when the spec declares a View; \`package: "server"\` folds it into the
+    // server crate instead of a standalone one.
+    // worker: { package: "separate" },
     // templates: true,
   },
 });

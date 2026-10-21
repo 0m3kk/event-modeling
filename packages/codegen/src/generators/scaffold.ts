@@ -4,6 +4,8 @@
  * When `config.scaffold.enabled` is set, this generator emits a Cargo
  * workspace: a workspace `Cargo.toml`, an application crate (the command,
  * query, state, view and service implementations) and a server binary crate.
+ * With `config.scaffold.worker` it also emits a projection worker — either a
+ * standalone binary crate or a background task inside the server.
  *
  * The layout follows the generated application style: each command and query
  * is a self-contained module directory (`commands/<domain>/<use_case>/`) with
@@ -18,7 +20,7 @@
  * generator never overwrites or reports them.
  */
 import path from "node:path";
-import type { CodegenConfig, DepSpec, ScaffoldCrateConfig } from "../config";
+import type { CodegenConfig, DepSpec, ScaffoldCrateConfig, WorkerScaffoldConfig } from "../config";
 import { EVENT_STORE_GIT, artifactDomain } from "../ir/build";
 import type { IrArtifact, IrCrate, IrEventRef, IrMethod } from "../ir/types";
 import { planRoutes, resolveApiOptions } from "./api";
@@ -42,6 +44,15 @@ const SERVER_DEFAULT_DEPS: DepSpec[] = [
   { name: "url", version: "2" },
 ];
 
+/** Infrastructure dependencies a standalone worker crate needs, merged into `worker.deps`. */
+const WORKER_DEFAULT_DEPS: DepSpec[] = [
+  { name: "event-store", git: EVENT_STORE_GIT },
+  { name: "postgres-db", git: EVENT_STORE_GIT },
+  { name: "snapshot-store", git: EVENT_STORE_GIT },
+  { name: "telemetry", git: EVENT_STORE_GIT },
+  { name: "url", version: "2" },
+];
+
 /** Merges `defaults` under `userDeps`; a dependency the user names wins. */
 function mergeDeps(userDeps: DepSpec[], defaults: DepSpec[]): DepSpec[] {
   const byName = new Map(userDeps.map((dep) => [dep.name, dep]));
@@ -49,6 +60,14 @@ function mergeDeps(userDeps: DepSpec[], defaults: DepSpec[]): DepSpec[] {
     if (!byName.has(dep.name)) byName.set(dep.name, dep);
   }
   return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Runtime defaults baked into the generated worker's `WorkerOptions`. */
+interface WorkerSettings {
+  intervalMs: number;
+  debounceMs: number;
+  channel: string;
+  leaderLockId: number;
 }
 
 /** Resolved scaffold options. */
@@ -62,6 +81,11 @@ interface ScaffoldOptions {
   serverCrate: string;
   appDeps: DepSpec[];
   serverDeps: DepSpec[];
+  worker: boolean;
+  workerPackage: "separate" | "server";
+  workerCrate: string;
+  workerDeps: DepSpec[];
+  workerOptions: WorkerSettings;
 }
 
 /** Resolves the scaffold options from the config, or `undefined` when off. */
@@ -71,10 +95,14 @@ function resolveScaffold(config: CodegenConfig, crate: IrCrate): ScaffoldOptions
 
   const app = setting.app;
   const server = setting.server;
+  const worker = setting.worker;
   const appOn = app === undefined ? true : app !== false;
   const serverOn = server === undefined ? true : server !== false;
   const appOptions: ScaffoldCrateConfig = typeof app === "object" ? app : {};
   const serverOptions: ScaffoldCrateConfig = typeof server === "object" ? server : {};
+  const workerOptions: WorkerScaffoldConfig =
+    typeof worker === "object" && worker !== null ? worker : {};
+  const workerOn = worker !== undefined && worker !== false && workerOptions.enabled !== false;
 
   return {
     workspace: setting.workspace !== false,
@@ -86,6 +114,16 @@ function resolveScaffold(config: CodegenConfig, crate: IrCrate): ScaffoldOptions
     serverCrate: serverOptions.crate?.trim() || `${crate.name}-server`,
     appDeps: appOptions.deps ?? [],
     serverDeps: serverOptions.deps ?? [],
+    worker: workerOn,
+    workerPackage: workerOptions.package === "server" ? "server" : "separate",
+    workerCrate: workerOptions.crate?.trim() || `${crate.name}-worker`,
+    workerDeps: workerOptions.deps ?? [],
+    workerOptions: {
+      intervalMs: workerOptions.intervalMs ?? 5000,
+      debounceMs: workerOptions.debounceMs ?? 50,
+      channel: workerOptions.channel?.trim() || "events_appended",
+      leaderLockId: workerOptions.leaderLockId ?? 987654321,
+    },
   };
 }
 
@@ -307,6 +345,29 @@ export const scaffoldGenerator: Generator = {
     const hasGroup = (group: keyof AppDomain) =>
       domains.some((entry) => (entry[group] as unknown[]).length > 0);
 
+    const hasViews = hasGroup("views");
+    // The worker projects the View read models, so it needs at least one view,
+    // the application crate that holds the projection registry, and — when it
+    // is folded into the server rather than standalone — the server crate too.
+    const workerActive =
+      options.worker &&
+      hasViews &&
+      options.app &&
+      (options.workerPackage === "separate" || options.server);
+    const workerDir = `crates/${options.workerCrate}`;
+    const workerCratePath = options.workerCrate.replace(/-/g, "_");
+    if (workerActive && options.workerPackage === "separate") workspaceMembers.push(workerDir);
+
+    // One entry per View, used to generate the projection registry and the
+    // per-view catch-up driver.
+    const projectionViews = domains.flatMap((entry) =>
+      entry.views.map((view) => ({
+        domain: entry.module,
+        fileName: view.fileName,
+        rustName: view.rustName,
+      })),
+    );
+
     const context = {
       crate,
       domains,
@@ -328,9 +389,21 @@ export const scaffoldGenerator: Generator = {
       workspaceMembers,
       hasCommands: hasGroup("commands"),
       hasQueries: hasGroup("queries"),
-      hasViews: hasGroup("views"),
+      hasViews,
       hasStates: hasGroup("states"),
       hasServices: hasGroup("services"),
+      worker: workerActive,
+      workerPackage: options.workerPackage,
+      workerCrate: options.workerCrate,
+      workerCratePath,
+      workerDeps: mergeDeps(options.workerDeps, WORKER_DEFAULT_DEPS).map(depLine),
+      workerIntervalMs: options.workerOptions.intervalMs,
+      workerDebounceMs: options.workerOptions.debounceMs,
+      workerChannel: options.workerOptions.channel,
+      workerLeaderLockId: options.workerOptions.leaderLockId,
+      projectionViews,
+      baseFromWorker: relative(workerDir, baseDir),
+      appFromWorker: relative(workerDir, appDir),
     };
 
     const jobs: RenderJob[] = [];
@@ -369,6 +442,7 @@ export const scaffoldGenerator: Generator = {
       app("app_state.rs.njk", "src/state.rs");
       app("app_context.rs.njk", "src/context.rs");
       if (crate.api) app("app_register.rs.njk", "src/register.rs");
+      if (workerActive) app("app_projections_mod.rs.njk", "src/projections/mod.rs");
 
       // `commands/mod.rs`, `queries/mod.rs`, ... list the domain modules.
       const groups: Array<{ key: keyof AppDomain; dir: string }> = [
@@ -410,6 +484,28 @@ export const scaffoldGenerator: Generator = {
       server("server_main.rs.njk", "src/main.rs");
     }
 
+    // A standalone worker crate. With `worker.package: "server"` the worker is
+    // emitted into the server crate instead (see `server_main.rs.njk` and
+    // `worker_mod.rs.njk`).
+    if (workerActive && options.workerPackage === "separate") {
+      const worker = (template: string, outPath: string) =>
+        emit(template, `${workerDir}/${outPath}`);
+      worker("worker_cargo.toml.njk", "Cargo.toml");
+      worker("worker_lib.rs.njk", "src/lib.rs");
+      worker("worker_config.rs.njk", "src/config.rs");
+      worker("worker_main.rs.njk", "src/main.rs");
+      worker("worker_mod.rs.njk", "src/worker/mod.rs");
+      worker("worker_leader.rs.njk", "src/worker/leader.rs");
+      worker("worker_readme.md.njk", "README.md");
+    }
+
+    // With `package: "server"` the worker loop lives in the server crate and
+    // `main.rs` spawns it as a background task.
+    if (workerActive && options.workerPackage === "server") {
+      server("worker_mod.rs.njk", "src/worker/mod.rs");
+      server("worker_leader.rs.njk", "src/worker/leader.rs");
+    }
+
     return jobs;
 
     /** The `{ fileName, exports }` an item contributes to its domain `mod.rs`. */
@@ -445,6 +541,9 @@ export const scaffoldGenerator: Generator = {
             item: projection,
           });
           app("app_projection_handler.rs.njk", `${base}/handler.rs`, { item: projection });
+          if (workerActive && projection.typeFile === "view") {
+            app("app_view_projection.rs.njk", `${base}/projection.rs`, { item: projection });
+          }
         } else {
           const service = item as ServiceItem;
           app("app_service_mod.rs.njk", `${base}/mod.rs`, { item: service });

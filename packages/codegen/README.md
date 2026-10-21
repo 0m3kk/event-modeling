@@ -516,6 +516,7 @@ scaffold: {
   workspace: true,                 // workspace Cargo.toml + rust-toolchain + .gitignore
   app: { crate: "shop-app" },      // defaults to "<crate>-app"
   server: { crate: "shop-server" },// defaults to "<crate>-server"
+  worker: true,                    // projection worker; defaults to off
   templates: true,                 // eject the templates into templatesDir
   stubs: "todo",                   // "todo" (default) or "unimplemented"
 }
@@ -588,9 +589,9 @@ Every scaffold file is **create-only**. `em-codegen gen` writes each one only
 when it is missing, then the project owns it: existing files are never
 overwritten and never reported as drift. This covers the workspace and crate
 manifests, `lib.rs`, every `mod.rs`, the `register` glue, one `todo!()` stub per
-use case, a reducer stub per state/view, a service stub, `AppState`, `AppError`
-and the server `main`. Adding a command to the spec creates its files but leaves
-already-written ones alone.
+use case, a reducer stub per state/view, a service stub, `AppState`, `AppError`,
+the server `main`, and the projection worker (when enabled). Adding a command
+to the spec creates its files but leaves already-written ones alone.
 
 The application crate's `register` lists every command and query, so a route can
 never silently answer `500` because its handler was forgotten:
@@ -608,6 +609,59 @@ Run `em-codegen gen` with `scaffold.enabled` to write the workspace. The
 contract crate (the `out` directory) is still manifest-managed, so
 `em-codegen gen --check` in CI catches drift there; scaffold files are skipped
 by the check because the project owns them.
+
+### Projection worker
+
+Set `scaffold.worker` to also scaffold a **projection worker** that keeps the
+View read models up to date. It mirrors the backend service: a PostgreSQL
+`LISTEN`/`NOTIFY` subscription for near real-time sync, a periodic polling
+fallback ticker, a debounce window that coalesces notification bursts, and
+active-passive leader election through an advisory lock (only one replica
+projects at a time).
+
+The worker is emitted **only when the spec declares at least one View** — it has
+nothing to project otherwise. It builds on the application crate, which gains a
+`projections` module:
+
+- `src/projections/mod.rs` — `ProjectionRegistry<E, S>`, a generated list of the
+  view catch-up drivers; `catchup_all()` calls them in turn.
+- `src/views/<domain>/<view>/projection.rs` — one `catchup<E, S>(state)` stub per
+  View. It is a `todo!()` you fill in (load the read model with
+  `<View>::load`, persist it idempotently, return the projected event count).
+  The registry calls it on every tick and notification.
+
+```ts
+scaffold: {
+  enabled: true,
+  worker: true,                       // or an options object
+  // worker: { package: "server" },
+  // worker: { crate: "shop-worker", intervalMs: 5000, debounceMs: 50 },
+}
+```
+
+`worker` accepts these options:
+
+| Option | Meaning |
+| --- | --- |
+| `enabled` | Turn the worker on/off (it is off unless `worker` is set). |
+| `package` | `"separate"` (default) emits a standalone `crates/<spec>-worker` binary crate; `"server"` folds the worker into the server crate as a background task. |
+| `crate` | Worker crate name for `package: "separate"`. Defaults to `<spec>-worker`. |
+| `deps` | Extra dependencies merged into the worker crate's `Cargo.toml`. |
+| `intervalMs` | Polling fallback ticker, baked into the generated defaults. Defaults to `5000`. |
+| `debounceMs` | Notification debounce window (`0` disables). Defaults to `50`. |
+| `channel` | PostgreSQL NOTIFY channel. Defaults to `"events_appended"`. |
+| `leaderLockId` | Advisory lock id for leader election (`0` disables). Defaults to `987654321`. |
+
+With `package: "separate"` the workspace gains a `crates/<spec>-worker` crate
+(`config.rs`, `lib.rs`, `src/worker/` and a `main`) with its own
+`WorkerConfig`/`WorkerSecret` and `event-store`, `postgres-db`,
+`snapshot-store`, `telemetry` and `sqlx` dependencies. Run it with
+`cargo run -p <spec>-worker`.
+
+With `package: "server"` no extra crate is emitted; the server crate gains
+`src/worker/` and its `main` spawns the worker as a background task alongside
+the HTTP server (it builds its own pool, so one process serves the API and
+projects the views).
 
 ## Config reference
 
@@ -634,7 +688,7 @@ export default defineConfig({
     api: { prefix: "/api" },       // axum transport + OpenAPI; false by default
     // every generator can take an options object instead of a boolean
   },
-  scaffold: { enabled: true },      // Cargo workspace + app/server crates
+  scaffold: { enabled: true, worker: true }, // Cargo workspace + app/server crates (+ a worker)
   templatesDir: ".codegen/templates",
   rustfmt: true,
   filters: { shout: (s) => String(s).toUpperCase() },

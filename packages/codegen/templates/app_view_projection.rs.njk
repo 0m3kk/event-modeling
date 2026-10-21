@@ -1,0 +1,19 @@
+//! `{{ item.rustName }}` projection driver.
+//!
+//! Generated once; edit freely — the generator will not overwrite this file.
+//!
+//! Load the read model with `{{ item.rustName }}::load`, persist the result and
+//! return how many events were projected. Keep the write idempotent: the worker
+//! may re-run a catch-up after a crash or a dropped notification.
+
+use crate::{AppError, AppState};
+
+/// Catch up the `{{ item.rustName }}` read model from the event store.
+pub async fn catchup<E, S>(state: &AppState<E, S>) -> Result<u64, AppError>
+where
+    E: Send + Sync + 'static,
+    S: Send + Sync + 'static,
+{
+    let _ = state;
+    {{ stubs }}!("project {{ item.rustName }}")
+}

@@ -1,0 +1,18 @@
+[package]
+name = "{{ workerCrate }}"
+version = "{{ crate.version }}"
+edition = "{{ crate.edition }}"
+
+[dependencies]
+{{ appCrate }} = { path = "{{ appFromWorker }}" }
+{{ crate.name }} = { path = "{{ baseFromWorker }}" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres"] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time"] }
+tracing = "0.1"
+{% for dep in workerDeps -%}
+{{ dep }}
+{% endfor -%}

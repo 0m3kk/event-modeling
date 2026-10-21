@@ -65,6 +65,38 @@ export interface ScaffoldCrateConfig {
 }
 
 /**
+ * Options for the projection worker the scaffold can emit.
+ *
+ * The worker catches up the generated View read models: it subscribes to a
+ * PostgreSQL `LISTEN` channel, keeps a periodic polling fallback ticker, and
+ * elects a single active replica through an advisory lock. It is only emitted
+ * when the spec declares at least one View and the application crate exists.
+ */
+export interface WorkerScaffoldConfig {
+  /** Turn the worker on/off. Defaults to on when `worker` is set to `true` or an object. */
+  enabled?: boolean;
+  /**
+   * Where the worker runs:
+   *  - `"separate"` (default) emits its own binary crate (`crates/<spec>-worker`);
+   *  - `"server"` starts it as a background task inside the server crate's
+   *    `main`, so one process serves the API and projects the views.
+   */
+  package?: "separate" | "server";
+  /** Worker crate name; `package: "separate"` only. Defaults to `<spec>-worker`. */
+  crate?: string;
+  /** Extra dependencies merged into the worker crate's `Cargo.toml`. */
+  deps?: DepSpec[];
+  /** Periodic catch-up ticker interval in milliseconds. Defaults to `5000`. */
+  intervalMs?: number;
+  /** NOTIFY debounce window in milliseconds. Defaults to `50`. */
+  debounceMs?: number;
+  /** PostgreSQL NOTIFY channel to listen on. Defaults to `"events_appended"`. */
+  channel?: string;
+  /** Advisory lock id for leader election across replicas (0 disables). Defaults to `987654321`. */
+  leaderLockId?: number;
+}
+
+/**
  * Options for the repository scaffold.
  *
  * When enabled, `em-codegen gen` also emits a Cargo workspace around the
@@ -81,6 +113,12 @@ export interface ScaffoldConfig {
   app?: boolean | ScaffoldCrateConfig;
   /** Emit the server binary crate; an object overrides its name and deps. */
   server?: boolean | ScaffoldCrateConfig;
+  /**
+   * Emit a projection worker that catches up the View read models. Emitted only
+   * when the spec has at least one View; `package: "server"` folds it into the
+   * server crate instead of a standalone one.
+   */
+  worker?: boolean | WorkerScaffoldConfig;
   /** Eject the built-in templates into `templatesDir` so they can be edited. */
   templates?: boolean;
   /** Body of an unimplemented stub: `"todo"` (default) or `"unimplemented"`. */

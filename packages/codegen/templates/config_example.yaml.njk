@@ -45,4 +45,12 @@ postgres:
   idle_timeout_secs: 600
   max_lifetime_secs: 1800
 # `DATABASE_URL` overrides the host, port, database and credentials above.
+{% if worker %}
+# Projection worker options (read by `crates/{{ workerCrate }}` when standalone).
+worker:
+  interval_ms: {{ workerIntervalMs }}      # polling fallback interval
+  debounce_ms: {{ workerDebounceMs }}        # NOTIFY debounce window (0 disables)
+  channel: {{ workerChannel }}       # PostgreSQL NOTIFY channel
+  leader_lock_id: {{ workerLeaderLockId }} # advisory lock id (0 disables leader election)
+{% endif %}
 

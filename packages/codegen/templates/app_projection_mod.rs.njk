@@ -1,7 +1,9 @@
 //! `{{ item.rustName }}` {{ item.typeFile }}.
 
 mod handler;
-mod {{ item.typeFile }};
+mod {{ item.typeFile }};{% if worker and item.typeFile == "view" %}
+mod projection;{% endif %}
 
-pub use handler::{{ item.implType }};
+pub use handler::{{ item.implType }};{% if worker and item.typeFile == "view" %}
+pub use projection::catchup;{% endif %}
 pub use {{ item.typeFile }}::{{ item.rustName }};

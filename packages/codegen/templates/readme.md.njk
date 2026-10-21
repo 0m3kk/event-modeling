@@ -10,7 +10,10 @@ Backend generated from `board.spec.yaml` by `@em/codegen`.
   edit by hand.
 - `crates/{{ appCrate }}/` — **application crate**: implementations of the
   generated traits. Generated once, then owned by you.
-- `crates/{{ serverCrate }}/` — **server binary**: wiring (event store, router).
+- `crates/{{ serverCrate }}/` — **server binary**: wiring (event store, router).{% if worker and workerPackage == "server" %}
+  It also starts the **projection worker** as a background task.{% endif %}{% if worker and workerPackage == "separate" %}
+- `crates/{{ workerCrate }}/` — **projection worker**: catches up the View read
+  models over `LISTEN`/`NOTIFY` with a polling fallback and leader election.{% endif %}
 
 ## Workflow
 
@@ -18,7 +21,9 @@ Backend generated from `board.spec.yaml` by `@em/codegen`.
 2. `em-codegen gen` — regenerate the contract crate and any missing
    implementation stubs.
 3. Implement the `todo!()` bodies in `crates/{{ appCrate }}/`.
-4. `cargo run -p {{ serverCrate }}`.
+4. `cargo run -p {{ serverCrate }}`.{% if worker %}
+5. {% if workerPackage == "separate" %}Run `cargo run -p {{ workerCrate }}` to
+   project the Views.{% else %}The server projects the Views in the background.{% endif %}{% endif %}
 
 `em-codegen gen --check` fails when a managed (regenerated) file is out of date.
 Implementation files are never overwritten once created.

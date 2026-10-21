@@ -1,0 +1,9 @@
+//! Background projection worker service.
+//!
+//! Generated once; edit freely.
+
+mod config;
+pub mod worker;
+
+pub use config::{WorkerConfig, WorkerSecret};
+pub use worker::{Worker, WorkerError, WorkerOptions};

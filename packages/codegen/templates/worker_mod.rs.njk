@@ -1,0 +1,273 @@
+//! Background projection worker.
+//!
+//! Catches up the generated View read models: it subscribes to a PostgreSQL
+//! `LISTEN` channel for near real-time sync, keeps a periodic polling fallback
+//! ticker, debounces notification bursts, and elects a single active replica
+//! across instances with a PostgreSQL advisory lock.
+//!
+//! Generated once; edit freely.
+
+mod leader;
+
+use std::collections::HashSet;
+use std::pin::Pin;
+use std::time::Duration;
+
+use {{ appCratePath }}::ProjectionRegistry;
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use sqlx::postgres::PgListener;
+use thiserror::Error;
+use tokio::sync::watch;
+use tokio::time::{Sleep, interval, sleep};
+
+use leader::LeaderGuard;
+
+/// Errors that can occur in the projection worker.
+#[derive(Debug, Error)]
+pub enum WorkerError {
+    /// Underlying database error.
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
+}
+
+/// Runtime options for the projection worker.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkerOptions {
+    /// Periodic catch-up ticker interval in milliseconds.
+    #[serde(default = "default_interval_ms")]
+    pub interval_ms: u64,
+
+    /// Notification debounce window in milliseconds (0 disables debouncing).
+    #[serde(default = "default_debounce_ms")]
+    pub debounce_ms: u64,
+
+    /// PostgreSQL NOTIFY channel to listen on.
+    #[serde(default = "default_channel")]
+    pub channel: String,
+
+    /// Advisory lock id for active-passive leader election (0 disables it).
+    #[serde(default = "default_leader_lock_id")]
+    pub leader_lock_id: i64,
+}
+
+fn default_interval_ms() -> u64 {
+    {{ workerIntervalMs }}
+}
+
+fn default_debounce_ms() -> u64 {
+    {{ workerDebounceMs }}
+}
+
+fn default_channel() -> String {
+    "{{ workerChannel }}".to_string()
+}
+
+fn default_leader_lock_id() -> i64 {
+    {{ workerLeaderLockId }}
+}
+
+impl Default for WorkerOptions {
+    fn default() -> Self {
+        Self {
+            interval_ms: default_interval_ms(),
+            debounce_ms: default_debounce_ms(),
+            channel: default_channel(),
+            leader_lock_id: default_leader_lock_id(),
+        }
+    }
+}
+
+/// Background worker that catches up the read-model projections.
+pub struct Worker<E, S = ()> {
+    pool: PgPool,
+    registry: ProjectionRegistry<E, S>,
+    options: WorkerOptions,
+}
+
+impl<E, S> Worker<E, S>
+where
+    E: Send + Sync + 'static,
+    S: Send + Sync + 'static,
+{
+    /// Create a worker over the given pool, projection registry and options.
+    pub fn new(pool: PgPool, registry: ProjectionRegistry<E, S>, options: WorkerOptions) -> Self {
+        Self {
+            pool,
+            registry,
+            options,
+        }
+    }
+
+    /// Run the worker until a shutdown signal is received.
+    #[tracing::instrument(name = "worker.run", skip(self, shutdown_rx))]
+    pub async fn run(self, mut shutdown_rx: watch::Receiver<bool>) -> Result<(), WorkerError> {
+        tracing::info!(
+            channel = %self.options.channel,
+            interval_ms = self.options.interval_ms,
+            debounce_ms = self.options.debounce_ms,
+            leader_lock_id = self.options.leader_lock_id,
+            "starting projection worker"
+        );
+
+        let leader = match LeaderGuard::acquire(
+            &self.pool,
+            self.options.leader_lock_id,
+            self.interval(),
+            &mut shutdown_rx,
+        )
+        .await?
+        {
+            Some(guard) => Some(guard),
+            None if self.options.leader_lock_id > 0 => return Ok(()),
+            None => None,
+        };
+
+        if *shutdown_rx.borrow() {
+            if let Some(guard) = leader {
+                guard.release().await;
+            }
+            return Ok(());
+        }
+
+        // One full catch-up before listening, so a fresh worker is in sync even
+        // if it missed the notification that announced the latest events.
+        self.catch_up_all().await;
+        self.listen_loop(&mut shutdown_rx).await;
+
+        if let Some(guard) = leader {
+            guard.release().await;
+        }
+        Ok(())
+    }
+
+    async fn listen_loop(&self, shutdown_rx: &mut watch::Receiver<bool>) {
+        if *shutdown_rx.borrow() {
+            return;
+        }
+
+        let mut listener = self.init_listener().await;
+        let mut ticker = interval(self.interval());
+        let mut pending: HashSet<String> = HashSet::new();
+        let mut debounce: Option<Pin<Box<Sleep>>> = None;
+
+        loop {
+            tokio::select! {
+                _ = shutdown_rx.changed() => {
+                    if *shutdown_rx.borrow() {
+                        tracing::info!("shutdown signal received, stopping projection worker");
+                        break;
+                    }
+                }
+                _ = ticker.tick() => {
+                    self.catch_up_all().await;
+                }
+                Some(()) = async {
+                    match &mut debounce {
+                        Some(sleep) => {
+                            sleep.await;
+                            Some(())
+                        }
+                        None => std::future::pending().await,
+                    }
+                } => {
+                    debounce = None;
+                    pending.clear();
+                    self.catch_up_all().await;
+                }
+                notification = async {
+                    match &mut listener {
+                        Some(listener) => listener.recv().await,
+                        None => {
+                            sleep(Duration::from_secs(2)).await;
+                            Err(sqlx::Error::PoolClosed)
+                        }
+                    }
+                } => {
+                    match notification {
+                        Ok(notification) => {
+                            tracing::debug!(
+                                channel = %notification.channel(),
+                                event_type = notification.payload(),
+                                "notification received from PostgreSQL"
+                            );
+                            if self.debounce_duration().is_zero() {
+                                self.catch_up_all().await;
+                            } else {
+                                pending.insert(notification.payload().to_string());
+                                if debounce.is_none() {
+                                    debounce = Some(Box::pin(sleep(self.debounce_duration())));
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            tracing::warn!(%error, "listener disconnected, reconnecting");
+                            listener = self.init_listener().await;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    async fn catch_up_all(&self) {
+        match self.registry.catchup_all().await {
+            Ok(count) => {
+                if count > 0 {
+                    tracing::info!(count, "caught up read model projections");
+                }
+            }
+            Err(error) => {
+                tracing::error!(%error, "failed to catch up read model projections");
+            }
+        }
+    }
+
+    async fn init_listener(&self) -> Option<PgListener> {
+        match PgListener::connect_with(&self.pool).await {
+            Ok(mut listener) => match listener.listen(&self.options.channel).await {
+                Ok(()) => {
+                    tracing::info!(
+                        channel = %self.options.channel,
+                        "subscribed to PostgreSQL notifications"
+                    );
+                    Some(listener)
+                }
+                Err(error) => {
+                    tracing::error!(
+                        %error,
+                        channel = %self.options.channel,
+                        "failed to subscribe to channel"
+                    );
+                    None
+                }
+            },
+            Err(error) => {
+                tracing::error!(%error, "failed to establish PgListener connection");
+                None
+            }
+        }
+    }
+
+    fn interval(&self) -> Duration {
+        Duration::from_millis(self.options.interval_ms)
+    }
+
+    fn debounce_duration(&self) -> Duration {
+        Duration::from_millis(self.options.debounce_ms)
+    }
+}
+
+/// Convenience entry point: build a [`Worker`] and run it.
+pub async fn run<E, S>(
+    pool: PgPool,
+    registry: ProjectionRegistry<E, S>,
+    options: WorkerOptions,
+    shutdown_rx: watch::Receiver<bool>,
+) -> Result<(), WorkerError>
+where
+    E: Send + Sync + 'static,
+    S: Send + Sync + 'static,
+{
+    Worker::new(pool, registry, options).run(shutdown_rx).await
+}
