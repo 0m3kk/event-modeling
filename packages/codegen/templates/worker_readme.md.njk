@@ -27,4 +27,4 @@ Configuration is read from `CONFIG_FILE` / `SECRET_FILE` (or the
 `DATABASE_URL` overriding the connection settings. The runtime options live
 under the `worker` key and default to sane values. Every `catchup` driver the
 worker calls is a stub next to the View reducer in the `{{ appCrate }}` crate:
-implement `crate::views::<domain>::<view>::catchup` to project each View.
+implement `crate::domains::<domain>::views::<view>::catchup` to project each View.

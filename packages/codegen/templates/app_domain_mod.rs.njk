@@ -1,8 +1,5 @@
-//! Domain modules for this folder.
+//! Modules in this kind folder.
 
-{% for item in modItems -%}
-pub mod {{ item.fileName }};
-{% endfor -%}
-{% for item in modItems -%}
-pub use {{ item.fileName }}::{{ "{" }}{{ item.exports | join(", ") }}{{ "}" }};
+{% for module in moduleNames -%}
+pub mod {{ module }};
 {% endfor -%}

@@ -524,30 +524,43 @@ scaffold: {
 }
 ```
 
-The application crate gives every command, query, state, view and service its
-own module directory rather than one flat file:
+The application crate mirrors the contract crate's layout — one folder per
+domain, one folder per kind, and a self-contained module directory per item:
 
 ```
 crates/shop-app/src/
   lib.rs                 # module tree (regenerated)
-  context.rs             # re-exports the generated ExecutionContext
   error.rs               # AppError (the generated ApiError)
   state.rs               # AppState<E>, generic over the event store
   register.rs            # registers every handler on the generated Api
   extension/
     mod.rs               # create-only: declare your own modules here
     register.rs          # add project routes after the generated ones
-  commands/sales/place_order/
-    mod.rs               # wiring + re-exports (regenerated)
-    command.rs           # re-exports the generated request/response types
-    handler.rs           # PlaceOrderUseCase<E> (the todo!() you fill in)
-  queries/... views/... states/... services/...   # same shape
+  domains/               # same grouping as the contract crate
+    mod.rs               # the domains the app implements (regenerated)
+    sales/
+      mod.rs             # kinds this domain has: commands, states, ...
+      commands/
+        mod.rs
+        place_order/
+          mod.rs         # the PlaceOrderUseCase handler (the todo!() you fill in)
+      queries/...
+      states/
+        order_state/
+          mod.rs         # the OrderStateReducerImpl implementation
+    shipping/
+      commands/... views/
+        order_shipping_view/
+          mod.rs         # reducer + catch-up driver (when the worker is on)
+    common/              # items that belong to no declared domain
+      services/...
 ```
 
-Each directory re-exports the pieces the contract crate already generates (the
-request/response structs, the handler trait, the projection type), so the
-scaffold stays adapted to the core instead of duplicating it. Only the
-implementation file is a `todo!()`.
+Every item is a single `mod.rs`: a command/query holds the handler, a view or
+state the reducer (and the View catch-up driver), a service its implementation.
+The generated types and traits are imported straight from the contract crate,
+so neither the item modules nor their parent `mod.rs` files re-export them —
+only `pub mod` wiring is generated. Only the implementation is a `todo!()`.
 
 The technical plumbing is generated too, and is kept free of domain logic:
 
@@ -592,15 +605,15 @@ already excludes `config.yaml`, `secrets.yaml` and `.env`.
 
 Scaffold files use three regeneration strategies:
 
-- **Wiring is overwritten.** `lib.rs`, `context.rs`, `register.rs`, every
-  `mod.rs` and the re-export files are regenerated on every run and carry the
-  do-not-edit banner. Project code belongs in `src/extension/`:
+- **Wiring is overwritten.** `lib.rs`, `register.rs`, `domains/mod.rs` and every
+  domain/kind `mod.rs` are regenerated on every run and carry the do-not-edit
+  banner. Project code belongs in `src/extension/`:
   - `extension/mod.rs` (create-only) — declare your own modules.
   - `extension/register.rs` (merge) — add routes after the generated ones;
     `register.rs` calls it last.
 - **Implementation and configurable wiring are three-way merged.** `Cargo.toml`,
-  `AppError`, `AppState`, every `handler.rs`/`projection.rs`, the server
-  `config.rs`/`state.rs`/`router.rs`/`main.rs`, the worker files and the
+  `AppError`, `AppState`, every item `mod.rs` (handler/reducer/service), the
+  server `config.rs`/`state.rs`/`router.rs`/`main.rs`, the worker files and the
   workspace manifest. The generator stores its last output in
   `.codegen/baseline/`; on the next run it merges the new output over your
   edits with `git merge-file`. Non-overlapping changes apply silently;
@@ -675,7 +688,7 @@ nothing to project otherwise. It builds on the application crate, which gains a
 
 - `src/projections/mod.rs` — `ProjectionRegistry<E, S>`, a generated list of the
   view catch-up drivers; `catchup_all()` calls them in turn.
-- `src/views/<domain>/<view>/projection.rs` — one `catchup<E, S>(state)` stub per
+- `src/domains/<domain>/views/<view>/mod.rs` — one `catchup<E, S>(state)` stub per
   View. It is a `todo!()` you fill in (load the read model with
   `<View>::load`, persist it idempotently, return the projected event count).
   The registry calls it on every tick and notification.

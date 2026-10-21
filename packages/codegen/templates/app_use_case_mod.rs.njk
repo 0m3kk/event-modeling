@@ -1,7 +1,0 @@
-//! `{{ item.rustName }}` {{ item.typeFile }} use case.
-
-mod {{ item.typeFile }};
-mod handler;
-
-pub use {{ item.typeFile }}::{{ "{" }}{{ item.rustName }}{% if item.responseType %}, {{ item.responseType }}{% endif %}{{ "}" }};
-pub use handler::{{ item.useCaseType }};

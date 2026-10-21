@@ -32,7 +32,7 @@ where
     pub async fn catchup_all(&self) -> Result<u64, AppError> {
         let mut total = 0u64;
 {% for view in projectionViews -%}
-        total += crate::views::{{ view.domain }}::{{ view.fileName }}::catchup(&self.state).await?;
+        total += crate::domains::{{ view.domain }}::views::{{ view.fileName }}::catchup(&self.state).await?;
 {% endfor -%}
         Ok(total)
     }

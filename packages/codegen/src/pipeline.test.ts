@@ -1123,10 +1123,12 @@ describe("run", () => {
     expect(paths).toContain("crates/shop-app/Cargo.toml");
     expect(paths).toContain("crates/shop-app/src/lib.rs");
     expect(paths).toContain("crates/shop-app/src/register.rs");
-    expect(paths).toContain("crates/shop-app/src/commands/sales/mod.rs");
-    expect(paths).toContain("crates/shop-app/src/commands/sales/place_order/mod.rs");
-    expect(paths).toContain("crates/shop-app/src/commands/sales/place_order/command.rs");
-    expect(paths).toContain("crates/shop-app/src/commands/sales/place_order/handler.rs");
+    expect(paths).toContain("crates/shop-app/src/domains/mod.rs");
+    expect(paths).toContain("crates/shop-app/src/domains/sales/mod.rs");
+    expect(paths).toContain("crates/shop-app/src/domains/sales/commands/mod.rs");
+    expect(paths).toContain("crates/shop-app/src/domains/sales/commands/place_order/mod.rs");
+    expect(paths).not.toContain("crates/shop-app/src/domains/sales/commands/place_order/command.rs");
+    expect(paths).not.toContain("crates/shop-app/src/domains/sales/commands/place_order/handler.rs");
     expect(paths).toContain("crates/shop-server/src/config.rs");
     expect(paths).toContain("crates/shop-server/src/state.rs");
     expect(paths).toContain("crates/shop-server/src/router.rs");
@@ -1147,8 +1149,9 @@ describe("run", () => {
     const register = await readFromRoot("crates/shop-app/src/register.rs");
     expect(register).toContain("pub fn register<E, S>(api: Api<AppError>, state: AppState<E, S>)");
     expect(register).toContain(".with_place_order(PlaceOrderUseCase::new(state.clone()))");
+    expect(register).toContain("use crate::domains::sales::commands::place_order::PlaceOrderUseCase;");
 
-    const stub = await readFromRoot("crates/shop-app/src/commands/sales/place_order/handler.rs");
+    const stub = await readFromRoot("crates/shop-app/src/domains/sales/commands/place_order/mod.rs");
     expect(stub).toContain(
       "impl<E, S> PlaceOrderHandler for PlaceOrderUseCase<E, S>",
     );
@@ -1181,18 +1184,25 @@ describe("run", () => {
     expect(paths).toContain("secrets.example.yaml");
     expect(paths).toContain(".env.example");
 
-    // The use case re-exports the generated request/response types and wires
-    // its own submodules, instead of re-declaring them.
-    const commandType = await readFromRoot(
-      "crates/shop-app/src/commands/sales/place_order/command.rs",
-    );
-    expect(commandType).toContain("shop::domains::sales::commands::{PlaceOrder}");
+    // A command directory is a single module: the handler lives in `mod.rs`
+    // and imports the generated request/response types directly.
     const useCaseMod = await readFromRoot(
-      "crates/shop-app/src/commands/sales/place_order/mod.rs",
+      "crates/shop-app/src/domains/sales/commands/place_order/mod.rs",
     );
-    expect(useCaseMod).toContain("mod command;");
-    expect(useCaseMod).toContain("mod handler;");
-    expect(useCaseMod).toContain("pub use handler::PlaceOrderUseCase;");
+    expect(useCaseMod).toContain(
+      "use shop::domains::sales::commands::{PlaceOrder, PlaceOrderHandler};",
+    );
+    expect(useCaseMod).toContain("pub struct PlaceOrderUseCase<E, S = ()>");
+    expect(useCaseMod).not.toContain("mod handler;");
+    expect(useCaseMod).not.toContain("pub use");
+    expect(useCaseMod).toContain("use shop::ExecutionContext;");
+
+    // Parent modules only wire their children; nothing is re-exported.
+    const commandsMod = await readFromRoot(
+      "crates/shop-app/src/domains/sales/commands/mod.rs",
+    );
+    expect(commandsMod).toContain("pub mod place_order;");
+    expect(commandsMod).not.toContain("pub use");
 
     // Merge files are generated but expected to be edited, so they say edits
     // are preserved instead of claiming to be read-only.
@@ -1209,7 +1219,10 @@ describe("run", () => {
     const appLib = await readFromRoot("crates/shop-app/src/lib.rs");
     expect(appLib).toContain("Do not edit by hand");
     expect(appLib).toContain("Add project code under `src/extension/` instead.");
+    expect(appLib).toContain("pub mod domains;");
     expect(appLib).toContain("pub mod extension;");
+    expect(appLib).not.toContain("pub mod context;");
+    expect(appLib).not.toContain("pub use context::");
     const appRegister = await readFromRoot("crates/shop-app/src/register.rs");
     expect(appRegister).toContain("crate::extension::register::register(api, state)");
     const extensionMod = await readFromRoot("crates/shop-app/src/extension/mod.rs");
@@ -1287,7 +1300,7 @@ describe("run", () => {
 
     const handler = path.join(
       dir,
-      "crates/shop-app/src/services/common/order_service/handler.rs",
+      "crates/shop-app/src/domains/common/services/order_service/mod.rs",
     );
     const original = await fs.readFile(handler, "utf8");
     await fs.writeFile(
@@ -1304,7 +1317,7 @@ describe("run", () => {
     const merged = await fs.readFile(handler, "utf8");
 
     expect(second.merged).toContain(
-      "@root/crates/shop-app/src/services/common/order_service/handler.rs",
+      "@root/crates/shop-app/src/domains/common/services/order_service/mod.rs",
     );
     expect(merged).toContain("_order_id // project implementation");
     expect(merged).toContain("async fn quote(");
@@ -1314,7 +1327,7 @@ describe("run", () => {
     // --force takes the generated version, discarding project edits.
     const forced = await run({ cwd: dir, rustfmt: false, force: true });
     expect(forced.written).toContain(
-      "@root/crates/shop-app/src/services/common/order_service/handler.rs",
+      "@root/crates/shop-app/src/domains/common/services/order_service/mod.rs",
     );
     expect(await fs.readFile(handler, "utf8")).not.toContain(
       "_order_id // project implementation",
@@ -1362,7 +1375,7 @@ describe("run", () => {
 
       const handler = path.join(
         dir,
-        "crates/shop-app/src/services/common/order_service/handler.rs",
+        "crates/shop-app/src/domains/common/services/order_service/mod.rs",
       );
       const original = await fs.readFile(handler, "utf8");
       // A deliberately unformatted project line: the post-merge rustfmt pass
@@ -1379,7 +1392,7 @@ describe("run", () => {
       await fs.writeFile(path.join(dir, "board.spec.yaml"), spec(true), "utf8");
       const second = await run({ cwd: dir });
       expect(second.merged).toContain(
-        "@root/crates/shop-app/src/services/common/order_service/handler.rs",
+        "@root/crates/shop-app/src/domains/common/services/order_service/mod.rs",
       );
 
       const merged = await fs.readFile(handler, "utf8");
@@ -1414,7 +1427,7 @@ describe("run", () => {
 
     const handler = path.join(
       dir,
-      "crates/shop-app/src/services/common/order_service/handler.rs",
+      "crates/shop-app/src/domains/common/services/order_service/mod.rs",
     );
     const original = await fs.readFile(handler, "utf8");
     await fs.writeFile(
@@ -1430,7 +1443,7 @@ describe("run", () => {
     const conflicted = await fs.readFile(handler, "utf8");
 
     expect(second.conflicted).toContain(
-      "@root/crates/shop-app/src/services/common/order_service/handler.rs",
+      "@root/crates/shop-app/src/domains/common/services/order_service/mod.rs",
     );
     expect(conflicted).toContain("<<<<<<< current");
     expect(conflicted).toContain("=======");
@@ -1446,7 +1459,7 @@ describe("run", () => {
     );
     await run({ cwd: dir, rustfmt: false });
 
-    const handler = "crates/shop-app/src/commands/sales/place_order/handler.rs";
+    const handler = "crates/shop-app/src/domains/sales/commands/place_order/mod.rs";
     await fs.rm(path.join(dir, ".codegen/baseline/root", handler), { force: true });
 
     const second = await run({ cwd: dir, rustfmt: false });
@@ -1474,7 +1487,7 @@ describe("run", () => {
 
     const coreView = "crates/shop/src/domains/shipping/views/order_shipping_view.rs";
     const appView =
-      "crates/shop-app/src/views/shipping/order_shipping_view/handler.rs";
+      "crates/shop-app/src/domains/shipping/views/order_shipping_view/mod.rs";
     expect(await readFromRoot(coreView)).toContain("OrderShippingView");
 
     // Drop the View from the spec.
@@ -1512,7 +1525,7 @@ describe("run", () => {
       fs.readFile(
         path.join(
           dir,
-          ".codegen/baseline/root/crates/shop-app/src/views/shipping/order_shipping_view/handler.rs",
+          ".codegen/baseline/root/crates/shop-app/src/domains/shipping/views/order_shipping_view/mod.rs",
         ),
         "utf8",
       ),
@@ -1583,7 +1596,7 @@ describe("run", () => {
     );
     await run({ cwd: dir, rustfmt: false });
 
-    const handler = "crates/shop-app/src/services/common/order_service/handler.rs";
+    const handler = "crates/shop-app/src/domains/common/services/order_service/mod.rs";
     const handlerKey = `@root/${handler}`;
     const abs = path.join(dir, handler);
     await fs.appendFile(abs, "// project edit\n", "utf8");
@@ -1618,7 +1631,13 @@ describe("run", () => {
     expect(paths).toContain("crates/shop-worker/README.md");
     expect(paths).toContain("crates/shop-app/src/projections/mod.rs");
     expect(paths).toContain(
-      "crates/shop-app/src/views/shipping/order_shipping_view/projection.rs",
+      "crates/shop-app/src/domains/shipping/views/order_shipping_view/mod.rs",
+    );
+    expect(paths).not.toContain(
+      "crates/shop-app/src/domains/shipping/views/order_shipping_view/projection.rs",
+    );
+    expect(paths).not.toContain(
+      "crates/shop-app/src/domains/shipping/views/order_shipping_view/handler.rs",
     );
 
     const workspace = await readFromRoot("Cargo.toml");
@@ -1627,20 +1646,19 @@ describe("run", () => {
     const registry = await readFromRoot("crates/shop-app/src/projections/mod.rs");
     expect(registry).toContain("pub struct ProjectionRegistry<E, S = ()>");
     expect(registry).toContain(
-      "crate::views::shipping::order_shipping_view::catchup(&self.state)",
+      "crate::domains::shipping::views::order_shipping_view::catchup(&self.state)",
     );
-
-    const driver = await readFromRoot(
-      "crates/shop-app/src/views/shipping/order_shipping_view/projection.rs",
-    );
-    expect(driver).toContain("pub async fn catchup<E, S>");
-    expect(driver).toContain('todo!("project OrderShippingView")');
 
     const viewMod = await readFromRoot(
-      "crates/shop-app/src/views/shipping/order_shipping_view/mod.rs",
+      "crates/shop-app/src/domains/shipping/views/order_shipping_view/mod.rs",
     );
-    expect(viewMod).toContain("mod projection;");
-    expect(viewMod).toContain("pub use projection::catchup;");
+    expect(viewMod).toContain(
+      "use shop::domains::shipping::views::{OrderShippingView, OrderShippingViewReducer};",
+    );
+    expect(viewMod).toContain("pub struct OrderShippingViewReducerImpl;");
+    expect(viewMod).toContain("pub async fn catchup<E, S>");
+    expect(viewMod).toContain('todo!("project OrderShippingView")');
+    expect(viewMod).not.toContain("pub use");
 
     const appLib = await readFromRoot("crates/shop-app/src/lib.rs");
     expect(appLib).toContain("pub mod projections;");

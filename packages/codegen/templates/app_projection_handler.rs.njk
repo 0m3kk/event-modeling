@@ -1,4 +1,10 @@
-{% if item.async %}use crate::AppError;
+//! `{{ item.rustName }}` {{ item.typeFile }}.
+//!
+//! The projection type and reducer trait live in the generated contract crate;
+//! this module implements the reducer{% if worker and item.typeFile == "view" %} and its catch-up driver{% endif %}.
+
+{% if item.async and worker and item.typeFile == "view" %}use crate::{AppError, AppState};
+{% elif item.async %}use crate::AppError;
 {% endif -%}
 {% for event in item.projectionEvents -%}
 use {{ crate.name }}::{{ event.modulePath | join("::") }}::{{ event.rustName }};
@@ -23,3 +29,18 @@ impl {{ item.reducerType }} for {{ item.implType }} {
     }
 {% endfor -%}
 }
+{% if worker and item.typeFile == "view" %}
+/// Catch up the `{{ item.rustName }}` read model from the event store.
+///
+/// Load the read model with `{{ item.rustName }}::load`, persist the result and
+/// return how many events were projected. Keep the write idempotent: the worker
+/// may re-run a catch-up after a crash or a dropped notification.
+pub async fn catchup<E, S>(state: &AppState<E, S>) -> Result<u64, AppError>
+where
+    E: Send + Sync + 'static,
+    S: Send + Sync + 'static,
+{
+    let _ = state;
+    {{ stubs }}!("project {{ item.rustName }}")
+}
+{% endif -%}

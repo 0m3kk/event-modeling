@@ -4,26 +4,16 @@
 //! handlers and routes belong in [`extension`]; the generated wiring only
 //! declares it.
 
-{% if hasCommands %}pub mod commands;
-{% endif -%}
-{% if hasQueries %}pub mod queries;
-{% endif -%}
-{% if hasViews %}pub mod views;
-{% endif -%}
-{% if hasStates %}pub mod states;
-{% endif -%}
-{% if hasServices %}pub mod services;
+{% if hasDomains %}pub mod domains;
 {% endif -%}
 {% if worker %}pub mod projections;
 {% endif -%}
-pub mod context;
 pub mod error;
 pub mod extension;
 pub mod state;
 {% if crate.api %}pub mod register;
 
 {% endif -%}
-pub use context::ExecutionContext;
 pub use error::AppError;
 {% if worker %}pub use projections::ProjectionRegistry;
 {% endif -%}

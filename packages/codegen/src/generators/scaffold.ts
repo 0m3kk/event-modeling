@@ -7,18 +7,19 @@
  * With `config.scaffold.worker` it also emits a projection worker — either a
  * standalone binary crate or a background task inside the server.
  *
- * The layout follows the generated application style: each command and query
- * is a self-contained module directory (`commands/<domain>/<use_case>/`) with
- * the request/response re-export, the use-case struct and its `mod.rs`, rather
- * than one flat file per item. Views, states and services follow the same
- * shape. The pieces the contract crate already generates (request/response
- * types, handler traits, projections) are reused and only re-exported, so the
- * scaffold stays adapted to the core rather than duplicating it.
+ * The layout mirrors the contract crate: one folder per domain, one folder per
+ * kind, and one self-contained module directory per item
+ * (`domains/<domain>/commands/<use_case>/`). Each item is a single `mod.rs`:
+ * a command or query holds its handler, a view or state its reducer (plus the
+ * View catch-up driver when the worker is on), and a service its implementation.
+ * The generated types and traits are imported from the contract crate rather
+ * than duplicated or re-exported, so the parent `mod.rs` files only wire child
+ * modules.
  *
  * Every file the scaffold emits uses one of three strategies (see
  * {@link RenderJob.strategy}):
  *
- *  - pure wiring (`lib.rs`, `register.rs`, `mod.rs`, re-exports) is
+ *  - pure wiring (`lib.rs`, `register.rs`, wiring `mod.rs`, re-exports) is
  *    **overwritten** on every run; project code belongs in `src/extension/`;
  *  - implementation and configurable wiring files are **three-way merged**, so
  *    generator changes are applied while project edits survive;
@@ -149,7 +150,7 @@ interface UseCaseItem {
   contractModulePath: string[];
   /** Request file name inside the use-case directory. */
   typeFile: "command" | "query";
-  /** App-crate module path, e.g. `commands::sales::place_order`. */
+  /** App-crate module path, e.g. `domains::sales::commands::place_order`. */
   appPath: string;
   doc?: string;
 }
@@ -208,7 +209,7 @@ function toUseCase(artifact: IrArtifact, config: CodegenConfig): UseCaseItem {
     useCaseType: `${artifact.rustName}UseCase`,
     contractModulePath: artifact.modulePath,
     typeFile,
-    appPath: `${group}::${domain}::${artifact.fileName}`,
+    appPath: `domains::${domain}::${group}::${artifact.fileName}`,
     doc: artifact.doc,
   };
 }
@@ -307,14 +308,6 @@ function depLine(dep: DepSpec): string {
   return `${dep.name} = { ${parts.join(", ")} }`;
 }
 
-/** The exported names of a use case, for its domain `mod.rs`. */
-function useCaseExports(item: UseCaseItem): string[] {
-  const names = [item.rustName];
-  if (item.responseType) names.push(item.responseType);
-  names.push(item.useCaseType);
-  return names;
-}
-
 export const scaffoldGenerator: Generator = {
   name: "scaffold",
   generate({ crate, config }): RenderJob[] {
@@ -398,6 +391,7 @@ export const scaffoldGenerator: Generator = {
       hasViews,
       hasStates: hasGroup("states"),
       hasServices: hasGroup("services"),
+      hasDomains: domains.length > 0,
       worker: workerActive,
       workerPackage: options.workerPackage,
       workerCrate: options.workerCrate,
@@ -465,7 +459,6 @@ export const scaffoldGenerator: Generator = {
       app("app_lib.rs.njk", "src/lib.rs", "overwrite", {}, extensionHint);
       app("app_error.rs.njk", "src/error.rs", "merge");
       app("app_state.rs.njk", "src/state.rs", "merge");
-      app("app_context.rs.njk", "src/context.rs", "overwrite");
       app("app_extension_mod.rs.njk", "src/extension/mod.rs", "create-only");
       app("app_extension_register.rs.njk", "src/extension/register.rs", "merge");
       if (crate.api) {
@@ -473,7 +466,9 @@ export const scaffoldGenerator: Generator = {
       }
       if (workerActive) app("app_projections_mod.rs.njk", "src/projections/mod.rs", "merge");
 
-      // `commands/mod.rs`, `queries/mod.rs`, ... list the domain modules.
+      // The app crate is grouped by domain, exactly like the contract crate:
+      // `domains/<domain>/<kind>/<item>/`. Each level only wires its children;
+      // per-item files keep the same shape as before.
       const groups: Array<{ key: keyof AppDomain; dir: string }> = [
         { key: "commands", dir: "commands" },
         { key: "queries", dir: "queries" },
@@ -481,17 +476,28 @@ export const scaffoldGenerator: Generator = {
         { key: "states", dir: "states" },
         { key: "services", dir: "services" },
       ];
-      for (const group of groups) {
-        const populated = domains.filter((entry) => (entry[group.key] as unknown[]).length > 0);
-        if (populated.length === 0) continue;
-        app("app_group_mod.rs.njk", `src/${group.dir}/mod.rs`, "overwrite", {
-          groupModules: populated.map((entry) => entry.module),
+      if (domains.length > 0) {
+        app("app_domains_mod.rs.njk", "src/domains/mod.rs", "overwrite", {
+          domainModules: domainNames,
         });
-        for (const entry of populated) {
+      }
+      for (const entry of domains) {
+        const populated = groups.filter(
+          (group) => (entry[group.key] as unknown[]).length > 0,
+        );
+        app("app_domain_hub_mod.rs.njk", `src/domains/${entry.module}/mod.rs`, "overwrite", {
+          groupModules: populated.map((group) => group.dir),
+        });
+        for (const group of populated) {
           const items = entry[group.key] as Array<UseCaseItem | ProjectionItem | ServiceItem>;
-          app("app_domain_mod.rs.njk", `src/${group.dir}/${entry.module}/mod.rs`, "overwrite", {
-            modItems: items.map((item) => modItemFor(group.key, item)),
-          });
+          app(
+            "app_domain_mod.rs.njk",
+            `src/domains/${entry.module}/${group.dir}/mod.rs`,
+            "overwrite",
+            {
+              moduleNames: items.map((item) => item.fileName),
+            },
+          );
           scaffoldGroup(group.key, group.dir, entry, items);
         }
       }
@@ -537,18 +543,6 @@ export const scaffoldGenerator: Generator = {
 
     return jobs;
 
-    /** The `{ fileName, exports }` an item contributes to its domain `mod.rs`. */
-    function modItemFor(
-      group: keyof AppDomain,
-      item: UseCaseItem | ProjectionItem | ServiceItem,
-    ): { fileName: string; exports: string[] } {
-      if (group === "commands" || group === "queries") {
-        return { fileName: item.fileName, exports: useCaseExports(item as UseCaseItem) };
-      }
-      const typed = item as ProjectionItem | ServiceItem;
-      return { fileName: item.fileName, exports: [typed.rustName, typed.implType] };
-    }
-
     /** Emits the per-item files of one group within one domain. */
     function scaffoldGroup(
       group: keyof AppDomain,
@@ -557,33 +551,25 @@ export const scaffoldGenerator: Generator = {
       items: Array<UseCaseItem | ProjectionItem | ServiceItem>,
     ): void {
       for (const item of items) {
-        const base = `src/${dir}/${entry.module}/${item.fileName}`;
+        const base = `src/domains/${entry.module}/${dir}/${item.fileName}`;
         if (group === "commands" || group === "queries") {
           const useCase = item as UseCaseItem;
-          app("app_use_case_mod.rs.njk", `${base}/mod.rs`, "overwrite", { item: useCase });
-          app("app_use_case_type.rs.njk", `${base}/${useCase.typeFile}.rs`, "overwrite", {
-            item: useCase,
-          });
-          app("app_use_case_handler.rs.njk", `${base}/handler.rs`, "merge", { item: useCase });
+          // One file per use case: the module itself holds the handler. The
+          // request/response types and the handler trait are imported straight
+          // from the contract crate instead of being re-exported here.
+          app("app_use_case_handler.rs.njk", `${base}/mod.rs`, "merge", { item: useCase });
         } else if (group === "views" || group === "states") {
           const projection = item as ProjectionItem;
-          app("app_projection_mod.rs.njk", `${base}/mod.rs`, "overwrite", { item: projection });
-          app("app_type_reexport.rs.njk", `${base}/${projection.typeFile}.rs`, "overwrite", {
+          // One file per projection: the reducer (and, for Views, the catch-up
+          // driver) lives in `mod.rs`; the generated type and trait are
+          // imported from the contract crate.
+          app("app_projection_handler.rs.njk", `${base}/mod.rs`, "merge", {
             item: projection,
           });
-          app("app_projection_handler.rs.njk", `${base}/handler.rs`, "merge", {
-            item: projection,
-          });
-          if (workerActive && projection.typeFile === "view") {
-            app("app_view_projection.rs.njk", `${base}/projection.rs`, "merge", {
-              item: projection,
-            });
-          }
         } else {
           const service = item as ServiceItem;
-          app("app_service_mod.rs.njk", `${base}/mod.rs`, "overwrite", { item: service });
-          app("app_type_reexport.rs.njk", `${base}/service.rs`, "overwrite", { item: service });
-          app("app_service_handler.rs.njk", `${base}/handler.rs`, "merge", { item: service });
+          // One file per service: the module implements the generated trait.
+          app("app_service_handler.rs.njk", `${base}/mod.rs`, "merge", { item: service });
         }
       }
     }

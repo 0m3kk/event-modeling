@@ -1,8 +1,0 @@
-//! Domain modules in this group.
-
-{% for module in groupModules -%}
-pub mod {{ module }};
-{% endfor -%}
-{% for module in groupModules -%}
-pub use {{ module }}::*;
-{% endfor -%}

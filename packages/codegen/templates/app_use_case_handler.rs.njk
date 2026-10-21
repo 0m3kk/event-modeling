@@ -1,5 +1,10 @@
+//! `{{ item.rustName }}` {{ item.typeFile }} use case.
+//!
+//! The request/response types and the handler trait live in the generated
+//! contract crate; this module only implements the handler.
+
 use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ "{" }}{{ item.rustName }}, {{ item.handlerType }}{% if item.responseType %}, {{ item.responseType }}{% endif %}{{ "}" }};
-use crate::context::ExecutionContext;
+use {{ crate.name }}::ExecutionContext;
 use crate::{AppError, AppState};
 
 /// Implementation of the `{{ item.rustName }}` {{ item.typeFile }}.

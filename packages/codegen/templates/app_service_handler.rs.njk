@@ -1,3 +1,8 @@
+//! `{{ item.rustName }}` service.
+//!
+//! The service trait lives in the generated contract crate; this module
+//! implements it.
+
 {% if item.usesPrelude %}use {{ crate.name }}::prelude::*;
 {% endif -%}
 use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ item.rustName }};
@@ -5,6 +10,7 @@ use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ item.rustNa
 {% if method.resultTypeName %}use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ method.resultTypeName }};
 {% endif -%}
 {% endfor %}
+
 /// Implementation of the `{{ item.rustName }}` service.
 pub struct {{ item.implType }};
 
