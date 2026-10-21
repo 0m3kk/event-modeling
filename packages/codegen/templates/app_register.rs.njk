@@ -14,8 +14,10 @@ where
     E: Send + Sync + 'static,
     S: Send + Sync + 'static,
 {
-    api
+    let api = api
 {% for handler in handlers -%}
         .with_{{ handler.method }}({{ handler.useCaseType }}::new(state.clone()))
 {% endfor -%}
+        ;
+    crate::extension::register::register(api, state)
 }

@@ -1,9 +1,8 @@
 //! Application crate: implementations of the generated domain contracts.
 //!
-//! One module directory per command, query, state, view and service. Each
-//! directory re-exports the generated request/response or projection types and
-//! holds the implementation the generator created once. Fill in the `todo!()`
-//! stubs; the generator never overwrites these files.
+//! The module tree is regenerated on every run. Project-specific modules,
+//! handlers and routes belong in [`extension`]; the generated wiring only
+//! declares it.
 
 {% if hasCommands %}pub mod commands;
 {% endif -%}
@@ -19,6 +18,7 @@
 {% endif -%}
 pub mod context;
 pub mod error;
+pub mod extension;
 pub mod state;
 {% if crate.api %}pub mod register;
 

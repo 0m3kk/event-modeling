@@ -101,9 +101,12 @@ export interface WorkerScaffoldConfig {
  *
  * When enabled, `em-codegen gen` also emits a Cargo workspace around the
  * contract crate: a workspace `Cargo.toml`, an application crate
- * (handler/reducer/service implementations) and a server binary crate. Every
- * scaffold file is written once, when missing, and then owned by the project:
- * the generator never overwrites an existing file.
+ * (handler/reducer/service implementations) and a server binary crate.
+ *
+ * Scaffold files use three strategies. Pure wiring (`lib.rs`, `register.rs`,
+ * every `mod.rs`, re-exports) is regenerated wholesale and project code belongs
+ * in `src/extension/`. Implementation and wiring files expected to be edited
+ * are three-way merged. Extension files and docs are create-only.
  */
 export interface ScaffoldConfig {
   enabled?: boolean;
@@ -186,7 +189,11 @@ export interface CodegenConfig {
   templatesDir?: string;
   /** Emit a Cargo workspace + application/server crates around the contract crate. */
   scaffold?: ScaffoldConfig;
-  /** Run `rustfmt` over generated `.rs` files. Defaults to true. */
+  /**
+   * Run `rustfmt` over generated `.rs` files, and over the clean result of a
+   * three-way merge. Defaults to true. Conflict files (with markers) are left
+   * untouched for the project to resolve.
+   */
   rustfmt?: boolean;
   /** Custom Nunjucks filters, available in every template. */
   filters?: Record<string, FilterFn>;

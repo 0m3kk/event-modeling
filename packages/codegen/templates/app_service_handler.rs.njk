@@ -6,8 +6,6 @@ use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ item.rustNa
 {% endif -%}
 {% endfor %}
 /// Implementation of the `{{ item.rustName }}` service.
-///
-/// Generated once; edit freely — the generator will not overwrite this file.
 pub struct {{ item.implType }};
 
 #[async_trait::async_trait]

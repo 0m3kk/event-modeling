@@ -6,8 +6,6 @@ use {{ crate.name }}::{{ event.modulePath | join("::") }}::{{ event.rustName }};
 use {{ crate.name }}::{{ item.contractModulePath | join("::") }}::{{ "{" }}{{ item.rustName }}, {{ item.reducerType }}{{ "}" }};
 
 /// {% if item.async %}View{% else %}State{% endif %} reducer for `{{ item.rustName }}`.
-///
-/// Generated once; edit freely — the generator will not overwrite this file.
 pub struct {{ item.implType }};
 
 {% if item.async %}#[async_trait::async_trait]

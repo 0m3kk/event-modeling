@@ -15,16 +15,22 @@
  * types, handler traits, projections) are reused and only re-exported, so the
  * scaffold stays adapted to the core rather than duplicating it.
  *
- * Every file the scaffold emits is **create-only** (see {@link RenderJob}):
- * written once, when missing, and from then on owned by the project. The
- * generator never overwrites or reports them.
+ * Every file the scaffold emits uses one of three strategies (see
+ * {@link RenderJob.strategy}):
+ *
+ *  - pure wiring (`lib.rs`, `register.rs`, `mod.rs`, re-exports) is
+ *    **overwritten** on every run; project code belongs in `src/extension/`;
+ *  - implementation and configurable wiring files are **three-way merged**, so
+ *    generator changes are applied while project edits survive;
+ *  - extension files and docs are **create-only**: written once and owned by the
+ *    project.
  */
 import path from "node:path";
 import type { CodegenConfig, DepSpec, ScaffoldCrateConfig, WorkerScaffoldConfig } from "../config";
 import { EVENT_STORE_GIT, artifactDomain } from "../ir/build";
 import type { IrArtifact, IrCrate, IrEventRef, IrMethod } from "../ir/types";
 import { planRoutes, resolveApiOptions } from "./api";
-import type { Generator, RenderJob } from "./contract";
+import type { FileStrategy, Generator, RenderJob } from "./contract";
 
 /**
  * Infrastructure dependencies the application crate needs, merged into
@@ -410,39 +416,62 @@ export const scaffoldGenerator: Generator = {
     const emit = (
       template: string,
       outPath: string,
+      strategy: FileStrategy,
       extra: Record<string, unknown> = {},
+      bannerHint?: string,
     ) =>
       jobs.push({
         template,
         outPath,
         base: "root",
-        ownership: "create-only",
+        strategy,
+        bannerHint,
         context: { ...context, ...extra },
       });
-    const root = (template: string, outPath: string) => emit(template, outPath);
-    const app = (template: string, outPath: string, extra: Record<string, unknown> = {}) =>
-      emit(template, `${appDir}/${outPath}`, extra);
-    const server = (template: string, outPath: string) =>
-      emit(template, `${serverDir}/${outPath}`);
+    const root = (template: string, outPath: string, strategy: FileStrategy) =>
+      emit(template, outPath, strategy);
+    const app = (
+      template: string,
+      outPath: string,
+      strategy: FileStrategy,
+      extra: Record<string, unknown> = {},
+      bannerHint?: string,
+    ) => emit(template, `${appDir}/${outPath}`, strategy, extra, bannerHint);
+    const server = (
+      template: string,
+      outPath: string,
+      strategy: FileStrategy,
+      bannerHint?: string,
+    ) => emit(template, `${serverDir}/${outPath}`, strategy, {}, bannerHint);
+
+    // `lib.rs` and `register.rs` are regenerated wiring; they point project
+    // code at these extension files, which survive every run.
+    const extensionHint = "Add project code under `src/extension/` instead.";
+    const authHint =
+      "Add a middleware module of your own and wire it from `src/router.rs` instead.";
 
     if (options.workspace) {
-      root("workspace_cargo.toml.njk", "Cargo.toml");
-      root("rust_toolchain.toml.njk", "rust-toolchain.toml");
-      root("workspace_gitignore.njk", ".gitignore");
-      root("readme.md.njk", "README.md");
-      root("config_example.yaml.njk", "config.example.yaml");
-      root("secrets_example.yaml.njk", "secrets.example.yaml");
-      root("env_example.njk", ".env.example");
+      root("workspace_cargo.toml.njk", "Cargo.toml", "merge");
+      root("rust_toolchain.toml.njk", "rust-toolchain.toml", "overwrite");
+      root("workspace_gitignore.njk", ".gitignore", "merge");
+      root("readme.md.njk", "README.md", "create-only");
+      root("config_example.yaml.njk", "config.example.yaml", "merge");
+      root("secrets_example.yaml.njk", "secrets.example.yaml", "merge");
+      root("env_example.njk", ".env.example", "merge");
     }
 
     if (options.app) {
-      app("app_cargo.toml.njk", "Cargo.toml");
-      app("app_lib.rs.njk", "src/lib.rs");
-      app("app_error.rs.njk", "src/error.rs");
-      app("app_state.rs.njk", "src/state.rs");
-      app("app_context.rs.njk", "src/context.rs");
-      if (crate.api) app("app_register.rs.njk", "src/register.rs");
-      if (workerActive) app("app_projections_mod.rs.njk", "src/projections/mod.rs");
+      app("app_cargo.toml.njk", "Cargo.toml", "merge");
+      app("app_lib.rs.njk", "src/lib.rs", "overwrite", {}, extensionHint);
+      app("app_error.rs.njk", "src/error.rs", "merge");
+      app("app_state.rs.njk", "src/state.rs", "merge");
+      app("app_context.rs.njk", "src/context.rs", "overwrite");
+      app("app_extension_mod.rs.njk", "src/extension/mod.rs", "create-only");
+      app("app_extension_register.rs.njk", "src/extension/register.rs", "merge");
+      if (crate.api) {
+        app("app_register.rs.njk", "src/register.rs", "overwrite", {}, extensionHint);
+      }
+      if (workerActive) app("app_projections_mod.rs.njk", "src/projections/mod.rs", "merge");
 
       // `commands/mod.rs`, `queries/mod.rs`, ... list the domain modules.
       const groups: Array<{ key: keyof AppDomain; dir: string }> = [
@@ -455,12 +484,12 @@ export const scaffoldGenerator: Generator = {
       for (const group of groups) {
         const populated = domains.filter((entry) => (entry[group.key] as unknown[]).length > 0);
         if (populated.length === 0) continue;
-        app("app_group_mod.rs.njk", `src/${group.dir}/mod.rs`, {
+        app("app_group_mod.rs.njk", `src/${group.dir}/mod.rs`, "overwrite", {
           groupModules: populated.map((entry) => entry.module),
         });
         for (const entry of populated) {
           const items = entry[group.key] as Array<UseCaseItem | ProjectionItem | ServiceItem>;
-          app("app_domain_mod.rs.njk", `src/${group.dir}/${entry.module}/mod.rs`, {
+          app("app_domain_mod.rs.njk", `src/${group.dir}/${entry.module}/mod.rs`, "overwrite", {
             modItems: items.map((item) => modItemFor(group.key, item)),
           });
           scaffoldGroup(group.key, group.dir, entry, items);
@@ -470,40 +499,40 @@ export const scaffoldGenerator: Generator = {
 
     // The server wires the application crate, so it only exists alongside it.
     if (options.server && options.app) {
-      server("server_cargo.toml.njk", "Cargo.toml");
-      server("server_config.rs.njk", "src/config.rs");
-      server("server_state.rs.njk", "src/state.rs");
+      server("server_cargo.toml.njk", "Cargo.toml", "merge");
+      server("server_config.rs.njk", "src/config.rs", "merge");
+      server("server_state.rs.njk", "src/state.rs", "merge");
       if (crate.api) {
         // The router, middleware and server-level handlers wrap the generated
         // API transport.
-        server("server_middleware_mod.rs.njk", "src/middleware/mod.rs");
-        server("server_middleware_auth.rs.njk", "src/middleware/auth.rs");
-        server("server_handlers_mod.rs.njk", "src/handlers/mod.rs");
-        server("server_router.rs.njk", "src/router.rs");
+        server("server_middleware_mod.rs.njk", "src/middleware/mod.rs", "merge");
+        server("server_middleware_auth.rs.njk", "src/middleware/auth.rs", "overwrite", authHint);
+        server("server_handlers_mod.rs.njk", "src/handlers/mod.rs", "merge");
+        server("server_router.rs.njk", "src/router.rs", "merge");
       }
-      server("server_main.rs.njk", "src/main.rs");
+      server("server_main.rs.njk", "src/main.rs", "merge");
     }
 
     // A standalone worker crate. With `worker.package: "server"` the worker is
     // emitted into the server crate instead (see `server_main.rs.njk` and
     // `worker_mod.rs.njk`).
     if (workerActive && options.workerPackage === "separate") {
-      const worker = (template: string, outPath: string) =>
-        emit(template, `${workerDir}/${outPath}`);
-      worker("worker_cargo.toml.njk", "Cargo.toml");
-      worker("worker_lib.rs.njk", "src/lib.rs");
-      worker("worker_config.rs.njk", "src/config.rs");
-      worker("worker_main.rs.njk", "src/main.rs");
-      worker("worker_mod.rs.njk", "src/worker/mod.rs");
-      worker("worker_leader.rs.njk", "src/worker/leader.rs");
-      worker("worker_readme.md.njk", "README.md");
+      const worker = (template: string, outPath: string, strategy: FileStrategy) =>
+        emit(template, `${workerDir}/${outPath}`, strategy);
+      worker("worker_cargo.toml.njk", "Cargo.toml", "merge");
+      worker("worker_lib.rs.njk", "src/lib.rs", "merge");
+      worker("worker_config.rs.njk", "src/config.rs", "merge");
+      worker("worker_main.rs.njk", "src/main.rs", "merge");
+      worker("worker_mod.rs.njk", "src/worker/mod.rs", "merge");
+      worker("worker_leader.rs.njk", "src/worker/leader.rs", "merge");
+      worker("worker_readme.md.njk", "README.md", "create-only");
     }
 
     // With `package: "server"` the worker loop lives in the server crate and
     // `main.rs` spawns it as a background task.
     if (workerActive && options.workerPackage === "server") {
-      server("worker_mod.rs.njk", "src/worker/mod.rs");
-      server("worker_leader.rs.njk", "src/worker/leader.rs");
+      server("worker_mod.rs.njk", "src/worker/mod.rs", "merge");
+      server("worker_leader.rs.njk", "src/worker/leader.rs", "merge");
     }
 
     return jobs;
@@ -531,24 +560,30 @@ export const scaffoldGenerator: Generator = {
         const base = `src/${dir}/${entry.module}/${item.fileName}`;
         if (group === "commands" || group === "queries") {
           const useCase = item as UseCaseItem;
-          app("app_use_case_mod.rs.njk", `${base}/mod.rs`, { item: useCase });
-          app("app_use_case_type.rs.njk", `${base}/${useCase.typeFile}.rs`, { item: useCase });
-          app("app_use_case_handler.rs.njk", `${base}/handler.rs`, { item: useCase });
+          app("app_use_case_mod.rs.njk", `${base}/mod.rs`, "overwrite", { item: useCase });
+          app("app_use_case_type.rs.njk", `${base}/${useCase.typeFile}.rs`, "overwrite", {
+            item: useCase,
+          });
+          app("app_use_case_handler.rs.njk", `${base}/handler.rs`, "merge", { item: useCase });
         } else if (group === "views" || group === "states") {
           const projection = item as ProjectionItem;
-          app("app_projection_mod.rs.njk", `${base}/mod.rs`, { item: projection });
-          app("app_type_reexport.rs.njk", `${base}/${projection.typeFile}.rs`, {
+          app("app_projection_mod.rs.njk", `${base}/mod.rs`, "overwrite", { item: projection });
+          app("app_type_reexport.rs.njk", `${base}/${projection.typeFile}.rs`, "overwrite", {
             item: projection,
           });
-          app("app_projection_handler.rs.njk", `${base}/handler.rs`, { item: projection });
+          app("app_projection_handler.rs.njk", `${base}/handler.rs`, "merge", {
+            item: projection,
+          });
           if (workerActive && projection.typeFile === "view") {
-            app("app_view_projection.rs.njk", `${base}/projection.rs`, { item: projection });
+            app("app_view_projection.rs.njk", `${base}/projection.rs`, "merge", {
+              item: projection,
+            });
           }
         } else {
           const service = item as ServiceItem;
-          app("app_service_mod.rs.njk", `${base}/mod.rs`, { item: service });
-          app("app_type_reexport.rs.njk", `${base}/service.rs`, { item: service });
-          app("app_service_handler.rs.njk", `${base}/handler.rs`, { item: service });
+          app("app_service_mod.rs.njk", `${base}/mod.rs`, "overwrite", { item: service });
+          app("app_type_reexport.rs.njk", `${base}/service.rs`, "overwrite", { item: service });
+          app("app_service_handler.rs.njk", `${base}/handler.rs`, "merge", { item: service });
         }
       }
     }

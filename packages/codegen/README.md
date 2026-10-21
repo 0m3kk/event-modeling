@@ -41,7 +41,7 @@ em-codegen new-template <name>         Create a starter user template
 | `--spec <file>` | Override the spec path |
 | `--dry-run` | Render without writing |
 | `--check` | Report files that are missing or out of date (CI); exits `1` on drift |
-| `--force` | Overwrite files that were edited since the last run |
+| `--force` | Overwrite hand-edited files; take the generated version of merge files |
 | `--no-rustfmt` | Skip `rustfmt` post-processing |
 
 ## Pipeline
@@ -49,7 +49,7 @@ em-codegen new-template <name>         Create a starter user template
 ```
 spec.yaml -> parse (zod) -> hoist types -> build IR -> run passes
           -> plan render jobs -> render (Nunjucks) -> stamp banner -> rustfmt
-          -> write + manifest
+          -> write (overwrite / 3-way merge / create-only) + manifest
 ```
 
 - **parse** uses `@em/spec`: YAML -> validated document.
@@ -60,9 +60,11 @@ spec.yaml -> parse (zod) -> hoist types -> build IR -> run passes
   identifiers, decides each item's module path and detects crate dependencies.
 - **passes** are scriptable IR transforms (see below).
 - **render** runs each generator's jobs through Nunjucks.
-- **banner** prepends the "do not edit" header (see
-  [Generated file header](#generated-file-header)) to every file.
-- **write** respects the manifest so hand edits are never clobbered silently.
+- **banner** prepends the header that matches the file's strategy (see
+  [Generated file header](#generated-file-header)).
+- **write** applies the strategy: overwrite (manifest-protected), three-way
+  merge against `.codegen/baseline/`, or create-only. Core files the spec no
+  longer emits are pruned; scaffold files are kept and reported.
 
 ## Output layout
 
@@ -527,13 +529,16 @@ own module directory rather than one flat file:
 
 ```
 crates/shop-app/src/
-  lib.rs                 # module tree
+  lib.rs                 # module tree (regenerated)
   context.rs             # re-exports the generated ExecutionContext
   error.rs               # AppError (the generated ApiError)
   state.rs               # AppState<E>, generic over the event store
   register.rs            # registers every handler on the generated Api
+  extension/
+    mod.rs               # create-only: declare your own modules here
+    register.rs          # add project routes after the generated ones
   commands/sales/place_order/
-    mod.rs               # wiring + re-exports
+    mod.rs               # wiring + re-exports (regenerated)
     command.rs           # re-exports the generated request/response types
     handler.rs           # PlaceOrderUseCase<E> (the todo!() you fill in)
   queries/... views/... states/... services/...   # same shape
@@ -585,30 +590,75 @@ The workspace also ships example infrastructure files to copy and edit:
 (`DATABASE_URL`, `CONFIG_FILE`, `SECRET_FILE`). The generated `.gitignore`
 already excludes `config.yaml`, `secrets.yaml` and `.env`.
 
-Every scaffold file is **create-only**. `em-codegen gen` writes each one only
-when it is missing, then the project owns it: existing files are never
-overwritten and never reported as drift. This covers the workspace and crate
-manifests, `lib.rs`, every `mod.rs`, the `register` glue, one `todo!()` stub per
-use case, a reducer stub per state/view, a service stub, `AppState`, `AppError`,
-the server `main`, and the projection worker (when enabled). Adding a command
-to the spec creates its files but leaves already-written ones alone.
+Scaffold files use three regeneration strategies:
+
+- **Wiring is overwritten.** `lib.rs`, `context.rs`, `register.rs`, every
+  `mod.rs` and the re-export files are regenerated on every run and carry the
+  do-not-edit banner. Project code belongs in `src/extension/`:
+  - `extension/mod.rs` (create-only) — declare your own modules.
+  - `extension/register.rs` (merge) — add routes after the generated ones;
+    `register.rs` calls it last.
+- **Implementation and configurable wiring are three-way merged.** `Cargo.toml`,
+  `AppError`, `AppState`, every `handler.rs`/`projection.rs`, the server
+  `config.rs`/`state.rs`/`router.rs`/`main.rs`, the worker files and the
+  workspace manifest. The generator stores its last output in
+  `.codegen/baseline/`; on the next run it merges the new output over your
+  edits with `git merge-file`. Non-overlapping changes apply silently;
+  overlapping edits produce `<<<<<<<` markers and a `conflicted` report.
+  Resolve them, then rerun.
+- **Extension files and docs are create-only.** Written once and never touched
+  again: `src/extension/mod.rs` and the READMEs.
+
+The baseline is local tool state; `.codegen/` is ignored by the generated
+`.gitignore`. A merge file with no baseline (for example after upgrading from an
+older version) is left untouched and reported as `unbased`; run
+`em-codegen gen --force` once to adopt the generated version, or delete the file
+to have it recreated.
+
+Rust files are formatted with `rustfmt` before they are written. A clean
+three-way merge is formatted again before it is written, so inserted generated
+lines never leave the project with an unrelated formatting diff. This formats
+the whole merged file, including project code, which keeps later merges stable.
+Conflict files are not formatted: rustfmt cannot parse the markers — resolve
+them, format the file, then rerun. Set `rustfmt: false` (or pass
+`--no-rustfmt`) to opt out entirely.
+
+Adding a command to the spec rewrites the wiring and creates the new
+implementation files; existing `handler.rs` bodies stay in place. Editing a
+wiring file by hand is protected by the manifest like the contract crate: the
+run reports it as `skipped` until `--force`.
+
+Stale files are handled differently by strategy:
+
+- core output that the spec no longer emits is deleted automatically when its
+  content still matches the manifest (`--force` removes hand-edited stragglers
+  too);
+- scaffold files are never deleted. They are reported as `orphaned`, and both
+  the file and its merge base are kept — re-adding the item to the spec later
+  merges the new generated code over your existing implementation. The report
+  repeats until you delete the stale file (deleting it also drops its base).
+  A stale core file that was hand-edited is also reported as orphaned and only
+  removed by `--force`.
 
 The application crate's `register` lists every command and query, so a route can
 never silently answer `500` because its handler was forgotten:
 
 ```rust
-pub fn register<E>(api: Api<AppError>, state: AppState<E>) -> Api<AppError>
+pub fn register<E, S>(api: Api<AppError>, state: AppState<E, S>) -> Api<AppError>
 where
     E: Send + Sync + 'static,
+    S: Send + Sync + 'static,
 {
-    api.with_place_order(PlaceOrderUseCase::new(state.clone()))
+    let api = api.with_place_order(PlaceOrderUseCase::new(state.clone()));
+    crate::extension::register::register(api, state)
 }
 ```
 
 Run `em-codegen gen` with `scaffold.enabled` to write the workspace. The
 contract crate (the `out` directory) is still manifest-managed, so
-`em-codegen gen --check` in CI catches drift there; scaffold files are skipped
-by the check because the project owns them.
+`em-codegen gen --check` in CI catches drift there. Scaffold wiring is checked
+too; merge files are checked against their baseline (a project edit alone is not
+drift), and files without a baseline are skipped.
 
 ### Projection worker
 
@@ -745,20 +795,30 @@ For whole new output targets, add a generator module implementing the
 ## Generated file header
 
 Every file the pipeline writes opens with a banner whose wording matches its
-ownership class.
+generation strategy.
 
-**Managed** files (the contract crate) are regenerated on every run, so they are
-marked as generated:
+**Overwrite** files (the contract crate and scaffold wiring) are regenerated on
+every run, so they are marked as generated:
 
 ```rust
 // @generated by @em/codegen. Do not edit by hand.
 // Edit the spec or the templates, then rerun `em-codegen gen`.
+// Add project code under `src/extension/` instead.
 
 ```
 
-**Create-only** files (the scaffold) are written once and then owned by the
-project, so they get an edit-me notice instead — deliberately *without* the
-`@generated` marker, since hand-editing them is the intended use:
+**Merge** files (scaffold implementations and configurable wiring) are
+generated but expected to be edited, so their banner marks them as generated
+without an edit instruction; `em-codegen` reports merges and conflicts:
+
+```rust
+// @generated by @em/codegen. Generated lines are updated on rerun.
+
+```
+
+**Create-only** files (extension modules and docs) are written once and then
+owned by the project, so they get an edit-me notice instead — deliberately
+*without* the `@generated` marker, since hand-editing them is the intended use:
 
 ```rust
 // Scaffolded by @em/codegen. This file is yours to edit.
@@ -766,22 +826,32 @@ project, so they get an edit-me notice instead — deliberately *without* the
 
 ```
 
-The comment syntax follows the file type — `//` for Rust, `#` for `Cargo.toml`
-and `.gitignore`, `--` for SQL migrations — and `@generated` is the marker
-editors and code hosts use to flag generated files. The banner is stamped by the
-pipeline rather than by individual templates, so files rendered from your own
-templates carry it too. It is part of the file content, so for managed files it
-is tracked by the manifest like everything else (see below).
+The comment syntax follows the file type — `//` for Rust, `#` for
+`Cargo.toml`, YAML and `.gitignore`, `--` for SQL migrations — and `@generated`
+is the marker editors and code hosts use to flag generated files. The banner is
+stamped by the pipeline rather than by individual templates, so files rendered
+from your own templates carry it too. It is part of the file content, so for
+managed and merge files it is tracked by the manifest/baseline like everything
+else (see below).
 
 ## Manifest and safe regeneration
 
 Every run records a content hash per file in
 `<config dir>/.codegen/manifest.json`. On the next run:
 
-- a file that matches its recorded hash is overwritten;
-- a file whose contents drifted from the record (edited by hand) is **left
-  alone** and reported — pass `--force` to overwrite;
-- `--check` never writes and exits non-zero if any file is missing or stale.
+- an overwrite file that matches its recorded hash is regenerated; one whose
+  contents drifted from the record (edited by hand) is **left alone** and
+  reported — pass `--force` to overwrite;
+- a merge file is regenerated from `<config dir>/.codegen/baseline/`: a clean
+  three-way merge applies the generator's changes and keeps project edits; an
+  overlap writes conflict markers and reports the file;
+- a generator-owned core file that the spec no longer emits is removed (unless
+  it was edited by hand, in which case it is reported as orphaned);
+- scaffold files that are no longer generated are kept and reported as
+  orphaned; their merge base is retained so re-adding the item restores the
+  project implementation;
+- `--check` never writes and exits non-zero if any overwrite file is missing or
+  stale, or if a merge file has pending generated changes or conflict markers.
 
 ## Development
 

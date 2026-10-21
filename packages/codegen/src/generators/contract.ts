@@ -9,6 +9,20 @@
 import type { GeneratorName, CodegenConfig } from "../config";
 import type { IrCrate } from "../ir/types";
 
+/**
+ * How the pipeline treats a file that already exists on disk.
+ *
+ *  - `"overwrite"` (default): generator-owned. Regenerated on every run, with a
+ *    do-not-edit banner. Hand edits are protected by the manifest unless
+ *    `--force` is used. Project-specific code belongs in an extension file.
+ *  - `"merge"`: generator-owned but expected to be edited. A three-way merge
+ *    (`git merge-file`) replays the generator's changes on top of the project's
+ *    edits and leaves conflict markers when both touched the same lines.
+ *  - `"create-only"`: written once, then owned entirely by the project. Never
+ *    overwritten, recorded or reported as drift.
+ */
+export type FileStrategy = "overwrite" | "merge" | "create-only";
+
 export interface RenderJob {
   /** Template path within the render search paths. */
   template: string;
@@ -22,12 +36,13 @@ export interface RenderJob {
    * (the workspace root when scaffolding is enabled).
    */
   base?: "out" | "root";
+  /** Existing-file handling. Defaults to `"overwrite"`. */
+  strategy?: FileStrategy;
   /**
-   * `"managed"` (default) files are recorded in the manifest and protected from
-   * silent clobbering. `"create-only"` files are written once (when missing) and
-   * then owned by the project: never overwritten, recorded or reported as drift.
+   * Extra line appended to an overwrite banner, e.g. pointing at the extension
+   * module project code should use instead of editing the generated file.
    */
-  ownership?: "managed" | "create-only";
+  bannerHint?: string;
 }
 
 export interface GeneratorContext {

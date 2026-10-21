@@ -4,6 +4,10 @@
  * Records a content hash for every file the tool last wrote, so a later run can
  * tell an untouched generated file apart from one a developer edited by hand
  * (and refuse to clobber the latter without `--force`).
+ *
+ * Merge strategy files additionally keep their last generated content under
+ * `.codegen/baseline/` (see `baseline.ts`); the manifest hash is still the hash
+ * of the generated side, not of the merged result.
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";

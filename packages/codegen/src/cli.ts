@@ -31,7 +31,7 @@ Options for "gen":
       --spec <file>   Override the spec path
       --dry-run       Render without writing
       --check         Report files that are missing or out of date (CI)
-      --force         Overwrite files edited since the last run
+      --force         Overwrite hand-edited files; take the generated version of merge files
       --no-rustfmt    Skip rustfmt post-processing
 
 Options for "eject" / "new-template":
@@ -138,6 +138,16 @@ async function cmdGen(parsed: ParsedArgs, cwd: string): Promise<number> {
     return 1;
   }
   if (flagBool(parsed.flags, "check")) {
+    if (result.unbased.length > 0) {
+      console.error(
+        `  ${result.unbased.length} merge file(s) not checked (no merge base in .codegen/baseline).`,
+      );
+    }
+    if (result.unmerged.length > 0) {
+      console.error(
+        `  ${result.unmerged.length} merge file(s) not checked (merge tool unavailable).`,
+      );
+    }
     console.log(`Up to date: ${total} files.`);
     return 0;
   }
@@ -149,10 +159,34 @@ async function cmdGen(parsed: ParsedArgs, cwd: string): Promise<number> {
   await ejectScaffoldTemplates(result.config, cwd);
   console.log(
     `Generated ${total} files in ${result.config.outDir} ` +
-      `(${result.written.length} written, ${result.unchanged.length} unchanged, ${result.skipped.length} skipped).`,
+      `(${result.written.length} written, ${result.unchanged.length} unchanged, ` +
+      `${result.merged.length} merged, ${result.conflicted.length} conflicts, ` +
+      `${result.skipped.length} skipped).`,
   );
+  if (result.merged.length > 0) {
+    console.error(
+      `  merged ${result.merged.length} file(s) with generated changes; project edits were kept.`,
+    );
+  }
+  for (const file of result.conflicted) {
+    console.error(`  conflict (resolve <<<<<<< markers): ${file}`);
+  }
+  for (const file of result.unbased) {
+    console.error(
+      `  no merge base (kept; use --force to take the generated version): ${file}`,
+    );
+  }
+  for (const file of result.unmerged) {
+    console.error(`  kept (merge tool unavailable): ${file}`);
+  }
   for (const file of result.skipped) {
     console.error(`  skipped (edited by hand, use --force): ${file}`);
+  }
+  for (const file of result.removed) {
+    console.error(`  removed (no longer generated): ${file}`);
+  }
+  for (const file of result.orphaned) {
+    console.error(`  orphaned (kept; delete manually if unwanted): ${file}`);
   }
   return 0;
 }

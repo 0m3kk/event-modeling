@@ -1,8 +1,7 @@
 //! Shared server state and store initialization.
 //!
-//! Generated once; edit freely — swap `Store`/`Snapshots` for other
-//! implementations (mocks in tests, different backends in production) and the
-//! application handlers keep working unchanged.
+//! Swap `Store`/`Snapshots` for other implementations (mocks in tests, different
+//! backends in production) and the application handlers keep working unchanged.
 
 use {{ appCratePath }}::AppState;
 use event_store::PostgresEventStore;

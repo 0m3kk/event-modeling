@@ -49,8 +49,8 @@ export default defineConfig({
 
   // Emit a Cargo workspace around the crate: a workspace manifest, an
   // application crate (handler/reducer/service implementations) and a server
-  // binary. Files are written once and then owned by the project; existing
-  // files are never overwritten.
+  // binary. Pure wiring is regenerated; implementation files are 3-way merged so
+  // your edits survive; \`src/extension/\` is yours.
   scaffold: {
     enabled: true,
     // app: { crate: "domain-app" },
