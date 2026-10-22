@@ -39,3 +39,10 @@ impl {{ structName }} {
     }
 {% endfor -%}
 }
+{% if not params and extraDerive != "Default" %}
+impl Default for {{ structName }} {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+{% endif -%}

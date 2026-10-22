@@ -658,6 +658,17 @@ The workspace also ships example infrastructure files to copy and edit:
 (`DATABASE_URL`, `CONFIG_FILE`, `SECRET_FILE`). The generated `.gitignore`
 already excludes `config.yaml`, `secrets.yaml` and `.env`.
 
+It also emits repository automation under `.github/`:
+
+- `dependabot.yml` — weekly grouped Cargo, Rust toolchain and GitHub Actions
+  updates with a cooldown window (mirroring the backend-kit setup); the emitted
+  `rust-toolchain.toml` pins a versioned channel (`1.99.0` instead of `stable`)
+  so the toolchain updater can actually bump it;
+- `workflows/ci.yml` — `cargo fmt --check`, Clippy with `-D warnings`, `cargo
+  check` and `cargo test` on every push/PR. The test job boots PostgreSQL only
+  when the generated workspace runs against one (a server, the View worker, or
+  an app with persisted Views) and exports `DATABASE_URL` for it.
+
 Scaffold files use three regeneration strategies:
 
 - **Wiring is overwritten.** `lib.rs`, `register.rs`, `views.rs`,
@@ -667,11 +678,12 @@ Scaffold files use three regeneration strategies:
   - `extension/register.rs` (merge) — add routes after the generated ones;
     `register.rs` calls it last.
 - **Implementation and configurable wiring are three-way merged.** `Cargo.toml`,
-  `AppError`, `AppState`, every item `mod.rs` (handler/reducer/service), the
-  server `config.rs`/`state.rs`/`router.rs`/`main.rs`, the worker files and the
-  workspace manifest. The generator stores its last output in
-  `.codegen/baseline/`; on the next run it merges the new output over your
-  edits with `git merge-file`. Non-overlapping changes apply silently;
+  `rust-toolchain.toml`, `AppError`, `AppState`, every item `mod.rs`
+  (handler/reducer/service), the server
+  `config.rs`/`state.rs`/`router.rs`/`main.rs`, the worker files, the workspace
+  manifest and the generated `.github/` automation. The generator stores its
+  last output in `.codegen/baseline/`; on the next run it merges the new output
+  over your edits with `git merge-file`. Non-overlapping changes apply silently;
   overlapping edits produce `<<<<<<<` markers and a `conflicted` report.
   Resolve them, then rerun.
 - **Extension files and docs are create-only.** Written once and never touched

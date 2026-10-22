@@ -367,6 +367,12 @@ export const scaffoldGenerator: Generator = {
       })),
     );
 
+    // The generated CI only needs a PostgreSQL service when the workspace
+    // actually runs against one: a server, the projection worker, or an app
+    // with persisted Views.
+    const database =
+      (options.app && hasViews) || workerActive || (options.server && options.app);
+
     const context = {
       crate,
       domains,
@@ -392,6 +398,7 @@ export const scaffoldGenerator: Generator = {
       hasStates: hasGroup("states"),
       hasServices: hasGroup("services"),
       hasDomains: domains.length > 0,
+      database,
       worker: workerActive,
       workerPackage: options.workerPackage,
       workerCrate: options.workerCrate,
@@ -446,12 +453,17 @@ export const scaffoldGenerator: Generator = {
 
     if (options.workspace) {
       root("workspace_cargo.toml.njk", "Cargo.toml", "merge");
-      root("rust_toolchain.toml.njk", "rust-toolchain.toml", "overwrite");
+      // Merged rather than overwritten: Dependabot bumps the pinned toolchain
+      // channel, and rerunning the generator must not reset it to the template's
+      // version.
+      root("rust_toolchain.toml.njk", "rust-toolchain.toml", "merge");
       root("workspace_gitignore.njk", ".gitignore", "merge");
       root("readme.md.njk", "README.md", "create-only");
       root("config_example.yaml.njk", "config.example.yaml", "merge");
       root("secrets_example.yaml.njk", "secrets.example.yaml", "merge");
       root("env_example.njk", ".env.example", "merge");
+      root("dependabot.yml.njk", ".github/dependabot.yml", "merge");
+      root("workflow_ci.yml.njk", ".github/workflows/ci.yml", "merge");
     }
 
     if (options.app) {

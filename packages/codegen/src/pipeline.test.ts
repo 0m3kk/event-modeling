@@ -670,6 +670,15 @@ describe("run", () => {
     const status = await read("src/domains/common/types/status.rs");
     expect(status).toContain("Default");
     expect(status).toContain("#[default]");
+
+    // A struct whose `new()` takes no arguments also implements `Default`, so
+    // Clippy's `new_without_default` stays quiet in generated CI.
+    const event = await read("src/domains/common/events/order_placed.rs");
+    expect(event).toContain("impl Default for OrderPlaced");
+    // Object types already derive it; the manual impl must not be duplicated.
+    expect(await read("src/domains/common/types/order.rs")).not.toContain(
+      "impl Default for Order",
+    );
   });
 
   it("generates a factory and with_ builders for commands, queries, events and types", async () => {
@@ -1211,6 +1220,27 @@ describe("run", () => {
     expect(paths).toContain("secrets.example.yaml");
     expect(paths).toContain(".env.example");
 
+    // Repository automation: grouped dependency updates and a Rust CI that
+    // mirrors the backend-kit checks.
+    expect(paths).toContain(".github/dependabot.yml");
+    expect(paths).toContain(".github/workflows/ci.yml");
+    const dependabot = await readFromRoot(".github/dependabot.yml");
+    expect(dependabot).toContain('package-ecosystem: "cargo"');
+    expect(dependabot).toContain('package-ecosystem: "rust-toolchain"');
+    expect(dependabot).toContain('package-ecosystem: "github-actions"');
+    expect(dependabot).toContain("rust-minor-patch");
+    const toolchain = await readFromRoot("rust-toolchain.toml");
+    expect(toolchain).toContain('channel = "1.99.0"');
+    expect(toolchain).not.toContain('channel = "stable"');
+    const ci = await readFromRoot(".github/workflows/ci.yml");
+    expect(ci).toContain("cargo fmt --all -- --check");
+    expect(ci).toContain("cargo clippy --workspace --all-targets -- -D warnings");
+    expect(ci).toContain("cargo check --workspace --all-targets");
+    expect(ci).toContain("cargo test --workspace");
+    // A server workspace needs PostgreSQL in CI.
+    expect(ci).toContain("image: postgres:18");
+    expect(ci).toContain("DATABASE_URL: postgres://postgres:password@localhost:5432/dev");
+
     // A command directory is a single module: the handler lives in `mod.rs`
     // and imports the generated request/response types directly.
     const useCaseMod = await readFromRoot(
@@ -1262,6 +1292,23 @@ describe("run", () => {
 
     // The contract crate stays managed and keeps the do-not-edit banner.
     expect(await readFromRoot("crates/shop/src/lib.rs")).toContain("Do not edit by hand");
+  });
+
+  it("omits PostgreSQL from generated CI when the workspace has no runtime database", async () => {
+    await fs.writeFile(
+      path.join(dir, "codegen.config.ts"),
+      `export default { spec: "board.spec.yaml", out: "crates/shop", rustfmt: false, ` +
+        `scaffold: { enabled: true, app: true, server: false } };\n`,
+      "utf8",
+    );
+
+    const result = await run({ cwd: dir, rustfmt: false });
+    expect(result.files.map((file) => file.path)).toContain(".github/workflows/ci.yml");
+
+    const ci = await readFromRoot(".github/workflows/ci.yml");
+    expect(ci).toContain("cargo test --workspace");
+    expect(ci).not.toContain("DATABASE_URL");
+    expect(ci).not.toContain("image: postgres");
   });
 
   it("overwrites generated wiring but keeps the project's extension code", async () => {
