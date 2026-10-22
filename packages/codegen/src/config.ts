@@ -141,7 +141,10 @@ export interface ViewsGeneratorConfig {
    * `<out>/migrations/` in sqlx's `<version>_create_<table>.up.sql` /
    * `.down.sql` layout. The schema mirrors the generated Rust struct: objects
    * are flattened into prefixed columns and an array of objects becomes a child
-   * table. Off by default, like the views themselves.
+   * table. Root tables also carry the read-model bookkeeping columns
+   * (`last_event_position`, `created_at`, `updated_at`), and one shared
+   * `view_checkpoints` table is emitted for the catch-up drivers. Off by
+   * default, like the views themselves.
    */
   migrations?: boolean;
 }

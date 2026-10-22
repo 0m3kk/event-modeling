@@ -12,6 +12,7 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use {{ appCratePath }}::ProjectionRegistry;
+use event_store::EventStore;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use sqlx::postgres::PgListener;
@@ -85,7 +86,8 @@ pub struct Worker<E, S = ()> {
 
 impl<E, S> Worker<E, S>
 where
-    E: Send + Sync + 'static,
+    E: EventStore + Send + Sync + 'static,
+    E::Error: std::fmt::Debug,
     S: Send + Sync + 'static,
 {
     /// Create a worker over the given pool, projection registry and options.
@@ -170,8 +172,10 @@ where
                     }
                 } => {
                     debounce = None;
-                    pending.clear();
-                    self.catch_up_all().await;
+                    let event_types: Vec<String> = pending.drain().collect();
+                    for event_type in event_types {
+                        self.catch_up_on_event(&event_type).await;
+                    }
                 }
                 notification = async {
                     match &mut listener {
@@ -221,6 +225,27 @@ where
         }
     }
 
+    async fn catch_up_on_event(&self, event_type: &str) {
+        match self.registry.catchup_on_event(event_type).await {
+            Ok(count) => {
+                if count > 0 {
+                    tracing::info!(
+                        count,
+                        event_type,
+                        "caught up matching read model projections"
+                    );
+                }
+            }
+            Err(error) => {
+                tracing::error!(
+                    %error,
+                    event_type,
+                    "failed to catch up read model projections for event"
+                );
+            }
+        }
+    }
+
     async fn init_listener(&self) -> Option<PgListener> {
         match PgListener::connect_with(&self.pool).await {
             Ok(mut listener) => match listener.listen(&self.options.channel).await {
@@ -264,7 +289,8 @@ pub async fn run<E, S>(
     shutdown_rx: watch::Receiver<bool>,
 ) -> Result<(), WorkerError>
 where
-    E: Send + Sync + 'static,
+    E: EventStore + Send + Sync + 'static,
+    E::Error: std::fmt::Debug,
     S: Send + Sync + 'static,
 {
     Worker::new(pool, registry, options).run(shutdown_rx).await

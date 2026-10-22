@@ -5,10 +5,13 @@
 #}
 {%- if artifact.doc %}-- {{ artifact.doc }}
 {% endif -%}
--- Generated from the `{{ artifact.name }}` view by @em/codegen.
+-- Generated from {{ origin }} by @em/codegen.
 -- The schema mirrors the generated read model; tracked in the manifest.
 {% for note in notes %}-- note: {{ note }}
 {% endfor %}
 CREATE TABLE IF NOT EXISTS "{{ table }}" (
 {% for line in lines %}    {{ line }}{% if not loop.last %},{% endif %}
 {% endfor %});
+{% for index in indexSql %}
+{{ index }}
+{% endfor -%}

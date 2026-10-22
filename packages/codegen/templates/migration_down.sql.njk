@@ -5,5 +5,5 @@
 #}
 {%- if artifact.doc %}-- {{ artifact.doc }}
 {% endif -%}
--- Generated from the `{{ artifact.name }}` view by @em/codegen.
+-- Generated from {{ origin }} by @em/codegen.
 DROP TABLE IF EXISTS "{{ table }}";

@@ -1,5 +1,6 @@
 use std::sync::Arc;
-
+{% if hasViews %}use sqlx::PgPool;
+{% endif %}
 /// Shared application state handed to every command and query handler.
 ///
 /// Generic over the event store `E` and the snapshot store `S`, so the same
@@ -12,6 +13,10 @@ pub struct AppState<E, S = ()> {
 
     /// Optional snapshot store used to speed up model/projection loading.
     pub snapshot_store: Option<Arc<S>>,
+{% if hasViews %}
+    /// PostgreSQL pool used by View reducers and catch-up checkpoints.
+    pool: Option<PgPool>,
+{% endif %}
 }
 
 impl<E, S> AppState<E, S> {
@@ -20,7 +25,8 @@ impl<E, S> AppState<E, S> {
         Self {
             event_store: Arc::new(event_store),
             snapshot_store: None,
-        }
+{% if hasViews %}            pool: None,
+{% endif %}        }
     }
 
     /// Create the state from an already shared event store, without snapshots.
@@ -28,7 +34,8 @@ impl<E, S> AppState<E, S> {
         Self {
             event_store,
             snapshot_store: None,
-        }
+{% if hasViews %}            pool: None,
+{% endif %}        }
     }
 
     /// Replace the event store.
@@ -53,6 +60,18 @@ impl<E, S> AppState<E, S> {
     pub fn snapshots(&self) -> Option<&S> {
         self.snapshot_store.as_deref()
     }
+{% if hasViews %}
+    /// Set the PostgreSQL pool View reducers persist their rows with.
+    pub fn with_pool(mut self, pool: PgPool) -> Self {
+        self.pool = Some(pool);
+        self
+    }
+
+    /// Borrow the PostgreSQL pool, if one is configured.
+    pub fn pool(&self) -> Option<&PgPool> {
+        self.pool.as_ref()
+    }
+{% endif %}
 }
 
 impl<E, S> Clone for AppState<E, S> {
@@ -60,6 +79,7 @@ impl<E, S> Clone for AppState<E, S> {
         Self {
             event_store: Arc::clone(&self.event_store),
             snapshot_store: self.snapshot_store.clone(),
-        }
+{% if hasViews %}            pool: self.pool.clone(),
+{% endif %}        }
     }
 }

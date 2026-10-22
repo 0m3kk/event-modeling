@@ -461,6 +461,11 @@ export const scaffoldGenerator: Generator = {
       app("app_state.rs.njk", "src/state.rs", "merge");
       app("app_extension_mod.rs.njk", "src/extension/mod.rs", "create-only");
       app("app_extension_register.rs.njk", "src/extension/register.rs", "merge");
+      if (hasViews) {
+        // Checkpoints and the shared error bridge used by View reducers and
+        // their catch-up drivers. Pure infrastructure, so it is regenerated.
+        app("app_views.rs.njk", "src/views.rs", "overwrite", {}, extensionHint);
+      }
       if (crate.api) {
         app("app_register.rs.njk", "src/register.rs", "overwrite", {}, extensionHint);
       }

@@ -36,7 +36,12 @@ pub async fn build_state(
     snapshot_store::SNAPSHOT_STORE_MIGRATOR.run(&pool).await?;
 
     let event_store = PostgresEventStore::new(pool.clone());
-    let snapshot_store = PostgresSnapshotStore::new(pool);
+    let snapshot_store = PostgresSnapshotStore::new({% if hasViews %}pool.clone(){% else %}pool{% endif %});
 
-    Ok(AppState::new(event_store).with_snapshot_store(snapshot_store))
+    let state = AppState::new(event_store).with_snapshot_store(snapshot_store);
+{% if hasViews %}
+    Ok(state.with_pool(pool))
+{% else %}
+    Ok(state)
+{% endif %}
 }

@@ -34,6 +34,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let event_store = PostgresEventStore::new(pool.clone());
     let snapshot_store = PostgresSnapshotStore::new(pool.clone());
     let state: State = AppState::new(event_store).with_snapshot_store(snapshot_store);
+{% if hasViews %}
+    let state: State = state.with_pool(pool.clone());
+{% endif -%}
     let registry = ProjectionRegistry::new(state);
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);

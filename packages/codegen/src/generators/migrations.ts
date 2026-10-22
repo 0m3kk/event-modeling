@@ -10,6 +10,11 @@
  *  - the View's `params` (its identity) become the primary key and are always
  *    `NOT NULL`, and the projected fields become `NOT NULL` columns only when
  *    the spec marks them required;
+ *  - every root table also gets the backend read-model bookkeeping columns
+ *    (`last_event_position`, `created_at`, `updated_at`) and an index on the
+ *    position, so reducers can reject stale events and catch-up resumes cheaply;
+ *  - one shared `view_checkpoints` table records how far each View has folded
+ *    the stream; it is pinned to the version epoch so it always applies first;
  *  - a field whose type is an object is **flattened**: a `profile` of type
  *    `AccountProfile { firstName, lastName }` becomes `profile_first_name` and
  *    `profile_last_name`, recursively;
@@ -38,6 +43,14 @@ export interface MigrationColumn {
   type: string;
   /** True when the column accepts `NULL`. */
   nullable: boolean;
+  /** SQL default expression, e.g. `0` or `NOW()`. */
+  default?: string;
+}
+
+/** An index created alongside a table. */
+export interface MigrationIndex {
+  name: string;
+  columns: string[];
 }
 
 /** A foreign key constraint (used by child tables for arrays of objects). */
@@ -53,6 +66,8 @@ export interface PlannedTable {
   columns: MigrationColumn[];
   primaryKey: string[];
   foreignKeys: MigrationForeignKey[];
+  /** Extra indexes beyond the primary key. */
+  indexes: MigrationIndex[];
   /** True for the table that mirrors the View struct, false for child tables. */
   root: boolean;
   /** Notes about types with no direct SQL mapping. */
@@ -206,6 +221,7 @@ function createChildTable(
         referencedColumns: [...owner.primaryKey],
       },
     ],
+    indexes: [],
     root: false,
     notes: [],
   };
@@ -253,6 +269,19 @@ function planFields(
   }
 }
 
+/**
+ * Columns every materialized View table carries, mirroring the backend read
+ * models: reducers advance `last_event_position` with the event they applied so
+ * a replayed or out-of-order event cannot overwrite newer data, while the
+ * timestamps make a row's age visible. They are skipped when the spec already
+ * declares a column with the same name.
+ */
+const VIEW_SYSTEM_COLUMNS: MigrationColumn[] = [
+  { name: "last_event_position", type: "bigint", nullable: false, default: "0" },
+  { name: "created_at", type: "timestamptz", nullable: false, default: "NOW()" },
+  { name: "updated_at", type: "timestamptz", nullable: false, default: "NOW()" },
+];
+
 /** Plans every table a View generates: its own table plus a table per object array. */
 export function planView(view: IrArtifact, types: Map<string, IrArtifact>): PlannedTable[] {
   const sql: SqlTypeContext = { types, notes: [] };
@@ -268,12 +297,29 @@ export function planView(view: IrArtifact, types: Map<string, IrArtifact>): Plan
     columns: primaryKey.map((column) => ({ ...column })),
     primaryKey: primaryKey.map((column) => column.name),
     foreignKeys: [],
+    indexes: [],
     root: true,
     notes: [],
   };
   plan.tables.push(root);
 
   planFields(view.fields ?? [], root, "", false, plan);
+
+  // Add the bookkeeping columns after the projected fields so the spec's own
+  // columns keep their natural order, and skip any name the spec already uses.
+  const taken = new Set(root.columns.map((column) => column.name));
+  for (const column of VIEW_SYSTEM_COLUMNS) {
+    if (taken.has(column.name)) {
+      root.notes.push(`the spec already declares \`${column.name}\`; generated bookkeeping skipped`);
+      continue;
+    }
+    root.columns.push({ ...column });
+    taken.add(column.name);
+  }
+  root.indexes.push({
+    name: `idx_${view.fileName}_last_event_pos`,
+    columns: ["last_event_position"],
+  });
 
   if (root.primaryKey.length === 0) root.notes.push("the view declares no params; the table has no primary key");
   root.notes.push(...sql.notes);
@@ -296,9 +342,11 @@ function allocateBlock(viewTable: string, count: number, taken: Set<number>): nu
 
 /** Renders the `up`/`down` SQL for one planned table. */
 function renderTableJobs(view: IrArtifact, table: PlannedTable, version: number, crate: IrCrate): RenderJob[] {
-  const lines = table.columns.map(
-    (column) => `"${column.name}" ${column.type}${column.nullable ? "" : " NOT NULL"}`,
-  );
+  const lines = table.columns.map((column) => {
+    const suffix = column.nullable ? "" : " NOT NULL";
+    const fallback = column.default ? ` DEFAULT ${column.default}` : "";
+    return `"${column.name}" ${column.type}${suffix}${fallback}`;
+  });
   if (table.primaryKey.length > 0) {
     lines.push(`PRIMARY KEY (${table.primaryKey.map((key) => `"${key}"`).join(", ")})`);
   }
@@ -308,13 +356,26 @@ function renderTableJobs(view: IrArtifact, table: PlannedTable, version: number,
     lines.push(`FOREIGN KEY (${columns}) REFERENCES "${foreignKey.references}" (${referenced})`);
   }
 
+  const indexSql = table.indexes.map(
+    (index) =>
+      `CREATE INDEX IF NOT EXISTS "${index.name}" ON "${table.name}" (${index.columns
+        .map((column) => `"${column}"`)
+        .join(", ")});`,
+  );
+
   const name = `${version}_create_${table.name}`;
+  const origin =
+    view.name === "ViewCheckpoints"
+      ? "the shared View checkpoint table"
+      : `the \`${view.name}\` view`;
   const context = {
     crate,
     artifact: view,
     table: table.name,
     version: String(version),
+    origin,
     lines,
+    indexSql,
     primaryKey: table.primaryKey,
     notes: table.notes,
   };
@@ -322,6 +383,27 @@ function renderTableJobs(view: IrArtifact, table: PlannedTable, version: number,
     { template: "migration_up.sql.njk", outPath: `migrations/${name}.up.sql`, context },
     { template: "migration_down.sql.njk", outPath: `migrations/${name}.down.sql`, context },
   ];
+}
+
+/**
+ * The shared checkpoint table. It replaces the backend's generic `kv` lookup
+ * with a dedicated table, so a View's progress is readable (and queryable)
+ * without decoding JSON blobs.
+ */
+function checkpointTable(): PlannedTable {
+  return {
+    name: "view_checkpoints",
+    columns: [
+      { name: "view_name", type: "text", nullable: false },
+      { name: "position", type: "bigint", nullable: false, default: "0" },
+      { name: "updated_at", type: "timestamptz", nullable: false, default: "NOW()" },
+    ],
+    primaryKey: ["view_name"],
+    foreignKeys: [],
+    indexes: [],
+    root: true,
+    notes: [],
+  };
 }
 
 /** One `up`/`down` migration pair per table across every View. */
@@ -339,6 +421,20 @@ export function migrationJobs(crate: IrCrate): RenderJob[] {
   const ordered = [...views].sort((a, b) => a.fileName.localeCompare(b.fileName));
   const taken = new Set<number>();
   const jobs: RenderJob[] = [];
+
+  // Checkpoints are infrastructure for every View, so pin their version to the
+  // epoch: it always sorts before the view blocks allocated after it.
+  const checkpoint = checkpointTable();
+  const checkpointArtifact: IrArtifact = {
+    kind: "view",
+    name: "ViewCheckpoints",
+    rustName: "ViewCheckpoints",
+    fileName: checkpoint.name,
+    modulePath: [],
+    doc: "Per-view catch-up checkpoints.",
+  };
+  taken.add(MIGRATION_EPOCH);
+  jobs.push(...renderTableJobs(checkpointArtifact, checkpoint, MIGRATION_EPOCH, crate));
 
   for (const view of ordered) {
     const tables = planView(view, types);

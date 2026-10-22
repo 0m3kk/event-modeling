@@ -143,6 +143,13 @@ export interface IrArtifact {
   eventImports?: IrEventImport[];
   /** Present for state/view projections: notes about items that could not resolve. */
   projectionNotes?: string[];
+  /**
+   * Present for state/view projections: every event type literal the query
+   * subscribes to, snake_cased and sorted. Used for static event-type routing.
+   */
+  queryEventTypes?: string[];
+  /** True when a query item declares no event types and therefore matches any event type. */
+  matchesAnyEventType?: boolean;
   /** Present for enum types. */
   variants?: IrEnumVariant[];
   /** Present for `type` artifacts. */

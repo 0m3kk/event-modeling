@@ -8,6 +8,8 @@
 {% endif -%}
 {% if worker %}pub mod projections;
 {% endif -%}
+{% if hasViews %}pub mod views;
+{% endif -%}
 pub mod error;
 pub mod extension;
 pub mod state;

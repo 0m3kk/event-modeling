@@ -417,6 +417,17 @@ function resolveProjection(artifact: IrArtifact, eventIndex: Map<string, IrArtif
     notes.push("no query items declared; the query matches nothing");
   }
 
+  // Event types the view subscribes to, used to route NOTIFY payloads to the
+  // views that actually fold them. An item without types matches any type.
+  const eventTypes = new Set<string>();
+  let matchesAny = false;
+  for (const item of artifact.queryItems ?? []) {
+    if (item.typeRefs.length === 0) matchesAny = true;
+    for (const ref of item.typeRefs) eventTypes.add(ref.literal);
+  }
+  artifact.queryEventTypes = Array.from(eventTypes).sort((a, b) => a.localeCompare(b));
+  artifact.matchesAnyEventType = matchesAny;
+
   artifact.projectionEvents = Array.from(events.values());
   artifact.eventImports = Array.from(imports.values())
     .map((entry) => ({

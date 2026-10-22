@@ -427,6 +427,8 @@ states:
       { literal: "order_shipped", rustName: "OrderShipped" },
     ]);
     expect(state.projectionEvents!.map((e) => e.rustName)).toEqual(["OrderPlaced", "OrderShipped"]);
+    expect(state.queryEventTypes).toEqual(["order_placed", "order_shipped"]);
+    expect(state.matchesAnyEventType).toBe(false);
     expect(state.eventImports).toEqual([
       { modulePath: ["domains", "sales", "events"], names: ["OrderPlaced"] },
       { modulePath: ["domains", "shipping", "events"], names: ["OrderShipped"] },
@@ -538,6 +540,8 @@ states:
     ]);
     expect(state.queryItems![0].tags).toEqual([]);
     expect(state.queryItems![0].typeRefs).toEqual([{ literal: "ghost_event" }]);
+    expect(state.queryEventTypes).toEqual(["ghost_event"]);
+    expect(state.matchesAnyEventType).toBe(false);
     expect(state.projectionEvents).toEqual([]);
   });
 

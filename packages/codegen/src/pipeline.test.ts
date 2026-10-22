@@ -371,13 +371,17 @@ describe("run", () => {
     expect(file).toContain("#[async_trait::async_trait]");
     expect(file).toContain("pub trait OrderListViewReducer");
     expect(file).toContain("type Error;");
-    expect(file).toContain(
-      "async fn on_order_placed(&self, state: &mut OrderListView, event: &OrderPlaced) -> Result<(), Self::Error>;",
-    );
+    expect(file).toContain("async fn on_order_placed(");
+    expect(file).toContain("position: SequencePosition,");
     expect(file).toContain("OrderListViewError<E::Error, R::Error>");
     expect(file).toContain(".map_err(OrderListViewError::Reducer)?;");
     expect(file).toContain("use crate::DomainEvent;");
     expect(file).toContain("if event.event_type == OrderPlaced::event_type() {");
+    expect(file).toContain('pub const TABLE_NAME: &\'static str = "order_list_view";');
+    expect(file).toContain("pub fn matches_event_type(event_type: &str) -> bool");
+    expect(file).toContain('["order_placed"].contains(&event_type)');
+    expect(file).toContain("pub fn stream_query() -> Query");
+    expect(file).toContain("pub async fn load_stream_since<E, R>");
 
     expect(await read("Cargo.toml")).toContain('async-trait = { version = "0.1" }');
   });
@@ -487,9 +491,10 @@ describe("run", () => {
     const migrations = result.files
       .map((file) => file.path)
       .filter((filePath) => filePath.startsWith("migrations/"));
-    // Two tables for OrderListView (its own + the items child) and one for
-    // OrderSummaryView, each with an `up` and a `down` file.
-    expect(migrations).toHaveLength(6);
+    // Two tables for OrderListView (its own + the items child), one for
+    // OrderSummaryView and the shared checkpoint table, each with an `up` and a
+    // `down` file.
+    expect(migrations).toHaveLength(8);
     for (const path of migrations) {
       // A stable, timestamp-shaped sqlx version prefix and the reversible suffix.
       expect(path).toMatch(/^migrations\/\d{14}_create_[a-z0-9_]+\.(up|down)\.sql$/);
@@ -538,6 +543,25 @@ describe("run", () => {
     // The parent table is created before the child it references.
     const versionOf = (path: string) => Number(path.split("/")[1].split("_")[0]);
     expect(versionOf(find("order_list_view_items.", "up"))).toBeGreaterThan(
+      versionOf(find("order_list_view.", "up")),
+    );
+
+    // Every materialized view carries its bookkeeping columns plus an index, so
+    // a reducer can reject stale events and the worker can resume cheaply.
+    expect(up).toContain('"last_event_position" bigint NOT NULL DEFAULT 0,');
+    expect(up).toContain('"created_at" timestamptz NOT NULL DEFAULT NOW(),');
+    expect(up).toContain('"updated_at" timestamptz NOT NULL DEFAULT NOW(),');
+    expect(up).toContain(
+      'CREATE INDEX IF NOT EXISTS "idx_order_list_view_last_event_pos" ON "order_list_view" ("last_event_position");',
+    );
+
+    // One shared checkpoint table, versioned before the views it serves.
+    const checkpoint = await read(find("view_checkpoints.", "up"));
+    expect(checkpoint).toContain('CREATE TABLE IF NOT EXISTS "view_checkpoints" (');
+    expect(checkpoint).toContain('"view_name" text NOT NULL,');
+    expect(checkpoint).toContain('"position" bigint NOT NULL DEFAULT 0,');
+    expect(checkpoint).toContain('PRIMARY KEY ("view_name")');
+    expect(versionOf(find("view_checkpoints.", "up"))).toBeLessThan(
       versionOf(find("order_list_view.", "up")),
     );
 
@@ -1104,9 +1128,12 @@ describe("run", () => {
     const file = await read("src/domains/sales/states/order_state.rs");
     expect(file).toContain("use event_store::{EventStore, Query, QueryItem, SequencePosition};");
     expect(file).toContain("Result<(Self, Option<SequencePosition>), OrderStateError<E::Error>>");
+    expect(file).toContain("pub async fn load_since<E, R>");
+    expect(file).not.toContain("load_stream_since");
     expect(file).toContain("let mut position: Option<SequencePosition> = None;");
-    expect(file).toContain("position = Some(sequenced.position);");
-    expect(file).toContain("Ok((self, position))");
+    expect(file).toContain("let event_position = sequenced.position;");
+    expect(file).toContain("position = Some(event_position);");
+    expect(file).toContain("Ok((self, position, applied))");
   });
 
   it("scaffolds a workspace, an application crate and a server crate", async () => {
@@ -1630,6 +1657,7 @@ describe("run", () => {
     expect(paths).toContain("crates/shop-worker/src/worker/leader.rs");
     expect(paths).toContain("crates/shop-worker/README.md");
     expect(paths).toContain("crates/shop-app/src/projections/mod.rs");
+    expect(paths).toContain("crates/shop-app/src/views.rs");
     expect(paths).toContain(
       "crates/shop-app/src/domains/shipping/views/order_shipping_view/mod.rs",
     );
@@ -1648,6 +1676,10 @@ describe("run", () => {
     expect(registry).toContain(
       "crate::domains::shipping::views::order_shipping_view::catchup(&self.state)",
     );
+    expect(registry).toContain("pub async fn catchup_on_event(&self, event_type: &str)");
+    expect(registry).toContain(
+      "crate::domains::shipping::views::order_shipping_view::matches_event_type(event_type)",
+    );
 
     const viewMod = await readFromRoot(
       "crates/shop-app/src/domains/shipping/views/order_shipping_view/mod.rs",
@@ -1655,10 +1687,16 @@ describe("run", () => {
     expect(viewMod).toContain(
       "use shop::domains::shipping::views::{OrderShippingView, OrderShippingViewReducer};",
     );
-    expect(viewMod).toContain("pub struct OrderShippingViewReducerImpl;");
+    expect(viewMod).toContain("pub struct OrderShippingViewReducerImpl<E, S = ()>");
     expect(viewMod).toContain("pub async fn catchup<E, S>");
-    expect(viewMod).toContain('todo!("project OrderShippingView")');
+    expect(viewMod).toContain("load_stream_since(state.event_store.as_ref(), &reducer, from)");
+    expect(viewMod).toContain("last_position(pool, OrderShippingView::TABLE_NAME)");
+    expect(viewMod).toContain('todo!("project OrderShipped into OrderShippingView")');
     expect(viewMod).not.toContain("pub use");
+
+    expect(await readFromRoot("crates/shop-app/src/views.rs")).toContain(
+      "SELECT \"position\" FROM \"view_checkpoints\"",
+    );
 
     const appLib = await readFromRoot("crates/shop-app/src/lib.rs");
     expect(appLib).toContain("pub mod projections;");
@@ -1667,7 +1705,16 @@ describe("run", () => {
     const loop = await readFromRoot("crates/shop-worker/src/worker/mod.rs");
     expect(loop).toContain("use shop_app::ProjectionRegistry;");
     expect(loop).toContain("self.registry.catchup_all().await");
+    expect(loop).toContain("self.registry.catchup_on_event(event_type).await");
     expect(loop).toContain("PgListener::connect_with");
+
+    const appState = await readFromRoot("crates/shop-app/src/state.rs");
+    expect(appState).toContain("pub fn with_pool(mut self, pool: PgPool) -> Self");
+    expect(appState).toContain("pub fn pool(&self) -> Option<&PgPool>");
+    expect(await readFromRoot("crates/shop-app/Cargo.toml")).toContain("sqlx");
+    expect(await readFromRoot("crates/shop-worker/src/main.rs")).toContain(
+      "with_pool(pool.clone())",
+    );
 
     const leader = await readFromRoot("crates/shop-worker/src/worker/leader.rs");
     expect(leader).toContain("pg_try_advisory_lock");

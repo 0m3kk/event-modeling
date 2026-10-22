@@ -1,0 +1,63 @@
+//! Read-model catch-up support.
+//!
+//! Each View records how far it has folded the event stream in the
+//! `view_checkpoints` table, so a restarted worker resumes at the next event
+//! instead of replaying the whole store. The table is emitted by the
+//! `views.migrations` generator; when migrations are off, provision it
+//! yourself.
+
+use event_store::SequencePosition;
+use sqlx::PgPool;
+
+use crate::AppError;
+
+/// Read the last processed position for `view`, if it has run before.
+pub async fn last_position(
+    pool: &PgPool,
+    view: &str,
+) -> Result<Option<SequencePosition>, sqlx::Error> {
+    let position: Option<i64> = sqlx::query_scalar(
+        r#"SELECT "position" FROM "view_checkpoints" WHERE "view_name" = $1"#,
+    )
+    .bind(view)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(position.and_then(|position| u64::try_from(position).ok()))
+}
+
+/// Advance the checkpoint of `view` to `position`.
+///
+/// The upsert only moves forward, so a late or replayed event can never rewind
+/// a view. `position` is the sequence position of the last event applied.
+pub async fn update_position(
+    pool: &PgPool,
+    view: &str,
+    position: SequencePosition,
+) -> Result<(), sqlx::Error> {
+    let position = i64::try_from(position).unwrap_or(i64::MAX);
+    sqlx::query(
+        r#"
+        INSERT INTO "view_checkpoints" ("view_name", "position", "updated_at")
+        VALUES ($1, $2, NOW())
+        ON CONFLICT ("view_name") DO UPDATE SET
+            "position" = EXCLUDED."position",
+            "updated_at" = NOW()
+        WHERE "view_checkpoints"."position" < EXCLUDED."position"
+        "#,
+    )
+    .bind(view)
+    .bind(position)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Turn an infrastructure failure into the application's internal error.
+///
+/// Reducers can use this for `sqlx` and event-store errors without importing
+/// the concrete `AppError` shape (which differs when the API generator is on).
+pub fn internal(error: impl std::fmt::Display) -> AppError {
+    AppError::Internal(error.to_string())
+}

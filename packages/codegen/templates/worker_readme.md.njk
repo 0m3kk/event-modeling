@@ -25,6 +25,8 @@ cargo run -p {{ workerCrate }}
 Configuration is read from `CONFIG_FILE` / `SECRET_FILE` (or the
 `config.yaml` / `secrets.yaml` copies in the workspace root), with
 `DATABASE_URL` overriding the connection settings. The runtime options live
-under the `worker` key and default to sane values. Every `catchup` driver the
-worker calls is a stub next to the View reducer in the `{{ appCrate }}` crate:
-implement `crate::domains::<domain>::views::<view>::catchup` to project each View.
+under the `worker` key and default to sane values. Each `catchup` driver is
+generated: it resumes from `view_checkpoints`, folds the matching events and
+advances the checkpoint. Implement the `on_<event>` reducer bodies in
+`crates/{{ appCrate }}/src/domains/<domain>/views/<view>/mod.rs` to write each
+row (an idempotent upsert against the View's `TABLE_NAME`).

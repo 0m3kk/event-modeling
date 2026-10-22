@@ -395,10 +395,24 @@ query, and a `load` driver:
   each event `type` becomes `<Event>::event_type()` (falling back to a literal
   snake_case string when it does not resolve to a generated event) and each
   `tag` (normalized to snake_case) renders as `format!("{tag}:{}", self.<param>)`.
+- `fn stream_query() -> event_store::Query` — **Views only**: the same query
+  with the tags dropped, so a materialized View can replay every entity at once
+  instead of filtering on one instance's params.
+- `fn matches_event_type(event_type) -> bool` — **Views only**: static check
+  used by the projection worker to skip views that an appended event cannot
+  affect.
+- `const TABLE_NAME` — **Views only**: the physical table a View is materialized
+  into (and its checkpoint key).
 - `async fn load(self, store, reducer)` — reads every matching event from an
   `event_store::EventStore`, folds it through the reducer, and returns the
   projection **and the [`SequencePosition`] of the last event folded** so the
   caller can build an `AppendCondition` for optimistic concurrency.
+- `async fn load_since(self, store, reducer, from)` — the same fold starting at
+  an inclusive position, returning `(projection, last_position, applied_count)`
+  so a catch-up can resume from a checkpoint and report progress.
+- `async fn load_stream_since(self, store, reducer, from)` — **Views only**: the
+  whole-read-model variant used by the worker; it folds `stream_query()` rather
+  than the instance query.
 
 Use it as:
 
@@ -423,9 +437,34 @@ A **State** is folded in memory, so its reducer methods are plain, sync and
 infallible (`fn on_...(...)`), and its error enum is `<Name>Error<E>`. A
 **View** persists (or otherwise performs side effects) while folding, so its
 reducer is `#[async_trait::async_trait]` with an associated `Error` type and
-`async fn ... -> Result<(), Self::Error>` methods; its error enum is
-`<Name>Error<E, R>` with an extra `Reducer` variant, and `async-trait` is added
-to the crate.
+`async fn ...(state, event, position) -> Result<(), Self::Error>` methods; its
+error enum is `<Name>Error<E, R>` with an extra `Reducer` variant, and
+`async-trait` is added to the crate. The `position` lets a handler store the
+applied event's sequence position in the row.
+
+### Materializing a View
+
+A View is a **persisted read model**, so the scaffold turns it into a working
+catch-up pipeline rather than a stub:
+
+- the application crate gains `src/views.rs` with `last_position` /
+  `update_position`, backed by a `view_checkpoints` table;
+- each View's reducer implementation carries the shared `AppState`, so its
+  `on_<event>` methods can reach the PostgreSQL pool (`self.state.pool()`) and
+  idempotently upsert rows using `<View>::TABLE_NAME` and the folded event's
+  `position`;
+- each View's `catchup` driver reads the checkpoint, calls
+  `load_stream_since`, folds every matching event, advances the checkpoint and
+  returns the projected event count;
+- `AppState` gains an optional pool (`with_pool` / `pool`), wired by the server
+  and the worker; `src/views.rs` also exposes `internal(error)` so reducers can
+  map infrastructure failures onto the application error type.
+
+Only the business mapping — which event fields land in which columns, and how a
+delete removes a row — stays in the reducer implementation. The generated code
+owns the resume position, batching loop, event decoding and checkpoint
+monotonicity (the `UPDATE … WHERE position < EXCLUDED.position` guard means a
+replayed event can never rewind a view).
 
 Events named in a query that are not in the spec, and tags that do not bind to a
 param, are dropped and reported as `// note:` comments at the top of the file —
@@ -446,6 +485,8 @@ generators: {
 
 ```
 crates/shop/migrations/
+  20240101000000_create_view_checkpoints.up.sql
+  20240101000000_create_view_checkpoints.down.sql
   20240109603210_create_order_shipping_view.up.sql
   20240109603210_create_order_shipping_view.down.sql
 ```
@@ -461,8 +502,13 @@ crates/shop/migrations/
 CREATE TABLE IF NOT EXISTS "order_shipping_view" (
     "order_id" text NOT NULL,
     "shipped_at" text,
+    "last_event_position" bigint NOT NULL DEFAULT 0,
+    "created_at" timestamptz NOT NULL DEFAULT NOW(),
+    "updated_at" timestamptz NOT NULL DEFAULT NOW(),
     PRIMARY KEY ("order_id")
 );
+
+CREATE INDEX IF NOT EXISTS "idx_order_shipping_view_last_event_pos" ON "order_shipping_view" ("last_event_position");
 ```
 
 ```sql
@@ -480,6 +526,14 @@ The schema mirrors the generated Rust struct, targeting **PostgreSQL**:
   `NOT NULL`;
 - projected fields keep the spec's optionality (`NOT NULL` when `required:
   true`, nullable otherwise), using the snake_case field names;
+- every root table also carries the backend read-model bookkeeping columns:
+  `last_event_position` (advanced by the reducer and used to reject stale
+  events), `created_at` and `updated_at`, plus an index on the position. A
+  spec column with one of those names wins and the generated column is skipped
+  with a `-- note:`;
+- a single `view_checkpoints` table (`view_name`, `position`, `updated_at`) is
+  emitted once per migration set, pinned to the version epoch so it always
+  applies before the tables it serves;
 - types map to `text`, `boolean`, `smallint` / `integer` / `bigint`, `real` /
   `double precision`; `uuid`, `timestamptz`, `date` and `time` are recognised
   from the configured `typeMap` (for example `uuid: "uuid::Uuid"`), and arrays
@@ -531,7 +585,8 @@ domain, one folder per kind, and a self-contained module directory per item:
 crates/shop-app/src/
   lib.rs                 # module tree (regenerated)
   error.rs               # AppError (the generated ApiError)
-  state.rs               # AppState<E>, generic over the event store
+  state.rs               # AppState<E>, generic over the event store (and pool)
+  views.rs               # View checkpoints + error bridge (when Views exist)
   register.rs            # registers every handler on the generated Api
   extension/
     mod.rs               # create-only: declare your own modules here
@@ -605,9 +660,9 @@ already excludes `config.yaml`, `secrets.yaml` and `.env`.
 
 Scaffold files use three regeneration strategies:
 
-- **Wiring is overwritten.** `lib.rs`, `register.rs`, `domains/mod.rs` and every
-  domain/kind `mod.rs` are regenerated on every run and carry the do-not-edit
-  banner. Project code belongs in `src/extension/`:
+- **Wiring is overwritten.** `lib.rs`, `register.rs`, `views.rs`,
+  `domains/mod.rs` and every domain/kind `mod.rs` are regenerated on every run
+  and carry the do-not-edit banner. Project code belongs in `src/extension/`:
   - `extension/mod.rs` (create-only) — declare your own modules.
   - `extension/register.rs` (merge) — add routes after the generated ones;
     `register.rs` calls it last.
@@ -687,11 +742,15 @@ nothing to project otherwise. It builds on the application crate, which gains a
 `projections` module:
 
 - `src/projections/mod.rs` — `ProjectionRegistry<E, S>`, a generated list of the
-  view catch-up drivers; `catchup_all()` calls them in turn.
-- `src/domains/<domain>/views/<view>/mod.rs` — one `catchup<E, S>(state)` stub per
-  View. It is a `todo!()` you fill in (load the read model with
-  `<View>::load`, persist it idempotently, return the projected event count).
-  The registry calls it on every tick and notification.
+  view catch-up drivers. `catchup_all()` runs them all; `catchup_on_event()`
+  filters through each View's `matches_event_type` so a notification for one
+  event type only replays the views that subscribe to it.
+- `src/domains/<domain>/views/<view>/mod.rs` — a generated `catchup<E, S>(state)`
+  driver per View: it reads `view_checkpoints`, folds `load_stream_since`, writes
+  the checkpoint and returns the projected count. Only the reducer's
+  `on_<event>` bodies (the row upserts) are left for the project.
+- `src/views.rs` — shared `last_position` / `update_position` helpers over
+  `view_checkpoints`, plus `internal(error)` for reducers.
 
 ```ts
 scaffold: {
@@ -783,9 +842,10 @@ Built-in filters: `snake`, `pascal`, `camel`, `kebab`, `doccomment`,
 Useful `artifact` fields: `rustName`, `fileName`, `modulePath`, `doc`, `fields`
 (each with `rustName`, `rustType`, `valueType`, `optional`, `array`,
 `needsRename`, `doc`), `variants` (enums), `aliasOf` (aliases), `methods`
-(services), `action`. State
-and View artifacts also expose `params`, `queryItems`, `projectionEvents`,
-`eventImports` and `projectionNotes`.
+(services), `action`. State and View artifacts also expose `params`,
+`queryItems`, `projectionEvents`, `eventImports`, `projectionNotes`,
+`queryEventTypes` and `matchesAnyEventType` (the inputs of the static
+event-type matcher).
 
 ## Extending
 
