@@ -70,7 +70,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: applyContainerLayout(fitElementsToContent([...state.elements, uniqueElement])),
+      elements: applyContainerLayout(fitElementsToContent([...state.elements, uniqueElement]), current),
       selectedIds: [uniqueElement.id],
       selectedField: null,
       inlineEdit: null,
@@ -90,7 +90,10 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: applyContainerLayout(fitElementsToContent([...state.elements, ...processed])),
+      elements: applyContainerLayout(
+        fitElementsToContent([...state.elements, ...processed]),
+        current,
+      ),
       selectedIds: processed.map((e) => e.id),
       selectedField: null,
       inlineEdit: null,
@@ -208,7 +211,10 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       redoStack: [],
       // Only re-fit when content changed; pure geometry moves (drag, resize)
       // keep the width/height the user set.
-      elements: applyContainerLayout(finalPatch.data ? fitElementsToContent(renamed) : renamed),
+      elements: applyContainerLayout(
+        finalPatch.data ? fitElementsToContent(renamed) : renamed,
+        current,
+      ),
     }));
     if (patchTouchesModeling(patch)) {
       changeRecorder.recordDiff(current, get().elements, "Update card");
@@ -245,6 +251,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       // width/height the user set.
       elements: applyContainerLayout(
         finalPatches.some((p) => p.data) ? fitElementsToContent(updatedElements) : updatedElements,
+        current,
       ),
     }));
     if (finalPatches.some(patchTouchesModeling)) {
@@ -286,7 +293,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
-      elements: applyContainerLayout(cleaned),
+      elements: applyContainerLayout(cleaned, current),
       selectedIds: state.selectedIds.filter((id) => !idSet.has(id)),
       selectedField:
         state.selectedField && idSet.has(state.selectedField.elementId)

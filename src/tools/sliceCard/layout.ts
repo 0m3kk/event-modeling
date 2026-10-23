@@ -38,7 +38,8 @@ export interface SliceLane {
   /**
    * Tool type this lane is reserved for. Set by AI/spec-created lanes and
    * enforced on drop; manual lanes leave it unset and adopt the first card
-   * dropped in (and revert to "any" once emptied).
+   * dropped in (and revert to "any" once emptied). A reserved lane also
+   * releases its type once its last card has left (see `reflowSlices`).
    */
   childType?: string | null;
 }
@@ -56,6 +57,19 @@ export function createSliceLane(childType?: string | null): SliceLane {
   const lane: SliceLane = { id: `lane-${nanoid(6)}` };
   if (childType) lane.childType = childType;
   return lane;
+}
+
+/**
+ * Moves a lane to another index, preserving every lane's id so its cards stay
+ * attached. Returns the same array when the move is a no-op or out of bounds.
+ */
+export function moveSliceLane(lanes: SliceLane[], from: number, to: number): SliceLane[] {
+  if (from === to) return lanes;
+  if (from < 0 || from >= lanes.length || to < 0 || to >= lanes.length) return lanes;
+  const next = [...lanes];
+  const [lane] = next.splice(from, 1);
+  next.splice(to, 0, lane);
+  return next;
 }
 
 /**
@@ -455,8 +469,16 @@ export function normalizeSliceData(data: SliceData): SliceData {
  * longer exists (or whose type violates the lane's single-type rule), then
  * re-sizes slices and repositions cards. Returns the same array reference when
  * nothing changed so callers can skip redundant renders.
+ *
+ * `previousElements` (when provided) is the board state before the change. It
+ * lets a reserved lane release its `childType` once its last card leaves, so
+ * the lane becomes an empty "any type" lane again instead of staying locked to
+ * a type it no longer holds.
  */
-export function reflowSlices(elements: CanvasElement[]): CanvasElement[] {
+export function reflowSlices(
+  elements: CanvasElement[],
+  previousElements?: CanvasElement[],
+): CanvasElement[] {
   const sliceById = new Map<string, SliceElement>();
   for (const el of elements) {
     if (el.type === SLICE_TYPE) sliceById.set(el.id, el as SliceElement);
@@ -473,10 +495,23 @@ export function reflowSlices(elements: CanvasElement[]): CanvasElement[] {
   // of its left-most card.
   const validChildren = new Map<string, CanvasElement[]>();
   const validIds = new Set<string>();
+  const workingSlices = new Map<string, SliceElement>();
+  const releasedTypes = new Map<string, SliceData>();
+
+  // Previous children are only needed to tell "a reserved lane that has never
+  // held a card" (keep its type, e.g. right after the AI creates the slice)
+  // from "a lane whose last card just left" (release the type).
+  const previousKidsBySlice = new Map<string, CanvasElement[]>();
+  if (previousElements) {
+    for (const sliceId of sliceById.keys()) {
+      previousKidsBySlice.set(sliceId, getSliceChildren(previousElements, sliceId));
+    }
+  }
 
   for (const slice of sliceById.values()) {
     const sliceKids = getSliceChildren(elements, slice.id);
     const kept: CanvasElement[] = [];
+    const keptByLane = new Map<string, number>();
 
     for (const lane of slice.data.lanes ?? []) {
       const laneKids = sliceKids
@@ -484,12 +519,43 @@ export function reflowSlices(elements: CanvasElement[]): CanvasElement[] {
         .sort((a, b) => a.x - b.x || a.y - b.y);
       const enforced = laneEffectiveType(lane, laneKids);
 
+      let count = 0;
       for (const kid of laneKids) {
         if (!isSliceEligibleChild(kid.type)) continue;
         if (enforced !== null && kid.type !== enforced) continue;
         kept.push(kid);
         validIds.add(kid.id);
+        count++;
       }
+      keptByLane.set(lane.id, count);
+    }
+
+    const previousKids = previousKidsBySlice.get(slice.id);
+    const previousLaneIds = previousKids
+      ? new Set(previousKids.map((kid) => kid.laneId))
+      : null;
+    const lanes = slice.data.lanes ?? [];
+    let releaseIds: Set<string> | null = null;
+
+    if (previousLaneIds) {
+      for (const lane of lanes) {
+        if (!lane.childType) continue;
+        if ((keptByLane.get(lane.id) ?? 0) > 0) continue;
+        if (!previousLaneIds.has(lane.id)) continue;
+        (releaseIds ??= new Set<string>()).add(lane.id);
+      }
+    }
+
+    const nextLanes = releaseIds
+      ? lanes.map((lane) => (releaseIds!.has(lane.id) ? { id: lane.id } : lane))
+      : null;
+
+    if (nextLanes) {
+      const data: SliceData = { ...slice.data, lanes: nextLanes };
+      releasedTypes.set(slice.id, data);
+      workingSlices.set(slice.id, { ...slice, data });
+    } else {
+      workingSlices.set(slice.id, slice);
     }
 
     validChildren.set(slice.id, kept);
@@ -508,12 +574,16 @@ export function reflowSlices(elements: CanvasElement[]): CanvasElement[] {
   const byId = new Map<string, CanvasElement>();
   for (const el of elements) byId.set(el.id, el);
 
-  for (const slice of sliceById.values()) {
+  for (const slice of workingSlices.values()) {
     const kids = validChildren.get(slice.id) ?? [];
     const layout = computeSliceLayout(slice, kids);
-
-    if (slice.width !== layout.width || slice.height !== layout.height) {
-      patches.set(slice.id, { width: layout.width, height: layout.height });
+    const data = releasedTypes.get(slice.id);
+    const resized = slice.width !== layout.width || slice.height !== layout.height;
+    if (resized || data) {
+      patches.set(slice.id, {
+        ...(resized ? { width: layout.width, height: layout.height } : {}),
+        ...(data ? { data } : {}),
+      });
     }
 
     for (const [childId, pos] of layout.placements) {

@@ -11,6 +11,7 @@ import {
   computeSliceLayout,
   createSliceLane,
   findSliceDropTarget,
+  moveSliceLane,
   normalizeSliceData,
   orderForRender,
   reflowSlices,
@@ -137,6 +138,25 @@ describe("slice layout", () => {
   });
 });
 
+describe("moveSliceLane", () => {
+  it("moves a lane to a new index while preserving every lane id", () => {
+    const a = createSliceLane("commandCard");
+    const b = createSliceLane("eventCard");
+    const c = createSliceLane("queryCard");
+
+    const moved = moveSliceLane([a, b, c], 0, 2);
+    expect(moved.map((lane) => lane.id)).toEqual([b.id, c.id, a.id]);
+    expect(moved[2]).toBe(a);
+  });
+
+  it("returns the same list for a no-op or out-of-bounds move", () => {
+    const lanes = [createSliceLane(), createSliceLane()];
+    expect(moveSliceLane(lanes, 0, 0)).toBe(lanes);
+    expect(moveSliceLane(lanes, -1, 1)).toBe(lanes);
+    expect(moveSliceLane(lanes, 0, 5)).toBe(lanes);
+  });
+});
+
 describe("normalizeSliceData", () => {
   it("drops duplicate / malformed lane ids", () => {
     const data: SliceData = {
@@ -216,6 +236,50 @@ describe("reflowSlices", () => {
 
     const result = reflowSlices([slice, query]);
     expect(result.find((el) => el.id === "q1")!.sliceId).toBeUndefined();
+  });
+
+  it("releases a reserved lane's type when its last card leaves", () => {
+    const lane = createSliceLane("commandCard");
+    const slice = makeSlice("s1", 0, 0, { name: "Slice", lanes: [lane] });
+    const card = makeCard("c1", "commandCard", 0, 0, { sliceId: "s1", laneId: lane.id });
+    const previous = [slice, card];
+    // The card has been dragged out of the slice in the new board state.
+    const next = [slice, { ...card, sliceId: undefined, laneId: undefined, x: 900, y: 900 }];
+
+    const result = reflowSlices(next, previous);
+    const storedSlice = result.find((el) => el.id === "s1")!;
+
+    expect((storedSlice.data as SliceData).lanes[0]).toEqual({ id: lane.id });
+    expect(result.find((el) => el.id === "c1")!.sliceId).toBeUndefined();
+  });
+
+  it("keeps a reserved lane's type when it has never held a card", () => {
+    const lane = createSliceLane("commandCard");
+    const slice = makeSlice("s1", 0, 0, { name: "Slice", lanes: [lane] });
+
+    // Previous and next boards both have the lane empty, so nothing "left".
+    const result = reflowSlices([slice], [slice]);
+    expect((result.find((el) => el.id === "s1")!.data as SliceData).lanes[0].childType).toBe(
+      "commandCard",
+    );
+  });
+
+  it("keeps a reserved lane's type while at least one card remains", () => {
+    const lane = createSliceLane("commandCard");
+    const slice = makeSlice("s1", 0, 0, { name: "Slice", lanes: [lane] });
+    const leaving = makeCard("c1", "commandCard", 0, 0, { sliceId: "s1", laneId: lane.id });
+    const staying = makeCard("c2", "commandCard", 200, 0, { sliceId: "s1", laneId: lane.id });
+    const previous = [slice, leaving, staying];
+    const next = [
+      slice,
+      { ...leaving, sliceId: undefined, laneId: undefined },
+      staying,
+    ];
+
+    const result = reflowSlices(next, previous);
+    expect((result.find((el) => el.id === "s1")!.data as SliceData).lanes[0].childType).toBe(
+      "commandCard",
+    );
   });
 
   it("detaches ineligible card types that got assigned to a lane", () => {
@@ -342,5 +406,74 @@ describe("slice store integration", () => {
     const storedCard = useCanvasStore.getState().elements.find((el) => el.id === "cmd-1")!;
     expect(storedCard.sliceId).toBeUndefined();
     expect(storedCard.laneId).toBeUndefined();
+  });
+
+  it("reorders lanes without detaching their cards", () => {
+    const commandLane = createSliceLane("commandCard");
+    const eventLane = createSliceLane("eventCard");
+    const sliceData: SliceData = { name: "Slice", lanes: [commandLane, eventLane] };
+    const slice: CanvasElement<SliceData> = {
+      id: "slice-1",
+      type: SLICE_TYPE,
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 200,
+      data: sliceData,
+    };
+    const command = makeCard("cmd-1", "commandCard", 0, 0, {
+      sliceId: "slice-1",
+      laneId: commandLane.id,
+    });
+    const event = makeCard("evt-1", "eventCard", 0, 0, {
+      sliceId: "slice-1",
+      laneId: eventLane.id,
+    });
+
+    useCanvasStore.getState().addElements([slice, command, event]);
+    useCanvasStore.getState().updateElement("slice-1", {
+      data: { ...sliceData, lanes: moveSliceLane(sliceData.lanes, 0, 1) },
+    });
+
+    const stored = useCanvasStore.getState().elements;
+    const storedSlice = stored.find((el) => el.id === "slice-1")!;
+    const storedCommand = stored.find((el) => el.id === "cmd-1")!;
+    const storedEvent = stored.find((el) => el.id === "evt-1")!;
+
+    expect((storedSlice.data as SliceData).lanes.map((lane) => lane.id)).toEqual([
+      eventLane.id,
+      commandLane.id,
+    ]);
+    // Membership survives the move...
+    expect(storedCommand.laneId).toBe(commandLane.id);
+    expect(storedEvent.laneId).toBe(eventLane.id);
+    // ...and the event lane now sits above the command lane.
+    expect(storedEvent.y).toBeLessThan(storedCommand.y);
+  });
+
+  it("releases a reserved lane's type when its last card is dragged out", () => {
+    const lane = createSliceLane("commandCard");
+    const sliceData: SliceData = { name: "Slice", lanes: [lane] };
+    const slice: CanvasElement<SliceData> = {
+      id: "slice-1",
+      type: SLICE_TYPE,
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 200,
+      data: sliceData,
+    };
+    const card = makeCard("cmd-1", "commandCard", 0, 0, {
+      sliceId: "slice-1",
+      laneId: lane.id,
+    });
+
+    useCanvasStore.getState().addElements([slice, card]);
+    useCanvasStore.getState().updateElements([
+      { id: "cmd-1", sliceId: undefined, laneId: undefined, x: 900, y: 900 },
+    ]);
+
+    const storedSlice = useCanvasStore.getState().elements.find((el) => el.id === "slice-1")!;
+    expect((storedSlice.data as SliceData).lanes[0]).toEqual({ id: lane.id });
   });
 });

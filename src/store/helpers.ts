@@ -63,9 +63,15 @@ export function snapshotState(elements: CanvasElement[]): HistoryEntry {
  * lane their cards), then groups (fit a frame around their definition/service
  * /state cards), then domains (fit a dashed frame around their children, which may
  * include slices and groups).
+ *
+ * `previousElements` is the board before the change. Slices use it to release a
+ * lane's reserved type when its last card leaves the lane.
  */
-export function applyContainerLayout(elements: CanvasElement[]): CanvasElement[] {
-  return reflowDomains(reflowGroups(reflowSlices(elements)));
+export function applyContainerLayout(
+  elements: CanvasElement[],
+  previousElements?: CanvasElement[],
+): CanvasElement[] {
+  return reflowDomains(reflowGroups(reflowSlices(elements, previousElements)));
 }
 
 /**
