@@ -42,6 +42,7 @@ const DEFAULT_TYPE_MAP: Record<string, string> = {
   integer: "i64",
   float: "f64",
   boolean: "bool",
+  json: "serde_json::Value",
 };
 
 /** Folder name for each artifact kind. */
@@ -222,6 +223,18 @@ function buildValidations(
     const min = num(validation.min);
     const max = num(validation.max);
     if (min !== undefined || max !== undefined) attrs.push(`range(${rangeArgs(min, max, isFloat)})`);
+  } else if (mappedRust === "serde_json::Value") {
+    // JSON is free-form: string/number constraints cannot be expressed, but a
+    // custom rule is still reported below as a note.
+    if (
+      validation.minLength !== undefined ||
+      validation.maxLength !== undefined ||
+      validation.format !== undefined ||
+      validation.min !== undefined ||
+      validation.max !== undefined
+    ) {
+      notes.push("json fields have no built-in string or numeric constraints");
+    }
   } else {
     const min = num(validation.minLength);
     const max = num(validation.maxLength);
@@ -697,6 +710,7 @@ function collectDeps(
   }
   if (hasRustMarker(artifacts, "Uuid")) deps.push({ name: "uuid", version: "1", features: ["serde", "v7"] });
   if (hasRustMarker(artifacts, "Decimal")) deps.push({ name: "rust_decimal", version: "1" });
+  if (hasRustMarker(artifacts, "serde_json::Value")) deps.push({ name: "serde_json", version: "1" });
   if (
     hasRustMarker(artifacts, "NaiveDate") ||
     hasRustMarker(artifacts, "NaiveTime") ||

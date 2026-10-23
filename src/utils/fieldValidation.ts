@@ -67,16 +67,16 @@ export const FIELD_FORMAT_PRESETS: FieldFormatPreset[] = [
 ];
 
 /** Which constraint group applies to a field, based on its declared type. */
-export type FieldValidationKind = "string" | "number" | "array";
+export type FieldValidationKind = "string" | "number" | "array" | "json";
 
 /** Type names (lowercased) treated as numeric for validation grouping. */
 const NUMERIC_TYPES = new Set(["integer", "float"]);
 
 /**
  * Picks the validation group to surface for a field. Array fields always use
- * item-count bounds; otherwise the declared type decides between numeric range
- * and string length/pattern. Unknown/defined types (e.g. an Alias name) fall
- * back to the string group.
+ * item-count bounds; otherwise the declared type decides between numeric range,
+ * JSON (free-form, so only the custom rule applies) and string length/pattern.
+ * Unknown/defined types (e.g. an Alias name) fall back to the string group.
  */
 export function validationKindFor(
   type: string | undefined,
@@ -85,6 +85,7 @@ export function validationKindFor(
   if (isArray) return "array";
   const key = (type || "").trim().toLowerCase();
   if (NUMERIC_TYPES.has(key)) return "number";
+  if (key === "json") return "json";
   return "string";
 }
 

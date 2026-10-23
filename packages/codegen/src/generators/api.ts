@@ -87,6 +87,9 @@ function isComplexType(type: RustType, typeKinds: Map<string, string>): boolean 
       return isComplexType(type.inner, typeKinds);
     case "named":
       return typeKinds.get(type.name) === "object";
+    case "primitive":
+      // Free-form JSON has no flat query-string representation.
+      return type.name === "serde_json::Value";
     default:
       return false;
   }

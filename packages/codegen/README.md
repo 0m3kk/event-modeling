@@ -535,9 +535,10 @@ The schema mirrors the generated Rust struct, targeting **PostgreSQL**:
   emitted once per migration set, pinned to the version epoch so it always
   applies before the tables it serves;
 - types map to `text`, `boolean`, `smallint` / `integer` / `bigint`, `real` /
-  `double precision`; `uuid`, `timestamptz`, `date` and `time` are recognised
-  from the configured `typeMap` (for example `uuid: "uuid::Uuid"`), and arrays
-  keep their scalar element type (`text[]`, `uuid[]`, …);
+  `double precision`; `json` fields become `jsonb`; `uuid`, `timestamptz`,
+  `date` and `time` are recognised from the configured `typeMap` (for example
+  `uuid: "uuid::Uuid"`), and arrays keep their scalar element type (`text[]`,
+  `uuid[]`, …);
 - **object fields are flattened** rather than stored as JSON. A `profile` of
   type `AccountProfile { firstName, lastName }` becomes the columns
   `profile_first_name` and `profile_last_name`, recursing through nested
@@ -830,10 +831,10 @@ export default defineConfig({
 });
 ```
 
-Primitives map to `String`, `i64`, `f64`, `bool` by default and can be extended
-or overridden through `typeMap`. A required field renders as the bare type; an
-optional field (no `required: true` in the spec) wraps in `Option`, and an
-`array` field in `Vec`.
+Primitives map to `String`, `i64`, `f64`, `bool` and `serde_json::Value` (for
+`json`) by default and can be extended or overridden through `typeMap`. A
+required field renders as the bare type; an optional field (no `required: true`
+in the spec) wraps in `Option`, and an `array` field in `Vec`.
 
 ## Templates
 

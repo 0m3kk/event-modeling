@@ -3,17 +3,19 @@ import { getElementName, nameKey } from "./naming";
 
 /**
  * Built-in primitive field types that are always valid as a field type. This is
- * the whole vocabulary: `string`, `integer`, `float` and `boolean`. Anything
- * else (a UUID, a date, a timestamp, an email...) is modelled as a `string`
- * with a validation `format` (see `FIELD_FORMAT_PRESETS`). The AI may otherwise
- * only use a type that is defined on the board (an Object, Enum or Alias card)
- * — see {@link collectDefinedTypeNames}.
+ * the whole vocabulary: `string`, `integer`, `float`, `boolean` and `json`.
+ * `json` models free-form structured data that has no dedicated Object/Enum
+ * shape. Anything else (a UUID, a date, a timestamp, an email...) is modelled as
+ * a `string` with a validation `format` (see `FIELD_FORMAT_PRESETS`). The AI may
+ * otherwise only use a type that is defined on the board (an Object, Enum or
+ * Alias card) — see {@link collectDefinedTypeNames}.
  */
 export const PRIMITIVE_FIELD_TYPES = new Set<string>([
   "string",
   "integer",
   "float",
   "boolean",
+  "json",
 ]);
 
 /**

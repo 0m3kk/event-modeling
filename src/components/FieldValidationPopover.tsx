@@ -116,7 +116,13 @@ export function FieldValidationPopover({
   };
 
   const groupLabel =
-    kind === "array" ? "Array items" : kind === "number" ? "Numeric range" : "String";
+    kind === "array"
+      ? "Array items"
+      : kind === "number"
+        ? "Numeric range"
+        : kind === "json"
+          ? "JSON"
+          : "String";
 
   return (
     <form
@@ -236,6 +242,13 @@ export function FieldValidationPopover({
               placeholder="∞"
             />
           </div>
+        )}
+
+        {kind === "json" && (
+          <p className="text-[11px] text-gray-400 dark:text-zinc-500 leading-tight">
+            JSON values have no built-in constraints. Add a custom rule when the
+            payload must satisfy a specific shape.
+          </p>
         )}
 
         <RuleInput

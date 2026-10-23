@@ -220,6 +220,30 @@ states:
     expect(module("notificationService")).toEqual(["domains", "shared", "services"]);
   });
 
+  it("maps json primitives to serde_json::Value and adds its dependency", () => {
+    const source = `
+name: Json
+events:
+  - name: PayloadStored
+    fields:
+      - name: payload
+        type: json
+        required: true
+      - name: history
+        type: json
+        array: true
+`;
+    const spec = parseSpecification(source);
+    const { spec: hoisted, types } = hoistTypes(spec);
+    const { crate } = buildIr({ spec: hoisted, types, config: { spec: "s", out: "o" } });
+    const event = artifact(crate, "PayloadStored");
+    const field = (name: string) => event.fields!.find((f) => f.rustName === name)!;
+
+    expect(field("payload").rustType).toBe("serde_json::Value");
+    expect(field("history").rustType).toBe("Option<Vec<serde_json::Value>>");
+    expect(crate.deps.map((d) => d.name)).toContain("serde_json");
+  });
+
   it("always depends on serde and detects chrono/uuid from the type map", () => {
     // The fixture declares commands: handler traits need async-trait, and the
     // generated ExecutionContext needs event-store, serde_json and time.

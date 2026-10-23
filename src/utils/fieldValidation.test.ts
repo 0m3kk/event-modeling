@@ -40,9 +40,11 @@ describe("fieldValidation helpers", () => {
     expect(validationKindFor("string")).toBe("string");
     expect(validationKindFor("integer")).toBe("number");
     expect(validationKindFor("float")).toBe("number");
+    expect(validationKindFor("json")).toBe("json");
     expect(validationKindFor("Money")).toBe("string");
     expect(validationKindFor("CustomerId")).toBe("string");
     expect(validationKindFor("float", true)).toBe("array");
+    expect(validationKindFor("json", true)).toBe("array");
     expect(validationKindFor(undefined)).toBe("string");
   });
 
