@@ -1,9 +1,0 @@
-{#
-  The `down` half of a sqlx migration: drop the table created by the matching
-  `up` file. sqlx runs down migrations in reverse version order, so a child
-  table (higher version) is dropped before the parent it references.
-#}
-{%- if artifact.doc %}-- {{ artifact.doc }}
-{% endif -%}
--- Generated from {{ origin }} by @em/codegen.
-DROP TABLE IF EXISTS "{{ table }}";

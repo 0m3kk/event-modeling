@@ -10,7 +10,7 @@
     "proxy": "node server/proxy.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit && pnpm --filter @em/spec typecheck && pnpm --filter @em/codegen typecheck"
+    "typecheck": "tsc --noEmit && pnpm --filter @em/spec typecheck"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",

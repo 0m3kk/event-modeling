@@ -1,9 +1,0 @@
-{% if artifact.doc %}{{ artifact.doc | doccomment }}
-{% endif -%}
-{% if artifact.usesPrelude %}use crate::prelude::*;
-{% endif -%}
-{% for note in artifact.validationNotes %}// validator: {{ note }}
-{% endfor -%}
-{% if artifact.validations | length %}// validator: alias validation is not enforceable on a type alias; use `crate.aliases: "newtype"`
-{% endif -%}
-pub type {{ artifact.rustName }} = {{ artifact.aliasOf }};

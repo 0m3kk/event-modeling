@@ -3,9 +3,8 @@
 The shared **specification document contract**.
 
 This package owns the shape of the domain specification the board exports
-(`*.spec.yaml`) and that `@em/codegen` consumes, so the producer and the
-consumer cannot drift apart. The board app imports it to type its spec types and
-the YAML emitter; the generator imports it to parse and normalise.
+(`*.spec.yaml`). The board app imports it to type its spec types and the YAML
+emitter, and other consumers use it to parse and normalise the document.
 
 ## What's here
 
@@ -45,7 +44,7 @@ generator always sees `field.type` as a string.
 
 A type's domain is recorded in the usual membership lists: list its name in a
 domain's `cards`, or in a group's `cards` for the domain that group belongs to.
-A type that is not listed anywhere is placed by usage (see `@em/codegen`).
+A type that is not listed anywhere is placed by usage.
 
 ```ts
 import { parseSpecification, hoistTypes } from "@em/spec";

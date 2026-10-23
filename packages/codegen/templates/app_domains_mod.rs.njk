@@ -1,9 +1,0 @@
-//! Domain modules in the application crate.
-//!
-//! Every domain mirrors the generated contract crate: `domains/<domain>/`
-//! holds the domain's commands, queries, views, states and services, and each
-//! item has its own module directory.
-
-{% for module in domainModules -%}
-pub mod {{ module }};
-{% endfor -%}

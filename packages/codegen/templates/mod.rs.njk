@@ -1,7 +1,0 @@
-{% for child in dir.dirs -%}
-pub mod {{ child.name }};
-{% endfor -%}
-{% for file in dir.files -%}
-mod {{ file.fileName }};
-pub use {{ file.fileName }}::*;
-{% endfor -%}

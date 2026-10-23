@@ -1,7 +1,0 @@
-[workspace]
-resolver = "2"
-members = [{% for member in workspaceMembers %}"{{ member }}"{% if not loop.last %}, {% endif %}{% endfor %}]
-
-[workspace.package]
-version = "{{ crate.version }}"
-edition = "{{ crate.edition }}"
