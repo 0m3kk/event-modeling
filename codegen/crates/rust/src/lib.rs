@@ -42,10 +42,6 @@ pub const TEMPLATES: &[(&str, &str)] = &[
         include_str!("../templates/domain_event.rs.j2"),
     ),
     (
-        "rust/event_store.rs.j2",
-        include_str!("../templates/event_store.rs.j2"),
-    ),
-    (
         "rust/actors.rs.j2",
         include_str!("../templates/actors.rs.j2"),
     ),

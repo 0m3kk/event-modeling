@@ -58,12 +58,16 @@ fn generates_one_folder_per_domain() {
         "src/domains/two_factor/types.rs",
         "src/actors.rs",
         "src/domain_event.rs",
-        "src/event_store.rs",
         "src/tags.rs",
         "src/lib.rs",
     ] {
         assert!(find(&output, path).is_some(), "missing {path}");
     }
+
+    assert!(
+        find(&output, "src/event_store.rs").is_none(),
+        "the Event envelope comes from the event-store crate"
+    );
 
     // Commands/events/queries/services are no longer flat modules at the root,
     // and slices/constraints are not generated at all.
@@ -135,7 +139,7 @@ fn generates_one_folder_per_domain() {
 
     let lib = find(&output, "src/lib.rs").unwrap();
     assert!(lib.contains("pub mod domain_event;"));
-    assert!(lib.contains("pub mod event_store;"));
+    assert!(!lib.contains("pub mod event_store;"));
     assert!(lib.contains("pub use domain_event::DomainEvent;"));
     assert!(lib.contains("pub use event_store::Event;"));
     assert!(!lib.contains("pub mod events;"));
@@ -146,6 +150,7 @@ fn generates_one_folder_per_domain() {
 
     let manifest = find(&output, "Cargo.toml").unwrap();
     assert!(manifest.contains("edition = \"2024\""));
+    assert!(manifest.contains("event-store = { git = \"https://github.com/0m3kk/backend-kit\" }"));
     assert!(manifest.contains("validator ="));
     assert!(manifest.contains("regex ="));
 }
@@ -263,10 +268,17 @@ fn generates_the_domain_event_contract() {
     assert!(trait_source.contains("fn tags(&self) -> Vec<String>;"));
     assert!(trait_source.contains("fn to_store_event(&self)"));
     assert!(trait_source.contains("fn to_store_event_with_metadata"));
+    assert!(
+        trait_source.contains("use event_store::Event;"),
+        "the trait uses the shared Event type"
+    );
 
-    let store = find(&output, "src/event_store.rs").unwrap();
-    assert!(store.contains("pub struct Event"));
-    assert!(store.contains("pub fn with_metadata"));
+    assert!(
+        find(&output, "src/event_store.rs").is_none(),
+        "the Event type is imported from the event-store crate, not redefined"
+    );
+    let manifest = find(&output, "Cargo.toml").expect("manifest");
+    assert!(manifest.contains("event-store = { git = \"https://github.com/0m3kk/backend-kit\" }"));
 }
 
 #[test]

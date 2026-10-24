@@ -59,7 +59,6 @@ const ROOT_FILES: &[(&str, &str)] = &[
     ("rust/Cargo.toml.j2", "Cargo.toml"),
     ("rust/lib.rs.j2", "src/lib.rs"),
     ("rust/domain_event.rs.j2", "src/domain_event.rs"),
-    ("rust/event_store.rs.j2", "src/event_store.rs"),
     ("rust/actors.rs.j2", "src/actors.rs"),
     ("rust/tags.rs.j2", "src/tags.rs"),
     ("rust/domains/mod.rs.j2", "src/domains/mod.rs"),

@@ -7,7 +7,7 @@
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::event_store::Event;
+use event_store::Event;
 
 /// Behaviour shared by every domain event.
 pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {

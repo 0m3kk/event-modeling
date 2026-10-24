@@ -76,7 +76,6 @@ queries, states and services. The generated crate uses **Rust edition 2024**:
     lib.rs
     actors.rs            # actors + permissions (outside the domains)
     domain_event.rs      # DomainEvent trait implemented by every event
-    event_store.rs       # minimal Event envelope used by the trait
     tags.rs              # tag metadata
     domains/
       mod.rs
@@ -187,11 +186,11 @@ pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
 ```
 
 Every event struct implements `event_type()` and `tags()`; tags come from the
-fields marked with a `tag` in the spec. `src/event_store.rs` provides a minimal
-`Event { event_type, data, tags, metadata }` with `new()` and
-`with_metadata()`. Replace that module with your real event-store envelope if
-the surrounding project already has one; the trait only relies on those two
-constructors.
+fields marked with a `tag` in the spec. The `Event` type is **not** generated:
+the crate depends on [`event-store`](https://github.com/0m3kk/backend-kit) from
+`backend-kit` and re-exports `Event` from the crate root. That dependency is
+already in the generated `Cargo.toml`, so the trait can rely on
+`Event::new()` and `Event::with_metadata()` directly.
 
 ## How cards are assigned to domains
 

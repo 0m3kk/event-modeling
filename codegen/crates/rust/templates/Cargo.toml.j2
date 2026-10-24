@@ -7,6 +7,7 @@ description = {{ package_description|str_lit }}
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+event-store = { git = "https://github.com/0m3kk/backend-kit" }
 validator = { version = "0.20", features = ["derive"] }
 {%- if uses_regex %}
 regex = "1"
@@ -17,3 +18,4 @@ chrono = { version = "0.4", features = ["serde"] }
 {%- if uses_uuid %}
 uuid = { version = "1", features = ["serde"] }
 {%- endif %}
+

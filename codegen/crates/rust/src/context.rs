@@ -7,7 +7,6 @@
 //!   lib.rs
 //!   actors.rs
 //!   domain_event.rs        # DomainEvent trait
-//!   event_store.rs         # minimal Event envelope
 //!   tags.rs
 //!   domains/
 //!     identity/
