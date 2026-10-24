@@ -14,7 +14,6 @@
 pub mod actors;
 pub mod domain_event;
 pub mod domains;
-pub mod tags;
 {%- if has_shared %}
 pub mod shared;
 {%- endif %}
@@ -22,4 +21,3 @@ pub mod shared;
 pub use actors::Actor;
 pub use domain_event::DomainEvent;
 pub use event_store::Event;
-pub use tags::TagDefinition;

@@ -76,7 +76,6 @@ queries, states and services. The generated crate uses **Rust edition 2024**:
     lib.rs
     actors.rs            # actors + permissions (outside the domains)
     domain_event.rs      # DomainEvent trait implemented by every event
-    tags.rs              # tag metadata
     domains/
       mod.rs
       identity/
@@ -211,7 +210,7 @@ are dropped with a warning rather than failing the run.
 Rust templates receive one of two contexts:
 
 - `CrateCtx` for root files: spec metadata, counts, `domains`, `shared`,
-  `has_shared`, `actors`, `tags` and dependency flags
+  `has_shared`, `actors` and dependency flags
   (`uses_json`, `uses_chrono`, `uses_uuid`, `uses_regex`).
 - `DomainCtx` for each `domains/<domain>/` file: `name`, `module`,
   `module_ident`, and the `types`, `events`, `commands`, `queries`, `states`,

@@ -58,7 +58,6 @@ fn generates_one_folder_per_domain() {
         "src/domains/two_factor/types.rs",
         "src/actors.rs",
         "src/domain_event.rs",
-        "src/tags.rs",
         "src/lib.rs",
     ] {
         assert!(find(&output, path).is_some(), "missing {path}");
@@ -70,7 +69,8 @@ fn generates_one_folder_per_domain() {
     );
 
     // Commands/events/queries/services are no longer flat modules at the root,
-    // and slices/constraints are not generated at all.
+    // slices/constraints are not generated at all, and tag metadata is only used
+    // to build each event's `tags()` at generation time.
     for path in [
         "src/commands.rs",
         "src/events.rs",
@@ -78,6 +78,7 @@ fn generates_one_folder_per_domain() {
         "src/services.rs",
         "src/slices.rs",
         "src/constraints.rs",
+        "src/tags.rs",
     ] {
         assert!(find(&output, path).is_none(), "unexpected {path}");
     }
@@ -117,10 +118,6 @@ fn generates_one_folder_per_domain() {
     assert!(actors.contains("\"account_owner\""));
     assert!(actors.contains("\"identity:send_activation_email\""));
 
-    let tags = find(&output, "src/tags.rs").unwrap();
-    assert!(tags.contains("tag: \"password_reset\""));
-    assert!(tags.contains("\"account_registered\""));
-
     let identity_services = find(&output, "src/domains/identity/services.rs").unwrap();
     assert!(identity_services.contains("pub trait AccountNotification"));
     assert!(identity_services.contains("impl std::future::Future"));
@@ -142,6 +139,8 @@ fn generates_one_folder_per_domain() {
     assert!(!lib.contains("pub mod event_store;"));
     assert!(lib.contains("pub use domain_event::DomainEvent;"));
     assert!(lib.contains("pub use event_store::Event;"));
+    assert!(!lib.contains("pub mod tags;"));
+    assert!(!lib.contains("TagDefinition"));
     assert!(!lib.contains("pub mod events;"));
     assert!(
         !lib.contains("pub mod shared;"),

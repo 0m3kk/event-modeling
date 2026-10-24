@@ -5,7 +5,7 @@ specification by `em-codegen` {{ generator_version }}.
 
 ## Contents
 
-| Module | Count |
+| Item | Count |
 | --- | --- |
 | `domains` | {{ counts.domains }} |
 | `types` | {{ counts.types }} |
@@ -39,7 +39,6 @@ Outside the domains:
 
 - `actors` — actors and their permissions.
 - `domain_event` — the `DomainEvent` trait implemented by every event.
-- `tags` — tag metadata.
 - `shared` — items that were not assigned to a domain, when there are any.
 
 Service methods return `impl Future<Output = ...> + Send`; implement them with
@@ -66,7 +65,7 @@ fn persist<E: DomainEvent>(event: &E) -> Result<Event, serde_json::Error> {
 ## Usage
 
 ```rust
-use {{ package_name }}::{Actor, DomainEvent, TagDefinition};
+use {{ package_name }}::{Actor, DomainEvent};
 use {{ package_name }}::domains::your_domain::commands::YourCommand;
 ```
 

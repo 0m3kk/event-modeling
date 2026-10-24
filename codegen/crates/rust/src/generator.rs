@@ -60,7 +60,6 @@ const ROOT_FILES: &[(&str, &str)] = &[
     ("rust/lib.rs.j2", "src/lib.rs"),
     ("rust/domain_event.rs.j2", "src/domain_event.rs"),
     ("rust/actors.rs.j2", "src/actors.rs"),
-    ("rust/tags.rs.j2", "src/tags.rs"),
     ("rust/domains/mod.rs.j2", "src/domains/mod.rs"),
     ("rust/README.md.j2", "README.md"),
     ("rust/.gitignore.j2", ".gitignore"),
@@ -195,14 +194,6 @@ fn validate_names(ctx: &CrateCtx) -> Result<(), CodegenError> {
     check_unique(
         "domains",
         ctx.domains.iter().map(|domain| domain.module_ident.clone()),
-    )?;
-
-    check_unique(
-        "tags",
-        ctx.tags
-            .iter()
-            .map(|tag| tag.const_name.clone())
-            .chain(std::iter::once("TagDefinition".to_string())),
     )?;
 
     check_unique(

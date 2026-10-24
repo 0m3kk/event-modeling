@@ -7,7 +7,6 @@
 //!   lib.rs
 //!   actors.rs
 //!   domain_event.rs        # DomainEvent trait
-//!   tags.rs
 //!   domains/
 //!     identity/
 //!       mod.rs
@@ -29,7 +28,7 @@ use std::collections::{BTreeMap, HashSet};
 use em_codegen_core::generator::GenerateOptions;
 use em_codegen_core::model::{
     ActorModel, AliasModel, CommandModel, EnumModel, EventModel, FieldModel, Model, ObjectModel,
-    QueryModel, QuerySourceModel, ServiceModel, StateModel, TagModel, TypeModel,
+    QueryModel, QuerySourceModel, ServiceModel, StateModel, TypeModel,
 };
 use em_codegen_core::{naming, spec};
 use serde::Serialize;
@@ -54,7 +53,6 @@ pub struct CrateCtx {
     pub shared: Option<DomainCtx>,
     pub has_shared: bool,
     pub actors: Vec<ActorCtx>,
-    pub tags: Vec<TagCtx>,
     pub uses_json: bool,
     pub uses_chrono: bool,
     pub uses_uuid: bool,
@@ -277,14 +275,6 @@ pub struct ActorCtx {
     pub description: Option<String>,
     pub doc_lines: Vec<String>,
     pub permissions: Vec<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct TagCtx {
-    pub tag: String,
-    pub const_name: String,
-    pub types: Vec<String>,
-    pub from_events: Vec<String>,
 }
 
 /// Builds the context and returns any non-fatal warnings discovered on the way.
@@ -557,7 +547,6 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
         .any(|domain| !domain.command_regexes.is_empty() || !domain.query_regexes.is_empty());
 
     let actors = build_actors(model);
-    let tags = build_tags(model);
 
     let package_name = package_name(model, options);
     let description = format!(
@@ -580,13 +569,12 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
             states: model.states.len(),
             services: model.services.len(),
             actors: actors.len(),
-            tags: tags.len(),
+            tags: model.tags.len(),
         },
         domains,
         shared,
         has_shared,
         actors,
-        tags,
         uses_json: true,
         uses_chrono: deps.chrono,
         uses_uuid: deps.uuid,
@@ -1106,19 +1094,6 @@ fn build_actors(model: &Model) -> Vec<ActorCtx> {
                 .iter()
                 .map(|permission| snake_action(permission))
                 .collect(),
-        })
-        .collect()
-}
-
-fn build_tags(model: &Model) -> Vec<TagCtx> {
-    model
-        .tags
-        .iter()
-        .map(|tag: &TagModel| TagCtx {
-            tag: tag.tag.clone(),
-            const_name: const_ident(&tag.tag),
-            types: tag.types.clone(),
-            from_events: tag.from_events.clone(),
         })
         .collect()
 }
@@ -1723,18 +1698,6 @@ pub fn type_ident(name: &str) -> String {
 
 fn variant_ident(name: &str) -> String {
     type_ident(name)
-}
-
-/// `emailMustBeUnique` -> `EMAIL_MUST_BE_UNIQUE`.
-pub fn const_ident(name: &str) -> String {
-    let mut ident = naming::shouty_snake_case(name);
-    if ident.is_empty() {
-        ident = "UNNAMED".into();
-    }
-    if ident.starts_with(|character: char| character.is_ascii_digit()) {
-        ident = format!("_{ident}");
-    }
-    ident
 }
 
 fn module_names(name: &str) -> (String, String) {
