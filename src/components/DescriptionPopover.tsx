@@ -4,6 +4,7 @@ import { Info, Trash2, X } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 import { applyDescription, findDescriptionText, findRowName } from "@/utils/description";
+import { optionsBarPopoverStyle } from "./optionsBarPopover";
 
 interface DescriptionPopoverProps {
   /** Card whose description (or selected row's) is being edited. */
@@ -80,7 +81,8 @@ export function DescriptionPopover({
     <div
       ref={popoverRef}
       onWheel={(e) => e.stopPropagation()}
-      className={`absolute left-1/2 z-50 flex w-80 -translate-x-1/2 flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 ${positionClasses}`}
+      style={optionsBarPopoverStyle(placement, { centered: true })}
+      className={`absolute left-1/2 z-50 flex w-80 flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 ${positionClasses}`}
     >
       <div className="flex items-center justify-between border-b border-gray-100 pb-2.5 dark:border-zinc-800">
         <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-100">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Tag, Check, Trash2, Hash } from "lucide-react";
 import { toDisplayName } from "@/utils/naming";
+import { optionsBarPopoverStyle } from "./optionsBarPopover";
 
 interface FieldTagPopoverProps {
   currentTag?: string;
@@ -92,6 +93,7 @@ export function FieldTagPopover({
     <div
       ref={popoverRef}
       onWheel={(e) => e.stopPropagation()}
+      style={optionsBarPopoverStyle(placement)}
       className={`absolute left-0 ${positionClasses} w-59 max-h-[min(380px,calc(100vh-120px))] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 z-50 select-none`}
     >
       <div className="mb-2 flex items-center justify-between px-0.5 text-xs font-semibold text-gray-500 dark:text-zinc-400">

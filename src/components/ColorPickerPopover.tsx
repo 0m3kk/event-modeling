@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Palette, Check } from "lucide-react";
 import { getContrastTextColor } from "@/utils/color";
+import { optionsBarPopoverStyle } from "./optionsBarPopover";
 
 export const PRESET_COLORS = [
   { name: "Rose", hex: "#e11d48" },
@@ -57,6 +58,7 @@ export function ColorPickerPopover({
     <div
       ref={popoverRef}
       onWheel={(e) => e.stopPropagation()}
+      style={optionsBarPopoverStyle(placement)}
       className={`absolute left-0 ${positionClasses} w-49 max-h-[min(380px,calc(100vh-120px))] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-2.5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 z-50 select-none`}
     >
       <div className="mb-2 flex items-center justify-between px-1 text-xs font-semibold text-gray-500 dark:text-zinc-400">

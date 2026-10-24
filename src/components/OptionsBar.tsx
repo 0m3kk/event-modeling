@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, type CSSProperties } from "react";
 import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets, Asterisk, Diamond, ShieldCheck } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
@@ -7,6 +7,7 @@ import { FieldTypePopover } from "./FieldTypePopover";
 import { FieldTagPopover } from "./FieldTagPopover";
 import { FieldValidationPopover } from "./FieldValidationPopover";
 import { DescriptionPopover } from "./DescriptionPopover";
+import { OPTIONS_BAR_INVERSE_ZOOM } from "./optionsBarPopover";
 import type { CanvasElement } from "@/types";
 import { isElementOriginal } from "@/utils/reference";
 import { findDescriptionText } from "@/utils/description";
@@ -217,16 +218,21 @@ export function OptionsBar() {
   return (
     <div
       className="pointer-events-none absolute z-40"
-      style={{
-        left: `${barX}px`,
-        top: `${barY}px`,
-        // Scale the bar together with the canvas so it zooms in/out with the
-        // selected element. The transform-origin is set to the anchor edge
-        // (bottom-center when above, top-center when below) so the bar stays
-        // pinned to the element while growing/shrinking from that point.
-        transform: `translate(-50%, ${isAbove ? "-100%" : "0"}) scale(${zoom})`,
-        transformOrigin: isAbove ? "50% 100%" : "50% 0%",
-      }}
+      style={
+        {
+          left: `${barX}px`,
+          top: `${barY}px`,
+          // Scale the bar together with the canvas so it zooms in/out with the
+          // selected element. The transform-origin is set to the anchor edge
+          // (bottom-center when above, top-center when below) so the bar stays
+          // pinned to the element while growing/shrinking from that point.
+          transform: `translate(-50%, ${isAbove ? "-100%" : "0"}) scale(${zoom})`,
+          transformOrigin: isAbove ? "50% 100%" : "50% 0%",
+          // Popovers counter this scale so their text stays crisp (see
+          // `optionsBarPopoverStyle`).
+          [OPTIONS_BAR_INVERSE_ZOOM]: `${1 / zoom}`,
+        } as CSSProperties
+      }
     >
       <div
         onPointerDown={(e) => e.stopPropagation()}

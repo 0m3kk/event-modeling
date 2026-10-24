@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, Check, Trash2, Braces } from "lucide-react";
 import { toDisplayType } from "@/utils/naming";
+import { optionsBarPopoverStyle } from "./optionsBarPopover";
 import {
   FIELD_FORMAT_PRESETS,
   draftToValidation,
@@ -129,7 +130,8 @@ export function FieldValidationPopover({
       ref={popoverRef}
       onSubmit={handleSubmit}
       onWheel={(e) => e.stopPropagation()}
-      className={`absolute left-0 ${positionClasses} w-[248px] max-h-[min(420px,calc(100vh-120px))] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 z-50 select-none`}
+      style={optionsBarPopoverStyle(placement)}
+      className={`absolute left-0 ${positionClasses} w-62 max-h-[min(420px,calc(100vh-120px))] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 z-50 select-none`}
     >
       <div className="mb-1.5 flex items-center justify-between px-0.5 text-xs font-semibold text-gray-500 dark:text-zinc-400">
         <span className="flex items-center gap-1.5">
@@ -261,7 +263,7 @@ export function FieldValidationPopover({
       </div>
 
       {/* Live preview of the rules that will be applied */}
-      <div className="mt-2.5 flex min-h-[18px] flex-wrap gap-1 border-t border-gray-100 pt-2 dark:border-zinc-800">
+      <div className="mt-2.5 flex min-h-4.5 flex-wrap gap-1 border-t border-gray-100 pt-2 dark:border-zinc-800">
         {summary.length > 0 ? (
           summary.map((part, i) => (
             <span
