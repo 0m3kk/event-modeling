@@ -22,6 +22,9 @@ import {
   SERVICE_DEFAULT_WIDTH,
   SERVICE_HEADER_HEIGHT,
   SERVICE_GROUP_LABEL_HEIGHT,
+  SERVICE_NAME_CHIP_PADDING,
+  SERVICE_NAME_FONT_SIZE,
+  SERVICE_NAME_GAP,
   SERVICE_ROW_HEIGHT,
   SERVICE_SECTION_INDEX,
   buildServiceItems,
@@ -33,6 +36,7 @@ import {
   itemToSelectedField,
   selectedFieldToItem,
   serviceItemsEqual,
+  serviceNameLabel,
   type ServiceCardData,
   type ServiceField,
   type ServiceGroup,
@@ -53,6 +57,7 @@ export const ServiceCardSchema = z.object({
   name: z.string().default("ServiceName"),
   params: z.array(ServiceFieldSchema).default([]),
   returns: z.array(ServiceFieldSchema).default([]),
+  serviceName: z.string().optional(),
   color: z.string().optional(),
   description: z.string().optional(),
 });
@@ -206,7 +211,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
   type: "serviceCard",
   name: "Service",
   description:
-    "A service method execution with params and returns; Services may share a name",
+    "A service method execution with params and returns; methods sharing a serviceName form one interface",
   icon: Server,
   color: "#0ea5e9",
   category: "modeling",
@@ -351,13 +356,16 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
     g.stroke({ color: borderCol, width: isSelected ? 2 : 1 });
     container.addChild(g);
 
-    // 7. Header title + ⓘ badge
-    renderStandardCardTitle(
+    // 7. Header title, interface name + ⓘ badge
+    const title = renderStandardCardTitle(
       container,
       data.name || "Service",
       headerColor,
       context.textResolution,
     );
+    if (title && data.serviceName) {
+      renderServiceNameBadge(container, title, data.serviceName, isDark, context.textResolution);
+    }
     renderHeaderDescBadge(container, {
       elementId: element.id,
       width: w,
@@ -597,11 +605,17 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
   ai: {
     toolName: "create_service_card",
     description:
-      "Create a Service card in the Event Model. Each Service card is ONE method execution with params (inputs) and returns (outputs). Services may share a name.",
+      "Create a Service card in the Event Model. Each Service card is ONE method execution with params (inputs) and returns (outputs). Services may share a name; share a serviceName to group methods into one interface.",
     parameters: z.object({
       name: z
         .string()
         .describe("camelCase method name (e.g. placeOrder, chargeCard)"),
+      serviceName: z
+        .string()
+        .optional()
+        .describe(
+          "Optional service interface name (e.g. orderService). Methods sharing a serviceName are generated as the methods of one interface.",
+        ),
       params: z
         .array(
           z.object({
@@ -634,6 +648,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
         name: params.name || "serviceMethod",
         params: params.params || [],
         returns: params.returns || [],
+        ...(params.serviceName ? { serviceName: params.serviceName } : {}),
         color: params.color || serviceCardTool.color,
         ...(params.description ? { description: params.description } : {}),
       };
@@ -650,6 +665,48 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
     },
   },
 };
+
+/**
+ * Renders the service interface name as a chip on the header, right of the
+ * method name. The chip is placed next to the title so extra card width stays
+ * to its right.
+ */
+function renderServiceNameBadge(
+  container: Container,
+  title: Text,
+  serviceName: string,
+  isDark: boolean,
+  textResolution: number,
+): void {
+  const label = serviceNameLabel(serviceName);
+  if (!label) return;
+
+  const nameText = new Text({
+    text: label,
+    style: {
+      fontSize: SERVICE_NAME_FONT_SIZE,
+      fontWeight: "bold",
+      fontFamily: '"Geist Mono", monospace',
+      fill: isDark ? 0xe0f2fe : 0x0369a1,
+    },
+    resolution: textResolution,
+  });
+
+  const badgeW = nameText.width + SERVICE_NAME_CHIP_PADDING;
+  const badgeH = 15;
+  const badgeX = title.x + title.width + SERVICE_NAME_GAP;
+  const badgeY = (SERVICE_HEADER_HEIGHT - badgeH) / 2;
+
+  const badge = new Graphics();
+  badge.roundRect(badgeX, badgeY, badgeW, badgeH, 4);
+  badge.fill({ color: isDark ? 0x0c4a6e : 0xffffff, alpha: 0.95 });
+  badge.stroke({ color: isDark ? 0x38bdf8 : 0x7dd3fc, width: 1 });
+  container.addChild(badge);
+
+  nameText.x = badgeX + SERVICE_NAME_CHIP_PADDING / 2;
+  nameText.y = badgeY + (badgeH - nameText.height) / 2;
+  container.addChild(nameText);
+}
 
 function renderEmptyGroupHint(
   container: Container,

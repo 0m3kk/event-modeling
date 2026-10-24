@@ -238,6 +238,20 @@ describe("serviceCardTool (one method with params & returns)", () => {
     expect(element.data.returns).toHaveLength(1);
     expect(element.width).toBe(240);
   });
+
+  it("carries an interface name through the AI operation", () => {
+    const element = serviceCardTool.ai!.onCreate(
+      {
+        name: "chargeCard",
+        serviceName: "paymentService",
+        params: [],
+        returns: [],
+      },
+      { x: 500, y: 500 },
+    );
+
+    expect(element.data.serviceName).toBe("paymentService");
+  });
 });
 
 describe("serviceCardTool content width auto-grow", () => {
@@ -249,6 +263,21 @@ describe("serviceCardTool content width auto-grow", () => {
         returns: [],
       }).width,
     ).toBe(240);
+  });
+
+  it("widens the header so the interface name never clips", () => {
+    const unnamed = computeServiceCardSize({
+      name: "placeOrder",
+      params: [],
+      returns: [],
+    });
+    const named = computeServiceCardSize({
+      name: "placeOrder",
+      serviceName: "orderService",
+      params: [],
+      returns: [],
+    });
+    expect(named.width).toBeGreaterThan(unnamed.width);
   });
 
   it("widens to fit a long param field type", () => {

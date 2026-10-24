@@ -212,6 +212,10 @@ export function buildSpecification({
   const servicesSpec = services.map((el) => {
     const data = (el.data ?? {}) as Record<string, unknown>;
     const out: Record<string, unknown> = { name: nameOf(el) };
+    if (typeof data.serviceName === "string" && data.serviceName.trim()) {
+      // Interface name: methods sharing a serviceName belong to one interface.
+      out.serviceName = data.serviceName;
+    }
     if (typeof data.description === "string" && data.description) {
       out.description = data.description;
     }

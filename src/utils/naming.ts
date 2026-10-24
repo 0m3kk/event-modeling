@@ -154,10 +154,18 @@ export function toPascalIdentifier(input: string | undefined | null): string {
 /**
  * Identifier-valued string keys inside element data. `name` covers card titles,
  * fields, params, responses, methods and constraint state references; `field`
- * is a query-tag field reference; `tag` is a DCB tag; `type`/`aliasedType` are
- * type references.
+ * is a query-tag field reference; `tag` is a DCB tag; `serviceName` is the
+ * interface a Service method belongs to; `type`/`aliasedType` are type
+ * references.
  */
-const IDENTIFIER_STRING_KEYS = new Set(["name", "field", "tag", "type", "aliasedType"]);
+const IDENTIFIER_STRING_KEYS = new Set([
+  "name",
+  "field",
+  "tag",
+  "serviceName",
+  "type",
+  "aliasedType",
+]);
 
 /**
  * Card types whose `action` tokens (a Command/Query's declared `action`, an

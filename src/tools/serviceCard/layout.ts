@@ -34,8 +34,35 @@ export interface ServiceCardData {
   name: string;
   params: ServiceField[];
   returns: ServiceField[];
+  /**
+   * Name of the service interface this method belongs to. Services that share
+   * a `serviceName` are emitted as the methods of one generated interface.
+   * Stored as a canonical camelCase identifier (e.g. `orderService`) and
+   * displayed human-readable (`Order Service`).
+   */
+  serviceName?: string;
   color?: string;
   description?: string;
+}
+
+/** Font size of the interface-name chip in the Service header. */
+export const SERVICE_NAME_FONT_SIZE = 9;
+/** Horizontal padding inside the header interface chip. */
+export const SERVICE_NAME_CHIP_PADDING = 10;
+/** Gap between the method title and the interface-name chip. */
+export const SERVICE_NAME_GAP = 8;
+
+/** Display label of a Service's interface name (`orderService` -> `Order Service`). */
+export function serviceNameLabel(serviceName: string | undefined): string {
+  return serviceName ? toDisplayName(serviceName) : "";
+}
+
+/** Width of the header interface chip, padding included (0 when unnamed). */
+export function measureServiceNameWidth(serviceName: string | undefined): number {
+  const label = serviceNameLabel(serviceName);
+  return label
+    ? measureMonospaceText(label, SERVICE_NAME_FONT_SIZE) + SERVICE_NAME_CHIP_PADDING
+    : 0;
 }
 
 export type ServiceGroup = "params" | "returns";
@@ -91,6 +118,14 @@ export const SERVICE_ROW_LEFT_PADDING = 14;
  */
 export function computeServiceContentWidth(data: ServiceCardData): number {
   let required = measureCardTitleWidth(data.name);
+  // The interface chip sits right of the title, so both must fit on the header line.
+  const serviceNameWidth = measureServiceNameWidth(data.serviceName);
+  if (serviceNameWidth > 0) {
+    required = Math.max(
+      required,
+      measureCardTitleWidth(data.name) + SERVICE_NAME_GAP + serviceNameWidth,
+    );
+  }
   for (const field of [...(data.params ?? []), ...(data.returns ?? [])]) {
     required = Math.max(required, measureFieldRowWidth(field));
   }

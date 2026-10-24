@@ -162,6 +162,11 @@ export interface ServiceMethod {
  */
 export interface ServiceDef {
   name: string;
+  /**
+   * Service interface name: methods that share a `serviceName` are emitted as
+   * the methods of one generated service interface. Omitted when unspecified.
+   */
+  serviceName?: string;
   description?: string;
   params?: Field[];
   returns?: Field[];

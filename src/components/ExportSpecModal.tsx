@@ -241,16 +241,16 @@ function YamlOutlineRow({
             type="button"
             onClick={() => onToggle(node.id)}
             aria-expanded={!isCollapsed}
-            className="mt-[1px] flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded text-gray-400 hover:text-gray-700 dark:text-zinc-500 dark:hover:text-zinc-200"
+            className="mt-px flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded text-gray-400 hover:text-gray-700 dark:text-zinc-500 dark:hover:text-zinc-200"
           >
             {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
           </button>
         ) : (
           <span className="h-4 w-4 shrink-0" aria-hidden />
         )}
-        <span className="whitespace-pre-wrap break-words">{node.text}</span>
+        <span className="whitespace-pre-wrap wrap-break-word">{node.text}</span>
         {isCollapsed && (
-          <span className="mt-[1px] ml-2 shrink-0 select-none rounded bg-gray-200/70 px-1 text-[10px] text-gray-500 dark:bg-zinc-800 dark:text-zinc-400">
+          <span className="mt-px ml-2 shrink-0 select-none rounded bg-gray-200/70 px-1 text-[10px] text-gray-500 dark:bg-zinc-800 dark:text-zinc-400">
             ⋯ {node.descendants}
           </span>
         )}

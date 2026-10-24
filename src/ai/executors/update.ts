@@ -71,6 +71,9 @@ export function executeUpdateElement(updateName: string, args: any): string {
   if (!("description" in payload) && existingData.description !== undefined) {
     nextData = { ...nextData, description: existingData.description };
   }
+  if (!("serviceName" in payload) && existingData.serviceName !== undefined) {
+    nextData = { ...nextData, serviceName: existingData.serviceName };
+  }
   if (!("text" in payload) && existingData.text !== undefined) {
     nextData = { ...nextData, text: existingData.text };
   }

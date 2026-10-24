@@ -305,6 +305,37 @@ describe("buildSpecification", () => {
     ]);
   });
 
+  it("exports a service's interface name so same-name methods group into one interface", () => {
+    const elements: CanvasElement[] = [
+      el("svc1", "serviceCard", {
+        name: "placeOrder",
+        serviceName: "orderService",
+        params: [{ name: "orderId", type: "string" }],
+        returns: [],
+      }),
+      el("svc2", "serviceCard", {
+        name: "cancelOrder",
+        serviceName: "orderService",
+        params: [{ name: "orderId", type: "string" }],
+        returns: [],
+      }),
+    ];
+
+    const spec = buildSpecification({ name: "Shop", elements });
+    expect(spec.services).toEqual([
+      {
+        name: "placeOrder",
+        serviceName: "orderService",
+        params: [{ name: "orderId", type: "string" }],
+      },
+      {
+        name: "cancelOrder",
+        serviceName: "orderService",
+        params: [{ name: "orderId", type: "string" }],
+      },
+    ]);
+  });
+
   it("includes DCB tags derived from events and actor permissions", () => {
     const elements: CanvasElement[] = [
       el("ev", "eventCard", {
