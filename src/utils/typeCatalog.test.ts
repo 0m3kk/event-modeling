@@ -27,6 +27,8 @@ describe("typeCatalog", () => {
     expect(isPrimitiveFieldType("float")).toBe(true);
     expect(isPrimitiveFieldType("boolean")).toBe(true);
     expect(isPrimitiveFieldType("json")).toBe(true);
+    expect(isPrimitiveFieldType("date")).toBe(true);
+    expect(isPrimitiveFieldType("datetime")).toBe(true);
     expect(isPrimitiveFieldType("uuid")).toBe(false);
     expect(isPrimitiveFieldType("decimal")).toBe(false);
     expect(isPrimitiveFieldType("Order")).toBe(false);

@@ -41,6 +41,8 @@ describe("fieldValidation helpers", () => {
     expect(validationKindFor("integer")).toBe("number");
     expect(validationKindFor("float")).toBe("number");
     expect(validationKindFor("json")).toBe("json");
+    expect(validationKindFor("date")).toBe("string");
+    expect(validationKindFor("datetime")).toBe("string");
     expect(validationKindFor("Money")).toBe("string");
     expect(validationKindFor("CustomerId")).toBe("string");
     expect(validationKindFor("float", true)).toBe("array");

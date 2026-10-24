@@ -76,7 +76,8 @@ const NUMERIC_TYPES = new Set(["integer", "float"]);
  * Picks the validation group to surface for a field. Array fields always use
  * item-count bounds; otherwise the declared type decides between numeric range,
  * JSON (free-form, so only the custom rule applies) and string length/pattern.
- * Unknown/defined types (e.g. an Alias name) fall back to the string group.
+ * String-like primitives (including `date`/`datetime`) and unknown/defined types
+ * (e.g. an Alias name) use the string group.
  */
 export function validationKindFor(
   type: string | undefined,
