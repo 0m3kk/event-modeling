@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, Check, Trash2, Braces } from "lucide-react";
 import { toDisplayType } from "@/utils/naming";
-import { optionsBarPopoverStyle } from "./optionsBarPopover";
 import {
   FIELD_FORMAT_PRESETS,
   draftToValidation,
@@ -130,7 +129,6 @@ export function FieldValidationPopover({
       ref={popoverRef}
       onSubmit={handleSubmit}
       onWheel={(e) => e.stopPropagation()}
-      style={optionsBarPopoverStyle(placement)}
       className={`absolute left-0 ${positionClasses} w-62 max-h-[min(420px,calc(100vh-120px))] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 z-50 select-none`}
     >
       <div className="mb-1.5 flex items-center justify-between px-0.5 text-xs font-semibold text-gray-500 dark:text-zinc-400">
