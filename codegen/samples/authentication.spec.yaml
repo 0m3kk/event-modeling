@@ -1,9 +1,9 @@
 name: Authentication
 domains:
-  - name: identity
+  - name: account
     groups:
-      - identityTypes
-      - identityStates
+      - accountTypes
+      - accountStates
     slices:
       - registerAccount
       - sendActivationEmail
@@ -64,14 +64,14 @@ domains:
       - createSession
       - revokeSession
 groups:
-  - name: identityTypes
-    domain: identity
+  - name: accountTypes
+    domain: account
     cards:
       - email
       - password
       - accountStatus
-  - name: identityStates
-    domain: identity
+  - name: accountStates
+    domain: account
     cards:
       - accountRegistry
       - pendingActivation
@@ -155,7 +155,7 @@ groups:
       - sessionRecord
 slices:
   - name: registerAccount
-    domain: identity
+    domain: account
     description: A guest registers a new account using an email identity and a password.
     lanes:
       - type: Command
@@ -169,7 +169,7 @@ slices:
           - accountRegistered
           - passwordInitialized
   - name: sendActivationEmail
-    domain: identity
+    domain: account
     description: Send an account activation email to a newly registered user via the account notification service.
     lanes:
       - type: Command
@@ -185,7 +185,7 @@ slices:
         cards:
           - sendActivationEmail
   - name: activateAccount
-    domain: identity
+    domain: account
     description: The owner opens the activation link from the email and turns the pending account into an activated one.
     lanes:
       - type: Command
@@ -201,7 +201,7 @@ slices:
         cards:
           - sendAccountActivatedEmail
   - name: suspendAccount
-    domain: identity
+    domain: account
     description: Admin suspends an activated account, recording the reason
     lanes:
       - type: Command
@@ -217,7 +217,7 @@ slices:
         cards:
           - sendAccountSuspendedEmail
   - name: unsuspendAccount
-    domain: identity
+    domain: account
     description: Admin lifts a suspension and restores the account, recording the reason
     lanes:
       - type: Command
@@ -233,7 +233,7 @@ slices:
         cards:
           - sendAccountUnsuspendedEmail
   - name: deleteAccount
-    domain: identity
+    domain: account
     description: Admin permanently deletes an account, recording the reason
     lanes:
       - type: Command
@@ -1496,7 +1496,7 @@ events:
         description: Moment the initial password was stored
 commands:
   - name: registerAccount
-    action: identity:registerAccount
+    action: account:registerAccount
     description: Registers a new account using the email address as its identity and a password as its credential.
     inputs:
       - name: email
@@ -1521,7 +1521,7 @@ commands:
         required: true
         description: Initial lifecycle status of the new account.
   - name: sendActivationEmail
-    action: identity:sendActivationEmail
+    action: account:sendActivationEmail
     description: Sends the activation link email to a newly registered account. The command only receives the account identifier; the email address is read from the account's pending activation state.
     inputs:
       - name: accountId
@@ -1538,7 +1538,7 @@ commands:
         required: true
         description: Moment at which the activation link stops being valid.
   - name: activateAccount
-    action: identity:activateAccount
+    action: account:activateAccount
     description: Redeems the one-time activation token from the email link and turns the pending account into an activated one.
     inputs:
       - name: activationToken
@@ -1562,7 +1562,7 @@ commands:
         required: true
         description: Moment the account was activated.
   - name: suspendAccount
-    action: identity:suspendAccount
+    action: account:suspendAccount
     description: Administrator suspends an account, temporarily blocking its use
     inputs:
       - name: accountId
@@ -1590,7 +1590,7 @@ commands:
         required: true
         description: Timestamp when the account was suspended
   - name: unsuspendAccount
-    action: identity:unsuspendAccount
+    action: account:unsuspendAccount
     description: Administrator lifts a suspension so the account becomes usable again
     inputs:
       - name: accountId
@@ -1618,7 +1618,7 @@ commands:
         required: true
         description: Timestamp when the suspension was lifted
   - name: deleteAccount
-    action: identity:deleteAccount
+    action: account:deleteAccount
     description: Administrator permanently deletes an account
     inputs:
       - name: accountId
@@ -3345,8 +3345,8 @@ actors:
   - name: guest
     description: Unauthenticated visitor who can register, verify a password, obtain a session, sign in with a passkey and recover a password.
     permissions:
-      - identity:registerAccount
-      - identity:activateAccount
+      - account:registerAccount
+      - account:activateAccount
       - password:verifyPassword
       - session:createSession
       - passkey:loginWithPasskey
@@ -3355,14 +3355,14 @@ actors:
   - name: system
     description: Backend process that reacts to a registration and delivers the activation email.
     permissions:
-      - identity:sendActivationEmail
+      - account:sendActivationEmail
   - name: admin
     description: "Administrator who manages account lifecycle: sends activation emails, suspends, unsuspends and deletes accounts"
     permissions:
-      - identity:sendActivationEmail
-      - identity:suspendAccount
-      - identity:unsuspendAccount
-      - identity:deleteAccount
+      - account:sendActivationEmail
+      - account:suspendAccount
+      - account:unsuspendAccount
+      - account:deleteAccount
       - session:revokeSession
   - name: accountOwner
     description: Authenticated owner of an account who manages their own second factor
