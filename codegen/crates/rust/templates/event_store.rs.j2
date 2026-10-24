@@ -1,0 +1,44 @@
+//! Minimal event envelope used by the generated [`crate::domain_event::DomainEvent`]
+//! trait.
+//!
+//! Replace this module with your real event-store envelope if the surrounding
+//! project already has one. The trait only relies on `Event::new` and
+//! `Event::with_metadata`.
+
+use serde::{Deserialize, Serialize};
+
+/// A persisted domain event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Event {
+    /// Identifier of the event type, for example `account_registered`.
+    pub event_type: String,
+    /// Serialised event payload.
+    pub data: serde_json::Value,
+    /// Tags used to filter the event stream.
+    pub tags: Vec<String>,
+    /// Optional metadata attached when the event was stored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+}
+
+impl Event {
+    /// Creates an event envelope.
+    pub fn new(
+        event_type: impl Into<String>,
+        data: serde_json::Value,
+        tags: Vec<String>,
+    ) -> Self {
+        Self {
+            event_type: event_type.into(),
+            data,
+            tags,
+            metadata: None,
+        }
+    }
+
+    /// Attaches metadata to the event.
+    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+}

@@ -1,0 +1,54 @@
+//! Domain events of the `{{ module }}` domain.
+
+{% for event in events %}
+{%- for line in event.doc_lines %}
+/// {{ line }}
+{%- endfor %}
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct {{ event.rust_name }} {
+{%- for field in event.fields %}
+{%- for line in field.doc_lines %}
+    /// {{ line }}
+{%- endfor %}
+{%- if not field.required %}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+{%- endif %}
+    pub {{ field.rust_name }}: {{ field.rtype }},
+{%- endfor %}
+}
+
+impl crate::domain_event::DomainEvent for {{ event.rust_name }} {
+    fn event_type() -> &'static str {
+        {{ event.name|snake|str_lit }}
+    }
+
+    fn tags(&self) -> Vec<String> {
+{%- if event.tag_exprs %}
+        let mut tags = Vec::new();
+{%- for tag in event.tag_exprs %}
+{%- if tag.array and tag.optional %}
+        if let Some(values) = &self.{{ tag.field }} {
+            for value in values {
+                tags.push(format!("{{ tag.tag|snake }}:{}", crate::domain_event::tag_value(value)));
+            }
+        }
+{%- elif tag.array %}
+        for value in &self.{{ tag.field }} {
+            tags.push(format!("{{ tag.tag|snake }}:{}", crate::domain_event::tag_value(value)));
+        }
+{%- elif tag.optional %}
+        if let Some(value) = &self.{{ tag.field }} {
+            tags.push(format!("{{ tag.tag|snake }}:{}", crate::domain_event::tag_value(value)));
+        }
+{%- else %}
+        tags.push(format!("{{ tag.tag|snake }}:{}", crate::domain_event::tag_value(&self.{{ tag.field }})));
+{%- endif %}
+{%- endfor %}
+        tags
+{%- else %}
+        Vec::new()
+{%- endif %}
+    }
+}
+
+{% endfor %}

@@ -1,0 +1,14 @@
+//! {% if name == "shared" %}Items that are not assigned to a domain.{% else %}The `{{ module }}` domain.{% endif %}
+
+pub mod commands;
+pub mod events;
+pub mod queries;
+pub mod services;
+pub mod states;
+pub mod types;
+{%- if pub_uses %}
+
+{% for item in pub_uses %}
+pub use self::{{ item.module }}::{{ item.rust_name }};
+{%- endfor %}
+{%- endif %}

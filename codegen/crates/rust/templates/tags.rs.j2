@@ -1,0 +1,39 @@
+//! DCB tags declared by the `{{ spec_name }}` specification.
+//!
+//! A tag groups the events that carry the same kind of identifier, which is
+//! what a state projection usually filters on.
+
+/// One tag definition.
+#[derive(Debug, Clone, Copy)]
+pub struct TagDefinition {
+    /// Tag name, e.g. `account`.
+    pub tag: &'static str,
+    /// Types the tag can carry.
+    pub types: &'static [&'static str],
+    /// Events that emit this tag.
+    pub from_events: &'static [&'static str],
+}
+
+{% for tag in tags %}
+/// Tag `{{ tag.tag|snake }}`.
+pub const {{ tag.const_name }}: TagDefinition = TagDefinition {
+    tag: {{ tag.tag|snake|str_lit }},
+    types: &[
+{%- for ty in tag.types %}
+        {{ ty|snake|str_lit }},
+{%- endfor %}
+    ],
+    from_events: &[
+{%- for event in tag.from_events %}
+        {{ event|snake|str_lit }},
+{%- endfor %}
+    ],
+};
+
+{% endfor %}
+/// Every tag declared by the specification.
+pub const ALL: &[TagDefinition] = &[
+{%- for tag in tags %}
+    {{ tag.const_name }},
+{%- endfor %}
+];

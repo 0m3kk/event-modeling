@@ -1,0 +1,56 @@
+//! Service contracts of the `{{ module }}` domain.
+//!
+//! Methods sharing a `serviceName` are grouped into one trait. Implementors
+//! choose their own error type. Service methods live with the domain whose
+//! slices call them.
+
+{% for service in services %}
+{%- for method in service.methods %}
+{%- for line in method.doc_lines %}
+/// {{ line }}
+{%- endfor %}
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct {{ method.params_name }} {
+{%- for field in method.params %}
+{%- for line in field.doc_lines %}
+    /// {{ line }}
+{%- endfor %}
+{%- if not field.required %}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+{%- endif %}
+    pub {{ field.rust_name }}: {{ field.rtype }},
+{%- endfor %}
+}
+
+/// Value returned by [`{{ service.trait_name }}::{{ method.rust_name }}`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct {{ method.returns_name }} {
+{%- for field in method.returns %}
+{%- for line in field.doc_lines %}
+    /// {{ line }}
+{%- endfor %}
+{%- if not field.required %}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+{%- endif %}
+    pub {{ field.rust_name }}: {{ field.rtype }},
+{%- endfor %}
+}
+
+{% endfor %}
+/// Service contract `{{ service.name }}`.
+pub trait {{ service.trait_name }} {
+    /// Error type chosen by the implementation.
+    type Error;
+{%- for method in service.methods %}
+
+{%- for line in method.doc_lines %}
+    /// {{ line }}
+{%- endfor %}
+    fn {{ method.rust_name }}(
+        &self,
+        params: {{ method.params_name }},
+    ) -> impl std::future::Future<Output = Result<{{ method.returns_name }}, Self::Error>> + Send;
+{%- endfor %}
+}
+
+{% endfor %}

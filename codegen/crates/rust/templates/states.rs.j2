@@ -1,0 +1,43 @@
+//! Read-model / decision states of the `{{ module }}` domain.
+//!
+//! A state is generated as the projected state struct plus the parameters used
+//! to load it. The event types and tags that feed the projection are recorded
+//! in the doc comments.
+
+{% for state in states %}
+{%- for line in state.doc_lines %}
+/// {{ line }}
+{%- endfor %}
+{%- for source in state.query %}
+{%- for line in source.doc_lines %}
+/// {{ line }}
+{%- endfor %}
+{%- endfor %}
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct {{ state.params_name }} {
+{%- for field in state.params %}
+{%- for line in field.doc_lines %}
+    /// {{ line }}
+{%- endfor %}
+{%- if not field.required %}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+{%- endif %}
+    pub {{ field.rust_name }}: {{ field.rtype }},
+{%- endfor %}
+}
+
+/// Projected state of [`{{ state.params_name }}`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct {{ state.rust_name }} {
+{%- for field in state.states %}
+{%- for line in field.doc_lines %}
+    /// {{ line }}
+{%- endfor %}
+{%- if not field.required %}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+{%- endif %}
+    pub {{ field.rust_name }}: {{ field.rtype }},
+{%- endfor %}
+}
+
+{% endfor %}

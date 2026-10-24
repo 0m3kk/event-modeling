@@ -1,0 +1,106 @@
+# {{ spec_name }}
+
+A Rust library crate generated from the `{{ spec_name }}` event-modeling
+specification by `em-codegen` {{ generator_version }}.
+
+## Contents
+
+| Module | Count |
+| --- | --- |
+| `domains` | {{ counts.domains }} |
+| `types` | {{ counts.types }} |
+| `events` | {{ counts.events }} |
+| `commands` | {{ counts.commands }} |
+| `queries` | {{ counts.queries }} |
+| `states` | {{ counts.states }} |
+| `services` | {{ counts.services }} |
+| `actors` | {{ counts.actors }} |
+| `tags` | {{ counts.tags }} |
+
+## Layout
+
+Every domain owns a folder with its commands, events, queries, services,
+states and types:
+
+```text
+src/
+  domains/
+    <domain>/
+      commands.rs
+      events.rs
+      queries.rs
+      services.rs
+      states.rs
+      types.rs
+      mod.rs
+```
+
+Outside the domains:
+
+- `actors` — actors and their permissions.
+- `domain_event` — the `DomainEvent` trait implemented by every event.
+- `event_store` — a minimal `Event` envelope used by the trait (replace it with
+  your real event-store type if you already have one).
+- `tags` — tag metadata.
+- `shared` — items that were not assigned to a domain, when there are any.
+
+Service methods return `impl Future<Output = ...> + Send`; implement them with
+`async fn`. The traits are not object-safe.
+
+## Domain events
+
+There is no central event enum. Each event struct implements the
+`DomainEvent` trait, which knows its type name and tags and can produce a
+stored event:
+
+```rust
+use {{ package_name }}::{DomainEvent, Event};
+
+fn persist<E: DomainEvent>(event: &E) -> Result<Event, serde_json::Error> {
+    event.to_store_event()
+}
+```
+
+## Domains
+{% for domain in domains %}
+- `{{ domain.module }}`
+{% endfor %}
+## Usage
+
+```rust
+use {{ package_name }}::{Actor, DomainEvent, TagDefinition};
+use {{ package_name }}::domains::your_domain::commands::YourCommand;
+```
+
+Every generated type derives `serde::Serialize` and `serde::Deserialize`.
+
+## Validation
+
+Validation is generated **only for command input structs and query params
+structs**. Responses, events, states, services, types and aliases do not
+derive/implement `Validate`.
+
+Spec constraints become `validator` attributes:
+
+- `minLength` / `maxLength` → `length(...)`
+- `minItems` / `maxItems` → `length(...)` on the array
+- `format: email` / `format: url` → `email` / `url`
+- `pattern` → a `LazyLock<Regex>` static and `regex(path = *STATIC)`
+- `min` / `max` → `range(...)`
+- fields of alias type → a generated `custom(function = "validate_...")`
+
+If a command/query field uses an alias with constraints, the alias constraints
+are inlined as a `validate_*` function in that command/query module; the alias
+itself stays a plain newtype.
+
+## Temporal and UUID types
+
+`date` maps to `chrono::NaiveDate`, `time` to `chrono::NaiveTime`, `datetime` to
+`chrono::DateTime<chrono::Utc>`, and `uuid` (or `format: uuid`) to
+`uuid::Uuid`.
+
+## Naming
+
+Serialized names use `snake_case`: `event_type()` values, JSON field names,
+enum variants, tags and actor permissions. Rust type, trait and enum names stay
+`PascalCase` as required by Rust conventions.
