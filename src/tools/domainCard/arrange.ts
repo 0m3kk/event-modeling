@@ -27,7 +27,7 @@ import {
  *
  * The shape mirrors how a bounded context reads on a whiteboard:
  *
- *  - the reusable definition Groups (Types / States / Services) sit on the left
+ *  - the reusable definition Groups (Types / States) sit on the left
  *    as one or more columns of compact card grids;
  *  - the Slices line up in a horizontal row beside them, left-to-right in the
  *    Domain's stored {@link DomainData.sliceOrder};
@@ -76,8 +76,9 @@ function measureColumn(boxes: GroupBox[], gap: number): { width: number; height:
 
 /**
  * Sort rank for the standard definition Groups, so the left side always reads
- * Types → States → Services (whatever the Domain is called). Anything else lands
- * after them. Matches both "Account Types" and "AccountTypes" spellings.
+ * Types → States (whatever the Domain is called). Legacy "Services" groups sort
+ * after them, as does anything else. Matches both "Account Types" and
+ * "AccountTypes" spellings.
  */
 export function groupKindRank(group: CanvasElement): number {
   const words = nameKey(group.data?.name ?? "").split(" ");

@@ -74,10 +74,6 @@ export function executeUpdateElement(updateName: string, args: any): string {
   if (!("text" in payload) && existingData.text !== undefined) {
     nextData = { ...nextData, text: existingData.text };
   }
-  if (existingData.methodRef !== undefined) {
-    nextData = { ...nextData, methodRef: existingData.methodRef };
-  }
-
   // The canvas overview omits field-item descriptions, so carry the existing
   // ones over by name when the model leaves them out of the payload.
   nextData = carryOverDescriptions(nextData, existingData);

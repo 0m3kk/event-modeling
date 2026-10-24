@@ -165,43 +165,22 @@ function service(): CanvasElement {
     x: 0,
     y: 0,
     width: 240,
-    height: 140,
+    height: 142,
     data: {
-      name: "OrderService",
+      name: "placeOrder",
       description: "Handles orders",
-      methods: [
-        {
-          id: "m1",
-          name: "placeOrder",
-          description: "Places an order",
-          params: [{ name: "orderId", type: "string", description: "Param id" }],
-          returns: [{ name: "ok", type: "boolean" }],
-        },
-        { id: "m2", name: "cancelOrder", params: [], returns: [] },
-      ],
+      params: [{ name: "orderId", type: "string", description: "Param id" }],
+      returns: [{ name: "ok", type: "boolean" }],
     },
   };
 }
 
 describe("description utility — Service cards", () => {
-  it("flattens every method into a params band then a returns band", () => {
-    expect(getFieldSections(service()).map((s) => `${s.methodIndex}:${s.kind}`)).toEqual([
-      "0:params",
-      "0:returns",
-      "1:params",
-      "1:returns",
-    ]);
+  it("exposes a params band then a returns band", () => {
+    expect(getFieldSections(service()).map((s) => s.key)).toEqual(["params", "returns"]);
   });
 
-  it("reads method-level and row descriptions", () => {
-    expect(
-      findDescriptionText(service(), {
-        elementId: "svc-1",
-        sectionId: "method",
-        sectionIndex: 0,
-        fieldIndex: -1,
-      }),
-    ).toBe("Places an order");
+  it("reads row descriptions", () => {
     expect(
       findDescriptionText(service(), {
         elementId: "svc-1",
@@ -221,37 +200,39 @@ describe("description utility — Service cards", () => {
     expect(
       findRowName(service(), {
         elementId: "svc-1",
-        sectionId: "method",
+        sectionId: "params",
         sectionIndex: 0,
-        fieldIndex: -1,
+        fieldIndex: 0,
       }),
-    ).toBe("placeOrder");
+    ).toBe("orderId");
   });
 
-  it("writes method and row descriptions back under data.methods", () => {
-    const methodPatch = applyDescription(
-      service(),
-      { elementId: "svc-1", sectionId: "method", sectionIndex: 1, fieldIndex: -1 },
-      "Cancels an order",
-    );
-    expect((methodPatch?.data as any).methods[1].description).toBe("Cancels an order");
-
-    const rowPatch = applyDescription(
+  it("writes param and return row descriptions", () => {
+    const paramPatch = applyDescription(
       service(),
       { elementId: "svc-1", sectionId: "params", sectionIndex: 0, fieldIndex: 0 },
       "New id",
     );
-    expect((rowPatch?.data as any).methods[0].params[0].description).toBe("New id");
-    expect((rowPatch?.data as any).methods[1]).toEqual(service().data.methods[1]);
+    expect((paramPatch?.data as any).params[0].description).toBe("New id");
+    expect((paramPatch?.data as any).returns).toEqual(service().data.returns);
+
+    const returnPatch = applyDescription(
+      service(),
+      { elementId: "svc-1", sectionId: "returns", sectionIndex: 1, fieldIndex: 0 },
+      "Whether the order was accepted",
+    );
+    expect((returnPatch?.data as any).returns[0].description).toBe(
+      "Whether the order was accepted",
+    );
   });
 
-  it("removes a method description", () => {
+  it("removes a row description", () => {
     const patch = applyDescription(
       service(),
-      { elementId: "svc-1", sectionId: "method", sectionIndex: 0, fieldIndex: -1 },
+      { elementId: "svc-1", sectionId: "params", sectionIndex: 0, fieldIndex: 0 },
       "",
     );
-    expect("description" in (patch?.data as any).methods[0]).toBe(false);
+    expect("description" in (patch?.data as any).params[0]).toBe(false);
   });
 });
 

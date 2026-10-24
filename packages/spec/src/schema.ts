@@ -146,6 +146,8 @@ const constraintSchema: z.ZodType<ConstraintDef> = z.object({
 const serviceSchema: z.ZodType<ServiceDef> = z.object({
   name: z.string(),
   description: z.string().optional(),
+  params: z.array(fieldSchema).optional(),
+  returns: z.array(fieldSchema).optional(),
   methods: z
     .array(
       z.object({

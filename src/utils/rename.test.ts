@@ -120,15 +120,9 @@ describe("applyRenameMappings", () => {
         states: [{ name: "shipTo", type: "address" }],
       }),
       el("serviceCard", "sv1", {
-        name: "orderService",
-        methods: [
-          {
-            id: "m1",
-            name: "execute",
-            params: [{ name: "shipTo", type: "address" }],
-            returns: [{ name: "shipTo", type: "address" }],
-          },
-        ],
+        name: "placeOrder",
+        params: [{ name: "shipTo", type: "address" }],
+        returns: [{ name: "shipTo", type: "address" }],
       }),
       el("aliasCard", "a1", { name: "destination", aliasedType: "address" }),
     ];
@@ -147,8 +141,8 @@ describe("applyRenameMappings", () => {
     expect(updated[4].data.states[0].type).toBe("shippingAddress");
     expect(updated[5].data.params[0].type).toBe("shippingAddress");
     expect(updated[5].data.states[0].type).toBe("shippingAddress");
-    expect(updated[6].data.methods[0].params[0].type).toBe("shippingAddress");
-    expect(updated[6].data.methods[0].returns[0].type).toBe("shippingAddress");
+    expect(updated[6].data.params[0].type).toBe("shippingAddress");
+    expect(updated[6].data.returns[0].type).toBe("shippingAddress");
     expect(updated[7].data.aliasedType).toBe("shippingAddress");
   });
 

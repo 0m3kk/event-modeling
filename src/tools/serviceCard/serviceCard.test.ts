@@ -6,41 +6,31 @@ import { useCanvasStore } from "@/store";
 import type { CanvasElement } from "@/types";
 import { navigateSubSelect } from "@/utils/subSelection";
 
-describe("serviceCardTool (methods with params & returns)", () => {
+describe("serviceCardTool (one method with params & returns)", () => {
   beforeEach(() => {
     useCanvasStore.getState().clearBoard();
   });
 
-  // Layout with two methods:
+  // Layout for one method:
   //  32 header
-  //  method0: 24 header + 16 label + 2*26 params + 16 label + 1*26 returns = 134 -> ends 166
-  //  method1: 24 header + 16 label + 1*26 (empty) + 16 label + 1*26 (empty) = 108 -> ends 274
+  //  16 PARAMS label
+  //  2 * 26 params rows  -> ends 100
+  //  16 RETURNS label    -> ends 116
+  //  1 * 26 return row   -> ends 142
   const card: CanvasElement<ServiceCardData> = {
     id: "svc-1",
     type: "serviceCard",
     x: 100,
     y: 100,
     width: 240,
-    height: 274,
+    height: 142,
     data: {
-      name: "OrderService",
-      methods: [
-        {
-          id: "m1",
-          name: "placeOrder",
-          params: [
-            { name: "orderId", type: "string" },
-            { name: "total", type: "float" },
-          ],
-          returns: [{ name: "trackingCode", type: "string" }],
-        },
-        {
-          id: "m2",
-          name: "cancelOrder",
-          params: [],
-          returns: [],
-        },
+      name: "placeOrder",
+      params: [
+        { name: "orderId", type: "string" },
+        { name: "total", type: "float" },
       ],
+      returns: [{ name: "trackingCode", type: "string" }],
     },
   };
 
@@ -51,82 +41,64 @@ describe("serviceCardTool (methods with params & returns)", () => {
     expect(serviceCardTool.category).toBe("modeling");
   });
 
-  it("computes height from every method's params and returns", () => {
+  it("computes height from the method's params and returns", () => {
     const size = serviceCardTool.computeSize!(card.data);
     expect(size.width).toBe(240);
-    expect(size.height).toBe(274);
+    expect(size.height).toBe(142);
   });
 
-  it("sub-selects method headers and param/return rows", () => {
-    // Method 0 header (32..56)
-    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 40 })).toEqual({
-      elementId: "svc-1",
-      sectionId: "method",
-      sectionIndex: 0,
-      fieldIndex: -1,
-    });
+  it("sub-selects param and return rows, not the header or group labels", () => {
+    // Header (0..32) is the card title, not a row.
+    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 15 })).toBeNull();
 
-    // Params group label (56..72) -> no row
-    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 60 })).toBeNull();
+    // Params group label (32..48) -> no row
+    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 40 })).toBeNull();
 
-    // Param rows (72..124)
-    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 80 })).toEqual({
+    // Param rows (48..100)
+    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 50 })).toEqual({
       elementId: "svc-1",
       sectionId: "params",
       sectionIndex: 0,
       fieldIndex: 0,
     });
-    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 100 })).toEqual({
+    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 80 })).toEqual({
       elementId: "svc-1",
       sectionId: "params",
       sectionIndex: 0,
       fieldIndex: 1,
     });
 
-    // Returns label (124..140) -> no row
-    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 130 })).toBeNull();
+    // Returns label (100..116) -> no row
+    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 105 })).toBeNull();
 
-    // Return row (140..166)
-    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 150 })).toEqual({
+    // Return row (116..142)
+    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 120 })).toEqual({
       elementId: "svc-1",
       sectionId: "returns",
       sectionIndex: 1,
       fieldIndex: 0,
     });
-
-    // Method 1 header (166..190)
-    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 180 })).toEqual({
-      elementId: "svc-1",
-      sectionId: "method",
-      sectionIndex: 1,
-      fieldIndex: -1,
-    });
-
-    // Empty groups render a hint row but are NOT selectable.
-    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 210 })).toBeNull();
-    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 260 })).toBeNull();
+    expect(serviceCardTool.onSubSelect!(card, { x: 50, y: 150 })).toBeNull();
   });
 
-  it("exposes one params/returns section per method", () => {
+  it("exposes one params and one returns section", () => {
     const sections = serviceCardTool.getSubSelectSections!(card);
     expect(sections).toEqual([
       { id: "params", name: "params", count: 2 },
       { id: "returns", name: "returns", count: 1 },
-      { id: "params", name: "params", count: 0 },
-      { id: "returns", name: "returns", count: 0 },
     ]);
   });
 
-  it("navigates through methods, params and returns with arrows", () => {
-    // Method header -> first param
+  it("navigates through params and returns with arrows", () => {
+    // First param -> second param
     expect(
       navigateSubSelect(
         card,
-        { elementId: "svc-1", sectionId: "method", sectionIndex: 0, fieldIndex: -1 },
+        { elementId: "svc-1", sectionId: "params", sectionIndex: 0, fieldIndex: 0 },
         "down",
         serviceCardTool,
       ),
-    ).toEqual({ elementId: "svc-1", sectionId: "params", sectionIndex: 0, fieldIndex: 0 });
+    ).toEqual({ elementId: "svc-1", sectionId: "params", sectionIndex: 0, fieldIndex: 1 });
 
     // Last param -> first return
     expect(
@@ -138,7 +110,7 @@ describe("serviceCardTool (methods with params & returns)", () => {
       ),
     ).toEqual({ elementId: "svc-1", sectionId: "returns", sectionIndex: 1, fieldIndex: 0 });
 
-    // Last return -> next method header (method 1 has no rows)
+    // Last return -> stays on last return
     expect(
       navigateSubSelect(
         card,
@@ -146,45 +118,33 @@ describe("serviceCardTool (methods with params & returns)", () => {
         "down",
         serviceCardTool,
       ),
-    ).toEqual({ elementId: "svc-1", sectionId: "method", sectionIndex: 1, fieldIndex: -1 });
+    ).toEqual({ elementId: "svc-1", sectionId: "returns", sectionIndex: 1, fieldIndex: 0 });
 
-    // Method header up -> previous method's last return
+    // First return up -> last param
     expect(
       navigateSubSelect(
         card,
-        { elementId: "svc-1", sectionId: "method", sectionIndex: 1, fieldIndex: -1 },
+        { elementId: "svc-1", sectionId: "returns", sectionIndex: 1, fieldIndex: 0 },
         "up",
         serviceCardTool,
       ),
-    ).toEqual({ elementId: "svc-1", sectionId: "returns", sectionIndex: 1, fieldIndex: 0 });
+    ).toEqual({ elementId: "svc-1", sectionId: "params", sectionIndex: 0, fieldIndex: 1 });
   });
 
-  it("renames the service, a method and a row via inline edit", () => {
+  it("renames the method and a row via inline edit", () => {
     useCanvasStore.getState().addElement(card);
 
-    // Card header
+    // Card header → method name
     const serviceTarget = serviceCardTool.getInlineEditTarget!(card, { x: 50, y: 15 });
-    expect(serviceTarget?.initialValue).toBe("Order Service");
-    serviceTarget?.onCommit("CheckoutService");
-    expect(useCanvasStore.getState().elements[0].data.name).toBe("checkoutService");
-
-    // Method header
-    const methodTarget = serviceCardTool.getInlineEditTarget!(card, { x: 40, y: 40 });
-    expect(methodTarget?.initialValue).toBe("Place Order");
-    methodTarget?.onCommit("submitOrder");
-    expect(useCanvasStore.getState().elements[0].data.methods[0].name).toBe("submitOrder");
-    expect(useCanvasStore.getState().selectedField).toEqual({
-      elementId: "svc-1",
-      sectionId: "method",
-      sectionIndex: 0,
-      fieldIndex: -1,
-    });
+    expect(serviceTarget?.initialValue).toBe("Place Order");
+    serviceTarget?.onCommit("submitOrder");
+    expect(useCanvasStore.getState().elements[0].data.name).toBe("submitOrder");
 
     // Param row
-    const rowTarget = serviceCardTool.getInlineEditTarget!(card, { x: 30, y: 80 });
+    const rowTarget = serviceCardTool.getInlineEditTarget!(card, { x: 30, y: 50 });
     expect(rowTarget?.initialValue).toBe("Order ID");
     rowTarget?.onCommit("cartId");
-    expect(useCanvasStore.getState().elements[0].data.methods[0].params[0].name).toBe("cartId");
+    expect(useCanvasStore.getState().elements[0].data.params[0].name).toBe("cartId");
     expect(useCanvasStore.getState().selectedField).toEqual({
       elementId: "svc-1",
       sectionId: "params",
@@ -193,33 +153,29 @@ describe("serviceCardTool (methods with params & returns)", () => {
     });
   });
 
-  it("deletes param/return rows and whole methods", () => {
-    // Delete first param of method 0 (band 0)
+  it("deletes param/return rows", () => {
+    // Delete first param (sectionIndex 0)
     const paramPatch = serviceCardTool.onDeleteSubSelect!(card, 0, 0);
-    expect(paramPatch?.data?.methods?.[0].params).toHaveLength(1);
-    expect(paramPatch?.data?.methods?.[0].params[0].name).toBe("total");
-    // 32 + (24+16+1*26+16+26) + 108 = 248
-    expect(paramPatch?.height).toBe(248);
+    expect(paramPatch?.data?.params).toHaveLength(1);
+    expect(paramPatch?.data?.params[0].name).toBe("total");
+    // 32 + 16 + 1*26 + 16 + 26 = 116
+    expect(paramPatch?.height).toBe(116);
 
-    // Delete the return of method 0 (band 1)
+    // Delete the return (sectionIndex 1)
     const returnPatch = serviceCardTool.onDeleteSubSelect!(card, 0, 1);
-    expect(returnPatch?.data?.methods?.[0].returns).toHaveLength(0);
+    expect(returnPatch?.data?.returns).toHaveLength(0);
 
-    // A method header (fieldIndex < 0) deletes the whole method (sectionIndex = method index).
-    const methodPatch = serviceCardTool.onDeleteSubSelect!(card, -1, 1);
-    expect(methodPatch?.data?.methods).toHaveLength(1);
-    expect(methodPatch?.data?.methods?.[0].id).toBe("m1");
-    // 32 + method0 block (134) = 166
-    expect(methodPatch?.height).toBe(166);
+    // A non-row selection cannot be deleted.
+    expect(serviceCardTool.onDeleteSubSelect!(card, -1, 0)).toBeNull();
   });
 
-  it("updates field type / array / required on nested rows", () => {
+  it("updates field type / array / required on rows", () => {
     const typePatch = serviceCardTool.onUpdateSubSelectType!(
       card,
       { elementId: "svc-1", sectionId: "params", sectionIndex: 0, fieldIndex: 0 },
       "boolean",
     );
-    expect(typePatch?.data?.methods?.[0].params[0].type).toBe("boolean");
+    expect(typePatch?.data?.params[0].type).toBe("boolean");
 
     const arrayPatch = serviceCardTool.onToggleSubSelectArray!(card, {
       elementId: "svc-1",
@@ -227,7 +183,7 @@ describe("serviceCardTool (methods with params & returns)", () => {
       sectionIndex: 0,
       fieldIndex: 0,
     });
-    expect(arrayPatch?.data?.methods?.[0].params[0].isArray).toBe(true);
+    expect(arrayPatch?.data?.params[0].isArray).toBe(true);
 
     const requiredPatch = serviceCardTool.onToggleSubSelectRequired!(card, {
       elementId: "svc-1",
@@ -235,19 +191,10 @@ describe("serviceCardTool (methods with params & returns)", () => {
       sectionIndex: 1,
       fieldIndex: 0,
     });
-    expect(requiredPatch?.data?.methods?.[0].returns[0].isRequired).toBe(true);
+    expect(requiredPatch?.data?.returns[0].isRequired).toBe(true);
   });
 
   it("resolves selected item for the options bar", () => {
-    expect(
-      serviceCardTool.getSelectedFieldItem!(card, {
-        elementId: "svc-1",
-        sectionId: "method",
-        sectionIndex: 0,
-        fieldIndex: -1,
-      }),
-    ).toBeNull();
-
     expect(
       serviceCardTool.getSelectedFieldItem!(card, {
         elementId: "svc-1",
@@ -258,22 +205,37 @@ describe("serviceCardTool (methods with params & returns)", () => {
     ).toEqual({ name: "orderId", type: "string" });
   });
 
+  it("collapses the legacy multi-method shape to its first method", () => {
+    const normalized = serviceCardTool.normalizeData!(
+      {
+        name: "OrderService",
+        methods: [
+          { id: "m1", name: "placeOrder", params: [{ name: "id", type: "string" }], returns: [] },
+          { id: "m2", name: "cancelOrder", params: [], returns: [] },
+        ],
+      } as unknown as ServiceCardData,
+      { elements: [] },
+    );
+
+    expect(normalized.name).toBe("placeOrder");
+    expect(normalized.params).toEqual([{ name: "id", type: "string" }]);
+    expect("methods" in normalized).toBe(false);
+  });
+
   it("creates a Service card through the AI operation", () => {
     const element = serviceCardTool.ai!.onCreate(
       {
-        name: "PaymentService",
-        methods: [
-          { name: "charge", params: [{ name: "amount", type: "float" }], returns: [] },
-        ],
+        name: "chargeCard",
+        params: [{ name: "amount", type: "float" }],
+        returns: [{ name: "receiptId", type: "string" }],
       },
       { x: 500, y: 500 },
     );
 
     expect(element.type).toBe("serviceCard");
-    expect(element.data.name).toBe("PaymentService");
-    expect(element.data.methods).toHaveLength(1);
-    expect(element.data.methods[0].name).toBe("charge");
-    expect(element.data.methods[0].id).toBeTruthy();
+    expect(element.data.name).toBe("chargeCard");
+    expect(element.data.params).toHaveLength(1);
+    expect(element.data.returns).toHaveLength(1);
     expect(element.width).toBe(240);
   });
 });
@@ -282,25 +244,18 @@ describe("serviceCardTool content width auto-grow", () => {
   it("keeps the default width for short content", () => {
     expect(
       computeServiceCardSize({
-        name: "OrderService",
-        methods: [
-          { id: "m1", name: "place", params: [{ name: "id", type: "string" }], returns: [] },
-        ],
+        name: "placeOrder",
+        params: [{ name: "id", type: "string" }],
+        returns: [],
       }).width,
     ).toBe(240);
   });
 
   it("widens to fit a long param field type", () => {
     const data: ServiceCardData = {
-      name: "OrderService",
-      methods: [
-        {
-          id: "m1",
-          name: "place",
-          params: [{ name: "p", type: "a".repeat(40) }],
-          returns: [],
-        },
-      ],
+      name: "placeOrder",
+      params: [{ name: "p", type: "a".repeat(40) }],
+      returns: [],
     };
     // 12 + "P"(7.2) + 30 gap + type(40 chars * 11 * 0.6 = 264) + 12 -> 326
     expect(computeServiceCardSize(data).width).toBe(326);
@@ -308,25 +263,18 @@ describe("serviceCardTool content width auto-grow", () => {
 
   it("widens to fit a long method name", () => {
     const data: ServiceCardData = {
-      name: "S",
-      methods: [
-        { id: "m1", name: "placeOrderEverySingleTime", params: [], returns: [] },
-      ],
+      name: "placeOrderEverySingleTime",
+      params: [],
+      returns: [],
     };
     expect(computeServiceCardSize(data).width).toBeGreaterThan(240);
   });
 
   it("never shrinks below a requested width", () => {
     const data: ServiceCardData = {
-      name: "OrderService",
-      methods: [
-        {
-          id: "m1",
-          name: "place",
-          params: [{ name: "p", type: "a".repeat(40) }],
-          returns: [],
-        },
-      ],
+      name: "placeOrder",
+      params: [{ name: "p", type: "a".repeat(40) }],
+      returns: [],
     };
     expect(computeServiceCardSize(data, 900).width).toBe(900);
   });
@@ -337,31 +285,47 @@ describe("serviceCardTool store auto-fit", () => {
     useCanvasStore.getState().clearBoard();
   });
 
-  it("widens the card when a method's param type grows", () => {
+  it("widens the card when a param type grows", () => {
     useCanvasStore.getState().addElement({
       id: "svc-1",
       type: "serviceCard",
       x: 0,
       y: 0,
       width: 240,
-      height: 134,
+      height: 116,
       data: {
-        name: "OrderService",
-        methods: [
-          { id: "m1", name: "place", params: [{ name: "p", type: "string" }], returns: [] },
-        ],
+        name: "placeOrder",
+        params: [{ name: "p", type: "string" }],
+        returns: [],
       },
     });
     expect(useCanvasStore.getState().elements[0].width).toBe(240);
 
     useCanvasStore.getState().updateElement("svc-1", {
       data: {
-        name: "OrderService",
-        methods: [
-          { id: "m1", name: "place", params: [{ name: "p", type: "a".repeat(40) }], returns: [] },
-        ],
+        name: "placeOrder",
+        params: [{ name: "p", type: "a".repeat(40) }],
+        returns: [],
       },
     });
     expect(useCanvasStore.getState().elements[0].width).toBe(326);
+  });
+
+  it("allows two Service cards to share a name", () => {
+    const make = (id: string) => ({
+      id,
+      type: "serviceCard" as const,
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 116,
+      data: { name: "charge", params: [], returns: [] },
+    });
+
+    useCanvasStore.getState().addElement(make("svc-1"));
+    useCanvasStore.getState().addElement(make("svc-2"));
+
+    const names = useCanvasStore.getState().elements.map((el) => el.data.name);
+    expect(names).toEqual(["charge", "charge"]);
   });
 });

@@ -42,8 +42,8 @@ export function validateTypeValue(
 
 /**
  * Validates the `type` of every field in `fields`, reporting one issue per bad
- * row. `pathPrefix` is the dotted path to the array (e.g. `params`,
- * `methods[0].returns`) so issues point at the exact field.
+ * row. `pathPrefix` is the dotted path to the array (e.g. `params`, `returns`)
+ * so issues point at the exact field.
  */
 export function validateFieldTypes(
   fields: TypedFieldLike[] | undefined,

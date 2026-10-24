@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets, Asterisk, Diamond, Play, ShieldCheck } from "lucide-react";
+import { Trash2, Copy, Palette, Link2, Tag, Info, Braces, Brackets, Asterisk, Diamond, ShieldCheck } from "lucide-react";
 import { useCanvasStore } from "@/store";
 import { toolRegistry } from "@/tools";
 import { ColorPickerPopover } from "./ColorPickerPopover";
@@ -444,19 +444,6 @@ export function OptionsBar() {
                 <Link2 size={14} className="stroke-[2.5]" />
               </div>
             )}
-            <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
-          </>
-        )}
-
-        {/* Method-execution copy indicator (Service) — icon-only, distinct from ref badges */}
-        {isSingle && singleElement?.data?.methodRef && (
-          <>
-            <div
-              className="flex items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 px-2 py-1 text-emerald-600 dark:text-emerald-400"
-              title="Method Copy: live-linked to a method on its source service."
-            >
-              <Play size={13} className="fill-emerald-500/30 stroke-[2.5]" />
-            </div>
             <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800" />
           </>
         )}

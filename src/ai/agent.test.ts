@@ -181,12 +181,10 @@ describe("AIAgent", () => {
     expect(view.states.items.properties.description.type).toBe("string");
     expect(view.queryItems.items.properties.description.type).toBe("string");
 
-    // Service: method params + returns.
+    // Service: one method's params + returns.
     const service = tool("create_service_card").function.parameters.properties;
-    expect(service.methods.items.properties.params.items.properties.description.type).toBe("string");
-    expect(service.methods.items.properties.returns.items.properties.description.type).toBe(
-      "string",
-    );
+    expect(service.params.items.properties.description.type).toBe("string");
+    expect(service.returns.items.properties.description.type).toBe("string");
 
     // Enum: value description.
     const enumTool = tool("create_enum_card");
@@ -914,17 +912,33 @@ describe("AIAgent", () => {
     expect(groupTool.function.parameters.properties.group).toBeUndefined();
     expect(groupTool.function.parameters.properties.domain.type).toBe("string");
 
-    // Definition/service/state cards can join a Group.
+    // Definition/state cards can join a Group.
     const objectTool = tools.find((t) => t.function.name === "create_object_card")!;
     expect(objectTool.function.parameters.properties.group.type).toBe("string");
-    const serviceTool = tools.find((t) => t.function.name === "create_service_card")!;
-    expect(serviceTool.function.parameters.properties.group.type).toBe("string");
     const stateTool = tools.find((t) => t.function.name === "create_state_card")!;
     expect(stateTool.function.parameters.properties.group.type).toBe("string");
 
-    // Behavior cards cannot.
+    // Service cards live in a Slice lane; behavior cards cannot join a Group.
+    const serviceTool = tools.find((t) => t.function.name === "create_service_card")!;
+    expect(serviceTool.function.parameters.properties.group).toBeUndefined();
     const eventTool = tools.find((t) => t.function.name === "create_event_card")!;
     expect(eventTool.function.parameters.properties.group).toBeUndefined();
+  });
+
+  it("rejects placing a Service card in a Group", async () => {
+    await executeAITool("create_group_card", { name: "Services" });
+
+    const res = JSON.parse(
+      await executeAITool("create_service_card", {
+        name: "charge",
+        params: [],
+        returns: [],
+        group: "Services",
+      }),
+    );
+    expect(res.status).toBe("error");
+    expect(res.error).toBe("group_placement_failed");
+    expect(useCanvasStore.getState().elements.some((e) => e.type === "serviceCard")).toBe(false);
   });
 
   it("creates a group and places an object inside it", async () => {
@@ -1021,22 +1035,16 @@ describe("AIAgent", () => {
     expect(object.groupId).toBeUndefined();
   });
 
-  it("exposes reference and method-execution copy tools with placement props", () => {
+  it("exposes the reference copy tool with placement props", () => {
     const tools = buildOpenAITools();
     const names = tools.map((t) => t.function.name);
     expect(names).toContain("create_reference_copy");
-    expect(names).toContain("create_service_method_execution");
+    expect(names).not.toContain("create_service_method_execution");
 
     const refTool = tools.find((t) => t.function.name === "create_reference_copy")!;
     expect(refTool.function.parameters.required).toContain("target");
     expect(refTool.function.parameters.properties.slice.type).toBe("string");
     expect(refTool.function.parameters.properties.domain.type).toBe("string");
-
-    const execTool = tools.find((t) => t.function.name === "create_service_method_execution")!;
-    expect(execTool.function.parameters.required).toEqual(
-      expect.arrayContaining(["service", "method"]),
-    );
-    expect(execTool.function.parameters.properties.lane.type).toBe("string");
   });
 
   it("creates a live reference copy linked to the original", async () => {
@@ -1069,75 +1077,45 @@ describe("AIAgent", () => {
     expect(useCanvasStore.getState().elements).toHaveLength(0);
   });
 
-  it("creates a service method-execution copy linked to its source method", async () => {
-    await executeAITool("create_service_card", {
-      name: "PaymentService",
-      methods: [
-        { name: "charge", params: [{ name: "amount", type: "float" }], returns: [] },
-      ],
-    });
-
+  it("creates a Service card as one method execution", async () => {
     const res = JSON.parse(
-      await executeAITool("create_service_method_execution", {
-        service: "PaymentService",
-        method: "charge",
+      await executeAITool("create_service_card", {
+        name: "charge",
+        params: [{ name: "amount", type: "float" }],
+        returns: [],
       }),
     );
     expect(res.status).toBe("success");
     expect(res.type).toBe("serviceCard");
 
-    const elements = useCanvasStore.getState().elements;
-    const service = elements.find(
-      (e) => e.type === "serviceCard" && !(e.data as any).methodRef,
-    )!;
-    const copy = elements.find((e) => e.id === res.createdId)!;
-    expect((copy.data as any).methodRef).toEqual({
-      serviceId: service.id,
-      methodId: (service.data as any).methods[0].id,
-    });
-    expect((copy.data as any).methods).toHaveLength(1);
+    const service = useCanvasStore.getState().elements.find((e) => e.id === res.createdId)!;
+    expect((service.data as any).name).toBe("charge");
+    expect((service.data as any).params).toHaveLength(1);
+    expect((service.data as any).methodRef).toBeUndefined();
   });
 
-  it("reports method_not_found with the available methods", async () => {
-    await executeAITool("create_service_card", {
-      name: "PaymentService",
-      methods: [{ name: "charge", params: [], returns: [] }],
-    });
+  it("allows Service cards to share a name", async () => {
+    await executeAITool("create_service_card", { name: "charge", params: [], returns: [] });
+    await executeAITool("create_service_card", { name: "charge", params: [], returns: [] });
 
-    const res = JSON.parse(
-      await executeAITool("create_service_method_execution", {
-        service: "PaymentService",
-        method: "refund",
-      }),
-    );
-    expect(res.status).toBe("error");
-    expect(res.error).toBe("method_not_found");
-    expect(res.availableMethods).toContain("charge");
-
-    const missing = JSON.parse(
-      await executeAITool("create_service_method_execution", {
-        service: "GhostService",
-        method: "charge",
-      }),
-    );
-    expect(missing.status).toBe("error");
-    expect(missing.error).toBe("element_not_found");
+    const names = useCanvasStore
+      .getState()
+      .elements.filter((e) => e.type === "serviceCard")
+      .map((e) => (e.data as any).name);
+    expect(names).toEqual(["charge", "charge"]);
   });
 
-  it("places a method-execution copy into a service lane of a slice", async () => {
-    await executeAITool("create_service_card", {
-      name: "PaymentService",
-      methods: [{ name: "charge", params: [], returns: [] }],
-    });
+  it("places a Service card into a service lane of a slice", async () => {
     await executeAITool("create_slice", {
       name: "PlaceOrder",
       lanes: [{ type: "serviceCard" }],
     });
 
     const res = JSON.parse(
-      await executeAITool("create_service_method_execution", {
-        service: "PaymentService",
-        method: "charge",
+      await executeAITool("create_service_card", {
+        name: "charge",
+        params: [],
+        returns: [],
         slice: "PlaceOrder",
       }),
     );
@@ -1145,9 +1123,9 @@ describe("AIAgent", () => {
 
     const slice = useCanvasStore.getState().elements.find((e) => e.type === "sliceCard")!;
     const lane = (slice.data as any).lanes[0];
-    const copy = useCanvasStore.getState().elements.find((e) => e.id === res.createdId)!;
-    expect(copy.sliceId).toBe(slice.id);
-    expect(copy.laneId).toBe(lane.id);
+    const card = useCanvasStore.getState().elements.find((e) => e.id === res.createdId)!;
+    expect(card.sliceId).toBe(slice.id);
+    expect(card.laneId).toBe(lane.id);
   });
 
   it("anchors an AI card to its Group instead of the viewport centre", async () => {

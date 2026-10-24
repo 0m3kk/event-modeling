@@ -107,39 +107,6 @@ export function drawMasterBadge(
     .fill({ color: glyph });
 }
 
-/**
- * Draws the method-execution-copy badge — an emerald circle with a play glyph —
- * on a Service element that mirrors a single method of a source service. This
- * is deliberately distinct from the ❖ master and 🔗 reference-copy badges.
- */
-export function drawMethodCopyBadge(
-  g: Graphics,
-  element: CanvasElement<any>,
-  options: LinkBadgeOptions = {},
-): void {
-  const radius = options.radius ?? 9;
-  const isDark = options.theme === "dark";
-  const fill = options.fill ?? 0x059669; // emerald (#059669)
-  const glyph = options.glyph ?? 0xffffff;
-  const stroke = options.stroke ?? (isDark ? 0x27272a : 0xffffff);
-
-  // Positioned in top-right corner inside card bounds, like the ref badges.
-  const cx = element.width - 15;
-  const cy = 16;
-
-  // 1. Badge circular background with contrast border
-  g.circle(cx, cy, radius)
-    .fill({ color: fill })
-    .stroke({ color: stroke, width: 1.5 });
-
-  // 2. Play triangle glyph (▶) — "execute this method"
-  const s = radius / 9;
-  g.moveTo(cx - 2.6 * s, cy - 3.6 * s)
-    .lineTo(cx + 3.8 * s, cy)
-    .lineTo(cx - 2.6 * s, cy + 3.6 * s)
-    .closePath()
-    .fill({ color: glyph });
-}
 
 /**
  * Universal dispatcher: draws either the Master badge or the Reference Copy badge.

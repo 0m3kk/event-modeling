@@ -398,8 +398,16 @@ export function makeUniqueName(base: string, taken: Iterable<string>): string {
 }
 
 /**
+ * Card types whose names are labels rather than global identifiers. Service
+ * cards are single method executions, and different services may expose a
+ * method with the same name, so they are allowed to share a name.
+ */
+const NAME_UNIQUENESS_EXEMPT_TYPES = new Set(["serviceCard"]);
+
+/**
  * Ensures a newly added or updated element has a unique name among elements of the same type.
- * Reference copies (sharing referenceId with existing elements) are NOT renamed.
+ * Reference copies (sharing referenceId with existing elements) and types that
+ * may share names (Service) are NOT renamed.
  */
 export function ensureUniqueElement(
   element: CanvasElement,
@@ -414,6 +422,8 @@ export function ensureUniqueElement(
   ) {
     return element;
   }
+
+  if (NAME_UNIQUENESS_EXEMPT_TYPES.has(element.type)) return element;
 
   const rawName = getElementName(element);
   if (!rawName) return element;
@@ -446,6 +456,8 @@ export function resolveUniqueDataOnUpdate<T extends Record<string, any>>(
   patchData: T,
   elements: CanvasElement[],
 ): T {
+  if (NAME_UNIQUENESS_EXEMPT_TYPES.has(target.type)) return patchData;
+
   const currentName = getElementName(target);
   const nextName = getElementName({ ...target, data: patchData });
   if (!nextName || nextName === currentName) {

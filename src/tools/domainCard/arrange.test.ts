@@ -49,7 +49,7 @@ function slice(id: string, x: number, domainId: string, extra: Partial<CanvasEle
 }
 
 describe("group ordering", () => {
-  it("ranks Types, States and Services by name suffix", () => {
+  it("ranks Types and States, placing legacy Services groups last", () => {
     expect(groupKindRank({ data: { name: "Account Types" } } as CanvasElement)).toBe(0);
     expect(groupKindRank({ data: { name: "MoneyTypes" } } as CanvasElement)).toBe(0);
     expect(groupKindRank({ data: { name: "Account States" } } as CanvasElement)).toBe(1);
@@ -57,7 +57,7 @@ describe("group ordering", () => {
     expect(groupKindRank({ data: { name: "Actors" } } as CanvasElement)).toBe(3);
   });
 
-  it("orders groups Types -> States -> Services regardless of position", () => {
+  it("orders Types -> States -> legacy Services groups regardless of position", () => {
     const services = group("g-svc", "Account Services", 500);
     const states = group("g-state", "Account States", 0);
     const types = group("g-types", "Account Types", 250);

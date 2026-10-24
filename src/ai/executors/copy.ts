@@ -1,10 +1,9 @@
 /**
- * Canvas operations that add or remove elements: single delete, live reference
- * copies and Service method-execution copies.
+ * Canvas operations that add or remove elements: single delete and live
+ * reference copies.
  */
 import { useCanvasStore } from "@/store";
-import { getElementName, nameKey } from "@/utils/naming";
-import type { ServiceMethod } from "@/tools/serviceCard/layout";
+import { getElementName } from "@/utils/naming";
 import { findElementByName } from "../lookup";
 import { applyCreatedPlacement } from "../placement";
 
@@ -85,85 +84,5 @@ export function executeCreateReferenceCopy(args: any): string {
     referenceId: copy.referenceId,
     sourceId: source.id,
     note: `Reference copy of "${getElementName(source) ?? targetName}" created; it stays in sync with the original.`,
-  });
-}
-
-/**
- * Creates a method-execution copy of a Service method: a live Service card that
- * renders just that one method and stays linked to the source service. Locates
- * the source Service by name (ignoring existing execution copies, which share
- * the name) and the method by its name.
- */
-export function executeCreateServiceMethodExecution(args: any): string {
-  const state = useCanvasStore.getState();
-  const serviceName = typeof args?.service === "string" ? args.service.trim() : "";
-  const methodName = typeof args?.method === "string" ? args.method.trim() : "";
-
-  if (!serviceName || !methodName) {
-    return JSON.stringify({
-      status: "error",
-      error: "validation_failed",
-      message: "Both `service` and `method` are required.",
-      issues: [
-        ...(serviceName
-          ? []
-          : [{ path: "service", code: "service_missing", message: "Service name is required." }]),
-        ...(methodName
-          ? []
-          : [{ path: "method", code: "method_missing", message: "Method name is required." }]),
-      ],
-    });
-  }
-
-  // Prefer a real Service over an execution copy, which shares its name but
-  // renders a single method.
-  const service =
-    state.elements.find(
-      (el) =>
-        el.type === "serviceCard" &&
-        !(el.data as { methodRef?: unknown } | undefined)?.methodRef &&
-        nameKey(getElementName(el) ?? "") === nameKey(serviceName),
-    ) ?? findElementByName(state.elements, serviceName, "serviceCard");
-  if (!service) {
-    return JSON.stringify({
-      status: "error",
-      error: "element_not_found",
-      message: `No Service named "${serviceName}" exists on the board. Create it first with create_service_card or use get_canvas_overview to list services.`,
-      name: serviceName,
-    });
-  }
-
-  const methods =
-    ((service.data as { methods?: ServiceMethod[] } | undefined)?.methods ?? []) as ServiceMethod[];
-  const method = methods.find((m) => nameKey(m.name) === nameKey(methodName));
-  if (!method) {
-    return JSON.stringify({
-      status: "error",
-      error: "method_not_found",
-      message: `Service "${getElementName(service) ?? serviceName}" has no method named "${methodName}".`,
-      availableMethods: methods.map((m) => m.name),
-    });
-  }
-
-  const copy = state.createMethodCopy(service.id, method.id);
-  if (!copy) {
-    return JSON.stringify({
-      status: "error",
-      error: "method_copy_failed",
-      message: `Could not create an execution copy of "${methodName}" from "${serviceName}".`,
-    });
-  }
-
-  const placementError = applyCreatedPlacement(copy.id, args);
-  if (placementError) return placementError;
-
-  const serviceLabel = getElementName(service) ?? serviceName;
-  return JSON.stringify({
-    status: "success",
-    createdId: copy.id,
-    type: copy.type,
-    service: serviceLabel,
-    method: method.name,
-    note: `Execution copy of "${method.name}" created; it stays linked to "${serviceLabel}".`,
   });
 }

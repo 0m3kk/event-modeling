@@ -21,93 +21,49 @@ import { validateFieldTypes } from "../common/typeValidation";
 import {
   SERVICE_DEFAULT_WIDTH,
   SERVICE_HEADER_HEIGHT,
-  SERVICE_METHOD_HEADER_HEIGHT,
   SERVICE_GROUP_LABEL_HEIGHT,
   SERVICE_ROW_HEIGHT,
-  bandIndex,
-  bandToGroup,
-  bandToMethodIndex,
+  SERVICE_SECTION_INDEX,
   buildServiceItems,
   computeServiceCardSize,
-  getMethodLayouts,
+  getServiceLayout,
+  getServiceRows,
+  groupFromSectionId,
+  groupFromSectionIndex,
   itemToSelectedField,
   selectedFieldToItem,
   serviceItemsEqual,
   type ServiceCardData,
   type ServiceField,
   type ServiceGroup,
-  type ServiceMethod,
+  type ServiceItem,
 } from "./layout";
 
-export type {
-  ServiceCardData,
-  ServiceField,
-  ServiceGroup,
-  ServiceMethod,
-} from "./layout";
+export type { ServiceCardData, ServiceField, ServiceGroup } from "./layout";
+
+const ServiceFieldSchema = z.object({
+  name: z.string(),
+  type: z.string(),
+  isArray: z.boolean().optional(),
+  isRequired: z.boolean().optional(),
+  description: z.string().optional(),
+});
 
 export const ServiceCardSchema = z.object({
   name: z.string().default("ServiceName"),
-  methods: z
-    .array(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        params: z
-          .array(
-            z.object({
-              name: z.string(),
-              type: z.string(),
-              isArray: z.boolean().optional(),
-              isRequired: z.boolean().optional(),
-              description: z.string().optional(),
-            }),
-          )
-          .default([]),
-        returns: z
-          .array(
-            z.object({
-              name: z.string(),
-              type: z.string(),
-              isArray: z.boolean().optional(),
-              isRequired: z.boolean().optional(),
-              description: z.string().optional(),
-            }),
-          )
-          .default([]),
-        description: z.string().optional(),
-      }),
-    )
-    .default([]),
+  params: z.array(ServiceFieldSchema).default([]),
+  returns: z.array(ServiceFieldSchema).default([]),
   color: z.string().optional(),
   description: z.string().optional(),
-  methodRef: z
-    .object({
-      serviceId: z.string(),
-      methodId: z.string(),
-    })
-    .optional(),
 });
 
-export function createServiceMethod(index: number): ServiceMethod {
-  return {
-    id: `method-${nanoid(6)}`,
-    name: `method${index}`,
-    params: [],
-    returns: [],
-  };
-}
-
-/** Immutably replaces one group's rows within a method. */
+/** Immutably replaces one group's rows. */
 function replaceRows(
-  methods: ServiceMethod[],
-  methodIndex: number,
+  data: ServiceCardData,
   group: ServiceGroup,
   rows: ServiceField[],
-): ServiceMethod[] {
-  const next = [...methods];
-  next[methodIndex] = { ...next[methodIndex], [group]: rows };
-  return next;
+): ServiceCardData {
+  return { ...data, [group]: rows };
 }
 
 /** Muted uppercase label above a params/returns group (e.g. "PARAMS"). */
@@ -137,7 +93,6 @@ function renderServiceGroupLabel(
 interface ServiceRowRenderOptions {
   elementId: string;
   field: ServiceField;
-  methodIndex: number;
   group: ServiceGroup;
   fieldIndex: number;
   rowY: number;
@@ -153,7 +108,6 @@ function renderServiceRow(
   {
     elementId,
     field,
-    methodIndex,
     group,
     fieldIndex,
     rowY,
@@ -234,7 +188,7 @@ function renderServiceRow(
     if (field.description) {
       addDescZone(elementId, {
         elementId,
-        sectionIndex: bandIndex(methodIndex, group),
+        sectionIndex: SERVICE_SECTION_INDEX[group],
         fieldIndex,
         text: field.description,
         iconBounds: {
@@ -252,7 +206,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
   type: "serviceCard",
   name: "Service",
   description:
-    "A Service that exposes methods; each method lists params and returns fields, and can be placed as a live method-execution copy",
+    "A service method execution with params and returns; Services may share a name",
   icon: Server,
   color: "#0ea5e9",
   category: "modeling",
@@ -260,11 +214,15 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
   schema: ServiceCardSchema,
   createDefaultData: () => ({
     name: "NewService",
-    methods: [],
+    params: [],
+    returns: [],
     color: "#0ea5e9",
   }),
 
-  defaultSize: { width: SERVICE_DEFAULT_WIDTH, height: SERVICE_HEADER_HEIGHT + SERVICE_ROW_HEIGHT },
+  defaultSize: {
+    width: SERVICE_DEFAULT_WIDTH,
+    height: getServiceLayout({ name: "", params: [], returns: [] }).bottom,
+  },
 
   computeSize: (data, width) => computeServiceCardSize(data, width),
 
@@ -274,11 +232,30 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
 
   validateData: (data, context) => {
     const elements = context.elements ?? [];
-    const issues = (data.methods ?? []).flatMap((method, methodIndex) => [
-      ...validateFieldTypes(method.params, `methods[${methodIndex}].params`, elements),
-      ...validateFieldTypes(method.returns, `methods[${methodIndex}].returns`, elements),
-    ]);
+    const issues = [
+      ...validateFieldTypes(data.params, "params", elements),
+      ...validateFieldTypes(data.returns, "returns", elements),
+    ];
     return { data, issues };
+  },
+
+  // Older boards stored a Service as a list of methods; a Service card is now a
+  // single method execution, so collapse the legacy shape to its first method.
+  normalizeData: (data) => {
+    const legacy = (data as unknown as { methods?: unknown }).methods;
+    if (!Array.isArray(legacy)) return data;
+    const first = (legacy[0] ?? {}) as {
+      name?: string;
+      params?: ServiceField[];
+      returns?: ServiceField[];
+    };
+    const { methods: _legacy, ...rest } = data as ServiceCardData & { methods?: unknown };
+    return {
+      ...rest,
+      name: first.name || data.name,
+      params: Array.isArray(data.params) ? data.params : first.params ?? [],
+      returns: Array.isArray(data.returns) ? data.returns : first.returns ?? [],
+    };
   },
 
   render: (container, element, context) => {
@@ -291,20 +268,16 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
     const h = element.height;
     const r = CARD_CORNER_RADIUS;
     const headerColor = resolveHeaderColor(element.data.color || serviceCardTool.color, isDark);
-    const methods = element.data.methods ?? [];
-    const layouts = getMethodLayouts(element.data);
+    const data = element.data;
+    const layout = getServiceLayout(data);
 
     const selectedField =
       context.selectedField?.elementId === element.id ? context.selectedField : null;
 
     const cardBg = isDark ? 0x18181b : 0xffffff;
-    const sectionHeaderBg = isDark ? 0x27272a : 0xf4f4f5;
     const groupLabelBg = isDark ? 0x1f1f23 : 0xfafafa;
     const borderCol = isSelected ? 0x3b82f6 : isDark ? 0x3f3f46 : 0xe4e4e7;
-    const dividerCol = isDark ? 0x3f3f46 : 0xe4e4e7;
     const sunkenColor = isDark ? 0x121214 : 0xf1f5f9;
-    // Accent used to make method headers read as distinct sections and to tint
-    // the active method. It follows the service's own color.
     const accentColor = hexToNumber(headerColor);
 
     const g = new Graphics();
@@ -329,75 +302,45 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
     g.closePath();
     g.fill({ color: cardBg });
 
-    // 3. Method header + group label bands
-    layouts.forEach((layout) => {
-      g.rect(0, layout.headerTop, w, SERVICE_METHOD_HEADER_HEIGHT);
-      g.fill({ color: sectionHeaderBg });
-      g.rect(0, layout.paramsLabelTop, w, SERVICE_GROUP_LABEL_HEIGHT);
-      g.fill({ color: groupLabelBg });
-      g.rect(0, layout.returnsLabelTop, w, SERVICE_GROUP_LABEL_HEIGHT);
-      g.fill({ color: groupLabelBg });
-    });
+    // 3. Params/returns group label bands
+    g.rect(0, layout.paramsLabelTop, w, SERVICE_GROUP_LABEL_HEIGHT);
+    g.fill({ color: groupLabelBg });
+    g.rect(0, layout.returnsLabelTop, w, SERVICE_GROUP_LABEL_HEIGHT);
+    g.fill({ color: groupLabelBg });
 
-    // 4. Selection highlight for the active sub-selection. A selected method
-    //    header gets a colored accent tint (clearly "chosen"), while rows keep
-    //    the standard sunken fill.
-    let selectedMethodIndex: number | null = null;
+    // 4. Selection highlight for the active row.
     let selectedRowTop: number | null = null;
-
-    if (selectedField) {
-      if (selectedField.sectionId === "method" && selectedField.fieldIndex < 0) {
-        const layout = layouts[selectedField.sectionIndex ?? 0];
-        if (layout) {
-          selectedMethodIndex = selectedField.sectionIndex ?? 0;
-          g.rect(0, layout.headerTop, w, SERVICE_METHOD_HEADER_HEIGHT);
-          g.fill({ color: accentColor, alpha: isDark ? 0.36 : 0.22 });
+    if (selectedField && selectedField.fieldIndex >= 0) {
+      const group = groupFromSectionId(selectedField.sectionId);
+      const rows = getServiceRows(data, group);
+      if (selectedField.fieldIndex < rows.length) {
+        const base = group === "params" ? layout.paramsRowsTop : layout.returnsRowsTop;
+        const rowY = base + selectedField.fieldIndex * SERVICE_ROW_HEIGHT;
+        const isVeryLast =
+          group === "returns" && selectedField.fieldIndex === rows.length - 1;
+        if (isVeryLast) {
+          g.moveTo(0, rowY);
+          g.lineTo(w, rowY);
+          g.lineTo(w, h - r);
+          g.arcTo(w, h, w - r, h, r);
+          g.lineTo(r, h);
+          g.arcTo(0, h, 0, h - r, r);
+          g.closePath();
+          g.fill({ color: sunkenColor });
+        } else {
+          g.rect(0, rowY, w, SERVICE_ROW_HEIGHT);
+          g.fill({ color: sunkenColor });
         }
-      } else if (selectedField.fieldIndex >= 0) {
-        const mi = bandToMethodIndex(selectedField.sectionIndex ?? 0);
-        const group = bandToGroup(selectedField.sectionIndex ?? 0);
-        const layout = layouts[mi];
-        const rows = group === "params" ? layout?.method.params : layout?.method.returns;
-        if (layout && rows && selectedField.fieldIndex < rows.length) {
-          const base = group === "params" ? layout.paramsRowsTop : layout.returnsRowsTop;
-          const rowY = base + selectedField.fieldIndex * SERVICE_ROW_HEIGHT;
-          const isVeryLast =
-            layout.methodIndex === methods.length - 1 &&
-            group === "returns" &&
-            selectedField.fieldIndex === rows.length - 1;
-          if (isVeryLast) {
-            g.moveTo(0, rowY);
-            g.lineTo(w, rowY);
-            g.lineTo(w, h - r);
-            g.arcTo(w, h, w - r, h, r);
-            g.lineTo(r, h);
-            g.arcTo(0, h, 0, h - r, r);
-            g.closePath();
-            g.fill({ color: sunkenColor });
-          } else {
-            g.rect(0, rowY, w, SERVICE_ROW_HEIGHT);
-            g.fill({ color: sunkenColor });
-          }
-          selectedRowTop = rowY;
-        }
+        selectedRowTop = rowY;
       }
     }
 
-    // 5. Method accents: a colored left stripe marks each method header, a
-    //    divider separates stacked methods, and the active method's stripe (or
-    //    its selected row's stripe) is drawn full-strength on top.
-    layouts.forEach((layout) => {
-      const isMethodSelected = layout.methodIndex === selectedMethodIndex;
-      g.rect(0, layout.headerTop, isMethodSelected ? 5 : 3, SERVICE_METHOD_HEADER_HEIGHT);
-      g.fill({ color: accentColor, alpha: isMethodSelected ? 1 : 0.55 });
-
-      if (layout.methodIndex > 0) {
-        g.moveTo(0, layout.headerTop);
-        g.lineTo(w, layout.headerTop);
-        g.stroke({ color: dividerCol, width: 1 });
-      }
-    });
-
+    // 5. Accent stripes mark the two groups; the selected row's stripe is drawn
+    //    full-strength on top.
+    for (const top of [layout.paramsLabelTop, layout.returnsLabelTop]) {
+      g.rect(0, top, 3, SERVICE_GROUP_LABEL_HEIGHT);
+      g.fill({ color: accentColor, alpha: 0.55 });
+    }
     if (selectedRowTop !== null) {
       g.rect(0, selectedRowTop, 3, SERVICE_ROW_HEIGHT);
       g.fill({ color: accentColor, alpha: 0.9 });
@@ -411,7 +354,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
     // 7. Header title + ⓘ badge
     renderStandardCardTitle(
       container,
-      element.data.name || "Service",
+      data.name || "Service",
       headerColor,
       context.textResolution,
     );
@@ -420,255 +363,133 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
       width: w,
       isDark,
       isSelected,
-      hasDescription: Boolean(element.data.description),
-      hasReference: Boolean(element.referenceId) || Boolean(element.data.methodRef),
-      text: element.data.description,
+      hasDescription: Boolean(data.description),
+      hasReference: Boolean(element.referenceId),
+      text: data.description,
       textResolution: context.textResolution,
     });
 
     if (typeof document === "undefined") return;
 
-    // 8. Empty hint
-    if (methods.length === 0) {
-      const empty = new Text({
-        text: "(no methods)",
-        style: {
-          fontSize: 11,
-          fontFamily: '"Geist Mono", monospace',
-          fill: isDark ? 0x71717a : 0xa1a1aa,
-        },
-        resolution: context.textResolution,
+    // 8. Params + returns groups
+    renderServiceGroupLabel(
+      container,
+      "PARAMS",
+      layout.paramsLabelTop,
+      isDark,
+      context.textResolution,
+    );
+    (data.params ?? []).forEach((field, fieldIndex) => {
+      renderServiceRow(container, {
+        elementId: element.id,
+        field,
+        group: "params",
+        fieldIndex,
+        rowY: layout.paramsRowsTop + fieldIndex * SERVICE_ROW_HEIGHT,
+        width: w,
+        isDark,
+        isSelected: Boolean(
+          selectedField &&
+            selectedField.sectionId === "params" &&
+            selectedField.fieldIndex === fieldIndex,
+        ),
+        textResolution: context.textResolution,
       });
-      empty.x = 12;
-      empty.y = SERVICE_HEADER_HEIGHT + 7;
-      container.addChild(empty);
-      return;
+    });
+    if ((data.params ?? []).length === 0) {
+      renderEmptyGroupHint(container, layout.paramsRowsTop, isDark, context.textResolution);
     }
 
-    // 9. Methods
-    layouts.forEach((layout) => {
-      const { method, methodIndex } = layout;
-      const isMethodSelected = Boolean(
-        selectedField &&
-          selectedField.sectionId === "method" &&
-          selectedField.fieldIndex < 0 &&
-          selectedField.sectionIndex === methodIndex,
-      );
-
-      const nameText = new Text({
-        text: toDisplayName(method.name),
-        style: {
-          fontSize: 12,
-          fontWeight: "bold",
-          fontFamily: '"Geist Mono", monospace',
-          fill: isDark ? 0xf4f4f5 : 0x18181b,
-        },
-        resolution: context.textResolution,
-      });
-      nameText.x = 14;
-      nameText.y = layout.headerTop + 5;
-      container.addChild(nameText);
-
-      if (method.description || isMethodSelected) {
-        const cx = w - 16;
-        const cy = layout.headerTop + SERVICE_METHOD_HEADER_HEIGHT / 2;
-        const badgeG = new Graphics();
-        drawInfoBadge(badgeG, container, cx, cy, {
-          radius: 6,
-          stroke: 0x94a3b8,
-          fill: 0x64748b,
-          fontSize: 7,
-          alpha: method.description ? 1 : 0.5,
-          textResolution: context.textResolution,
-        });
-        container.addChild(badgeG);
-
-        if (method.description) {
-          addDescZone(element.id, {
-            elementId: element.id,
-            sectionIndex: methodIndex,
-            fieldIndex: -1,
-            text: method.description,
-            iconBounds: {
-              x: cx - DESC_HIT_HALF,
-              y: cy - DESC_HIT_HALF,
-              width: DESC_HIT_HALF * 2,
-              height: DESC_HIT_HALF * 2,
-            },
-          });
-        }
-      }
-
-      renderServiceGroupLabel(
-        container,
-        "PARAMS",
-        layout.paramsLabelTop,
+    renderServiceGroupLabel(
+      container,
+      "RETURNS",
+      layout.returnsLabelTop,
+      isDark,
+      context.textResolution,
+    );
+    (data.returns ?? []).forEach((field, fieldIndex) => {
+      renderServiceRow(container, {
+        elementId: element.id,
+        field,
+        group: "returns",
+        fieldIndex,
+        rowY: layout.returnsRowsTop + fieldIndex * SERVICE_ROW_HEIGHT,
+        width: w,
         isDark,
-        context.textResolution,
-      );
-      renderServiceGroupLabel(
-        container,
-        "RETURNS",
-        layout.returnsLabelTop,
-        isDark,
-        context.textResolution,
-      );
-
-      (method.params ?? []).forEach((field, fieldIndex) => {
-        renderServiceRow(container, {
-          elementId: element.id,
-          field,
-          methodIndex,
-          group: "params",
-          fieldIndex,
-          rowY: layout.paramsRowsTop + fieldIndex * SERVICE_ROW_HEIGHT,
-          width: w,
-          isDark,
-          isSelected: Boolean(
-            selectedField &&
-              selectedField.sectionId === "params" &&
-              selectedField.sectionIndex === bandIndex(methodIndex, "params") &&
-              selectedField.fieldIndex === fieldIndex,
-          ),
-          textResolution: context.textResolution,
-        });
+        isSelected: Boolean(
+          selectedField &&
+            selectedField.sectionId === "returns" &&
+            selectedField.fieldIndex === fieldIndex,
+        ),
+        textResolution: context.textResolution,
       });
-      if ((method.params ?? []).length === 0) {
-        renderEmptyGroupHint(container, layout.paramsRowsTop, isDark, context.textResolution);
-      }
-
-      (method.returns ?? []).forEach((field, fieldIndex) => {
-        renderServiceRow(container, {
-          elementId: element.id,
-          field,
-          methodIndex,
-          group: "returns",
-          fieldIndex,
-          rowY: layout.returnsRowsTop + fieldIndex * SERVICE_ROW_HEIGHT,
-          width: w,
-          isDark,
-          isSelected: Boolean(
-            selectedField &&
-              selectedField.sectionId === "returns" &&
-              selectedField.sectionIndex === bandIndex(methodIndex, "returns") &&
-              selectedField.fieldIndex === fieldIndex,
-          ),
-          textResolution: context.textResolution,
-        });
-      });
-      if ((method.returns ?? []).length === 0) {
-        renderEmptyGroupHint(container, layout.returnsRowsTop, isDark, context.textResolution);
-      }
     });
+    if ((data.returns ?? []).length === 0) {
+      renderEmptyGroupHint(container, layout.returnsRowsTop, isDark, context.textResolution);
+    }
   },
 
   getDescHoverTarget: (element, localPoint) => hitDescZone(element.id, localPoint),
 
   onSubSelect: (element, localPoint): SelectedField | null => {
-    const layouts = getMethodLayouts(element.data);
+    const layout = getServiceLayout(element.data);
     const y = localPoint.y;
 
-    for (const layout of layouts) {
-      // Method header row
-      if (y >= layout.headerTop && y < layout.paramsLabelTop) {
-        return itemToSelectedField(element.id, {
-          kind: "method",
-          methodIndex: layout.methodIndex,
-        });
+    // Params rows
+    const paramsEnd = layout.paramsRowsTop + layout.paramsRowCount * SERVICE_ROW_HEIGHT;
+    if (y >= layout.paramsRowsTop && y < paramsEnd) {
+      const index = Math.floor((y - layout.paramsRowsTop) / SERVICE_ROW_HEIGHT);
+      if (index < (element.data.params?.length || 0)) {
+        return itemToSelectedField(element.id, { group: "params", fieldIndex: index });
       }
-      // Params rows
-      const paramsEnd = layout.paramsRowsTop + layout.paramsRowCount * SERVICE_ROW_HEIGHT;
-      if (y >= layout.paramsRowsTop && y < paramsEnd) {
-        const index = Math.floor((y - layout.paramsRowsTop) / SERVICE_ROW_HEIGHT);
-        if (index < (layout.method.params?.length || 0)) {
-          return itemToSelectedField(element.id, {
-            kind: "field",
-            methodIndex: layout.methodIndex,
-            group: "params",
-            fieldIndex: index,
-          });
-        }
-        return null;
-      }
-      // Returns rows
-      const returnsEnd = layout.returnsRowsTop + layout.returnsRowCount * SERVICE_ROW_HEIGHT;
-      if (y >= layout.returnsRowsTop && y < returnsEnd) {
-        const index = Math.floor((y - layout.returnsRowsTop) / SERVICE_ROW_HEIGHT);
-        if (index < (layout.method.returns?.length || 0)) {
-          return itemToSelectedField(element.id, {
-            kind: "field",
-            methodIndex: layout.methodIndex,
-            group: "returns",
-            fieldIndex: index,
-          });
-        }
-        return null;
-      }
+      return null;
     }
+
+    // Returns rows
+    const returnsEnd = layout.returnsRowsTop + layout.returnsRowCount * SERVICE_ROW_HEIGHT;
+    if (y >= layout.returnsRowsTop && y < returnsEnd) {
+      const index = Math.floor((y - layout.returnsRowsTop) / SERVICE_ROW_HEIGHT);
+      if (index < (element.data.returns?.length || 0)) {
+        return itemToSelectedField(element.id, { group: "returns", fieldIndex: index });
+      }
+      return null;
+    }
+
     return null;
   },
 
   onDeleteSubSelect: (element, fieldIndex, sectionIndex = 0) => {
-    const methods = element.data.methods ?? [];
-
-    // A selected method header (fieldIndex < 0) deletes the whole method.
-    if (fieldIndex < 0) {
-      const methodIndex = sectionIndex;
-      if (methodIndex < 0 || methodIndex >= methods.length) return null;
-      const nextData: ServiceCardData = {
-        ...element.data,
-        methods: methods.filter((_, i) => i !== methodIndex),
-      };
-      const size = computeServiceCardSize(nextData, element.width);
-      return { width: size.width, height: size.height, data: nextData };
-    }
-
-    const methodIndex = bandToMethodIndex(sectionIndex);
-    const method = methods[methodIndex];
-    if (!method) return null;
-
-    const group = bandToGroup(sectionIndex);
-    const rows = method[group] ?? [];
+    if (fieldIndex < 0) return null;
+    const group = groupFromSectionIndex(sectionIndex);
+    const rows = getServiceRows(element.data, group);
     if (fieldIndex >= rows.length) return null;
 
-    const nextData: ServiceCardData = {
-      ...element.data,
-      methods: replaceRows(
-        methods,
-        methodIndex,
-        group,
-        rows.filter((_, i) => i !== fieldIndex),
-      ),
-    };
+    const nextData = replaceRows(
+      element.data,
+      group,
+      rows.filter((_, i) => i !== fieldIndex),
+    );
     const size = computeServiceCardSize(nextData, element.width);
     return { width: size.width, height: size.height, data: nextData };
   },
 
   onUpdateSubSelectType: (element, field, type) => {
     if (field.fieldIndex < 0) return null;
-    const methods = element.data.methods ?? [];
-    const methodIndex = bandToMethodIndex(field.sectionIndex ?? 0);
-    const group = bandToGroup(field.sectionIndex ?? 0);
-    const method = methods[methodIndex];
-    if (!method) return null;
-    const rows = method[group] ?? [];
+    const group = groupFromSectionId(field.sectionId);
+    const rows = getServiceRows(element.data, group);
     if (field.fieldIndex >= rows.length) return null;
 
     const trimmed = type.trim();
     if (!trimmed) return null;
     const nextRows = [...rows];
     nextRows[field.fieldIndex] = { ...rows[field.fieldIndex], type: trimmed };
-    return { data: { ...element.data, methods: replaceRows(methods, methodIndex, group, nextRows) } };
+    return { data: replaceRows(element.data, group, nextRows) };
   },
 
   onToggleSubSelectArray: (element, field) => {
     if (field.fieldIndex < 0) return null;
-    const methods = element.data.methods ?? [];
-    const methodIndex = bandToMethodIndex(field.sectionIndex ?? 0);
-    const group = bandToGroup(field.sectionIndex ?? 0);
-    const method = methods[methodIndex];
-    if (!method) return null;
-    const rows = method[group] ?? [];
+    const group = groupFromSectionId(field.sectionId);
+    const rows = getServiceRows(element.data, group);
     if (field.fieldIndex >= rows.length) return null;
 
     const nextRows = [...rows];
@@ -676,17 +497,13 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
       ...rows[field.fieldIndex],
       isArray: !rows[field.fieldIndex].isArray,
     };
-    return { data: { ...element.data, methods: replaceRows(methods, methodIndex, group, nextRows) } };
+    return { data: replaceRows(element.data, group, nextRows) };
   },
 
   onToggleSubSelectRequired: (element, field) => {
     if (field.fieldIndex < 0) return null;
-    const methods = element.data.methods ?? [];
-    const methodIndex = bandToMethodIndex(field.sectionIndex ?? 0);
-    const group = bandToGroup(field.sectionIndex ?? 0);
-    const method = methods[methodIndex];
-    if (!method) return null;
-    const rows = method[group] ?? [];
+    const group = groupFromSectionId(field.sectionId);
+    const rows = getServiceRows(element.data, group);
     if (field.fieldIndex >= rows.length) return null;
 
     const nextRows = [...rows];
@@ -694,27 +511,22 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
       ...rows[field.fieldIndex],
       isRequired: !rows[field.fieldIndex].isRequired,
     };
-    return { data: { ...element.data, methods: replaceRows(methods, methodIndex, group, nextRows) } };
+    return { data: replaceRows(element.data, group, nextRows) };
   },
 
   getSelectedFieldItem: (element, field) => {
-    if (field.sectionId === "method" || field.fieldIndex < 0) return null;
-    const methodIndex = bandToMethodIndex(field.sectionIndex ?? 0);
-    const group = bandToGroup(field.sectionIndex ?? 0);
-    return element.data.methods?.[methodIndex]?.[group]?.[field.fieldIndex] ?? null;
+    if (field.fieldIndex < 0) return null;
+    const group = groupFromSectionId(field.sectionId);
+    return getServiceRows(element.data, group)[field.fieldIndex] ?? null;
   },
 
-  getSubSelectSections: (element) => {
-    const sections: { id: string; name: string; count: number }[] = [];
-    (element.data.methods ?? []).forEach((method) => {
-      sections.push({ id: "params", name: "params", count: method.params?.length || 0 });
-      sections.push({ id: "returns", name: "returns", count: method.returns?.length || 0 });
-    });
-    return sections;
-  },
+  getSubSelectSections: (element) => [
+    { id: "params", name: "params", count: element.data.params?.length || 0 },
+    { id: "returns", name: "returns", count: element.data.returns?.length || 0 },
+  ],
 
   onNavigateSubSelect: (element, current, direction) => {
-    const items = buildServiceItems(element.data);
+    const items: ServiceItem[] = buildServiceItems(element.data);
     if (items.length === 0) return null;
 
     const cur = selectedFieldToItem(current);
@@ -732,7 +544,7 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
   },
 
   getInlineEditTarget: (element, localPoint): InlineEditState | null => {
-    // 1. Card header → rename the service
+    // 1. Card header → rename the service method
     if (localPoint.y <= SERVICE_HEADER_HEIGHT) {
       return {
         elementId: element.id,
@@ -755,65 +567,29 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
       };
     }
 
-    const layouts = getMethodLayouts(element.data);
+    const layout = getServiceLayout(element.data);
 
-    for (const layout of layouts) {
-      const method = layout.method;
+    // 2. Param rows → rename the row
+    const paramTarget = resolveRowEditTarget(
+      element,
+      "params",
+      layout.paramsRowsTop,
+      layout.paramsRowCount,
+      element.data.params ?? [],
+      localPoint.y,
+    );
+    if (paramTarget) return paramTarget;
 
-      // 2. Method header → rename the method
-      if (localPoint.y >= layout.headerTop && localPoint.y < layout.paramsLabelTop) {
-        useCanvasStore.getState().setSelectedField({
-          elementId: element.id,
-          sectionId: "method",
-          sectionIndex: layout.methodIndex,
-          fieldIndex: -1,
-        });
-        return {
-          elementId: element.id,
-          worldBounds: {
-            x: element.x + 12,
-            y: element.y + layout.headerTop + 1,
-            width: Math.max(80, element.width - 40),
-            height: 22,
-          },
-          initialValue: toDisplayName(method.name),
-          multiline: false,
-          onCommit: (newName) => {
-            const trimmed = newName.trim();
-            if (trimmed && !isSameIdentifier(trimmed, method.name)) {
-              const methods = [...(element.data.methods ?? [])];
-              methods[layout.methodIndex] = { ...method, name: trimmed };
-              useCanvasStore.getState().updateElement(element.id, {
-                data: { ...element.data, methods },
-              });
-            }
-          },
-        };
-      }
-
-      // 3. Param / return rows → rename the row
-      const rowTarget = resolveRowEditTarget(
-        element,
-        layout.paramsRowsTop,
-        layout.paramsRowCount,
-        method.params ?? [],
-        "params",
-        layout.methodIndex,
-        localPoint.y,
-      );
-      if (rowTarget) return rowTarget;
-
-      const returnTarget = resolveRowEditTarget(
-        element,
-        layout.returnsRowsTop,
-        layout.returnsRowCount,
-        method.returns ?? [],
-        "returns",
-        layout.methodIndex,
-        localPoint.y,
-      );
-      if (returnTarget) return returnTarget;
-    }
+    // 3. Return rows → rename the row
+    const returnTarget = resolveRowEditTarget(
+      element,
+      "returns",
+      layout.returnsRowsTop,
+      layout.returnsRowCount,
+      element.data.returns ?? [],
+      localPoint.y,
+    );
+    if (returnTarget) return returnTarget;
 
     return null;
   },
@@ -821,75 +597,43 @@ export const serviceCardTool: ToolDefinition<ServiceCardData> = {
   ai: {
     toolName: "create_service_card",
     description:
-      "Create a Service card in the Event Model. A service exposes methods; each method has params (inputs) and returns (outputs).",
+      "Create a Service card in the Event Model. Each Service card is ONE method execution with params (inputs) and returns (outputs). Services may share a name.",
     parameters: z.object({
-      name: z.string().describe("PascalCase service name (e.g. OrderService, PaymentGateway)"),
-      methods: z
+      name: z
+        .string()
+        .describe("camelCase method name (e.g. placeOrder, chargeCard)"),
+      params: z
         .array(
           z.object({
-            name: z.string().describe("Method name (camelCase)"),
-            params: z
-              .array(
-                z.object({
-                  name: z.string().describe("Param field name in camelCase"),
-                  type: z
-                    .string()
-                    .describe(
-                      "Field type (primitive or defined type name)",
-                    ),
-                  isArray: z.boolean().optional().describe("Array of this type"),
-                  isRequired: z.boolean().optional().describe("Required"),
-                  description: z
-                    .string()
-                    .optional()
-                    .describe("What this param means"),
-                }),
-              )
-              .optional()
-              .describe("Param fields of the method"),
-            returns: z
-              .array(
-                z.object({
-                  name: z.string().describe("Return field name (camelCase)"),
-                  type: z
-                    .string()
-                    .describe(
-                      "Field type (primitive or defined type name)",
-                    ),
-                  isArray: z.boolean().optional().describe("Array of this type"),
-                  isRequired: z.boolean().optional().describe("Required"),
-                  description: z
-                    .string()
-                    .optional()
-                    .describe("What this return field means"),
-                }),
-              )
-              .optional()
-              .describe("Return fields of the method"),
-            description: z.string().optional().describe("Optional method description"),
+            name: z.string().describe("Param field name in camelCase"),
+            type: z.string().describe("Field type (primitive or defined type name)"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
+            description: z.string().optional().describe("What this param means"),
           }),
         )
         .optional()
-        .describe("Methods exposed by the service"),
-      color: z.string().optional().describe("Optional hex color"),
-      description: z
-        .string()
+        .describe("Param fields of the method"),
+      returns: z
+        .array(
+          z.object({
+            name: z.string().describe("Return field name (camelCase)"),
+            type: z.string().describe("Field type (primitive or defined type name)"),
+            isArray: z.boolean().optional().describe("Array of this type"),
+            isRequired: z.boolean().optional().describe("Required"),
+            description: z.string().optional().describe("What this return field means"),
+          }),
+        )
         .optional()
-        .describe("Description of the service"),
+        .describe("Return fields of the method"),
+      color: z.string().optional().describe("Optional hex color"),
+      description: z.string().optional().describe("Description of the service method"),
     }),
     onCreate: (params, center: Point): CanvasElement<ServiceCardData> => {
-      const methods: ServiceMethod[] = (params.methods || []).map(
-        (m: { name: string; params?: ServiceField[]; returns?: ServiceField[]; description?: string }) => ({
-          id: `method-${nanoid(6)}`,
-          name: m.name || "method",
-          params: m.params || [],
-          returns: m.returns || [],
-          ...(m.description ? { description: m.description } : {}),
-        }),
-      );
       const data: ServiceCardData = {
-        name: params.name || "Service",
-        methods,
+        name: params.name || "serviceMethod",
+        params: params.params || [],
+        returns: params.returns || [],
         color: params.color || serviceCardTool.color,
         ...(params.description ? { description: params.description } : {}),
       };
@@ -928,17 +672,16 @@ function renderEmptyGroupHint(
 }
 
 /**
- * Resolves the inline-edit target for a param/return row under `localY`, or null
- * when the point is not on a populated row. Also parks the sub-selection on the
- * row so the options bar follows the edit.
+ * Resolves the inline-edit target for a params/returns row under `localY`, or
+ * null when the point is not on a populated row. Also parks the sub-selection on
+ * the row so the options bar follows the edit.
  */
 function resolveRowEditTarget(
   element: CanvasElement<ServiceCardData>,
+  group: ServiceGroup,
   rowsTop: number,
   rowCount: number,
   rows: ServiceField[],
-  group: ServiceGroup,
-  methodIndex: number,
   localY: number,
 ): InlineEditState | null {
   const end = rowsTop + rowCount * SERVICE_ROW_HEIGHT;
@@ -950,7 +693,7 @@ function resolveRowEditTarget(
   useCanvasStore.getState().setSelectedField({
     elementId: element.id,
     sectionId: group,
-    sectionIndex: bandIndex(methodIndex, group),
+    sectionIndex: SERVICE_SECTION_INDEX[group],
     fieldIndex: index,
   });
 
@@ -967,12 +710,10 @@ function resolveRowEditTarget(
     onCommit: (newName) => {
       const trimmed = newName.trim();
       if (trimmed && !isSameIdentifier(trimmed, field.name)) {
-        const methods = [...(element.data.methods ?? [])];
         const nextRows = [...rows];
         nextRows[index] = { ...field, name: trimmed };
-        methods[methodIndex] = { ...methods[methodIndex], [group]: nextRows };
         useCanvasStore.getState().updateElement(element.id, {
-          data: { ...element.data, methods },
+          data: replaceRows(element.data, group, nextRows),
         });
       }
     },

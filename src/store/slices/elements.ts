@@ -4,12 +4,8 @@ import type { CanvasElement } from "@/types";
 import { ensureUniqueElement, resolveUniqueDataOnUpdate } from "@/utils/naming";
 import {
   createReferenceCopy as makeReferenceCopy,
-  createMethodReferenceCopy,
   syncReferenceUpdates,
   syncBatchReferenceUpdates,
-  syncServiceMethodCopies,
-  syncBatchServiceMethodCopies,
-  detachOrphanedMethodCopies,
   pruneDanglingReferences,
 } from "@/utils/reference";
 import { applyRenameMappings, collectRenameMappings } from "@/utils/rename";
@@ -45,7 +41,6 @@ export type ElementSlice = Pick<
   | "addElement"
   | "addElements"
   | "createReferenceCopy"
-  | "createMethodCopy"
   | "copySelection"
   | "pasteClipboard"
   | "updateElement"
@@ -129,39 +124,6 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
     return copy;
   },
 
-  createMethodCopy: (sourceId, methodId) => {
-    const current = get().elements;
-    const source = current.find((el) => el.id === sourceId);
-    if (!source || source.type !== "serviceCard") return null;
-
-    // When the picked element is itself an execution copy, link the new copy to
-    // the real source service so every execution shares one live link.
-    const existingRef = source.data?.methodRef as
-      | { serviceId: string; methodId: string }
-      | undefined;
-    const rootId = existingRef?.serviceId ?? sourceId;
-    const rootMethodId = existingRef?.methodId ?? methodId;
-    const root = current.find((el) => el.id === rootId) ?? source;
-
-    const method = (root.data?.methods ?? []).find((m: { id: string }) => m.id === rootMethodId);
-    if (!method) return null;
-
-    const copy = createMethodReferenceCopy(root, method);
-    copy.x = source.x + 30;
-    copy.y = source.y + 30;
-
-    set((state) => ({
-      undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
-      redoStack: [],
-      elements: [...state.elements, copy],
-      selectedIds: [copy.id],
-      selectedField: null,
-      inlineEdit: null,
-    }));
-    changeRecorder.recordDiff(current, get().elements, "Create method execution");
-    return copy;
-  },
-
   copySelection: () => {
     const { elements, selectedIds } = get();
     if (selectedIds.length === 0) return;
@@ -200,12 +162,11 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
       : patch;
 
     const withReferences = syncReferenceUpdates(current, id, finalPatch);
-    const withMethodCopies = syncServiceMethodCopies(withReferences, id, finalPatch);
     // Propagate any rename (Object/Enum/Alias, Event, State, DCB tag, param)
     // to the elements that reference it by name.
     const renamed = finalPatch.data
-      ? applyRenameMappings(withMethodCopies, collectRenameMappings(target, finalPatch.data))
-      : withMethodCopies;
+      ? applyRenameMappings(withReferences, collectRenameMappings(target, finalPatch.data))
+      : withReferences;
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
@@ -237,13 +198,12 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
     });
 
     const withReferences = syncBatchReferenceUpdates(current, finalPatches);
-    const withMethodCopies = syncBatchServiceMethodCopies(withReferences, finalPatches);
     // Propagate every rename in the batch to the elements that reference it.
     const renameMappings = finalPatches.flatMap((patch) => {
       const target = patch.data ? current.find((el) => el.id === patch.id) : undefined;
       return target && patch.data ? collectRenameMappings(target, patch.data) : [];
     });
-    const updatedElements = applyRenameMappings(withMethodCopies, renameMappings);
+    const updatedElements = applyRenameMappings(withReferences, renameMappings);
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],
       redoStack: [],
@@ -288,7 +248,7 @@ export const createElementSlice: StateCreator<CanvasStoreState, [], [], ElementS
     const idSet = new Set(ids);
     const current = get().elements;
     const remaining = current.filter((el) => !idSet.has(el.id));
-    const cleaned = detachOrphanedMethodCopies(pruneDanglingReferences(remaining));
+    const cleaned = pruneDanglingReferences(remaining);
 
     set((state) => ({
       undoStack: [...state.undoStack.slice(-MAX_HISTORY), snapshotState(current)],

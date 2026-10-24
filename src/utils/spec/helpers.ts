@@ -27,6 +27,26 @@ export function uniqueByName(elements: CanvasElement[]): CanvasElement[] {
   return out;
 }
 
+/**
+ * Keeps the first element seen for each reference group. Unlike
+ * {@link uniqueByName}, distinct elements that merely share a name are all
+ * kept — Service cards are allowed to share a method name.
+ */
+export function uniqueByReference(elements: CanvasElement[]): CanvasElement[] {
+  const seen = new Set<string>();
+  const out: CanvasElement[] = [];
+  for (const el of elements) {
+    if (!el.referenceId) {
+      out.push(el);
+      continue;
+    }
+    if (seen.has(el.referenceId)) continue;
+    seen.add(el.referenceId);
+    out.push(el);
+  }
+  return out;
+}
+
 /** Maps DCB query items (`types` OR'd, `tags` AND'd) to their spec form. */
 export function mapQueryItems(items: unknown): Record<string, unknown>[] | undefined {
   if (!Array.isArray(items) || items.length === 0) return undefined;

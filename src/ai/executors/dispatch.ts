@@ -8,11 +8,7 @@ import { normalizeIdentifierNames } from "@/utils/naming";
 import { readOverviewFilters, resolveCanvasOverview } from "../canvasOverview";
 import { resolveCreatedPlacement } from "../placement";
 import { buildValidationError, getViewportCenter } from "./common";
-import {
-  executeCreateReferenceCopy,
-  executeCreateServiceMethodExecution,
-  executeDeleteElement,
-} from "./copy";
+import { executeCreateReferenceCopy, executeDeleteElement } from "./copy";
 import { executeUpdateElement } from "./update";
 
 export async function executeAITool(name: string, args: any): Promise<string> {
@@ -34,10 +30,6 @@ export async function executeAITool(name: string, args: any): Promise<string> {
 
   if (name === "create_reference_copy") {
     return executeCreateReferenceCopy(args);
-  }
-
-  if (name === "create_service_method_execution") {
-    return executeCreateServiceMethodExecution(args);
   }
 
   if (name.startsWith("update_")) {

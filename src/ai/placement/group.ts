@@ -20,9 +20,9 @@ const GROUP_NOT_REQUESTED: GroupPlacement = { requested: false };
  * `group` is the Group's name; an explicit empty `group` detaches the card from
  * any Group.
  *
- * Only definition/service/state/actor cards can join a Group, and a card in a
- * Slice lane is handled separately (lane and group membership are mutually
- * exclusive).
+ * Only definition/state/actor cards can join a Group, and a card in a Slice lane
+ * is handled separately (lane and group membership are mutually exclusive).
+ * Service cards always live in a Slice lane, never in a Group.
  */
 export function resolveGroupMembership(
   elements: CanvasElement[],
@@ -42,7 +42,7 @@ export function resolveGroupMembership(
   if (!isGroupEligibleChild(cardType)) {
     return issue(
       "group_ineligible_card",
-      `${cardType} cards cannot join a Group (only Object, Enum, Alias, Service, State and Actor cards can).`,
+      `${cardType} cards cannot join a Group (only Object, Enum, Alias, State and Actor cards can; Service cards belong in a Slice lane).`,
     );
   }
 

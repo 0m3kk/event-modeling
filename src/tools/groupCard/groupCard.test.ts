@@ -39,7 +39,7 @@ function makeCard(
 describe("group layout", () => {
   it("bounds children with padding and a label band", () => {
     const a = makeCard("a", "objectCard", 100, 200, { width: 120, height: 80 });
-    const b = makeCard("b", "serviceCard", 300, 240, { width: 150, height: 90 });
+    const b = makeCard("b", "stateCard", 300, 240, { width: 150, height: 90 });
 
     const bounds = computeGroupBounds([a, b])!;
     expect(bounds.x).toBe(100 - GROUP_PADDING);
@@ -96,7 +96,7 @@ describe("reflowGroups", () => {
 
   it("drops group membership from slice-lane members (exclusive)", () => {
     const group = makeGroup("g1", 0, 0, { name: "Types" });
-    const card = makeCard("c1", "serviceCard", 0, 0, {
+    const card = makeCard("c1", "stateCard", 0, 0, {
       groupId: "g1",
       sliceId: "s1",
       laneId: "l1",
@@ -104,6 +104,14 @@ describe("reflowGroups", () => {
 
     const result = reflowGroups([group, card]);
     expect(result.find((el) => el.id === "c1")!.groupId).toBeUndefined();
+  });
+
+  it("detaches a Service card because Services live in Slice lanes", () => {
+    const group = makeGroup("g1", 0, 0, { name: "Services" });
+    const service = makeCard("s1", "serviceCard", 0, 0, { groupId: "g1" });
+
+    const result = reflowGroups([group, service]);
+    expect(result.find((el) => el.id === "s1")!.groupId).toBeUndefined();
   });
 });
 
@@ -121,6 +129,7 @@ describe("findGroupDropTarget", () => {
   it("refuses an ineligible card type", () => {
     const group = makeGroup("g1", 0, 0, { name: "Types" });
     expect(findGroupDropTarget([group], { x: 10, y: 10 }, "drag", "eventCard")).toBeNull();
+    expect(findGroupDropTarget([group], { x: 10, y: 10 }, "drag", "serviceCard")).toBeNull();
     expect(findGroupDropTarget([group], { x: 10, y: 10 }, "drag", GROUP_TYPE)).toBeNull();
   });
 });
@@ -197,7 +206,7 @@ describe("group drop placement (interaction)", () => {
   it("places a card entering a group in a free spot instead of overlapping", () => {
     const group = makeGroup("g1", 0, 0, { name: "Group" });
     const a = makeCard("a", "objectCard", 60, 60, { width: 120, height: 80, groupId: "g1" });
-    const b = makeCard("b", "serviceCard", 60, 60, { width: 120, height: 80 });
+    const b = makeCard("b", "stateCard", 60, 60, { width: 120, height: 80 });
 
     useCanvasStore.setState({
       elements: [group, a, b],

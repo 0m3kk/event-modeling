@@ -224,28 +224,11 @@ function rewriteElementReferences(
 
   // Typed field rows. `states` is a no-op on a Constraint card (its rows carry
   // a `name`, not a `type`), and is rewritten there by the state rule below.
-  for (const key of ["fields", "inputs", "responses", "params", "states"]) {
+  for (const key of ["fields", "inputs", "responses", "params", "returns", "states"]) {
     const rows = nextData[key];
     if (!Array.isArray(rows)) continue;
     const nextRows = rewriteTypedRows(rows, buckets);
     if (nextRows !== rows) nextData = { ...nextData, [key]: nextRows };
-  }
-
-  // Service methods nest their typed rows under `methods[].params/returns`.
-  const methods = nextData.methods;
-  if (Array.isArray(methods) && buckets.typeMappings.length > 0) {
-    const nextMethods = rewriteArray(methods, (method: any) => {
-      if (!method || typeof method !== "object") return method;
-      let nextMethod = method;
-      for (const group of ["params", "returns"] as const) {
-        const rows = nextMethod[group];
-        if (!Array.isArray(rows)) continue;
-        const nextRows = rewriteTypedRows(rows, buckets);
-        if (nextRows !== rows) nextMethod = { ...nextMethod, [group]: nextRows };
-      }
-      return nextMethod;
-    });
-    if (nextMethods !== methods) nextData = { ...nextData, methods: nextMethods };
   }
 
   // Alias wraps a single named type.

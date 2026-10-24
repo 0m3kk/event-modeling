@@ -6,7 +6,13 @@
 import type { CanvasElement } from "@/types";
 import { collectBoardTags } from "../eventTags";
 import { createFieldMapper } from "./dataTypes";
-import { elementName, listNamed, mapQueryItems, uniqueByName } from "./helpers";
+import {
+  elementName,
+  listNamed,
+  mapQueryItems,
+  uniqueByName,
+  uniqueByReference,
+} from "./helpers";
 
 /** Display labels for the card types a Slice lane can be reserved for. */
 const TOOL_LABELS: Record<string, string> = {
@@ -57,10 +63,9 @@ export function buildSpecification({
   const views = uniqueByName(byType("viewCard"));
   const states = uniqueByName(byType("stateCard"));
   const constraints = uniqueByName(byType("constraintCard"));
-  // Method-execution copies mirror a Service method; they are not definitions.
-  const services = uniqueByName(
-    byType("serviceCard").filter((el) => !(el.data as { methodRef?: unknown })?.methodRef),
-  );
+  // A Service card is one method execution. Reference copies collapse, but
+  // distinct services are allowed to share a method name.
+  const services = uniqueByReference(byType("serviceCard"));
   // Object / Enum / Alias cards, in board order; the mapper de-duplicates them.
   const dataCards = elements.filter((el) => DATA_CARD_TYPES.has(el.type));
   const actors = uniqueByName(byType("actorCard"));
@@ -68,24 +73,6 @@ export function buildSpecification({
 
   const idToName = new Map(elements.map((el) => [el.id, elementName(el)]));
   const nameOf = (el: CanvasElement) => idToName.get(el.id) ?? elementName(el);
-
-  /**
-   * Label for a card listed inside a Slice lane. A service method-execution copy
-   * mirrors a single method of a source Service, so it is rendered as
-   * `Service.method` — the plain service name would otherwise be ambiguous with
-   * the definition and with copies of the service's other methods.
-   */
-  const laneCardLabel = (el: CanvasElement): string => {
-    const data = (el.data ?? {}) as { methodRef?: unknown; methods?: unknown };
-    if (data.methodRef) {
-      const methods = Array.isArray(data.methods) ? data.methods : [];
-      const methodName = (methods[0] as { name?: unknown } | undefined)?.name;
-      if (typeof methodName === "string" && methodName) {
-        return `${nameOf(el)}.${methodName}`;
-      }
-    }
-    return nameOf(el);
-  };
 
   const domainIdToName = new Map(domains.map((d) => [d.id, nameOf(d)]));
 
@@ -145,7 +132,7 @@ export function buildSpecification({
         const laneType = lane.childType ?? laneCards[0]?.type ?? null;
         return {
           type: laneType ? TOOL_LABELS[laneType] ?? laneType : "any",
-          cards: laneCards.map(laneCardLabel),
+          cards: laneCards.map(nameOf),
         };
       });
     if (laneSpec.length > 0) out.lanes = laneSpec;
@@ -228,24 +215,10 @@ export function buildSpecification({
     if (typeof data.description === "string" && data.description) {
       out.description = data.description;
     }
-    const methods = Array.isArray(data.methods) ? data.methods : [];
-    if (methods.length > 0) {
-      out.methods = methods.map((raw) => {
-        const method = (raw ?? {}) as {
-          name?: string;
-          description?: string;
-          params?: unknown;
-          returns?: unknown;
-        };
-        const methodOut: Record<string, unknown> = { name: method.name ?? "" };
-        if (method.description) methodOut.description = method.description;
-        const params = mapFields(method.params);
-        if (params) methodOut.params = params;
-        const returns = mapFields(method.returns);
-        if (returns) methodOut.returns = returns;
-        return methodOut;
-      });
-    }
+    const params = mapFields(data.params);
+    if (params) out.params = params;
+    const returns = mapFields(data.returns);
+    if (returns) out.returns = returns;
     return out;
   });
 

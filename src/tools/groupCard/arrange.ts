@@ -11,7 +11,7 @@ import {
 /**
  * Auto-arrange for the children of a single Group.
  *
- * A Group clusters reusable cards (Object/Enum/Alias, Service, State, Actor) and
+ * A Group clusters reusable cards (Object/Enum/Alias, State, Actor) and
  * auto-fits a frame around them. Cards are usually dropped wherever they land, so
  * this packs them back into a compact, roughly square grid — the same grid the
  * Domain arrange uses for its Groups, exposed here so a free-standing Group (or

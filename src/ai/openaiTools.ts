@@ -39,13 +39,13 @@ const DOMAIN_PLACEMENT_PROPS: Record<string, any> = {
 
 /**
  * Extra JSON-schema property injected into every group-eligible card tool so
- * the model can place a definition/service/state/actor card inside a Group
- * frame in the same call.
+ * the model can place a definition/state/actor card inside a Group frame in the
+ * same call.
  */
 const GROUP_PLACEMENT_PROPS: Record<string, any> = {
   group: {
     type: "string",
-    description: "Optional Group name; only Object/Enum/Alias/Service/State/Actor cards can join.",
+    description: "Optional Group name; only Object/Enum/Alias/State/Actor cards can join.",
   },
 };
 
@@ -159,37 +159,7 @@ export function buildOpenAITools(): any[] {
     },
   });
 
-  // 5. Create a live method-execution copy of a Service method
-  tools.push({
-    type: "function",
-    function: {
-      name: "create_service_method_execution",
-      description:
-        "Create a method-execution copy: a live Service card that renders ONE method of a source " +
-        "Service and stays linked to it (edits to the method propagate). Use it as the serviceCard " +
-        "lane of a write slice to show which service method the flow executes. Give the source " +
-        "Service name in `service` and the method name in `method`.",
-      parameters: {
-        type: "object",
-        properties: {
-          service: {
-            type: "string",
-            description: "Name of the source Service that owns the method",
-          },
-          method: {
-            type: "string",
-            description: "Name of the method to execute (from that Service)",
-          },
-          ...SLICE_PLACEMENT_PROPS,
-          ...GROUP_PLACEMENT_PROPS,
-          ...DOMAIN_PLACEMENT_PROPS,
-        },
-        required: ["service", "method"],
-      },
-    },
-  });
-
-  // 6. Dynamic decoupled tools from registry: each create tool also gets a
+  // 5. Dynamic decoupled tools from registry: each create tool also gets a
   //    matching update tool that reuses the same payload schema plus a
   //    `target` locator (the card's current name). Lane-eligible card tools
   //    also accept `slice` / `lane` so the model can drop the card straight

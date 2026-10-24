@@ -6,8 +6,8 @@ import { memoizeArray } from "@/utils/memo";
  * Pure geometry + data helpers for the Group tool.
  *
  * A Group is a *light* container: a solid rounded frame with a name chip that
- * clusters related reusable cards — Objects, Enums, Aliases, Services, States
- * or Actors. It is deliberately narrower than a Domain (which holds anything)
+ * clusters related reusable cards — Objects, Enums, Aliases, States or Actors.
+ * It is deliberately narrower than a Domain (which holds anything)
  * and a Slice (which stacks typed lanes of behavior cards). A Group usually
  * lives inside a Domain, but it can also stand on its own.
  *
@@ -33,20 +33,19 @@ export interface GroupData {
 export type GroupElement = CanvasElement<GroupData>;
 
 /**
- * Card types a Group may cluster. Definition cards (Object/Enum/Alias),
- * Services, States and Actors are the reusable building blocks that read best
- * pulled together; behavior cards (events, commands, …) belong to a Slice lane
+ * Card types a Group may cluster. Definition cards (Object/Enum/Alias), States
+ * and Actors are the reusable building blocks that read best pulled together;
+ * behavior cards (events, commands, …) and Service cards belong to a Slice lane
  * instead.
  *
- * A domain usually has one Group for its type definitions, one for its Services
- * and one wrapping its States, while the system as a whole often has a single
- * Group holding every Actor.
+ * A domain usually has one Group for its type definitions and one wrapping its
+ * States, while the system as a whole often has a single Group holding every
+ * Actor.
  */
 export const GROUP_ELIGIBLE_CHILD_TYPES: ReadonlySet<string> = new Set([
   "objectCard",
   "enumCard",
   "aliasCard",
-  "serviceCard",
   "stateCard",
   "actorCard",
 ]);

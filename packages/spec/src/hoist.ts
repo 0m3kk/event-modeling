@@ -95,6 +95,8 @@ export function hoistTypes(spec: Specification): HoistResult {
   if (spec.services) {
     out.services = spec.services.map((s) => ({
       ...s,
+      params: hoistFields(s.params),
+      returns: hoistFields(s.returns),
       methods: s.methods?.map((m) => ({
         ...m,
         params: hoistFields(m.params),

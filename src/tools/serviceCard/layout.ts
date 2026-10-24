@@ -10,14 +10,12 @@ import {
 /**
  * Pure geometry + data helpers for the Service card.
  *
- * The Service card lists one or more methods stacked vertically. Each method is
- * its own "section": a header row (the method name) followed by a PARAMS group
- * and a RETURNS group. Keeping the layout math here (free of React / Pixi /
- * store imports) lets both the Pixi renderer and the store's reference-sync
- * logic reuse it without creating import cycles.
+ * A Service card is a single method execution: the card title is the method
+ * name, followed by a PARAMS group and a RETURNS group. Keeping the layout math
+ * here (free of React / Pixi / store imports) lets both the Pixi renderer and
+ * the store's reference-sync logic reuse it without creating import cycles.
  */
 export const SERVICE_HEADER_HEIGHT = 32;
-export const SERVICE_METHOD_HEADER_HEIGHT = 24;
 export const SERVICE_GROUP_LABEL_HEIGHT = 16;
 export const SERVICE_ROW_HEIGHT = 26;
 export const SERVICE_DEFAULT_WIDTH = 240;
@@ -31,40 +29,18 @@ export interface ServiceField {
   description?: string;
 }
 
-export interface ServiceMethod {
-  /** Stable id so method-execution copies can live-link to this method. */
-  id: string;
+export interface ServiceCardData {
+  /** The method name this card executes. */
   name: string;
   params: ServiceField[];
   returns: ServiceField[];
-  description?: string;
-}
-
-/**
- * Marker placed on a method-execution copy: points back at the source service
- * element and the specific method it mirrors.
- */
-export interface ServiceMethodRef {
-  serviceId: string;
-  methodId: string;
-}
-
-export interface ServiceCardData {
-  name: string;
-  methods: ServiceMethod[];
   color?: string;
   description?: string;
-  /** Present only on a method-execution copy. */
-  methodRef?: ServiceMethodRef;
 }
 
 export type ServiceGroup = "params" | "returns";
 
-export interface MethodLayout {
-  method: ServiceMethod;
-  methodIndex: number;
-  /** Top of the method's header row (the selectable method name band). */
-  headerTop: number;
+export interface ServiceLayout {
   paramsLabelTop: number;
   paramsRowsTop: number;
   /** Rendered row count, floored at 1 so an empty group still shows a hint row. */
@@ -72,192 +48,113 @@ export interface MethodLayout {
   returnsLabelTop: number;
   returnsRowsTop: number;
   returnsRowCount: number;
-  /** Bottom edge of the whole method block (exclusive). */
+  /** Bottom edge of the card content (exclusive). */
   bottom: number;
 }
 
-export function paramsRowCount(method: ServiceMethod): number {
-  return Math.max(1, method.params?.length || 0);
+export function paramsRowCount(data: ServiceCardData): number {
+  return Math.max(1, data.params?.length || 0);
 }
 
-export function returnsRowCount(method: ServiceMethod): number {
-  return Math.max(1, method.returns?.length || 0);
+export function returnsRowCount(data: ServiceCardData): number {
+  return Math.max(1, data.returns?.length || 0);
 }
 
-/** Total vertical size of one method block (header + labels + rows). */
-export function methodBlockHeight(method: ServiceMethod): number {
-  return (
-    SERVICE_METHOD_HEADER_HEIGHT +
-    SERVICE_GROUP_LABEL_HEIGHT +
-    paramsRowCount(method) * SERVICE_ROW_HEIGHT +
-    SERVICE_GROUP_LABEL_HEIGHT +
-    returnsRowCount(method) * SERVICE_ROW_HEIGHT
-  );
+/** Vertical layout of the card's params and returns groups. */
+export function getServiceLayout(data: ServiceCardData): ServiceLayout {
+  const pCount = paramsRowCount(data);
+  const rCount = returnsRowCount(data);
+  const paramsLabelTop = SERVICE_HEADER_HEIGHT;
+  const paramsRowsTop = paramsLabelTop + SERVICE_GROUP_LABEL_HEIGHT;
+  const returnsLabelTop = paramsRowsTop + pCount * SERVICE_ROW_HEIGHT;
+  const returnsRowsTop = returnsLabelTop + SERVICE_GROUP_LABEL_HEIGHT;
+  const bottom = returnsRowsTop + rCount * SERVICE_ROW_HEIGHT;
+
+  return {
+    paramsLabelTop,
+    paramsRowsTop,
+    paramsRowCount: pCount,
+    returnsLabelTop,
+    returnsRowsTop,
+    returnsRowCount: rCount,
+    bottom,
+  };
 }
 
-/** Vertical layout of every method, in top-to-bottom order. */
-export function getMethodLayouts(data: ServiceCardData): MethodLayout[] {
-  const methods = data.methods ?? [];
-  const layouts: MethodLayout[] = [];
-  let y = SERVICE_HEADER_HEIGHT;
-
-  methods.forEach((method, methodIndex) => {
-    const pCount = paramsRowCount(method);
-    const rCount = returnsRowCount(method);
-    const headerTop = y;
-    const paramsLabelTop = headerTop + SERVICE_METHOD_HEADER_HEIGHT;
-    const paramsRowsTop = paramsLabelTop + SERVICE_GROUP_LABEL_HEIGHT;
-    const returnsLabelTop = paramsRowsTop + pCount * SERVICE_ROW_HEIGHT;
-    const returnsRowsTop = returnsLabelTop + SERVICE_GROUP_LABEL_HEIGHT;
-    const bottom = returnsRowsTop + rCount * SERVICE_ROW_HEIGHT;
-
-    layouts.push({
-      method,
-      methodIndex,
-      headerTop,
-      paramsLabelTop,
-      paramsRowsTop,
-      paramsRowCount: pCount,
-      returnsLabelTop,
-      returnsRowsTop,
-      returnsRowCount: rCount,
-      bottom,
-    });
-    y = bottom;
-  });
-
-  return layouts;
-}
-
-/** Horizontal padding before a method/row name (mirrors the renderer's `x = 14`). */
+/** Horizontal padding before a row name (mirrors the renderer's `x = 14`). */
 export const SERVICE_ROW_LEFT_PADDING = 14;
-/** Space kept right of a method header name for its right-aligned ⓘ badge. */
-export const SERVICE_METHOD_BADGE_RESERVE = 30;
 
 /**
- * Minimum width that fits the Service title, every method header name (plus its
- * right-aligned ⓘ badge) and every param/return row (name + required marker +
- * right-aligned type). Kept alongside the layout so reference copies and
- * method-execution copies size themselves the same way the store re-fits them.
+ * Minimum width that fits the Service title and every param/return row (name +
+ * required marker + right-aligned type). Kept alongside the layout so reference
+ * copies size themselves the same way the store re-fits them.
  */
 export function computeServiceContentWidth(data: ServiceCardData): number {
   let required = measureCardTitleWidth(data.name);
-  for (const method of data.methods ?? []) {
-    const headerWidth =
-      SERVICE_ROW_LEFT_PADDING +
-      measureMonospaceText(toDisplayName(method.name), CARD_NAME_FONT_SIZE) +
-      SERVICE_METHOD_BADGE_RESERVE;
-    required = Math.max(required, headerWidth);
-    for (const field of [...(method.params ?? []), ...(method.returns ?? [])]) {
-      required = Math.max(required, measureFieldRowWidth(field));
-    }
+  for (const field of [...(data.params ?? []), ...(data.returns ?? [])]) {
+    required = Math.max(required, measureFieldRowWidth(field));
   }
   return Math.ceil(required);
 }
 
 /**
- * Content-driven size: one block per method (its header + PARAMS/RETURNS rows),
- * plus a width that fits the title, method headers and every row without
- * clipping. Never narrows below `customWidth`, so a user-widened card stays
- * wide.
+ * Content-driven size: the title header plus the PARAMS/RETURNS groups, with a
+ * width that fits the title and every row without clipping. Never narrows below
+ * `customWidth`, so a user-widened card stays wide.
  */
 export function computeServiceCardSize(
   data: ServiceCardData,
   customWidth = SERVICE_DEFAULT_WIDTH,
 ): { width: number; height: number } {
   const width = Math.max(customWidth, computeServiceContentWidth(data));
-  const methods = data.methods ?? [];
-  if (methods.length === 0) {
-    return { width, height: SERVICE_HEADER_HEIGHT + SERVICE_ROW_HEIGHT };
-  }
-  let height = SERVICE_HEADER_HEIGHT;
-  for (const method of methods) {
-    height += methodBlockHeight(method);
-  }
-  return { width, height };
+  return { width, height: getServiceLayout(data).bottom };
 }
 
-/**
- * A single stop in the card's linear sub-selection order:
- * a method header, then its params rows, then its returns rows, and so on.
- */
-export type ServiceItem =
-  | { kind: "method"; methodIndex: number }
-  | { kind: "field"; methodIndex: number; group: ServiceGroup; fieldIndex: number };
+/** `sectionIndex` used by sub-selection for each group. */
+export const SERVICE_SECTION_INDEX: Record<ServiceGroup, number> = {
+  params: 0,
+  returns: 1,
+};
 
-/**
- * `sectionIndex` for a field row. Each method contributes two bands: its params
- * (even) and its returns (odd). This order matches `getSubSelectSections`, so
- * the store's generic post-delete adjacency logic keeps working.
- */
-export function bandIndex(methodIndex: number, group: ServiceGroup): number {
-  return methodIndex * 2 + (group === "returns" ? 1 : 0);
+export function groupFromSectionId(sectionId: string | undefined): ServiceGroup {
+  return sectionId === "returns" ? "returns" : "params";
 }
 
-export function bandToMethodIndex(band: number): number {
-  return Math.floor(band / 2);
+export function groupFromSectionIndex(sectionIndex: number | undefined): ServiceGroup {
+  return (sectionIndex ?? 0) === SERVICE_SECTION_INDEX.returns ? "returns" : "params";
 }
 
-export function bandToGroup(band: number): ServiceGroup {
-  return band % 2 === 1 ? "returns" : "params";
+export function getServiceRows(data: ServiceCardData, group: ServiceGroup): ServiceField[] {
+  return group === "returns" ? data.returns ?? [] : data.params ?? [];
+}
+
+/** A single stop in the card's linear sub-selection order. */
+export interface ServiceItem {
+  group: ServiceGroup;
+  fieldIndex: number;
 }
 
 export function buildServiceItems(data: ServiceCardData): ServiceItem[] {
   const items: ServiceItem[] = [];
-  (data.methods ?? []).forEach((method, methodIndex) => {
-    items.push({ kind: "method", methodIndex });
-    (method.params ?? []).forEach((_, fieldIndex) =>
-      items.push({ kind: "field", methodIndex, group: "params", fieldIndex }),
-    );
-    (method.returns ?? []).forEach((_, fieldIndex) =>
-      items.push({ kind: "field", methodIndex, group: "returns", fieldIndex }),
-    );
-  });
+  (data.params ?? []).forEach((_, fieldIndex) => items.push({ group: "params", fieldIndex }));
+  (data.returns ?? []).forEach((_, fieldIndex) => items.push({ group: "returns", fieldIndex }));
   return items;
 }
 
 export function itemToSelectedField(elementId: string, item: ServiceItem): SelectedField {
-  if (item.kind === "method") {
-    return {
-      elementId,
-      sectionId: "method",
-      sectionIndex: item.methodIndex,
-      fieldIndex: -1,
-    };
-  }
   return {
     elementId,
     sectionId: item.group,
-    sectionIndex: bandIndex(item.methodIndex, item.group),
+    sectionIndex: SERVICE_SECTION_INDEX[item.group],
     fieldIndex: item.fieldIndex,
   };
 }
 
 export function selectedFieldToItem(field: SelectedField | null): ServiceItem | null {
-  if (!field) return null;
-  if (field.sectionId === "method") {
-    return { kind: "method", methodIndex: field.sectionIndex ?? 0 };
-  }
-  if (field.fieldIndex < 0) return null;
-  return {
-    kind: "field",
-    methodIndex: bandToMethodIndex(field.sectionIndex ?? 0),
-    group: field.sectionId === "returns" ? "returns" : "params",
-    fieldIndex: field.fieldIndex,
-  };
+  if (!field || field.fieldIndex < 0) return null;
+  return { group: groupFromSectionId(field.sectionId), fieldIndex: field.fieldIndex };
 }
 
 export function serviceItemsEqual(a: ServiceItem, b: ServiceItem): boolean {
-  if (a.kind !== b.kind) return false;
-  if (a.kind === "method" && b.kind === "method") {
-    return a.methodIndex === b.methodIndex;
-  }
-  if (a.kind === "field" && b.kind === "field") {
-    return (
-      a.methodIndex === b.methodIndex &&
-      a.group === b.group &&
-      a.fieldIndex === b.fieldIndex
-    );
-  }
-  return false;
+  return a.group === b.group && a.fieldIndex === b.fieldIndex;
 }

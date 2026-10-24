@@ -259,38 +259,49 @@ describe("buildSpecification", () => {
     ]);
   });
 
-  it("appends the executed method to a service method-execution copy in a lane", () => {
+  it("labels a service reference copy in a lane by its method name", () => {
     const elements: CanvasElement[] = [
-      el("svc", "serviceCard", {
-        name: "OrderService",
-        methods: [
-          { id: "m1", name: "place", params: [], returns: [] },
-          { id: "m2", name: "cancel", params: [], returns: [] },
-        ],
-      }),
+      el(
+        "svc",
+        "serviceCard",
+        { name: "placeOrder", params: [], returns: [] },
+        { referenceId: "r-svc", isOriginal: true },
+      ),
       el("s1", "sliceCard", { name: "Place order", lanes: [{ id: "l1" }] }),
-      el("c1", "serviceCard", {
-        name: "OrderService",
-        methods: [{ id: "m1", name: "place", params: [], returns: [] }],
-        methodRef: { serviceId: "svc", methodId: "m1" },
-      }, { sliceId: "s1", laneId: "l1" }),
+      el(
+        "c1",
+        "serviceCard",
+        { name: "placeOrder", params: [], returns: [] },
+        { sliceId: "s1", laneId: "l1", referenceId: "r-svc", isOriginal: false },
+      ),
     ];
 
     const spec = buildSpecification({ name: "Shop", elements });
     expect(spec.slices).toEqual([
-      { name: "Place order", lanes: [{ type: "Service", cards: ["OrderService.place"] }] },
+      { name: "Place order", lanes: [{ type: "Service", cards: ["placeOrder"] }] },
     ]);
   });
 
-  it("excludes service method-execution copies from service definitions", () => {
+  it("collapses service reference copies but keeps services that share a name", () => {
     const elements: CanvasElement[] = [
-      el("svc", "serviceCard", { name: "OrderService", methods: [{ id: "m1", name: "place", params: [], returns: [] }] }),
-      el("copy", "serviceCard", { name: "OrderService", methods: [], methodRef: { serviceId: "svc", methodId: "m1" } }),
+      el(
+        "svc",
+        "serviceCard",
+        { name: "placeOrder", params: [{ name: "orderId", type: "string" }], returns: [] },
+        { referenceId: "r-svc", isOriginal: true },
+      ),
+      el(
+        "copy",
+        "serviceCard",
+        { name: "placeOrder", params: [{ name: "orderId", type: "string" }], returns: [] },
+        { referenceId: "r-svc", isOriginal: false },
+      ),
+      el("other", "serviceCard", { name: "placeOrder", params: [], returns: [] }),
     ];
     const spec = buildSpecification({ name: "Shop", elements });
-    expect((spec.services as unknown[]).length).toBe(1);
     expect(spec.services).toEqual([
-      { name: "OrderService", methods: [{ name: "place" }] },
+      { name: "placeOrder", params: [{ name: "orderId", type: "string" }] },
+      { name: "placeOrder" },
     ]);
   });
 

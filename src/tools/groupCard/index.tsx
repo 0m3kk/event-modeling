@@ -45,7 +45,7 @@ export const groupCardTool: ToolDefinition<GroupData> = {
   type: GROUP_TYPE,
   name: "Group",
   description:
-    "A Group is a compact frame that clusters related Object, Enum, Alias, Service, State or Actor cards (usually inside a Domain)",
+    "A Group is a compact frame that clusters related Object, Enum, Alias, State or Actor cards (usually inside a Domain)",
   icon: Boxes,
   color: "#0d9488",
   category: "modeling",
@@ -105,7 +105,7 @@ export const groupCardTool: ToolDefinition<GroupData> = {
 
     if (children.length === 0) {
       const hint = new Text({
-        text: "Drop objects, enums, aliases, services, states or actors here",
+        text: "Drop objects, enums, aliases, states or actors here",
         style: {
           fontSize: 11,
           fontFamily: '"Geist Mono", monospace',
@@ -161,15 +161,15 @@ export const groupCardTool: ToolDefinition<GroupData> = {
   ai: {
     toolName: "create_group_card",
     description:
-      "Create a Group — a compact frame clustering reusable definitions (Object/Enum/Alias), Services, States and/or Actors inside a Domain. " +
-      "Name it after its Domain (e.g. Account Types, Account States, Account Services) so names stay unique across Domains; " +
+      "Create a Group — a compact frame clustering reusable definitions (Object/Enum/Alias), States and/or Actors inside a Domain. " +
+      "Name it after its Domain (e.g. Account Types, Account States) so names stay unique across Domains; " +
       "Actors are the exception — keep them in a single board-wide \"Actors\" group. " +
-      "After creating it, place eligible cards in it via `group`.",
+      "After creating it, place eligible cards in it via `group`. Service cards do not belong in a Group; put them in a Slice lane.",
     parameters: z.object({
       name: z
         .string()
         .describe(
-          "Domain-prefixed PascalCase group name (e.g. Account Types, Account States, Account Services)",
+          "Domain-prefixed PascalCase group name (e.g. Account Types, Account States)",
         ),
       color: z.string().optional().describe("Optional hex color"),
       description: z

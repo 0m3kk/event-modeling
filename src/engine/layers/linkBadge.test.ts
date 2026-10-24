@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  drawLinkBadge,
-  drawMasterBadge,
-  drawMethodCopyBadge,
-  drawReferenceIndicator,
-} from "./linkBadge";
+import { drawLinkBadge, drawMasterBadge, drawReferenceIndicator } from "./linkBadge";
 import type { CanvasElement } from "@/types";
 import { Graphics } from "pixi.js";
 
@@ -63,21 +58,6 @@ describe("linkBadge renderers", () => {
     expect(circleSpy).toHaveBeenCalledWith(205, 16, 9);
     // Fill called with violet for master
     expect(fillSpy).toHaveBeenCalledWith({ color: 0x8b5cf6 });
-    expect(strokeSpy).toHaveBeenCalled();
-  });
-
-  it("draws method-copy badge with emerald background and play glyph", () => {
-    const g = new Graphics();
-    const circleSpy = vi.spyOn(g, "circle");
-    const fillSpy = vi.spyOn(g, "fill");
-    const strokeSpy = vi.spyOn(g, "stroke");
-
-    drawMethodCopyBadge(g, copyElement, { radius: 9, theme: "light" });
-
-    // 1 circle for the badge background (the glyph is a filled triangle).
-    expect(circleSpy).toHaveBeenCalledTimes(1);
-    expect(circleSpy).toHaveBeenCalledWith(205, 16, 9);
-    expect(fillSpy).toHaveBeenCalledWith({ color: 0x059669 });
     expect(strokeSpy).toHaveBeenCalled();
   });
 

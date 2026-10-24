@@ -69,7 +69,6 @@ export interface CanvasStoreState {
   addElement: (element: CanvasElement) => void;
   addElements: (elements: CanvasElement[]) => void;
   createReferenceCopy: (id: string) => CanvasElement | null;
-  createMethodCopy: (sourceId: string, methodId: string) => CanvasElement | null;
   /** Copies the current selection into the in-memory clipboard. */
   copySelection: () => void;
   /** Pastes the clipboard as independent copies, selecting the new elements. */

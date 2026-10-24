@@ -70,15 +70,31 @@ describe("hoistTypes", () => {
       name: "Mixed",
       services: [
         {
-          name: "S",
-          methods: [{ name: "m", params: [{ name: "x", type: { alias: "X", of: "string" } }] }],
+          name: "m",
+          params: [{ name: "x", type: { alias: "X", of: "string" } }],
+          returns: [{ name: "z", type: { object: "Z", fields: [] } }],
         },
       ],
       states: [{ name: "St", params: [{ name: "y", type: { object: "Y", fields: [] } }] }],
     };
 
     const { types } = hoistTypes(spec);
-    expect(types.map(defName).sort()).toEqual(["X", "Y"]);
+    expect(types.map(defName).sort()).toEqual(["X", "Y", "Z"]);
+  });
+
+  it("still hoists the legacy multi-method service shape", () => {
+    const spec: Specification = {
+      name: "Legacy",
+      services: [
+        {
+          name: "S",
+          methods: [{ name: "m", params: [{ name: "x", type: { alias: "X", of: "string" } }] }],
+        },
+      ],
+    };
+
+    const { types } = hoistTypes(spec);
+    expect(types.map(defName).sort()).toEqual(["X"]);
   });
 
   it("keeps an explicit `types` registry and normalises its field types", () => {

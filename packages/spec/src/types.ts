@@ -148,6 +148,7 @@ export interface ConstraintDef {
   rules?: string[];
 }
 
+/** @deprecated Services are now exported as one method per definition. */
 export interface ServiceMethod {
   name: string;
   description?: string;
@@ -155,9 +156,16 @@ export interface ServiceMethod {
   returns?: Field[];
 }
 
+/**
+ * A service method execution. Each entry in `spec.services` is one method:
+ * its `name` is the method name and its fields are `params` / `returns`.
+ */
 export interface ServiceDef {
   name: string;
   description?: string;
+  params?: Field[];
+  returns?: Field[];
+  /** @deprecated Legacy multi-method shape; still parsed when present. */
   methods?: ServiceMethod[];
 }
 

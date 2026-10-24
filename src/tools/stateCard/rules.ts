@@ -80,12 +80,8 @@ function collectDeclaredFieldNames(elements: CanvasElement[]): Set<string> {
         addFieldNames(names, data.fields);
         break;
       case "serviceCard":
-        if (Array.isArray(data.methods)) {
-          for (const method of data.methods) {
-            addFieldNames(names, method?.params);
-            addFieldNames(names, method?.returns);
-          }
-        }
+        addFieldNames(names, data.params);
+        addFieldNames(names, data.returns);
         break;
       default:
         break;
