@@ -51,6 +51,7 @@ export interface GoogleDriveAuthState {
 const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
 const CLIENT_ID_STORAGE_KEY = "event_modeling_gdrive_client_id";
 const DRIVE_FILE_STORAGE_KEY = "event_modeling_gdrive_last_file";
+const DRIVE_FOLDER_STORAGE_KEY = "event_modeling_gdrive_folder_path";
 const AUTH_STORAGE_KEY = "event_modeling_gdrive_auth";
 
 /**
@@ -281,6 +282,59 @@ export async function fetchGoogleUserProfile(accessToken: string): Promise<Googl
   };
 }
 
+export interface GoogleDriveFolder {
+  id: string;
+  name: string;
+}
+
+/**
+ * Folder the user chose to save new boards into. The array is the full path
+ * from My Drive down to the selected folder (empty means My Drive root), which
+ * lets the picker reopen exactly where the user left off.
+ */
+export type DriveFolderPath = GoogleDriveFolder[];
+
+export function getStoredDriveFolderPath(): DriveFolderPath {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(DRIVE_FOLDER_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (entry): entry is GoogleDriveFolder =>
+          entry && typeof entry.id === "string" && typeof entry.name === "string",
+      );
+    }
+  } catch {
+    // Ignore malformed or inaccessible storage.
+  }
+  return [];
+}
+
+export function setStoredDriveFolderPath(path: DriveFolderPath) {
+  if (typeof window === "undefined") return;
+  try {
+    if (!path.length) {
+      localStorage.removeItem(DRIVE_FOLDER_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(DRIVE_FOLDER_STORAGE_KEY, JSON.stringify(path));
+  } catch {
+    // Persistence is best-effort; ignore quota/security errors.
+  }
+}
+
+/**
+ * Remove the trailing file extension purely for display, so the Drive list
+ * shows "My Board" instead of "My Board.eventmodel".
+ */
+export function stripFileExtension(fileName: string): string {
+  const trimmed = fileName.trim();
+  const match = trimmed.match(/^(.*)\.[^.]+$/);
+  return match && match[1] ? match[1] : trimmed;
+}
+
 export async function listDriveFiles(accessToken: string): Promise<GoogleDriveFile[]> {
   const q =
     "trashed = false and (mimeType = 'application/json' or mimeType = 'application/octet-stream')";
@@ -295,17 +349,68 @@ export async function listDriveFiles(accessToken: string): Promise<GoogleDriveFi
   return data.files || [];
 }
 
+/**
+ * Lists the folders directly under `parentId` (null means My Drive root).
+ *
+ * The app only requests the `drive.file` scope, so this returns the folders the
+ * app itself can see — which is exactly the set it is allowed to save into.
+ */
+export async function listDriveFolders(
+  accessToken: string,
+  parentId: string | null,
+): Promise<GoogleDriveFolder[]> {
+  const parent = parentId ? `'${parentId}'` : "'root'";
+  const q = `${parent} in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&orderBy=name&pageSize=100`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) throw await toGoogleDriveError(res, "Failed to list Google Drive folders");
+  const data = await res.json();
+  return data.files || [];
+}
+
+export async function createDriveFolder(
+  accessToken: string,
+  name: string,
+  parentId: string | null,
+): Promise<GoogleDriveFolder> {
+  const res = await fetch(
+    "https://www.googleapis.com/drive/v3/files?fields=id,name",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name,
+        mimeType: "application/vnd.google-apps.folder",
+        ...(parentId ? { parents: [parentId] } : {}),
+      }),
+    },
+  );
+
+  if (!res.ok) throw await toGoogleDriveError(res, "Failed to create Google Drive folder");
+  return res.json();
+}
+
 async function uploadDriveFile(
   accessToken: string,
   fileName: string,
   fileBytes: Uint8Array,
   existingFileId: string | null,
+  folderId?: string | null,
 ): Promise<{ id: string; name: string }> {
   const boundary = "boundary_event_modeling_gdrive";
   const name = fileName.endsWith(".eventmodel") ? fileName : `${fileName}.eventmodel`;
   const metadata = {
     name,
     mimeType: "application/octet-stream",
+    // Only set the parent on creation: an update keeps the file where it is.
+    ...(!existingFileId && folderId ? { parents: [folderId] } : {}),
   };
 
   const body = new Blob([
@@ -341,6 +446,7 @@ export async function saveToGoogleDrive(
   fileName: string,
   fileBytes: Uint8Array,
   existingFileId?: string | null,
+  folderId?: string | null,
 ): Promise<{ id: string; name: string }> {
   if (existingFileId) {
     try {
@@ -351,12 +457,12 @@ export async function saveToGoogleDrive(
       // `drive.file` scope that yields 403/404, so fall back to creating a
       // fresh file instead of failing the save.
       if (err instanceof GoogleDriveApiError && (err.status === 403 || err.status === 404)) {
-        return await uploadDriveFile(accessToken, fileName, fileBytes, null);
+        return await uploadDriveFile(accessToken, fileName, fileBytes, null, folderId);
       }
       throw err;
     }
   }
-  return await uploadDriveFile(accessToken, fileName, fileBytes, null);
+  return await uploadDriveFile(accessToken, fileName, fileBytes, null, folderId);
 }
 
 export async function downloadFromGoogleDrive(

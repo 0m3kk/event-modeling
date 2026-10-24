@@ -65,8 +65,19 @@
     "clientIdHelp": "Tạo OAuth 2.0 Web Client ID trong Google Cloud Console với Authorized JavaScript origin là URL hiện tại.",
     "connected": "Đã kết nối Google",
     "errorList": "Lỗi tải danh sách: {{message}}",
+    "errorFolders": "Lỗi tải thư mục: {{message}}",
+    "errorCreateFolder": "Lỗi tạo thư mục: {{message}}",
     "saveSuccess": "✅ Đã lưu thành công lên Google Drive!",
     "overwriteHint": "Thao tác lưu sẽ ghi đè tệp Drive: {{name}}",
+    "folderLabel": "Thư mục",
+    "myDrive": "Drive của tôi",
+    "chooseFolder": "Chọn",
+    "folderLockedHint": "Tệp đã liên kết sẽ được ghi đè tại vị trí hiện tại trên Drive.",
+    "noFolders": "Chưa có thư mục nào ở đây.",
+    "newFolderPlaceholder": "Tên thư mục mới",
+    "createFolder": "Tạo thư mục",
+    "useThisFolder": "Lưu vào đây",
+    "folderSelected": "Đã chọn",
     "errorSave": "Lỗi lưu: {{message}}",
     "openSuccess": "✅ Đã mở tệp {{name}}",
     "errorOpen": "Lỗi mở tệp: {{message}}"
@@ -96,6 +107,7 @@
   },
   "common": {
     "close": "Đóng",
+    "cancel": "Hủy bỏ",
     "delete": "Xóa"
   },
   "changes": {

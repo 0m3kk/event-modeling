@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
-import { X, Cloud, Loader2, LogOut, Download, Upload, Check } from "lucide-react";
+import {
+  X,
+  Cloud,
+  Loader2,
+  LogOut,
+  Download,
+  Upload,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Folder,
+  FolderPlus,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import {
@@ -7,11 +19,18 @@ import {
   signOutGoogle,
   getActiveGoogleAuth,
   listDriveFiles,
+  listDriveFolders,
+  createDriveFolder,
   saveToGoogleDrive,
   downloadFromGoogleDrive,
   getStoredGoogleClientId,
   setStoredGoogleClientId,
+  getStoredDriveFolderPath,
+  setStoredDriveFolderPath,
+  stripFileExtension,
   type GoogleDriveFile,
+  type GoogleDriveFolder,
+  type DriveFolderPath,
   type GoogleUserProfile,
 } from "@/utils/googleDrive";
 import { serializeProjectV3, parseProjectBytes } from "@/utils/projectFile";
@@ -43,9 +62,19 @@ export function GoogleDriveModal() {
   const [saveFileName, setSaveFileName] = useState(projectName);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // Destination folder for new Drive files. An empty path means My Drive root.
+  const [folderPath, setFolderPath] = useState<DriveFolderPath>(getStoredDriveFolderPath);
+  const [isFolderPickerOpen, setIsFolderPickerOpen] = useState(false);
+  const [browsePath, setBrowsePath] = useState<DriveFolderPath>([]);
+  const [folders, setFolders] = useState<GoogleDriveFolder[]>([]);
+  const [isFolderLoading, setIsFolderLoading] = useState(false);
+  const [folderError, setFolderError] = useState<string | null>(null);
+  const [newFolderName, setNewFolderName] = useState("");
+
   useEffect(() => {
     setTab(initialTab);
     setSaveFileName(projectName);
+    setIsFolderPickerOpen(false);
   }, [initialTab, projectName, isOpen]);
 
   useEffect(() => {
@@ -115,6 +144,74 @@ export function GoogleDriveModal() {
     setFiles([]);
   };
 
+  const loadFolders = async (path: DriveFolderPath) => {
+    if (!auth.accessToken) return;
+    setIsFolderLoading(true);
+    setFolderError(null);
+    try {
+      const parentId = path.length ? path[path.length - 1].id : null;
+      const list = await listDriveFolders(auth.accessToken, parentId);
+      setFolders(list);
+    } catch (err: any) {
+      setFolderError(t("drive.errorFolders", { message: err.message }));
+      setFolders([]);
+    } finally {
+      setIsFolderLoading(false);
+    }
+  };
+
+  const openFolderPicker = () => {
+    setBrowsePath(folderPath);
+    setNewFolderName("");
+    setIsFolderPickerOpen(true);
+    loadFolders(folderPath);
+  };
+
+  const navigateToFolder = (folder: GoogleDriveFolder) => {
+    const next = [...browsePath, folder];
+    setBrowsePath(next);
+    loadFolders(next);
+  };
+
+  const navigateToCrumb = (index: number) => {
+    const next = index < 0 ? [] : browsePath.slice(0, index + 1);
+    setBrowsePath(next);
+    loadFolders(next);
+  };
+
+  const handleCreateFolder = async () => {
+    if (!auth.accessToken) return;
+    const name = newFolderName.trim();
+    if (!name) return;
+    setIsFolderLoading(true);
+    setFolderError(null);
+    try {
+      const parentId = browsePath.length ? browsePath[browsePath.length - 1].id : null;
+      const created = await createDriveFolder(auth.accessToken, name, parentId);
+      const next = [...browsePath, created];
+      setBrowsePath(next);
+      setNewFolderName("");
+      await loadFolders(next);
+    } catch (err: any) {
+      setFolderError(t("drive.errorCreateFolder", { message: err.message }));
+    } finally {
+      setIsFolderLoading(false);
+    }
+  };
+
+  const handleSelectFolder = () => {
+    setFolderPath(browsePath);
+    setStoredDriveFolderPath(browsePath);
+    setIsFolderPickerOpen(false);
+  };
+
+  const isCurrentFolder = (path: DriveFolderPath) =>
+    path.length === folderPath.length && path.every((f, i) => f.id === folderPath[i].id);
+
+  const selectedFolderLabel = folderPath.length
+    ? folderPath.map((f) => f.name).join(" / ")
+    : t("drive.myDrive");
+
   const handleSave = async () => {
     if (!auth.accessToken) return;
     setIsLoading(true);
@@ -130,11 +227,13 @@ export function GoogleDriveModal() {
         createdAt: projectCreatedAt,
         withCheckpoint: true,
       });
+      const targetFolderId = folderPath.length ? folderPath[folderPath.length - 1].id : null;
       const res = await saveToGoogleDrive(
         auth.accessToken,
         saveFileName,
         bytes,
         googleDriveFileId,
+        targetFolderId,
       );
       setGoogleDriveFileId(res.id, saveFileName);
       setProjectName(saveFileName);
@@ -156,7 +255,9 @@ export function GoogleDriveModal() {
       const project = parseProjectBytes(bytes);
       useCanvasStore.getState().loadProject(project);
       setGoogleDriveFileId(file.id, file.name);
-      setStatusMessage(t("drive.openSuccess", { name: file.name }));
+      setStatusMessage(
+        t("drive.openSuccess", { name: stripFileExtension(file.name) }),
+      );
       setTimeout(() => setOpen(false), 800);
     } catch (err: any) {
       setStatusMessage(t("drive.errorOpen", { message: err.message }));
@@ -169,7 +270,7 @@ export function GoogleDriveModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-zinc-800">
           <div className="flex items-center gap-2 font-semibold text-sm">
@@ -299,6 +400,136 @@ export function GoogleDriveModal() {
                     </p>
                   )}
                 </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">{t("drive.folderLabel")}</label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-gray-300 px-3 py-2 dark:border-zinc-700">
+                      <Folder size={14} className="shrink-0 text-amber-500" />
+                      <span className="truncate text-xs text-gray-800 dark:text-zinc-200">
+                        {selectedFolderLabel}
+                      </span>
+                    </div>
+                    <button
+                      onClick={openFolderPicker}
+                      disabled={isLoading || Boolean(googleDriveFileId)}
+                      className="shrink-0 rounded-xl border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+                    >
+                      {t("drive.chooseFolder")}
+                    </button>
+                  </div>
+                  {googleDriveFileId ? (
+                    <p className="text-[11px] text-gray-400">{t("drive.folderLockedHint")}</p>
+                  ) : null}
+                </div>
+
+                {isFolderPickerOpen && !googleDriveFileId && (
+                  <div className="space-y-2 rounded-xl border border-gray-200 p-2.5 dark:border-zinc-700">
+                    {/* Breadcrumb */}
+                    <div className="flex min-w-0 items-center gap-0.5">
+                      <button
+                        onClick={() => navigateToCrumb(-1)}
+                        disabled={browsePath.length === 0}
+                        title={t("drive.myDrive")}
+                        className="shrink-0 rounded p-0.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <button
+                        onClick={() => navigateToCrumb(-1)}
+                        className="truncate rounded px-1 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+                      >
+                        {t("drive.myDrive")}
+                      </button>
+                      {browsePath.map((crumb, index) => (
+                        <span key={crumb.id} className="flex min-w-0 items-center gap-0.5">
+                          <ChevronRight size={12} className="shrink-0 text-gray-400" />
+                          <button
+                            onClick={() => navigateToCrumb(index)}
+                            className="truncate rounded px-1 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+                          >
+                            {crumb.name}
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Subfolders */}
+                    <div className="max-h-36 overflow-y-auto">
+                      {isFolderLoading ? (
+                        <div className="flex items-center justify-center py-4 text-xs text-gray-400">
+                          <Loader2 size={14} className="mr-2 animate-spin" />
+                          <span>{t("drive.loading")}</span>
+                        </div>
+                      ) : folders.length === 0 ? (
+                        <div className="py-4 text-center text-xs text-gray-400">
+                          {t("drive.noFolders")}
+                        </div>
+                      ) : (
+                        folders.map((folder) => (
+                          <button
+                            key={folder.id}
+                            onClick={() => navigateToFolder(folder)}
+                            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-zinc-800 cursor-pointer"
+                          >
+                            <Folder size={14} className="shrink-0 text-amber-500" />
+                            <span className="truncate">{folder.name}</span>
+                            <ChevronRight size={12} className="ml-auto shrink-0 text-gray-400" />
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    {/* New folder */}
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        placeholder={t("drive.newFolderPlaceholder")}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleCreateFolder();
+                        }}
+                        className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-transparent px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 dark:border-zinc-700 dark:text-zinc-100"
+                      />
+                      <button
+                        onClick={handleCreateFolder}
+                        disabled={!newFolderName.trim() || isFolderLoading}
+                        title={t("drive.createFolder")}
+                        className="shrink-0 rounded-lg bg-gray-100 p-1.5 text-gray-600 hover:bg-gray-200 disabled:opacity-40 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 cursor-pointer"
+                      >
+                        <FolderPlus size={14} />
+                      </button>
+                    </div>
+
+                    {folderError && (
+                      <div className="rounded-lg bg-red-50 p-2 text-[11px] text-red-600 dark:bg-red-950/40 dark:text-red-400">
+                        {folderError}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setIsFolderPickerOpen(false)}
+                        className="rounded-lg px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer"
+                      >
+                        {t("common.cancel")}
+                      </button>
+                      <button
+                        onClick={handleSelectFolder}
+                        className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 cursor-pointer"
+                      >
+                        <Check size={13} />
+                        <span>
+                          {isCurrentFolder(browsePath)
+                            ? t("drive.folderSelected")
+                            : t("drive.useThisFolder")}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={handleSave}
                   disabled={isLoading || !saveFileName.trim()}
@@ -327,7 +558,7 @@ export function GoogleDriveModal() {
                       className="flex items-center justify-between rounded-xl border border-gray-100 p-2.5 hover:border-blue-500 hover:bg-blue-50/30 cursor-pointer transition-colors dark:border-zinc-800 dark:hover:bg-zinc-800/60"
                     >
                       <div className="truncate text-xs font-medium text-gray-800 dark:text-zinc-200">
-                        {file.name}
+                        {stripFileExtension(file.name)}
                       </div>
                       <Download size={14} className="text-gray-400" />
                     </div>

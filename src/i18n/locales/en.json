@@ -65,8 +65,19 @@
     "clientIdHelp": "Create an OAuth 2.0 Web Client ID in Google Cloud Console with the Authorized JavaScript origin set to the current URL.",
     "connected": "Google Connected",
     "errorList": "Failed to load file list: {{message}}",
+    "errorFolders": "Failed to load folders: {{message}}",
+    "errorCreateFolder": "Failed to create folder: {{message}}",
     "saveSuccess": "✅ Saved to Google Drive successfully!",
     "overwriteHint": "Saving will overwrite the Drive file: {{name}}",
+    "folderLabel": "Folder",
+    "myDrive": "My Drive",
+    "chooseFolder": "Choose",
+    "folderLockedHint": "The linked file is overwritten in its current Drive location.",
+    "noFolders": "No folders here yet.",
+    "newFolderPlaceholder": "New folder name",
+    "createFolder": "Create folder",
+    "useThisFolder": "Save here",
+    "folderSelected": "Selected",
     "errorSave": "Failed to save: {{message}}",
     "openSuccess": "✅ Opened file {{name}}",
     "errorOpen": "Failed to open file: {{message}}"
@@ -96,6 +107,7 @@
   },
   "common": {
     "close": "Close",
+    "cancel": "Cancel",
     "delete": "Delete"
   },
   "changes": {
