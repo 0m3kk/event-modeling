@@ -57,6 +57,7 @@ fn generates_one_folder_per_domain() {
         "src/domains/session/commands.rs",
         "src/domains/two_factor/types.rs",
         "src/actors.rs",
+        "src/action.rs",
         "src/domain_event.rs",
         "src/lib.rs",
     ] {
@@ -135,6 +136,8 @@ fn generates_one_folder_per_domain() {
     );
 
     let lib = find(&output, "src/lib.rs").unwrap();
+    assert!(lib.contains("pub mod action;"));
+    assert!(lib.contains("pub use action::Action;"));
     assert!(lib.contains("pub mod domain_event;"));
     assert!(!lib.contains("pub mod event_store;"));
     assert!(lib.contains("pub use domain_event::DomainEvent;"));
@@ -300,6 +303,41 @@ fn template_overrides_win_and_fall_back_to_embedded_defaults() {
     assert!(lib.contains("Rust crate generated"));
 
     std::fs::remove_dir_all(directory).ok();
+}
+
+#[test]
+fn commands_and_queries_expose_their_action() {
+    let output = generate_sample(None);
+
+    let commands = find(&output, "src/domains/identity/commands.rs").unwrap();
+    assert!(commands.contains("impl crate::action::Action for RegisterAccount {"));
+    assert!(commands.contains("\"identity:register_account\""));
+    assert!(commands.contains("/// Action: `identity:register_account`."));
+
+    let queries = find(&output, "src/domains/totp/queries.rs").unwrap();
+    assert!(queries.contains("impl crate::action::Action for GetTotpStatusParams {"));
+    assert!(queries.contains("\"totp:get_totp_status\""));
+
+    let trait_source = find(&output, "src/action.rs").unwrap();
+    assert!(trait_source.contains("pub trait Action"));
+    assert!(trait_source.contains("fn action() -> &'static str;"));
+
+    let actors = find(&output, "src/actors.rs").unwrap();
+    assert!(actors.contains("pub fn can_execute<A: crate::action::Action>"));
+}
+
+#[test]
+fn commands_without_an_action_do_not_claim_one() {
+    let source = r#"
+name: NoAction
+commands:
+  - name: ping
+"#;
+    let output = generate_source(source);
+
+    let commands = find(&output, "src/shared/commands.rs").unwrap();
+    assert!(commands.contains("pub struct Ping {"));
+    assert!(!commands.contains("impl crate::action::Action"));
 }
 
 #[test]

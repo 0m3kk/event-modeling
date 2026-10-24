@@ -198,6 +198,7 @@ pub struct CommandCtx {
     pub name: String,
     pub rust_name: String,
     pub response_name: String,
+    /// Permission required to execute the command, normalised to snake_case.
     pub action: Option<String>,
     pub description: Option<String>,
     pub doc_lines: Vec<String>,
@@ -212,6 +213,7 @@ pub struct QueryCtx {
     pub rust_name: String,
     pub params_name: String,
     pub response_name: String,
+    /// Permission required to execute the query, normalised to snake_case.
     pub action: Option<String>,
     pub description: Option<String>,
     pub doc_lines: Vec<String>,
@@ -812,9 +814,10 @@ fn build_command(
 ) -> CommandCtx {
     let owner = format!("command `{}`", command.name);
     let rust_name = type_ident(&command.name);
+    let action = command.action.as_deref().map(snake_action);
     let mut docs = doc_lines(command.description.as_deref());
-    if let Some(action) = &command.action {
-        docs.push(format!("Action: `{}`.", snake_action(action)));
+    if let Some(action) = &action {
+        docs.push(format!("Action: `{action}`."));
     }
     let mut validation = ValidationCtx {
         regexes,
@@ -857,7 +860,7 @@ fn build_command(
         name: command.name.clone(),
         rust_name: rust_name.clone(),
         response_name: format!("{rust_name}Response"),
-        action: command.action.clone(),
+        action,
         description: command.description.clone(),
         doc_lines: docs,
         used_in_slices: command.used_in_slices.clone(),
@@ -878,9 +881,10 @@ fn build_query(
 ) -> QueryCtx {
     let owner = format!("query `{}`", query.name);
     let rust_name = type_ident(&query.name);
+    let action = query.action.as_deref().map(snake_action);
     let mut docs = doc_lines(query.description.as_deref());
-    if let Some(action) = &query.action {
-        docs.push(format!("Action: `{}`.", snake_action(action)));
+    if let Some(action) = &action {
+        docs.push(format!("Action: `{action}`."));
     }
     let mut validation = ValidationCtx {
         regexes,
@@ -924,7 +928,7 @@ fn build_query(
         params_name: format!("{rust_name}Params"),
         response_name: format!("{rust_name}Response"),
         rust_name,
-        action: query.action.clone(),
+        action,
         description: query.description.clone(),
         doc_lines: docs,
         used_in_slices: query.used_in_slices.clone(),

@@ -38,6 +38,8 @@ src/
 Outside the domains:
 
 - `actors` — actors and their permissions.
+- `action` — the `Action` trait implemented by every command input and query
+  params struct, returning the permission that `Actor` checks.
 - `domain_event` — the `DomainEvent` trait implemented by every event.
 - `shared` — items that were not assigned to a domain, when there are any.
 

@@ -64,5 +64,13 @@ pub struct {{ command.response_name }} {
     pub {{ field.rust_name }}: {{ field.rtype }},
 {%- endfor %}
 }
+{%- if command.action %}
+
+impl crate::action::Action for {{ command.rust_name }} {
+    fn action() -> &'static str {
+        {{ command.action|str_lit }}
+    }
+}
+{%- endif %}
 
 {% endfor %}

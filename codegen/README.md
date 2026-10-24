@@ -75,6 +75,7 @@ queries, states and services. The generated crate uses **Rust edition 2024**:
   src/
     lib.rs
     actors.rs            # actors + permissions (outside the domains)
+    action.rs            # Action trait mapping commands/queries to permissions
     domain_event.rs      # DomainEvent trait implemented by every event
     domains/
       mod.rs
@@ -110,16 +111,17 @@ What is generated:
   `chrono::DateTime<Utc>`, and `uuid` (or `format: uuid`) to `uuid::Uuid`.
 - **Events** — one struct per event implementing `DomainEvent`. There is no
   central event enum.
-- **Commands / Queries** — an input/params struct plus a response struct.
+- **Commands / Queries** — an input/params struct plus a response struct. Each
+  input/params struct implements the `Action` trait so its permission string is
+  available without knowing the concrete type.
 - **States** — a projected state struct plus a params struct; the query sources
   and tags are recorded in the doc comments.
 - **Services** — one trait per `serviceName`, with `Params`/`Returns` structs,
   generated inside the domain whose slices call the service. Methods return
   `impl Future<Output = ...> + Send`, so implementations can use `async fn`
   without an `async-trait` dependency and without an `allow` attribute.
-- **Actors** — an `Actor` enum, permission lists and `Actor::can()` with
-  `domain:*` wildcard support.
-- **Tags** — tag metadata exposed as constants.
+- **Actors** — an `Actor` enum, permission lists, `Actor::can()` with
+  `domain:*` wildcard support, and `Actor::can_execute::<A>()` for any `Action`.
 - **Validation** — validation is generated only for **command input structs** and
   **query params structs**. Other generated items (types, events, states,
   services, aliases) carry no `validator` derive or `Validate` impl. Constraints
@@ -190,6 +192,39 @@ the crate depends on [`event-store`](https://github.com/0m3kk/backend-kit) from
 `backend-kit` and re-exports `Event` from the crate root. That dependency is
 already in the generated `Cargo.toml`, so the trait can rely on
 `Event::new()` and `Event::with_metadata()` directly.
+
+### Actions and authorization
+
+The `action` declared on a command or query is the permission checked against
+actor permissions. Each command input struct and query params struct implements
+`Action`:
+
+```rust
+pub trait Action {
+    fn action() -> &'static str;
+}
+
+impl crate::action::Action for RegisterAccount {
+    fn action() -> &'static str {
+        "identity:register_account"
+    }
+}
+```
+
+The action string is normalised to `snake_case`, matching
+`Actor::permissions()` (`identity:register_account`, `totp:*`, ...). Use it
+directly or through the helper:
+
+```rust
+use authentication::{Action, Actor};
+use authentication::domains::identity::commands::RegisterAccount;
+
+assert!(Actor::Guest.can_execute::<RegisterAccount>());
+```
+
+When a command or query has no `action` in the spec, no `Action` impl is
+generated, since there is no permission to compare against. The action is also
+recorded as `Action: \`...\`` in the struct's doc comment.
 
 ## How cards are assigned to domains
 

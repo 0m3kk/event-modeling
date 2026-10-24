@@ -64,5 +64,13 @@ pub struct {{ query.response_name }} {
     pub {{ field.rust_name }}: {{ field.rtype }},
 {%- endfor %}
 }
+{%- if query.action %}
+
+impl crate::action::Action for {{ query.params_name }} {
+    fn action() -> &'static str {
+        {{ query.action|str_lit }}
+    }
+}
+{%- endif %}
 
 {% endfor %}

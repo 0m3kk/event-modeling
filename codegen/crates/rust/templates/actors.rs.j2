@@ -42,6 +42,11 @@ impl Actor {
         }
     }
 
+    /// Returns `true` when this actor may execute `A`.
+    pub fn can_execute<A: crate::action::Action>(&self) -> bool {
+        self.can(A::action())
+    }
+
     /// Returns `true` when this actor holds `permission`.
     ///
     /// A permission ending in `:*` grants every permission sharing the prefix,
