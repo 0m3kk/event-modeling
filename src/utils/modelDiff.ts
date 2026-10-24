@@ -181,7 +181,7 @@ function removeByPointer(root: unknown, path: string): void {
 // ---------------------------------------------------------------------------
 
 /** Structural equality for the plain JSON shapes used in card data. */
-function deepEqual(a: unknown, b: unknown): boolean {
+export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
   if (a === null || b === null) return false;
@@ -213,6 +213,17 @@ function itemKey(item: unknown): string | null {
   return null;
 }
 
+/** True when `b` is `a` with every item moved to a different position. */
+function isFullReorder(a: unknown[], b: unknown[]): boolean {
+  const keysA = a.map(itemKey);
+  const keysB = b.map(itemKey);
+  if (keysA.some((key) => key === null) || keysB.some((key) => key === null)) return false;
+  if (keysA.some((key, index) => key === keysB[index])) return false;
+  const sortedA = [...keysA].sort();
+  const sortedB = [...keysB].sort();
+  return sortedA.every((key, index) => key === sortedB[index]);
+}
+
 function diffValue(a: unknown, b: unknown, path: string, ops: PatchOp[]): void {
   if (deepEqual(a, b)) return;
 
@@ -237,22 +248,24 @@ function diffValue(a: unknown, b: unknown, path: string, ops: PatchOp[]): void {
     return;
   }
 
-  if (Array.isArray(a) && Array.isArray(b)) {
-    const keyed =
-      a.length === b.length &&
-      a.length > 0 &&
-      a.every(
-        (item, i) => itemKey(item) !== null && itemKey(item) === itemKey(b[i]),
-      );
-    if (keyed) {
-      for (let i = 0; i < a.length; i++) {
-        diffValue(a[i], b[i], joinPointer(path, i), ops);
-      }
+  if (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.length > 0) {
+    if (isFullReorder(a, b)) {
+      // A pure reorder would otherwise read as every row changing at once;
+      // replace the list so the panel can show one ordered before/after.
+      ops.push({ op: "replace", path, value: b });
       return;
     }
+    // Same-length arrays are diffed position by position. This keeps edits to
+    // list items (a field row, a lane, a query item) small and replayable even
+    // when an item is renamed, instead of replacing the whole array — which
+    // would also make the change panel dump raw JSON.
+    for (let i = 0; i < a.length; i++) {
+      diffValue(a[i], b[i], joinPointer(path, i), ops);
+    }
+    return;
   }
 
-  // Different shape (or a reordered/unkeyed array): replace the whole value.
+  // Different length (an item was added/removed): replace the whole value.
   ops.push({ op: "replace", path, value: b });
 }
 
@@ -275,7 +288,16 @@ function toShape(model: ModelElement): Record<string, unknown> {
 
 /** Applies a patch to a modeling element, returning a new object. */
 export function applyOps(model: ModelElement, ops: PatchOp[]): ModelElement {
-  const shape: Record<string, unknown> = toShape(model);
+  // Clone `data` before writing: the shape below is shallow, so writing through
+  // it would otherwise mutate the caller's element (and, during replay, the
+  // very log entries being replayed).
+  const shape: Record<string, unknown> = {
+    data: JSON.parse(JSON.stringify(model.data ?? {})),
+  };
+  for (const key of MODEL_MEMBERSHIP_KEYS) {
+    const value = (model as unknown as Record<string, unknown>)[key];
+    if (value !== undefined) shape[key] = value;
+  }
   for (const op of ops) {
     if (op.op === "remove") removeByPointer(shape, op.path);
     else setByPointer(shape, op.path, op.value);

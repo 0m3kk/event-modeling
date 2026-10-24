@@ -124,6 +124,48 @@
     "before": "Trước",
     "after": "Sau",
     "nothing": "—",
-    "focus": "Hiện trên bảng"
+    "added": "Thêm",
+    "removed": "Bỏ",
+    "yes": "Có",
+    "no": "Không",
+    "focus": "Hiện trên bảng",
+    "labels": {
+      "name": "Tên",
+      "description": "Mô tả",
+      "type": "Kiểu",
+      "array": "Mảng",
+      "required": "Bắt buộc",
+      "tagged": "Có tag",
+      "tag": "Tag",
+      "field": "Trường",
+      "action": "Hành động",
+      "service": "Dịch vụ",
+      "validation": "Ràng buộc",
+      "cardType": "Loại thẻ",
+      "eventTypes": "Loại sự kiện",
+      "text": "Nội dung",
+      "cardData": "Dữ liệu thẻ",
+      "none": "Không có",
+      "emptyLane": "Lane trống",
+      "unknown": "Không rõ"
+    },
+    "sections": {
+      "field": "Trường",
+      "param": "Tham số",
+      "input": "Đầu vào",
+      "response": "Phản hồi",
+      "return": "Kết quả",
+      "state": "Trạng thái",
+      "rule": "Quy tắc",
+      "permission": "Quyền",
+      "query": "Truy vấn",
+      "lane": "Lane"
+    },
+    "membership": {
+      "group": "Trong nhóm",
+      "slice": "Trong slice",
+      "lane": "Trong lane",
+      "domain": "Trong domain"
+    }
   }
 }

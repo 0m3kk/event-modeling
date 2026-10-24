@@ -72,6 +72,8 @@ describe("change log integration", () => {
   it("derives field-level before/after for the change history", () => {
     const store = useCanvasStore.getState();
     store.addElement(card("a"));
+    // Commit the creation first, so the edit is a separate change set.
+    changeRecorder.flush();
     store.updateElement("a", {
       data: { name: "Evta", fields: [{ name: "id", type: "number" }] },
     });

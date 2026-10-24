@@ -124,6 +124,48 @@
     "before": "Before",
     "after": "After",
     "nothing": "—",
-    "focus": "Show on canvas"
+    "added": "Added",
+    "removed": "Removed",
+    "yes": "Yes",
+    "no": "No",
+    "focus": "Show on canvas",
+    "labels": {
+      "name": "Name",
+      "description": "Description",
+      "type": "Type",
+      "array": "Array",
+      "required": "Required",
+      "tagged": "Tagged",
+      "tag": "Tag",
+      "field": "Field",
+      "action": "Action",
+      "service": "Service",
+      "validation": "Validation",
+      "cardType": "Card type",
+      "eventTypes": "Event types",
+      "text": "Text",
+      "cardData": "Card data",
+      "none": "None",
+      "emptyLane": "Empty lane",
+      "unknown": "Unknown"
+    },
+    "sections": {
+      "field": "Field",
+      "param": "Param",
+      "input": "Input",
+      "response": "Response",
+      "return": "Return",
+      "state": "State",
+      "rule": "Rule",
+      "permission": "Permission",
+      "query": "Query",
+      "lane": "Lane"
+    },
+    "membership": {
+      "group": "In group",
+      "slice": "In slice",
+      "lane": "In lane",
+      "domain": "In domain"
+    }
   }
 }

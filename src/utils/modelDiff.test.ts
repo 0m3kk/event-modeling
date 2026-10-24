@@ -82,6 +82,26 @@ describe("diffModelElement", () => {
     expect(applyOps(base, ops)).toEqual(next);
   });
 
+  it("diffs a renamed item in place instead of replacing the array", () => {
+    const next = toModelElement(
+      card({ data: { name: "X", fields: [{ name: "contactEmail", type: "string" }, { name: "b", type: "string" }] } }),
+    );
+    const ops = diffModelElement(base, next);
+    expect(ops).toEqual([{ op: "replace", path: "/data/fields/0/name", value: "contactEmail" }]);
+    expect(applyOps(base, ops)).toEqual(next);
+  });
+
+  it("replaces a fully reordered array with one op", () => {
+    const next = toModelElement(
+      card({ data: { name: "X", fields: [{ name: "b", type: "string" }, { name: "a", type: "string" }] } }),
+    );
+    const ops = diffModelElement(base, next);
+    expect(ops).toEqual([
+      { op: "replace", path: "/data/fields", value: [{ name: "b", type: "string" }, { name: "a", type: "string" }] },
+    ]);
+    expect(applyOps(base, ops)).toEqual(next);
+  });
+
   it("replaces a whole array when its shape changes", () => {
     const next = toModelElement(
       card({ data: { name: "X", fields: [{ name: "a", type: "string" }] } }),

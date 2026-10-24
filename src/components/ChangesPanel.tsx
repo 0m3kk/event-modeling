@@ -4,7 +4,14 @@ import { useTranslation } from "react-i18next";
 import { useCanvasStore } from "@/store";
 import { useChangeLog } from "@/store/recorder";
 import { toolRegistry } from "@/tools";
-import { buildChangeHistory, type HistoryItem, type HistoryEntry } from "@/utils/changeHistory";
+import {
+  buildChangeHistory,
+  type HistoryItem,
+  type HistoryEntry,
+  type MembershipTarget,
+} from "@/utils/changeHistory";
+import { describeFieldChange } from "@/utils/changeDisplay";
+import { getElementName } from "@/utils/naming";
 import type { ModelElement } from "@/types";
 
 function typeLabel(type: string): string {
@@ -12,30 +19,7 @@ function typeLabel(type: string): string {
 }
 
 function elementName(model: ModelElement): string {
-  const data = (model.data ?? {}) as Record<string, unknown>;
-  const name = data.name ?? data.text;
-  return typeof name === "string" && name.trim() ? name : typeLabel(model.type);
-}
-
-/** `/data/fields/0/type` → `fields[0].type`; membership paths stay as-is. */
-function formatPath(path: string): string {
-  const stripped = path.replace(/^\/data\/?/, "").replace(/^\//, "");
-  if (!stripped) return "";
-  return stripped.replace(/\/(\d+)/g, "[$1]").replace(/\//g, ".");
-}
-
-function formatValue(value: unknown, empty: string): string {
-  if (value === undefined || value === null) return empty;
-  if (typeof value === "string") return value.length > 80 ? `${value.slice(0, 80)}…` : value;
-  if (typeof value === "object") {
-    try {
-      const text = JSON.stringify(value);
-      return text.length > 80 ? `${text.slice(0, 80)}…` : text;
-    } catch {
-      return String(value);
-    }
-  }
-  return String(value);
+  return getElementName(model) ?? typeLabel(model.type);
 }
 
 function formatTime(at: string): string {
@@ -131,7 +115,7 @@ function ChangeSetRow({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
-  const { cs, items } = entry;
+  const { cs, items, targets } = entry;
   const counts = items.reduce(
     (acc, item) => {
       if (item.kind === "created") acc.created++;
@@ -178,9 +162,9 @@ function ChangeSetRow({
       </button>
 
       {expanded && (
-        <ul className="flex flex-col gap-1 border-t border-gray-200/80 px-3 py-2 dark:border-zinc-800">
+        <ul className="flex flex-col gap-1.5 border-t border-gray-200/80 px-3 py-2 dark:border-zinc-800">
           {items.map((item, index) => (
-            <HistoryItemRow key={`${cs.id}-${index}`} item={item} />
+            <HistoryItemRow key={`${cs.id}-${index}`} item={item} targets={targets} />
           ))}
         </ul>
       )}
@@ -188,8 +172,18 @@ function ChangeSetRow({
   );
 }
 
-function HistoryItemRow({ item }: { item: HistoryItem }) {
+function HistoryItemRow({
+  item,
+  targets,
+}: {
+  item: HistoryItem;
+  targets: Record<string, MembershipTarget>;
+}) {
   const { t } = useTranslation();
+  const itemId = item.kind === "cleared" ? null : item.id;
+  const exists = useCanvasStore((s) =>
+    itemId ? s.elements.some((element) => element.id === itemId) : false,
+  );
 
   if (item.kind === "cleared") {
     return (
@@ -208,40 +202,65 @@ function HistoryItemRow({ item }: { item: HistoryItem }) {
         ? "text-red-600 dark:text-red-400"
         : "text-amber-600 dark:text-amber-400";
 
-  const name =
-    item.kind === "updated" ? null : elementName(item.model);
+  const model = item.model;
+  const name = elementName(model);
+  const displayContext = { t, typeLabel, targets };
 
   return (
     <li className="text-[11px] text-gray-700 dark:text-zinc-300">
       <button
-        onClick={() => focusElement(item.id)}
-        title={t("changes.focus")}
-        className="flex w-full items-center gap-1.5 text-left cursor-pointer hover:underline"
+        onClick={() => itemId && focusElement(itemId)}
+        disabled={!exists}
+        title={exists ? t("changes.focus") : undefined}
+        className={`flex w-full items-center gap-1.5 text-left ${
+          exists ? "cursor-pointer hover:underline" : "cursor-default"
+        }`}
       >
         <Icon size={12} className={`shrink-0 ${iconColor}`} />
-        <span className="truncate font-medium">
-          {name ?? typeLabel(item.type)}
+        <span
+          className={`truncate font-medium ${
+            item.kind === "deleted" ? "text-gray-500 line-through dark:text-zinc-500" : ""
+          }`}
+        >
+          {name}
         </span>
         <span className="shrink-0 text-gray-400 dark:text-zinc-500">
           · {typeLabel(item.type)}
         </span>
-        <Crosshair size={11} className="ml-auto shrink-0 text-gray-300 dark:text-zinc-600" />
+        {exists && (
+          <Crosshair size={11} className="ml-auto shrink-0 text-gray-300 dark:text-zinc-600" />
+        )}
       </button>
 
       {item.kind === "updated" && (
-        <ul className="mt-0.5 flex flex-col gap-0.5 pl-5">
-          {item.fields.map((field, index) => (
-            <li key={index} className="flex flex-wrap items-baseline gap-1 font-mono">
-              <span className="text-gray-500 dark:text-zinc-400">{formatPath(field.path)}</span>
-              <span className="text-gray-400 line-through dark:text-zinc-600">
-                {formatValue(field.before, t("changes.nothing"))}
-              </span>
-              <span className="text-gray-400">→</span>
-              <span className="text-emerald-700 dark:text-emerald-400">
-                {formatValue(field.after, t("changes.nothing"))}
-              </span>
-            </li>
-          ))}
+        <ul className="mt-1 flex flex-col gap-0.5 pl-5">
+          {item.fields.map((field, index) => {
+            const change = describeFieldChange(field, item.before, item.model, displayContext);
+            return (
+              <li key={index} className="flex flex-wrap items-baseline gap-1">
+                <span className="text-gray-500 dark:text-zinc-400">{change.label}</span>
+                {change.kind === "added" ? (
+                  <span className="text-emerald-700 dark:text-emerald-400">
+                    {change.after ? `+ ${change.after}` : `+ ${t("changes.added")}`}
+                  </span>
+                ) : change.kind === "removed" ? (
+                  <span className="text-red-600 dark:text-red-400">
+                    {change.before ? `− ${change.before}` : `− ${t("changes.removed")}`}
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-gray-400 line-through dark:text-zinc-600">
+                      {change.before || t("changes.nothing")}
+                    </span>
+                    <span className="text-gray-400">→</span>
+                    <span className="text-emerald-700 dark:text-emerald-400">
+                      {change.after || t("changes.nothing")}
+                    </span>
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </li>
