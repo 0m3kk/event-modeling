@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use crate::error::CodegenError;
 use crate::naming;
-use crate::spec::{self, DataTypeDef, Field, FieldType, QueryItem, Specification};
+use crate::spec::{self, DataTypeDef, Field, FieldType, QueryItem, Specification, StateLikeDef};
 
 /// A spec loaded from disk, plus the warnings produced while normalising it.
 #[derive(Debug, Clone)]
@@ -34,7 +34,10 @@ pub struct Model {
     pub events: Vec<EventModel>,
     pub commands: Vec<CommandModel>,
     pub queries: Vec<QueryModel>,
+    /// In-memory decision models, loaded synchronously.
     pub states: Vec<StateModel>,
+    /// Persisted read models, loaded asynchronously.
+    pub views: Vec<StateModel>,
     pub services: Vec<ServiceModel>,
     pub actors: Vec<ActorModel>,
     pub constraints: Vec<ConstraintModel>,
@@ -388,36 +391,8 @@ pub fn build_model(mut spec: Specification) -> Model {
         });
     }
 
-    let mut states = Vec::new();
-    let mut state_keys = HashSet::new();
-    for state in spec.states.iter().chain(spec.views.iter()) {
-        let name = clean_name(&state.name);
-        if name.is_empty() {
-            warnings.push("skipping a state without a name".into());
-            continue;
-        }
-        if !state_keys.insert(naming::name_key(&name)) {
-            warnings.push(format!("duplicate state `{name}` ignored"));
-            continue;
-        }
-        states.push(StateModel {
-            description: clean_description(state.description.clone()),
-            params: normalise_fields(
-                &state.params,
-                &format!("state `{name}` params"),
-                &mut warnings,
-            ),
-            query: state.query.iter().map(normalise_query_item).collect(),
-            states: normalise_fields(
-                &state.states,
-                &format!("state `{name}` states"),
-                &mut warnings,
-            ),
-            name,
-            domain: None,
-            used_in_slices: Vec::new(),
-        });
-    }
+    let states = normalise_projections(&spec.states, "state", &mut warnings);
+    let views = normalise_projections(&spec.views, "view", &mut warnings);
 
     let services = normalise_services(&spec.services, &mut warnings);
     let actors = normalise_actors(&spec.actors);
@@ -433,6 +408,7 @@ pub fn build_model(mut spec: Specification) -> Model {
         commands,
         queries,
         states,
+        views,
         services,
         actors,
         constraints,
@@ -652,6 +628,39 @@ fn normalise_fields(fields: &[Field], owner: &str, warnings: &mut Vec<String>) -
             tag: clean_description(field.tag.clone()),
             description: clean_description(field.description.clone()),
             validation: field.validation.clone(),
+        });
+    }
+    out
+}
+
+/// Normalises state and view cards. They share a shape but stay in separate
+/// collections, because states are rehydrated synchronously from memory while
+/// views are read asynchronously from a database.
+fn normalise_projections(
+    defs: &[StateLikeDef],
+    kind: &str,
+    warnings: &mut Vec<String>,
+) -> Vec<StateModel> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    for def in defs {
+        let name = clean_name(&def.name);
+        if name.is_empty() {
+            warnings.push(format!("skipping a {kind} without a name"));
+            continue;
+        }
+        if !seen.insert(naming::name_key(&name)) {
+            warnings.push(format!("duplicate {kind} `{name}` ignored"));
+            continue;
+        }
+        out.push(StateModel {
+            description: clean_description(def.description.clone()),
+            params: normalise_fields(&def.params, &format!("{kind} `{name}` params"), warnings),
+            query: def.query.iter().map(normalise_query_item).collect(),
+            states: normalise_fields(&def.states, &format!("{kind} `{name}` states"), warnings),
+            name,
+            domain: None,
+            used_in_slices: Vec::new(),
         });
     }
     out
@@ -883,6 +892,7 @@ struct Registries {
     commands: BTreeMap<String, usize>,
     queries: BTreeMap<String, usize>,
     states: BTreeMap<String, usize>,
+    views: BTreeMap<String, usize>,
     services: BTreeMap<String, usize>,
     constraints: BTreeMap<String, usize>,
 }
@@ -902,6 +912,7 @@ impl Registries {
             commands: index(&model.commands, |command| &command.name),
             queries: index(&model.queries, |query| &query.name),
             states: index(&model.states, |state| &state.name),
+            views: index(&model.views, |view| &view.name),
             services: index(&model.services, |service| &service.name),
             constraints: index(&model.constraints, |constraint| &constraint.name),
         }
@@ -916,11 +927,13 @@ fn assign_domains(model: &mut Model, spec: &Specification) {
     let mut command_domains = vec![None; model.commands.len()];
     let mut query_domains = vec![None; model.queries.len()];
     let mut state_domains = vec![None; model.states.len()];
+    let mut view_domains = vec![None; model.views.len()];
 
     let mut event_slices = vec![Vec::new(); model.events.len()];
     let mut command_slices = vec![Vec::new(); model.commands.len()];
     let mut query_slices = vec![Vec::new(); model.queries.len()];
     let mut state_slices = vec![Vec::new(); model.states.len()];
+    let mut view_slices = vec![Vec::new(); model.views.len()];
     let mut service_slices = vec![Vec::new(); model.services.len()];
     let mut constraint_slices = vec![Vec::new(); model.constraints.len()];
 
@@ -991,6 +1004,7 @@ fn assign_domains(model: &mut Model, spec: &Specification) {
                 &mut command_domains,
                 &mut query_domains,
                 &mut state_domains,
+                &mut view_domains,
             );
         }
     }
@@ -1010,6 +1024,7 @@ fn assign_domains(model: &mut Model, spec: &Specification) {
                 &mut command_domains,
                 &mut query_domains,
                 &mut state_domains,
+                &mut view_domains,
             );
         }
     }
@@ -1044,9 +1059,13 @@ fn assign_domains(model: &mut Model, spec: &Specification) {
                         assign(&registries.queries, &mut query_domains, &key, &domain);
                         record(&registries.queries, &mut query_slices, &key, &slice_name);
                     }
-                    "state" | "view" => {
+                    "state" => {
                         assign(&registries.states, &mut state_domains, &key, &domain);
                         record(&registries.states, &mut state_slices, &key, &slice_name);
+                    }
+                    "view" => {
+                        assign(&registries.views, &mut view_domains, &key, &domain);
+                        record(&registries.views, &mut view_slices, &key, &slice_name);
                     }
                     "service" => {
                         record(&registries.services, &mut service_slices, &key, &slice_name);
@@ -1069,11 +1088,13 @@ fn assign_domains(model: &mut Model, spec: &Specification) {
                             &mut command_domains,
                             &mut query_domains,
                             &mut state_domains,
+                            &mut view_domains,
                         );
                         record(&registries.events, &mut event_slices, &key, &slice_name);
                         record(&registries.commands, &mut command_slices, &key, &slice_name);
                         record(&registries.queries, &mut query_slices, &key, &slice_name);
                         record(&registries.states, &mut state_slices, &key, &slice_name);
+                        record(&registries.views, &mut view_slices, &key, &slice_name);
                         record(&registries.services, &mut service_slices, &key, &slice_name);
                         record(
                             &registries.constraints,
@@ -1105,6 +1126,10 @@ fn assign_domains(model: &mut Model, spec: &Specification) {
     for (i, item) in model.states.iter_mut().enumerate() {
         item.domain = state_domains[i].clone();
         item.used_in_slices = std::mem::take(&mut state_slices[i]);
+    }
+    for (i, item) in model.views.iter_mut().enumerate() {
+        item.domain = view_domains[i].clone();
+        item.used_in_slices = std::mem::take(&mut view_slices[i]);
     }
     for (i, item) in model.services.iter_mut().enumerate() {
         item.used_in_slices = std::mem::take(&mut service_slices[i]);
@@ -1146,6 +1171,7 @@ fn assign_domains(model: &mut Model, spec: &Specification) {
         .chain(model.commands.iter().filter_map(|c| c.domain.as_deref()))
         .chain(model.queries.iter().filter_map(|q| q.domain.as_deref()))
         .chain(model.states.iter().filter_map(|s| s.domain.as_deref()))
+        .chain(model.views.iter().filter_map(|v| v.domain.as_deref()))
         .chain(model.slices.iter().filter_map(|s| s.domain.as_deref()));
     for domain in referenced {
         if !declared.iter().any(|d| d == domain) && seen.insert(domain.to_string()) {
@@ -1188,6 +1214,7 @@ fn assign_all(
     command_domains: &mut [Option<String>],
     query_domains: &mut [Option<String>],
     state_domains: &mut [Option<String>],
+    view_domains: &mut [Option<String>],
 ) {
     let key = naming::name_key(card);
     assign(&registries.types, type_domains, &key, domain);
@@ -1195,6 +1222,7 @@ fn assign_all(
     assign(&registries.commands, command_domains, &key, domain);
     assign(&registries.queries, query_domains, &key, domain);
     assign(&registries.states, state_domains, &key, domain);
+    assign(&registries.views, view_domains, &key, domain);
 }
 
 fn record(index: &BTreeMap<String, usize>, slices: &mut [Vec<String>], key: &str, slice: &str) {

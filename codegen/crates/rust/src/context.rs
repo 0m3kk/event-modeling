@@ -16,6 +16,7 @@
 //!       services.rs
 //!       states.rs
 //!       types.rs
+//!       views.rs
 //!   shared/                # only when items are not assigned to a domain
 //! ```
 //!
@@ -68,6 +69,7 @@ pub struct CountsCtx {
     pub commands: usize,
     pub queries: usize,
     pub states: usize,
+    pub views: usize,
     pub services: usize,
     pub actors: usize,
     pub tags: usize,
@@ -87,6 +89,7 @@ pub struct DomainCtx {
     pub commands: Vec<CommandCtx>,
     pub queries: Vec<QueryCtx>,
     pub states: Vec<StateCtx>,
+    pub views: Vec<StateCtx>,
     pub services: Vec<ServiceCtx>,
     pub command_regexes: Vec<RegexCtx>,
     pub query_regexes: Vec<RegexCtx>,
@@ -226,13 +229,25 @@ pub struct QueryCtx {
 pub struct StateCtx {
     pub name: String,
     pub rust_name: String,
-    pub params_name: String,
     pub description: Option<String>,
     pub doc_lines: Vec<String>,
     pub used_in_slices: Vec<String>,
+    /// Param fields, stored on the projection struct itself.
     pub params: Vec<FieldCtx>,
     pub states: Vec<FieldCtx>,
     pub query: Vec<QuerySourceCtx>,
+    /// One handler method per event type the projection reads.
+    pub event_handlers: Vec<EventHandlerCtx>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EventHandlerCtx {
+    /// Method name, e.g. `on_account_registered`.
+    pub method: String,
+    /// Serialized event type, e.g. `account_registered`.
+    pub event_type: String,
+    /// Fully-qualified Rust path of the event struct.
+    pub event_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -362,7 +377,24 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
             .filter(|state| state.domain.as_deref() == Some(domain.name.as_str()))
             .map(|state| {
                 build_state(
+                    "state",
                     state,
+                    &defs,
+                    item_scope,
+                    &resolver,
+                    &mut deps,
+                    &mut warnings,
+                )
+            })
+            .collect();
+        let views: Vec<StateCtx> = model
+            .views
+            .iter()
+            .filter(|view| view.domain.as_deref() == Some(domain.name.as_str()))
+            .map(|view| {
+                build_state(
+                    "view",
+                    view,
                     &defs,
                     item_scope,
                     &resolver,
@@ -387,7 +419,9 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
         );
 
         let (module, module_ident) = module_names(&domain.name);
-        let pub_uses = build_pub_uses(&types, &events, &commands, &queries, &states, &services);
+        let pub_uses = build_pub_uses(
+            &types, &events, &commands, &queries, &states, &views, &services,
+        );
 
         domains.push(DomainCtx {
             name: domain.name.clone(),
@@ -398,6 +432,7 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
             commands,
             queries,
             states,
+            views,
             services,
             command_regexes: command_regexes.entries,
             query_regexes: query_regexes.entries,
@@ -432,6 +467,11 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
         .iter()
         .filter(|state| state.domain.is_none())
         .collect();
+    let shared_views: Vec<&StateModel> = model
+        .views
+        .iter()
+        .filter(|view| view.domain.is_none())
+        .collect();
     let shared_services: Vec<&ServiceModel> = model
         .services
         .iter()
@@ -443,6 +483,7 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
         || !shared_commands.is_empty()
         || !shared_queries.is_empty()
         || !shared_states.is_empty()
+        || !shared_views.is_empty()
         || !shared_services.is_empty();
 
     let shared = if has_shared {
@@ -503,7 +544,22 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
             .iter()
             .map(|state| {
                 build_state(
+                    "state",
                     state,
+                    &defs,
+                    item_scope,
+                    &resolver,
+                    &mut deps,
+                    &mut warnings,
+                )
+            })
+            .collect();
+        let views: Vec<StateCtx> = shared_views
+            .iter()
+            .map(|view| {
+                build_state(
+                    "view",
+                    view,
                     &defs,
                     item_scope,
                     &resolver,
@@ -521,7 +577,9 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
             &mut deps,
             &mut warnings,
         );
-        let pub_uses = build_pub_uses(&types, &events, &commands, &queries, &states, &services);
+        let pub_uses = build_pub_uses(
+            &types, &events, &commands, &queries, &states, &views, &services,
+        );
 
         Some(DomainCtx {
             name: "shared".into(),
@@ -532,6 +590,7 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
             commands,
             queries,
             states,
+            views,
             services,
             command_regexes: command_regexes.entries,
             query_regexes: query_regexes.entries,
@@ -569,6 +628,7 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
             commands: model.commands.len(),
             queries: model.queries.len(),
             states: model.states.len(),
+            views: model.views.len(),
             services: model.services.len(),
             actors: actors.len(),
             tags: model.tags.len(),
@@ -592,6 +652,7 @@ fn build_pub_uses(
     commands: &[CommandCtx],
     queries: &[QueryCtx],
     states: &[StateCtx],
+    views: &[StateCtx],
     services: &[ServiceCtx],
 ) -> Vec<PubUseCtx> {
     let mut out = Vec::new();
@@ -621,7 +682,9 @@ fn build_pub_uses(
     }
     for state in states {
         push("states", &state.rust_name);
-        push("states", &state.params_name);
+    }
+    for view in views {
+        push("views", &view.rust_name);
     }
     for service in services {
         push("services", &service.trait_name);
@@ -938,6 +1001,7 @@ fn build_query(
 }
 
 fn build_state(
+    kind: &str,
     state: &StateModel,
     defs: &BTreeMap<String, &TypeModel>,
     scope: Scope<'_>,
@@ -945,28 +1009,76 @@ fn build_state(
     deps: &mut Dependencies,
     warnings: &mut Vec<String>,
 ) -> StateCtx {
-    let owner = format!("state `{}`", state.name);
+    let owner = format!("{kind} `{}`", state.name);
     let rust_name = type_ident(&state.name);
     let docs = doc_lines(state.description.as_deref());
+    let event_handlers = build_event_handlers(kind, state, resolver, warnings);
+    let params: Vec<FieldCtx> = state
+        .params
+        .iter()
+        .map(|field| build_field(field, &owner, defs, scope, resolver, deps, None, warnings))
+        .collect();
+    let mut field_names: HashSet<String> =
+        params.iter().map(|field| field.rust_name.clone()).collect();
+    let fields = state
+        .states
+        .iter()
+        .filter_map(|field| {
+            let built = build_field(field, &owner, defs, scope, resolver, deps, None, warnings);
+            if field_names.insert(built.rust_name.clone()) {
+                Some(built)
+            } else {
+                warnings.push(format!(
+                    "{kind} `{}`: field `{}` repeats a param and is skipped",
+                    state.name, built.name
+                ));
+                None
+            }
+        })
+        .collect();
     StateCtx {
         name: state.name.clone(),
-        params_name: format!("{rust_name}Params"),
         rust_name,
         description: state.description.clone(),
         doc_lines: docs,
         used_in_slices: state.used_in_slices.clone(),
-        params: state
-            .params
-            .iter()
-            .map(|field| build_field(field, &owner, defs, scope, resolver, deps, None, warnings))
-            .collect(),
-        states: state
-            .states
-            .iter()
-            .map(|field| build_field(field, &owner, defs, scope, resolver, deps, None, warnings))
-            .collect(),
+        params,
+        states: fields,
         query: state.query.iter().map(build_query_source).collect(),
+        event_handlers,
     }
+}
+
+/// Resolves the event types named by a projection's query into one reducer
+/// method per event. Types that do not name a known event are reported and
+/// skipped so a partially filled card still generates.
+fn build_event_handlers(
+    kind: &str,
+    state: &StateModel,
+    resolver: &TypeResolver,
+    warnings: &mut Vec<String>,
+) -> Vec<EventHandlerCtx> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    for source in &state.query {
+        for event in &source.types {
+            if !seen.insert(naming::name_key(event)) {
+                continue;
+            }
+            match resolver.event_path(event) {
+                Some(event_path) => out.push(EventHandlerCtx {
+                    method: format!("on_{}", naming::snake_case(event)),
+                    event_type: naming::snake_case(event),
+                    event_path,
+                }),
+                None => warnings.push(format!(
+                    "{kind} `{}`: event type `{event}` not found; skipping its `on_` handler",
+                    state.name
+                )),
+            }
+        }
+    }
+    out
 }
 
 fn build_query_source(source: &QuerySourceModel) -> QuerySourceCtx {
@@ -1122,6 +1234,8 @@ enum TypeLocation {
 
 struct TypeResolver {
     locations: BTreeMap<String, TypeLocation>,
+    /// Event name key -> fully-qualified event struct path.
+    events: BTreeMap<String, String>,
 }
 
 impl TypeResolver {
@@ -1150,7 +1264,30 @@ impl TypeResolver {
             locations.insert(naming::name_key(ty.name()), location);
         }
 
-        Self { locations }
+        let mut events = BTreeMap::new();
+        for event in &model.events {
+            let path = match event
+                .domain
+                .as_deref()
+                .and_then(|domain| domain_modules.get(&naming::name_key(domain)))
+            {
+                Some(module) => {
+                    format!(
+                        "crate::domains::{module}::events::{}",
+                        type_ident(&event.name)
+                    )
+                }
+                None => format!("crate::shared::events::{}", type_ident(&event.name)),
+            };
+            events.insert(naming::name_key(&event.name), path);
+        }
+
+        Self { locations, events }
+    }
+
+    /// Fully-qualified path of an event struct, if the spec declares it.
+    fn event_path(&self, name: &str) -> Option<String> {
+        self.events.get(&naming::name_key(name)).cloned()
     }
 
     fn type_path(&self, name: &str, scope: Scope<'_>) -> String {

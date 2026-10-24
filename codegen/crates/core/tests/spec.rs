@@ -59,14 +59,14 @@ fn assigns_cards_to_domains_from_groups_and_slices() {
     let model = &loaded.model;
 
     let email = model.find_type("email").expect("email type");
-    assert_eq!(email.domain(), Some("identity"));
+    assert_eq!(email.domain(), Some("account"));
 
     let registration = model
         .events
         .iter()
         .find(|event| event.name == "accountRegistered")
         .expect("accountRegistered event");
-    assert_eq!(registration.domain.as_deref(), Some("identity"));
+    assert_eq!(registration.domain.as_deref(), Some("account"));
     assert!(
         registration
             .used_in_slices
@@ -111,7 +111,7 @@ fn assigns_service_methods_to_the_first_slice_domain() {
 
     assert_eq!(
         service("sendActivationEmail").domain.as_deref(),
-        Some("identity")
+        Some("account")
     );
     assert_eq!(
         service("sendPasswordResetEmail").domain.as_deref(),
@@ -165,6 +165,56 @@ events:
         }
         other => panic!("expected object, got {other:?}"),
     }
+}
+
+#[test]
+fn keeps_states_and_views_separate() {
+    let source = r#"
+name: Projections
+domains:
+  - name: orders
+slices:
+  - name: listOrders
+    domain: orders
+    lanes:
+      - type: State
+        cards: [orderRegistry]
+      - type: View
+        cards: [orderList]
+states:
+  - name: orderRegistry
+    params:
+      - name: orderId
+        type: string
+        required: true
+    states:
+      - name: status
+        type: string
+    query:
+      - types: [orderPlaced]
+views:
+  - name: orderList
+    params:
+      - name: orderId
+        type: string
+        required: true
+    states:
+      - name: count
+        type: integer
+    query:
+      - types: [orderPlaced]
+"#;
+    let loaded = parse_spec(source, "projections.spec.yaml").expect("spec parses");
+    let model = &loaded.model;
+
+    assert_eq!(model.states.len(), 1);
+    assert_eq!(model.views.len(), 1);
+    assert_eq!(model.states[0].name, "orderRegistry");
+    assert_eq!(model.views[0].name, "orderList");
+    assert_eq!(model.states[0].domain.as_deref(), Some("orders"));
+    assert_eq!(model.views[0].domain.as_deref(), Some("orders"));
+    assert_eq!(model.views[0].params.len(), 1);
+    assert_eq!(model.views[0].states.len(), 1);
 }
 
 #[test]

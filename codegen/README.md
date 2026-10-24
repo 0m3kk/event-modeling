@@ -66,7 +66,8 @@ customise one file without copying the whole tree.
 ## Generated Rust layout
 
 The crate is split by **domain**. Each domain owns its types, events, commands,
-queries, states and services. The generated crate uses **Rust edition 2024**:
+queries, states, views and services. The generated crate uses **Rust edition
+2024**:
 
 ```text
 <package>/
@@ -87,6 +88,7 @@ queries, states and services. The generated crate uses **Rust edition 2024**:
         services.rs
         states.rs
         types.rs
+        views.rs         # only when the spec declares views
       totp/
         ...
     shared/              # only when the spec has unassigned items
@@ -97,25 +99,38 @@ queries, states and services. The generated crate uses **Rust edition 2024**:
       services.rs
       states.rs
       types.rs
+      views.rs         # only when the spec declares views
 ```
 
 Slices and constraints are **not** emitted as Rust modules. They are still
-parsed and used internally to assign commands/events/queries/services to
-domains.
+parsed and used internally to assign types, events, commands, queries, states,
+views and services to domains.
+
+Every generated file starts with a do-not-edit header. The comment syntax
+follows the file type (`//` for Rust, `#` for TOML and dotfiles, `<!-- -->` for
+Markdown).
 
 What is generated:
 
 - **Types** — objects become structs, enums become Rust enums with a spec-name
-  `as_str()`, aliases become serde-transparent newtypes. `date` maps to
-  `chrono::NaiveDate`, `time` to `chrono::NaiveTime`, `datetime` to
-  `chrono::DateTime<Utc>`, and `uuid` (or `format: uuid`) to `uuid::Uuid`.
+  `as_str()`, aliases become serde-transparent newtypes. All generated types
+  derive `Default` (enums default to their first variant) so projection
+  factories can initialise unset fields. `date` maps to `chrono::NaiveDate`,
+  `time` to `chrono::NaiveTime`, `datetime` to `chrono::DateTime<Utc>`, and
+  `uuid` (or `format: uuid`) to `uuid::Uuid`.
 - **Events** — one struct per event implementing `DomainEvent`. There is no
   central event enum.
 - **Commands / Queries** — an input/params struct plus a response struct. Each
   input/params struct implements the `Action` trait so its permission string is
   available without knowing the concrete type.
-- **States** — a projected state struct plus a params struct; the query sources
-  and tags are recorded in the doc comments.
+- **States / Views** — one struct per projection, holding both its params and
+  its projected fields. Each struct gets a `new(params...)` factory that
+  initialises the projected fields with `Default::default()`. A reducer trait
+  carries one `on_*` handler per event type an in-memory state reads, while a
+  `Store` trait carries the asynchronous handlers for a view stored in a
+  database. States are rebuilt on every rehydration; views are persisted. A
+  domain only gets a `views.rs` module when it actually owns View cards. The
+  query sources and tags are recorded in the doc comments.
 - **Services** — one trait per `serviceName`, with `Params`/`Returns` structs,
   generated inside the domain whose slices call the service. Methods return
   `impl Future<Output = ...> + Send`, so implementations can use `async fn`
@@ -249,7 +264,7 @@ Rust templates receive one of two contexts:
   (`uses_json`, `uses_chrono`, `uses_uuid`, `uses_regex`).
 - `DomainCtx` for each `domains/<domain>/` file: `name`, `module`,
   `module_ident`, and the `types`, `events`, `commands`, `queries`, `states`,
-  `services` and `pub_uses` owned by that domain.
+  `views`, `services` and `pub_uses` owned by that domain.
 
 Built-in filters: `pascal`, `camel`, `snake`, `kebab`, `shouty_snake` and
 `str_lit` (a quoted, escaped Rust/TOML string literal).
@@ -278,6 +293,7 @@ fn generators() -> Vec<Box<dyn Generator>> {
 ## Current scope
 
 This generator produces the **typed skeleton** of the domain: DTOs, the event
-contract, service traits and metadata. It deliberately does not generate command
-handlers, state reducers or persistence code yet. `serde` derives are included
-so the output can be used directly with an event store.
+contract, service traits, projection structs with their reducer/store handler
+traits and metadata. It deliberately does not generate command handlers or
+event-store persistence. `serde` derives are included so the output can be used
+directly with an event store.

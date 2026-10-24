@@ -5,7 +5,7 @@
 /// {{ line }}
 {%- endfor %}
 {%- if ty.kind == "object" %}
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct {{ ty.rust_name }} {
 {%- for field in ty.fields %}
 {%- for line in field.doc_lines %}
@@ -18,13 +18,16 @@ pub struct {{ ty.rust_name }} {
 {%- endfor %}
 }
 {%- elif ty.kind == "enum" %}
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy{% if ty.variants %}, Default{% endif %}, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum {{ ty.rust_name }} {
 {%- for variant in ty.variants %}
 {%- for line in variant.doc_lines %}
     /// {{ line }}
 {%- endfor %}
+{%- if loop.first %}
+    #[default]
+{%- endif %}
     {{ variant.rust_name }},
 {%- endfor %}
 }
@@ -46,7 +49,7 @@ impl std::fmt::Display for {{ ty.rust_name }} {
     }
 }
 {%- elif ty.kind == "alias" %}
-#[derive(Debug, Clone, PartialEq{% if ty.alias.eq_hash %}, Eq, Hash{% endif %}, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq{% if ty.alias.eq_hash %}, Eq, Hash{% endif %}, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct {{ ty.rust_name }}(pub {{ ty.alias.inner_rust }});
 

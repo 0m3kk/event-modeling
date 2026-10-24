@@ -1,0 +1,78 @@
+//! Persisted read-model views of the `{{ module }}` domain.
+//!
+//! A view is generated as one struct that holds both the params used to load it
+//! and the projected fields, plus an asynchronous `Store` trait with one `on_*`
+//! handler per event type the view reads. Views live in a database, so their
+//! handlers return a future.
+
+{% for view in views %}
+{%- for line in view.doc_lines %}
+/// {{ line }}
+{%- endfor %}
+{%- for source in view.query %}
+{%- for line in source.doc_lines %}
+/// {{ line }}
+{%- endfor %}
+{%- endfor %}
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct {{ view.rust_name }} {
+{%- for field in view.params %}
+{%- for line in field.doc_lines %}
+    /// {{ line }}
+{%- endfor %}
+{%- if not field.required %}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+{%- endif %}
+    pub {{ field.rust_name }}: {{ field.rtype }},
+{%- endfor %}
+{%- for field in view.states %}
+{%- for line in field.doc_lines %}
+    /// {{ line }}
+{%- endfor %}
+{%- if not field.required %}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+{%- endif %}
+    pub {{ field.rust_name }}: {{ field.rtype }},
+{%- endfor %}
+}
+
+impl {{ view.rust_name }} {
+    /// Creates an empty view with its params filled in.
+    pub fn new({% for field in view.params %}{{ field.rust_name }}: {{ field.rtype }}{% if not loop.last %}, {% endif %}{% endfor %}) -> Self {
+        Self {
+{%- for field in view.params %}
+            {{ field.rust_name }},
+{%- endfor %}
+{%- for field in view.states %}
+            {{ field.rust_name }}: Default::default(),
+{%- endfor %}
+        }
+    }
+}
+{%- if view.event_handlers %}
+
+/// Database-backed event handlers for [`{{ view.rust_name }}`].
+///
+/// Every method applies one event to the persisted view and may write the
+/// result back. The event types that feed this view are recorded on
+/// [`{{ view.rust_name }}`].
+///
+/// The methods return `impl Future + Send` instead of using `async fn`, so the
+/// crate does not need an `async-trait` dependency. Implement them with
+/// `async fn`.
+pub trait {{ view.rust_name }}Store {
+    /// Error type chosen by the implementation.
+    type Error;
+{%- for handler in view.event_handlers %}
+
+    /// Applies a `{{ handler.event_type }}` event to the view.
+    fn {{ handler.method }}(
+        &self,
+        view: &mut {{ view.rust_name }},
+        event: &{{ handler.event_path }},
+    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
+{%- endfor %}
+}
+{%- endif %}
+
+{% endfor %}

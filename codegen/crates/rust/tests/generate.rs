@@ -47,13 +47,13 @@ fn generates_one_folder_per_domain() {
     let output = generate_sample(None);
 
     for path in [
-        "src/domains/identity/commands.rs",
-        "src/domains/identity/events.rs",
-        "src/domains/identity/queries.rs",
-        "src/domains/identity/services.rs",
-        "src/domains/identity/states.rs",
-        "src/domains/identity/types.rs",
-        "src/domains/identity/mod.rs",
+        "src/domains/account/commands.rs",
+        "src/domains/account/events.rs",
+        "src/domains/account/queries.rs",
+        "src/domains/account/services.rs",
+        "src/domains/account/states.rs",
+        "src/domains/account/types.rs",
+        "src/domains/account/mod.rs",
         "src/domains/session/commands.rs",
         "src/domains/two_factor/types.rs",
         "src/actors.rs",
@@ -84,27 +84,32 @@ fn generates_one_folder_per_domain() {
         assert!(find(&output, path).is_none(), "unexpected {path}");
     }
 
-    let identity_commands = find(&output, "src/domains/identity/commands.rs").unwrap();
-    assert!(identity_commands.contains("pub struct RegisterAccount {"));
-    assert!(identity_commands.contains("pub email: crate::domains::identity::types::Email"));
-    assert!(identity_commands.contains("custom(function = \"validate_email\")"));
-    assert!(identity_commands.contains("fn validate_email("));
-    assert!(identity_commands.contains("#[validate(length("));
-
-    let identity_events = find(&output, "src/domains/identity/events.rs").unwrap();
-    assert!(identity_events.contains("pub struct AccountRegistered {"));
     assert!(
-        identity_events.contains("impl crate::domain_event::DomainEvent for AccountRegistered")
+        find(&output, "src/domains/account/views.rs").is_none(),
+        "the sample has no View cards, so views.rs is not generated"
     );
-    assert!(identity_events.contains("fn event_type() -> &'static str"));
-    assert!(identity_events.contains("\"account_registered\""));
-    assert!(identity_events.contains("crate::domain_event::tag_value"));
-    assert!(!identity_events.contains("#[serde(rename ="));
+    let account_mod = find(&output, "src/domains/account/mod.rs").unwrap();
+    assert!(!account_mod.contains("pub mod views;"));
 
-    let identity_types = find(&output, "src/domains/identity/types.rs").unwrap();
-    assert!(identity_types.contains("#[serde(rename_all = \"snake_case\")]"));
-    assert!(identity_types.contains("Self::Pending => \"pending\""));
-    assert!(!identity_types.contains("validator"));
+    let account_commands = find(&output, "src/domains/account/commands.rs").unwrap();
+    assert!(account_commands.contains("pub struct RegisterAccount {"));
+    assert!(account_commands.contains("pub email: crate::domains::account::types::Email"));
+    assert!(account_commands.contains("custom(function = \"validate_email\")"));
+    assert!(account_commands.contains("fn validate_email("));
+    assert!(account_commands.contains("#[validate(length("));
+
+    let account_events = find(&output, "src/domains/account/events.rs").unwrap();
+    assert!(account_events.contains("pub struct AccountRegistered {"));
+    assert!(account_events.contains("impl crate::domain_event::DomainEvent for AccountRegistered"));
+    assert!(account_events.contains("fn event_type() -> &'static str"));
+    assert!(account_events.contains("\"account_registered\""));
+    assert!(account_events.contains("crate::domain_event::tag_value"));
+    assert!(!account_events.contains("#[serde(rename ="));
+
+    let account_types = find(&output, "src/domains/account/types.rs").unwrap();
+    assert!(account_types.contains("#[serde(rename_all = \"snake_case\")]"));
+    assert!(account_types.contains("Self::Pending => \"pending\""));
+    assert!(!account_types.contains("validator"));
 
     let totp_commands = find(&output, "src/domains/totp/commands.rs").unwrap();
     assert!(totp_commands.contains("TOTP_CODE_PATTERN"));
@@ -117,17 +122,17 @@ fn generates_one_folder_per_domain() {
 
     let actors = find(&output, "src/actors.rs").unwrap();
     assert!(actors.contains("\"account_owner\""));
-    assert!(actors.contains("\"identity:send_activation_email\""));
+    assert!(actors.contains("\"account:send_activation_email\""));
 
-    let identity_services = find(&output, "src/domains/identity/services.rs").unwrap();
-    assert!(identity_services.contains("pub trait AccountNotification"));
-    assert!(identity_services.contains("impl std::future::Future"));
-    assert!(identity_services.contains("+ Send;"));
+    let account_services = find(&output, "src/domains/account/services.rs").unwrap();
+    assert!(account_services.contains("pub trait AccountNotification"));
+    assert!(account_services.contains("impl std::future::Future"));
+    assert!(account_services.contains("+ Send;"));
 
     let password_services = find(&output, "src/domains/password/services.rs").unwrap();
     assert!(password_services.contains("pub trait PasswordNotification"));
     assert!(
-        password_services.contains("crate::domains::identity::types::Email"),
+        password_services.contains("crate::domains::account::types::Email"),
         "cross-domain type is fully qualified"
     );
     assert!(
@@ -172,10 +177,10 @@ fn validation_is_limited_to_commands_and_queries() {
     }
 
     for path in [
-        "src/domains/identity/types.rs",
-        "src/domains/identity/events.rs",
-        "src/domains/identity/states.rs",
-        "src/domains/identity/services.rs",
+        "src/domains/account/types.rs",
+        "src/domains/account/events.rs",
+        "src/domains/account/states.rs",
+        "src/domains/account/services.rs",
     ] {
         let source = find(&output, path).unwrap();
         assert!(!source.contains("validator"), "{path} has validation");
@@ -295,10 +300,9 @@ fn template_overrides_win_and_fall_back_to_embedded_defaults() {
 
     let output = generate_sample(Some(directory.clone()));
 
-    assert_eq!(
-        find(&output, "src/actors.rs").map(str::trim),
-        Some("// custom actors template")
-    );
+    let actors = find(&output, "src/actors.rs").expect("actors");
+    assert!(actors.contains("// custom actors template"));
+    assert!(actors.starts_with("// Generated by `em-codegen`"));
     let lib = find(&output, "src/lib.rs").expect("embedded lib template still renders");
     assert!(lib.contains("Rust crate generated"));
 
@@ -306,13 +310,41 @@ fn template_overrides_win_and_fall_back_to_embedded_defaults() {
 }
 
 #[test]
+fn every_generated_file_is_marked_as_generated() {
+    let output = generate_sample(None);
+
+    for file in &output.files {
+        let path = file.path.to_string_lossy();
+        let prefix = if path.ends_with(".rs") {
+            "// Generated by `em-codegen`"
+        } else if path.ends_with(".md") {
+            "<!-- Generated by `em-codegen`"
+        } else {
+            "# Generated by `em-codegen`"
+        };
+
+        assert!(
+            file.contents.starts_with(prefix),
+            "{} is missing the generated header",
+            file.path.display()
+        );
+        assert!(
+            file.contents
+                .contains("Do not edit this file by hand; regenerate it instead."),
+            "{} is missing the do-not-edit note",
+            file.path.display()
+        );
+    }
+}
+
+#[test]
 fn commands_and_queries_expose_their_action() {
     let output = generate_sample(None);
 
-    let commands = find(&output, "src/domains/identity/commands.rs").unwrap();
+    let commands = find(&output, "src/domains/account/commands.rs").unwrap();
     assert!(commands.contains("impl crate::action::Action for RegisterAccount {"));
-    assert!(commands.contains("\"identity:register_account\""));
-    assert!(commands.contains("/// Action: `identity:register_account`."));
+    assert!(commands.contains("\"account:register_account\""));
+    assert!(commands.contains("/// Action: `account:register_account`."));
 
     let queries = find(&output, "src/domains/totp/queries.rs").unwrap();
     assert!(queries.contains("impl crate::action::Action for GetTotpStatusParams {"));
@@ -338,6 +370,153 @@ commands:
     let commands = find(&output, "src/shared/commands.rs").unwrap();
     assert!(commands.contains("pub struct Ping {"));
     assert!(!commands.contains("impl crate::action::Action"));
+}
+
+#[test]
+fn generates_states_and_views_with_separate_handler_traits() {
+    let source = r#"
+name: Projections
+domains:
+  - name: orders
+types:
+  - alias: OrderId
+    of: string
+events:
+  - name: orderPlaced
+    fields:
+      - name: orderId
+        type: string
+        required: true
+        tag: order
+commands:
+  - name: placeOrder
+    inputs:
+      - name: orderId
+        type: string
+        required: true
+slices:
+  - name: placeOrder
+    domain: orders
+    lanes:
+      - type: Command
+        cards: [placeOrder]
+      - type: Event
+        cards: [orderPlaced]
+      - type: State
+        cards: [orderRegistry]
+      - type: View
+        cards: [orderList]
+states:
+  - name: orderRegistry
+    params:
+      - name: orderId
+        type: string
+        required: true
+    query:
+      - types: [orderPlaced]
+    states:
+      - name: status
+        type: string
+        required: true
+views:
+  - name: orderList
+    params:
+      - name: orderId
+        type: string
+        required: true
+    query:
+      - types: [orderPlaced]
+    states:
+      - name: count
+        type: integer
+"#;
+    let output = generate_source(source);
+
+    let states = find(&output, "src/domains/orders/states.rs").expect("states.rs");
+    assert!(!states.contains("OrderRegistryParams"));
+    assert!(states.contains("pub struct OrderRegistry {"));
+    assert!(states.contains("pub order_id: String,"));
+    assert!(states.contains("pub fn new(order_id: String) -> Self"));
+    assert!(states.contains("status: Default::default(),"));
+    assert!(states.contains("pub trait OrderRegistryReducer {"));
+    assert!(!states.contains("Store"));
+    assert!(!states.contains("fn rehydrate("));
+    assert!(states.contains("fn on_order_placed("));
+    assert!(states.contains("event: &crate::domains::orders::events::OrderPlaced"));
+    assert!(!states.contains("std::future::Future"));
+
+    let views = find(&output, "src/domains/orders/views.rs").expect("views.rs");
+    assert!(!views.contains("OrderListParams"));
+    assert!(views.contains("pub struct OrderList {"));
+    assert!(views.contains("pub fn new(order_id: String) -> Self"));
+    assert!(views.contains("pub trait OrderListStore {"));
+    assert!(!views.contains("fn rehydrate("));
+    assert!(views.contains("fn on_order_placed("));
+    assert!(
+        views.contains(
+            "    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;"
+        ),
+        "view handlers are asynchronous"
+    );
+
+    let domain_mod = find(&output, "src/domains/orders/mod.rs").expect("domain mod");
+    assert!(domain_mod.contains("pub mod states;"));
+    assert!(domain_mod.contains("pub mod views;"));
+
+    let lib = find(&output, "src/lib.rs").expect("lib");
+    assert!(lib.contains("1 states, 1 views and"));
+    assert!(lib.contains("0 service methods"));
+}
+
+#[test]
+fn separate_states_and_views_can_share_a_name() {
+    let source = r#"
+name: SameName
+domains:
+  - name: orders
+slices:
+  - name: listOrders
+    domain: orders
+    lanes:
+      - type: State
+        cards: [orders]
+      - type: View
+        cards: [orders]
+states:
+  - name: orders
+    params:
+      - name: accountId
+        type: string
+        required: true
+    states:
+      - name: count
+        type: integer
+views:
+  - name: orders
+    params:
+      - name: accountId
+        type: string
+        required: true
+    states:
+      - name: count
+        type: integer
+"#;
+    let output = generate_source(source);
+
+    let states = find(&output, "src/domains/orders/states.rs").expect("states.rs");
+    assert!(states.contains("pub struct Orders {"));
+    assert!(!states.contains("pub struct OrdersParams"));
+
+    let views = find(&output, "src/domains/orders/views.rs").expect("views.rs");
+    assert!(views.contains("pub struct Orders {"));
+    assert!(!views.contains("pub struct OrdersParams"));
+
+    let domain_mod = find(&output, "src/domains/orders/mod.rs").expect("domain mod");
+    assert_eq!(
+        domain_mod.matches("Orders;").count(),
+        1,
+        "the duplicate name is re-exported once: {domain_mod}"
+    );
 }
 
 #[test]

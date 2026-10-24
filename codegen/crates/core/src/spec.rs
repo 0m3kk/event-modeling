@@ -26,7 +26,8 @@ pub struct Specification {
     pub commands: Vec<CommandDef>,
     #[serde(default)]
     pub queries: Vec<QueryDef>,
-    /// Deprecated read models; merged into [`Specification::states`].
+    /// Persisted read models (`View` cards). Kept separate from states because
+    /// they are rehydrated asynchronously from a database.
     #[serde(default)]
     pub views: Vec<StateLikeDef>,
     #[serde(default)]

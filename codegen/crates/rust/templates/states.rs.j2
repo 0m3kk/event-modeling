@@ -1,8 +1,10 @@
-//! Read-model / decision states of the `{{ module }}` domain.
+//! In-memory decision states of the `{{ module }}` domain.
 //!
-//! A state is generated as the projected state struct plus the parameters used
-//! to load it. The event types and tags that feed the projection are recorded
-//! in the doc comments.
+//! A state is generated as one struct that holds both the params used to load
+//! it and the projected fields, plus a synchronous `Reducer` trait with one
+//! `on_*` handler per event type the projection reads. States are rebuilt from
+//! events on every rehydration, so the handlers are synchronous and hold no
+//! state of their own.
 
 {% for state in states %}
 {%- for line in state.doc_lines %}
@@ -14,7 +16,7 @@
 {%- endfor %}
 {%- endfor %}
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct {{ state.params_name }} {
+pub struct {{ state.rust_name }} {
 {%- for field in state.params %}
 {%- for line in field.doc_lines %}
     /// {{ line }}
@@ -24,11 +26,6 @@ pub struct {{ state.params_name }} {
 {%- endif %}
     pub {{ field.rust_name }}: {{ field.rtype }},
 {%- endfor %}
-}
-
-/// Projected state of [`{{ state.params_name }}`].
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct {{ state.rust_name }} {
 {%- for field in state.states %}
 {%- for line in field.doc_lines %}
     /// {{ line }}
@@ -39,5 +36,40 @@ pub struct {{ state.rust_name }} {
     pub {{ field.rust_name }}: {{ field.rtype }},
 {%- endfor %}
 }
+
+impl {{ state.rust_name }} {
+    /// Creates an empty projection with its params filled in.
+    pub fn new({% for field in state.params %}{{ field.rust_name }}: {{ field.rtype }}{% if not loop.last %}, {% endif %}{% endfor %}) -> Self {
+        Self {
+{%- for field in state.params %}
+            {{ field.rust_name }},
+{%- endfor %}
+{%- for field in state.states %}
+            {{ field.rust_name }}: Default::default(),
+{%- endfor %}
+        }
+    }
+}
+{%- if state.event_handlers %}
+
+/// Synchronous reducer for [`{{ state.rust_name }}`].
+///
+/// Every method folds one event into the state. The state is rebuilt on every
+/// rehydration, so the reducer itself is stateless. The event types that feed
+/// this state are recorded on [`{{ state.rust_name }}`].
+pub trait {{ state.rust_name }}Reducer {
+    /// Error type chosen by the implementation.
+    type Error;
+{%- for handler in state.event_handlers %}
+
+    /// Folds a `{{ handler.event_type }}` event into the state.
+    fn {{ handler.method }}(
+        &self,
+        state: &mut {{ state.rust_name }},
+        event: &{{ handler.event_path }},
+    ) -> Result<(), Self::Error>;
+{%- endfor %}
+}
+{%- endif %}
 
 {% endfor %}
