@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "proxy": "node server/proxy.mjs",
+    "proxy": "node server/proxy.mjs --https",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && pnpm --filter @em/spec typecheck"

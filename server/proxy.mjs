@@ -14,6 +14,11 @@
  *
  *     https://opencode.ai/zen/go/v1   ->   http://localhost:8787
  *
+ * Run it with `--https` (or `HTTPS=true`) when the app itself is served over
+ * HTTPS, otherwise the browser blocks the request as mixed content:
+ *
+ *     https://opencode.ai/zen/go/v1   ->   https://localhost:8787
+ *
  * Every request path is forwarded verbatim to the upstream, so any
  * OpenAI-compatible API works (OpenCode Go, OpenAI, OpenRouter, Groq, a local
  * llama.cpp/Ollama server, ...). The API key in the Authorization header and
@@ -32,20 +37,42 @@
  *   CORS_ORIGIN    Access-Control-Allow-Origin. Default *.
  *   MAX_BODY_BYTES Max request body size. Default 10 MiB.
  *   QUIET          "true" to silence request logs.
+ *   HTTPS          "true" to serve over TLS. Also enabled by the --https flag.
+ *   TLS_CERT       Path to a PEM certificate (or the PEM itself).
+ *   TLS_KEY        Path to the PEM private key (or the PEM itself).
+ *                  If both are omitted in HTTPS mode, a self-signed certificate
+ *                  is generated once into server/.certs using openssl.
+ *   TLS_PASSPHRASE Passphrase for an encrypted private key.
  *
  * Usage:
  *   node server/proxy.mjs
+ *   node server/proxy.mjs --https
  *   UPSTREAM=https://api.openai.com/v1 PORT=9000 node server/proxy.mjs
+ *   TLS_CERT=/path/cert.pem TLS_KEY=/path/key.pem node server/proxy.mjs --https
  */
 import http from "node:http";
+import https from "node:https";
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 
+const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
+const CERT_DIR = path.join(SERVER_DIR, ".certs");
+
+const args = new Set(process.argv.slice(2));
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "0.0.0.0";
 const UPSTREAM = (process.env.UPSTREAM || "https://opencode.ai/zen/go/v1").replace(/\/+$/, "");
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 const MAX_BODY = Number(process.env.MAX_BODY_BYTES || 10 * 1024 * 1024);
 const QUIET = process.env.QUIET === "true";
+const USE_HTTPS =
+  args.has("--https") || args.has("--tls") || /^(1|true|yes|on)$/i.test(process.env.HTTPS || "");
+const TLS_CERT = process.env.TLS_CERT || "";
+const TLS_KEY = process.env.TLS_KEY || "";
+const TLS_PASSPHRASE = process.env.TLS_PASSPHRASE || undefined;
 
 // Validate the upstream once at startup so a typo fails fast.
 const upstreamUrl = new URL(UPSTREAM);
@@ -68,6 +95,96 @@ const HOP_BY_HOP = new Set([
   "origin",
   "referer",
 ]);
+
+/** Accepts either inline PEM contents or a path to a PEM file. */
+function readPem(value, label) {
+  if (value.includes("-----BEGIN")) return value;
+  const file = path.resolve(value);
+  try {
+    return fs.readFileSync(file);
+  } catch (err) {
+    throw new Error(`${label} is not readable at ${file}: ${err?.message || err}`);
+  }
+}
+
+/**
+ * Creates a self-signed localhost certificate once and reuses it afterwards.
+ * Uses the system openssl so the proxy stays dependency-free.
+ */
+function selfSignedCertificate() {
+  const certPath = path.join(CERT_DIR, "localhost.crt");
+  const keyPath = path.join(CERT_DIR, "localhost.key");
+
+  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+    return {
+      cert: fs.readFileSync(certPath),
+      key: fs.readFileSync(keyPath),
+      note: `self-signed certificate (${path.relative(process.cwd(), certPath)})`,
+    };
+  }
+
+  fs.mkdirSync(CERT_DIR, { recursive: true });
+  try {
+    execFileSync(
+      "openssl",
+      [
+        "req",
+        "-x509",
+        "-newkey",
+        "rsa:2048",
+        "-sha256",
+        "-nodes",
+        "-days",
+        "365",
+        "-keyout",
+        keyPath,
+        "-out",
+        certPath,
+        "-subj",
+        "/CN=localhost",
+        "-addext",
+        "subjectAltName=DNS:localhost,IP:127.0.0.1",
+      ],
+      { stdio: "pipe" },
+    );
+  } catch (err) {
+    fs.rmSync(CERT_DIR, { recursive: true, force: true });
+    const detail = err?.stderr ? String(err.stderr).trim() : String(err?.message || err);
+    throw new Error(
+      "Could not generate a self-signed certificate with openssl. " +
+        "Install openssl, or point TLS_CERT and TLS_KEY at your own PEM files.\n" +
+        detail,
+    );
+  }
+
+  return {
+    cert: fs.readFileSync(certPath),
+    key: fs.readFileSync(keyPath),
+    note: `generated self-signed certificate (${path.relative(process.cwd(), certPath)})`,
+  };
+}
+
+let tlsOptions = null;
+let tlsNote = "";
+if (USE_HTTPS) {
+  if (TLS_CERT || TLS_KEY) {
+    if (!TLS_CERT || !TLS_KEY) {
+      throw new Error(
+        "Both TLS_CERT and TLS_KEY are required (or omit both to generate a self-signed certificate).",
+      );
+    }
+    tlsOptions = { cert: readPem(TLS_CERT, "TLS_CERT"), key: readPem(TLS_KEY, "TLS_KEY") };
+    if (TLS_PASSPHRASE) tlsOptions.passphrase = TLS_PASSPHRASE;
+    tlsNote = "certificate from TLS_CERT / TLS_KEY";
+  } else {
+    const generated = selfSignedCertificate();
+    tlsOptions = { cert: generated.cert, key: generated.key };
+    tlsNote = generated.note;
+  }
+}
+
+const SCHEME = tlsOptions ? "https" : "http";
+const ORIGIN = `${SCHEME}://localhost:${PORT}`;
 
 function log(...args) {
   if (!QUIET) console.log(...args);
@@ -169,11 +286,16 @@ async function handleProxy(req, res, url) {
   Readable.fromWeb(upstreamRes.body).pipe(res);
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+async function handleRequest(req, res) {
+  const url = new URL(req.url || "/", `${SCHEME}://${req.headers.host || "localhost"}`);
 
   if (req.method === "OPTIONS") {
-    res.writeHead(204, corsHeaders());
+    const headers = corsHeaders();
+    // Chrome's Private Network Access preflight (public HTTPS page -> localhost).
+    if (req.headers["access-control-request-private-network"] === "true") {
+      headers["Access-Control-Allow-Private-Network"] = "true";
+    }
+    res.writeHead(204, headers);
     res.end();
     return;
   }
@@ -189,16 +311,24 @@ const server = http.createServer(async (req, res) => {
       ok: true,
       service: "ai-cors-proxy",
       upstream: UPSTREAM,
-      usage: `Set the AI panel "Base URL" to http://localhost:${PORT}`,
+      usage: `Set the AI panel "Base URL" to ${ORIGIN}`,
     });
     return;
   }
 
   await handleProxy(req, res, url);
-});
+}
+
+const server = tlsOptions
+  ? https.createServer(tlsOptions, handleRequest)
+  : http.createServer(handleRequest);
 
 server.listen(PORT, HOST, () => {
-  log(`AI proxy listening on http://localhost:${PORT}`);
+  log(`AI proxy listening on ${ORIGIN}`);
+  if (tlsNote) log(`  TLS: ${tlsNote}`);
   log(`  upstream: ${UPSTREAM}`);
-  log(`  AI panel "Base URL" -> http://localhost:${PORT}`);
+  log(`  AI panel "Base URL" -> ${ORIGIN}`);
+  if (tlsOptions && !TLS_CERT) {
+    log(`  self-signed cert: open ${ORIGIN} once and accept the browser warning`);
+  }
 });
