@@ -2,6 +2,12 @@
 
 A Rust library crate generated from the `{{ spec_name }}` event-modeling
 specification by `em-codegen` {{ generator_version }}.
+{%- if domain %}
+
+This crate was generated for the `{{ domain }}` domain only. Types and events it
+needs from other domains are emitted under `shared`, so the crate is
+self-contained.
+{%- endif %}
 
 ## Contents
 
@@ -43,7 +49,9 @@ Outside the domains:
 - `action` — the `Action` trait implemented by every command input and query
   params struct, returning the permission that `Actor` checks.
 - `domain_event` — the `DomainEvent` trait implemented by every event.
-- `shared` — items that were not assigned to a domain, when there are any.
+- `shared` — items that were not assigned to a domain, plus (for a
+  single-domain crate) the items pulled in from other domains, when there are
+  any.
 
 Service methods return `impl Future<Output = ...> + Send`; implement them with
 `async fn`. The traits are not object-safe.

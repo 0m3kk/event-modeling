@@ -543,3 +543,195 @@ commands:
     let lib = find(&output, "src/lib.rs").unwrap();
     assert!(lib.contains("pub mod shared;"));
 }
+
+fn generate_with_domain(source: &str, domain: &str) -> GeneratedOutput {
+    let loaded = em_codegen_core::model::parse_spec(source, "test.spec.yaml").expect("spec parses");
+    let options = GenerateOptions {
+        domain: Some(domain.to_string()),
+        ..GenerateOptions::default()
+    };
+    RustGenerator
+        .generate(&loaded.model, &options)
+        .expect("generation succeeds")
+}
+
+#[test]
+fn generates_only_the_requested_domain() {
+    let loaded = em_codegen_core::model::load_spec(sample_path()).expect("sample parses");
+    let options = GenerateOptions {
+        domain: Some("account".into()),
+        ..GenerateOptions::default()
+    };
+    let output = RustGenerator
+        .generate(&loaded.model, &options)
+        .expect("generation succeeds");
+
+    assert_eq!(output.package_name, "authentication_account");
+    for path in [
+        "src/domains/account/commands.rs",
+        "src/domains/account/events.rs",
+        "src/domains/account/queries.rs",
+        "src/domains/account/services.rs",
+        "src/domains/account/states.rs",
+        "src/domains/account/types.rs",
+        "src/domains/account/mod.rs",
+    ] {
+        assert!(find(&output, path).is_some(), "missing {path}");
+    }
+    for path in [
+        "src/domains/totp/types.rs",
+        "src/domains/recovery_codes/types.rs",
+        "src/domains/passkey/types.rs",
+        "src/domains/two_factor/types.rs",
+        "src/domains/password/types.rs",
+        "src/domains/session/types.rs",
+    ] {
+        assert!(find(&output, path).is_none(), "unexpected {path}");
+    }
+
+    let domain_mod = find(&output, "src/domains/mod.rs").unwrap();
+    assert!(domain_mod.contains("pub mod account;"));
+    assert!(!domain_mod.contains("pub mod totp;"));
+
+    let lib = find(&output, "src/lib.rs").unwrap();
+    assert!(lib.contains("contains the `account` domain only"));
+    assert!(lib.contains("The crate contains 1 domain module,"));
+}
+
+#[test]
+fn a_filtered_crate_pulls_cross_domain_dependencies_into_shared() {
+    let source = r#"
+name: Warehouse
+domains:
+  - name: orders
+    groups: [orderTypes, orderStates]
+    slices: [placeOrder]
+  - name: inventory
+    groups: [inventoryTypes]
+types:
+  - alias: OrderId
+    of: string
+  - alias: Sku
+    of: string
+  - object: OrderLine
+    fields:
+      - name: sku
+        type: Sku
+        required: true
+  - object: InventoryLevel
+    fields:
+      - name: sku
+        type: Sku
+        required: true
+      - name: quantity
+        type: integer
+        required: true
+events:
+  - name: orderPlaced
+    fields:
+      - name: orderId
+        type: OrderId
+        required: true
+      - name: lines
+        type: OrderLine
+        array: true
+        required: true
+  - name: inventoryAdjusted
+    fields:
+      - name: sku
+        type: Sku
+        required: true
+states:
+  - name: orderRegistry
+    params:
+      - name: orderId
+        type: OrderId
+        required: true
+    query:
+      - types: [orderPlaced, inventoryAdjusted]
+    states:
+      - name: lastSku
+        type: Sku
+        required: false
+commands:
+  - name: placeOrder
+    inputs:
+      - name: orderId
+        type: OrderId
+        required: true
+slices:
+  - name: placeOrder
+    domain: orders
+    lanes:
+      - type: Command
+        cards: [placeOrder]
+      - type: Event
+        cards: [orderPlaced]
+      - type: State
+        cards: [orderRegistry]
+groups:
+  - name: orderTypes
+    domain: orders
+    cards: [OrderId, OrderLine]
+  - name: orderStates
+    domain: orders
+    cards: [orderRegistry]
+  - name: inventoryTypes
+    domain: inventory
+    cards: [Sku, InventoryLevel]
+"#;
+    let output = generate_with_domain(source, "orders");
+
+    assert_eq!(output.package_name, "warehouse_orders");
+    assert!(find(&output, "src/domains/orders/mod.rs").is_some());
+    assert!(
+        find(&output, "src/domains/inventory/mod.rs").is_none(),
+        "other domains are not generated"
+    );
+
+    let states = find(&output, "src/domains/orders/states.rs").unwrap();
+    assert!(states.contains("pub last_sku: Option<crate::shared::types::Sku>"));
+    assert!(states.contains("event: &crate::shared::events::InventoryAdjusted"));
+
+    let shared_types = find(&output, "src/shared/types.rs").expect("shared types");
+    assert!(shared_types.contains("pub struct Sku(pub String)"));
+
+    let shared_events = find(&output, "src/shared/events.rs").expect("shared events");
+    assert!(shared_events.contains("pub struct InventoryAdjusted {"));
+
+    let lib = find(&output, "src/lib.rs").unwrap();
+    assert!(lib.contains("pub mod shared;"));
+}
+
+#[test]
+fn a_filtered_crate_can_override_its_name() {
+    let loaded = em_codegen_core::model::load_spec(sample_path()).expect("sample parses");
+    let options = GenerateOptions {
+        crate_name: Some("billing".into()),
+        domain: Some("account".into()),
+        ..GenerateOptions::default()
+    };
+    let output = RustGenerator
+        .generate(&loaded.model, &options)
+        .expect("generation succeeds");
+
+    assert_eq!(output.package_name, "billing");
+}
+
+#[test]
+fn unknown_domains_are_rejected() {
+    let loaded = em_codegen_core::model::load_spec(sample_path()).expect("sample parses");
+    let options = GenerateOptions {
+        domain: Some("missing".into()),
+        ..GenerateOptions::default()
+    };
+    let error = RustGenerator
+        .generate(&loaded.model, &options)
+        .expect_err("unknown domains fail");
+
+    assert!(matches!(
+        error,
+        em_codegen_core::CodegenError::UnknownDomain { .. }
+    ));
+    assert!(error.to_string().contains("available: account"));
+}

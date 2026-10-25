@@ -26,7 +26,7 @@ impl Generator for RustGenerator {
         model: &Model,
         options: &GenerateOptions,
     ) -> Result<GeneratedOutput, CodegenError> {
-        let (ctx, warnings) = context::build(model, options);
+        let (ctx, warnings) = context::build(model, options)?;
         validate_names(&ctx)?;
 
         let templates = TemplateSet::new(TEMPLATES, options.templates.as_deref())?;

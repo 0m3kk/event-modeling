@@ -28,10 +28,10 @@ use std::collections::{BTreeMap, HashSet};
 
 use em_codegen_core::generator::GenerateOptions;
 use em_codegen_core::model::{
-    ActorModel, AliasModel, CommandModel, EnumModel, EventModel, FieldModel, Model, ObjectModel,
-    QueryModel, QuerySourceModel, ServiceModel, StateModel, TypeModel,
+    ActorModel, AliasModel, CommandModel, DomainModel, EnumModel, EventModel, FieldModel, Model,
+    ObjectModel, QueryModel, QuerySourceModel, ServiceModel, StateModel, TypeModel,
 };
-use em_codegen_core::{naming, spec};
+use em_codegen_core::{CodegenError, naming, spec};
 use serde::Serialize;
 
 const RUST_KEYWORDS: &[&str] = &[
@@ -50,6 +50,8 @@ pub struct CrateCtx {
     pub version: String,
     pub package_description: String,
     pub generator_version: String,
+    /// Name of the domain this crate was generated for, when `--domain` is used.
+    pub domain: Option<String>,
     pub domains: Vec<DomainCtx>,
     pub shared: Option<DomainCtx>,
     pub has_shared: bool,
@@ -294,11 +296,222 @@ pub struct ActorCtx {
     pub permissions: Vec<String>,
 }
 
+/// Resolves the `--domain` selector against the domains in the spec.
+fn select_domain<'a>(
+    model: &'a Model,
+    requested: Option<&str>,
+) -> Result<Option<&'a DomainModel>, CodegenError> {
+    let Some(requested) = requested else {
+        return Ok(None);
+    };
+    let key = naming::name_key(requested);
+    model
+        .domains
+        .iter()
+        .find(|domain| naming::name_key(&domain.name) == key || domain.module == key)
+        .map(Some)
+        .ok_or_else(|| {
+            let available = if model.domains.is_empty() {
+                "none".to_string()
+            } else {
+                model
+                    .domains
+                    .iter()
+                    .map(|domain| domain.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            CodegenError::UnknownDomain {
+                domain: requested.to_string(),
+                available,
+            }
+        })
+}
+
+/// Items owned by other domains that a filtered crate still needs.
+#[derive(Debug, Default)]
+struct ExternalItems {
+    /// Type name key -> declared name.
+    types: BTreeMap<String, String>,
+    /// Event name key -> declared name.
+    events: BTreeMap<String, String>,
+}
+
+impl ExternalItems {
+    fn is_empty(&self) -> bool {
+        self.types.is_empty() && self.events.is_empty()
+    }
+
+    fn contains_type(&self, name: &str) -> bool {
+        self.types.contains_key(&naming::name_key(name))
+    }
+
+    fn contains_event(&self, name: &str) -> bool {
+        self.events.contains_key(&naming::name_key(name))
+    }
+}
+
+/// Collects the types and events owned by *other* domains that the generated
+/// items (the selected domain and unassigned shared items) reference, directly
+/// or transitively. They are emitted in `shared` so a single-domain crate does
+/// not depend on modules that were not generated.
+fn collect_external_items(model: &Model, selected: &str) -> ExternalItems {
+    let type_index: BTreeMap<String, &TypeModel> = model
+        .types
+        .iter()
+        .map(|ty| (naming::name_key(ty.name()), ty))
+        .collect();
+    let event_index: BTreeMap<String, &EventModel> = model
+        .events
+        .iter()
+        .map(|event| (naming::name_key(&event.name), event))
+        .collect();
+
+    // The selected domain and unassigned items are always generated.
+    let is_local = |domain: Option<&str>| match domain {
+        Some(domain) => naming::name_key(domain) == selected,
+        None => true,
+    };
+
+    fn push_fields(fields: &[FieldModel], pending: &mut Vec<String>) {
+        pending.extend(fields.iter().map(|field| field.ty.clone()));
+    }
+
+    fn push_type(ty: &TypeModel, pending: &mut Vec<String>) {
+        match ty {
+            TypeModel::Object(object) => push_fields(&object.fields, pending),
+            TypeModel::Alias(alias) => pending.push(alias.of.clone()),
+            TypeModel::Enum(_) => {}
+        }
+    }
+
+    fn push_state(
+        state: &StateModel,
+        pending_types: &mut Vec<String>,
+        pending_events: &mut Vec<String>,
+    ) {
+        push_fields(&state.params, pending_types);
+        push_fields(&state.states, pending_types);
+        for source in &state.query {
+            pending_events.extend(source.types.iter().cloned());
+        }
+    }
+
+    let mut pending_types = Vec::new();
+    let mut pending_events = Vec::new();
+
+    for ty in &model.types {
+        if is_local(ty.domain()) {
+            push_type(ty, &mut pending_types);
+        }
+    }
+    for event in &model.events {
+        if is_local(event.domain.as_deref()) {
+            push_fields(&event.fields, &mut pending_types);
+        }
+    }
+    for command in &model.commands {
+        if is_local(command.domain.as_deref()) {
+            push_fields(&command.inputs, &mut pending_types);
+            push_fields(&command.responses, &mut pending_types);
+        }
+    }
+    for query in &model.queries {
+        if is_local(query.domain.as_deref()) {
+            push_fields(&query.params, &mut pending_types);
+            push_fields(&query.responses, &mut pending_types);
+        }
+    }
+    for state in model.states.iter().chain(model.views.iter()) {
+        if is_local(state.domain.as_deref()) {
+            push_state(state, &mut pending_types, &mut pending_events);
+        }
+    }
+    for service in &model.services {
+        if is_local(service.domain.as_deref()) {
+            push_fields(&service.params, &mut pending_types);
+            push_fields(&service.returns, &mut pending_types);
+        }
+    }
+
+    let mut external = ExternalItems::default();
+    let mut seen_types = HashSet::new();
+    let mut seen_events = HashSet::new();
+    let mut type_cursor = 0;
+    let mut event_cursor = 0;
+
+    loop {
+        let mut progressed = false;
+
+        while event_cursor < pending_events.len() {
+            progressed = true;
+            let name = pending_events[event_cursor].clone();
+            event_cursor += 1;
+            let key = naming::name_key(&name);
+            if !seen_events.insert(key.clone()) {
+                continue;
+            }
+            let Some(event) = event_index.get(&key).copied() else {
+                continue;
+            };
+            if is_local(event.domain.as_deref()) {
+                continue;
+            }
+            external.events.insert(key, event.name.clone());
+            push_fields(&event.fields, &mut pending_types);
+        }
+
+        while type_cursor < pending_types.len() {
+            progressed = true;
+            let name = pending_types[type_cursor].clone();
+            type_cursor += 1;
+            let key = naming::name_key(&name);
+            if !seen_types.insert(key.clone()) {
+                continue;
+            }
+            let Some(ty) = type_index.get(&key).copied() else {
+                continue;
+            };
+            if is_local(ty.domain()) {
+                continue;
+            }
+            external.types.insert(key, ty.name().to_string());
+            push_type(ty, &mut pending_types);
+        }
+
+        if !progressed {
+            break;
+        }
+    }
+
+    external
+}
+
 /// Builds the context and returns any non-fatal warnings discovered on the way.
-pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>) {
+pub fn build(
+    model: &Model,
+    options: &GenerateOptions,
+) -> Result<(CrateCtx, Vec<String>), CodegenError> {
     let mut warnings = Vec::new();
     let mut deps = Dependencies::default();
-    let resolver = TypeResolver::new(model);
+
+    let selected = select_domain(model, options.domain.as_deref())?;
+    let selected_key = selected.map(|domain| naming::name_key(&domain.name));
+    let external = match selected_key.as_deref() {
+        Some(selected_key) => collect_external_items(model, selected_key),
+        None => ExternalItems::default(),
+    };
+    if !external.is_empty() {
+        let domain = selected
+            .expect("external items can only exist for a selected domain")
+            .name
+            .clone();
+        warnings.push(format!(
+            "domain `{domain}` references items owned by other domains; they are generated in the `shared` module"
+        ));
+    }
+
+    let resolver = TypeResolver::new(model, selected_key.as_deref());
 
     let defs: BTreeMap<String, &TypeModel> = model
         .types
@@ -307,7 +520,11 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
         .collect();
 
     let mut domains = Vec::new();
-    for domain in &model.domains {
+    let visible_domains: Vec<&DomainModel> = match selected {
+        Some(domain) => vec![domain],
+        None => model.domains.iter().collect(),
+    };
+    for domain in visible_domains {
         let scope_key = naming::name_key(&domain.name);
         let type_scope = Scope::Domain(&scope_key);
         let item_scope = Scope::Qualified;
@@ -442,15 +659,18 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
         });
     }
 
+    // Unassigned items are shared by every domain. With `--domain`, also pull
+    // in the types and events from other domains that the generated items use,
+    // so the crate compiles on its own.
     let shared_types: Vec<&TypeModel> = model
         .types
         .iter()
-        .filter(|ty| ty.domain().is_none())
+        .filter(|ty| ty.domain().is_none() || external.contains_type(ty.name()))
         .collect();
     let shared_events: Vec<&EventModel> = model
         .events
         .iter()
-        .filter(|event| event.domain.is_none())
+        .filter(|event| event.domain.is_none() || external.contains_event(&event.name))
         .collect();
     let shared_commands: Vec<&CommandModel> = model
         .commands
@@ -609,11 +829,44 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
 
     let actors = build_actors(model);
 
-    let package_name = package_name(model, options);
-    let description = format!(
-        "Generated Rust crate for the `{}` event-modeling specification.",
-        model.name
-    );
+    let package_name = package_name(model, options, selected);
+    let description = match selected {
+        Some(domain) => format!(
+            "Generated Rust crate for the `{}` domain of the `{}` event-modeling specification.",
+            domain.name, model.name
+        ),
+        None => format!(
+            "Generated Rust crate for the `{}` event-modeling specification.",
+            model.name
+        ),
+    };
+
+    let generated = || domains.iter().chain(shared.iter());
+    let tags = if selected.is_some() {
+        let included_events: HashSet<String> = generated()
+            .flat_map(|domain| domain.events.iter())
+            .map(|event| naming::name_key(&event.name))
+            .collect();
+        let included_types: HashSet<String> = generated()
+            .flat_map(|domain| domain.types.iter())
+            .map(|ty| naming::name_key(&ty.name))
+            .collect();
+        model
+            .tags
+            .iter()
+            .filter(|tag| {
+                tag.from_events
+                    .iter()
+                    .any(|event| included_events.contains(&naming::name_key(event)))
+                    || tag
+                        .types
+                        .iter()
+                        .any(|ty| included_types.contains(&naming::name_key(ty)))
+            })
+            .count()
+    } else {
+        model.tags.len()
+    };
 
     let context = CrateCtx {
         spec_name: model.name.clone(),
@@ -621,17 +874,18 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
         version: options.version.clone(),
         package_description: description,
         generator_version: env!("CARGO_PKG_VERSION").to_string(),
+        domain: selected.map(|domain| domain.name.clone()),
         counts: CountsCtx {
             domains: domains.len(),
-            types: model.types.len(),
-            events: model.events.len(),
-            commands: model.commands.len(),
-            queries: model.queries.len(),
-            states: model.states.len(),
-            views: model.views.len(),
-            services: model.services.len(),
+            types: generated().map(|domain| domain.types.len()).sum(),
+            events: generated().map(|domain| domain.events.len()).sum(),
+            commands: generated().map(|domain| domain.commands.len()).sum(),
+            queries: generated().map(|domain| domain.queries.len()).sum(),
+            states: generated().map(|domain| domain.states.len()).sum(),
+            views: generated().map(|domain| domain.views.len()).sum(),
+            services: generated().map(|domain| domain.services.len()).sum(),
             actors: actors.len(),
-            tags: model.tags.len(),
+            tags,
         },
         domains,
         shared,
@@ -643,7 +897,7 @@ pub fn build(model: &Model, options: &GenerateOptions) -> (CrateCtx, Vec<String>
         uses_regex,
     };
 
-    (context, warnings)
+    Ok((context, warnings))
 }
 
 fn build_pub_uses(
@@ -1239,12 +1493,16 @@ struct TypeResolver {
 }
 
 impl TypeResolver {
-    fn new(model: &Model) -> Self {
+    /// `visible_domain` is the domain a filtered crate is generated for. Types
+    /// and events owned by other domains are then resolved to `crate::shared`,
+    /// where the generator puts the items the filtered domain depends on.
+    fn new(model: &Model, visible_domain: Option<&str>) -> Self {
         let domain_modules: BTreeMap<String, String> = model
             .domains
             .iter()
             .map(|domain| (naming::name_key(&domain.name), module_names(&domain.name).1))
             .collect();
+        let is_external = |key: &str| visible_domain.is_some_and(|visible| visible != key);
 
         let mut locations = BTreeMap::new();
         for ty in &model.types {
@@ -1252,11 +1510,11 @@ impl TypeResolver {
                 Some(domain) => {
                     let key = naming::name_key(domain);
                     match domain_modules.get(&key) {
-                        Some(module) => TypeLocation::Domain {
+                        Some(module) if !is_external(&key) => TypeLocation::Domain {
                             key,
                             module: module.clone(),
                         },
-                        None => TypeLocation::Shared,
+                        _ => TypeLocation::Shared,
                     }
                 }
                 None => TypeLocation::Shared,
@@ -1266,16 +1524,16 @@ impl TypeResolver {
 
         let mut events = BTreeMap::new();
         for event in &model.events {
-            let path = match event
-                .domain
-                .as_deref()
-                .and_then(|domain| domain_modules.get(&naming::name_key(domain)))
-            {
-                Some(module) => {
-                    format!(
-                        "crate::domains::{module}::events::{}",
-                        type_ident(&event.name)
-                    )
+            let path = match event.domain.as_deref() {
+                Some(domain) => {
+                    let key = naming::name_key(domain);
+                    match domain_modules.get(&key) {
+                        Some(module) if !is_external(&key) => format!(
+                            "crate::domains::{module}::events::{}",
+                            type_ident(&event.name)
+                        ),
+                        _ => format!("crate::shared::events::{}", type_ident(&event.name)),
+                    }
                 }
                 None => format!("crate::shared::events::{}", type_ident(&event.name)),
             };
@@ -1861,9 +2119,13 @@ fn module_names(name: &str) -> (String, String) {
     (base, ident)
 }
 
-fn package_name(model: &Model, options: &GenerateOptions) -> String {
-    let raw = options.crate_name.as_deref().unwrap_or(model.name.as_str());
-    let mut name = naming::snake_case(raw);
+fn package_name(model: &Model, options: &GenerateOptions, domain: Option<&DomainModel>) -> String {
+    let raw = match (options.crate_name.as_deref(), domain) {
+        (Some(name), _) => name.to_string(),
+        (None, Some(domain)) => format!("{}_{}", model.name, domain.name),
+        (None, None) => model.name.clone(),
+    };
+    let mut name = naming::snake_case(&raw);
     if name.is_empty() {
         name = "generated_spec".into();
     }

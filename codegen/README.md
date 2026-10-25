@@ -36,7 +36,8 @@ cargo build
 
 ```text
 em-codegen generate <SPEC> [--lang rust] [--out DIR] [--name NAME]
-                           [--templates DIR] [--force] [--dry-run]
+                           [--domain NAME] [--templates DIR] [--force]
+                           [--dry-run]
 em-codegen templates [--lang rust] --out DIR [--force]
 em-codegen languages
 ```
@@ -46,6 +47,7 @@ em-codegen languages
 | `--lang` | Target language. Defaults to `rust`. |
 | `--out` | Output directory. Defaults to `generated/<package-name>`. |
 | `--name` | Override the generated package/crate name. |
+| `--domain` | Generate only this domain (plus the items it depends on). |
 | `--templates` | Directory with template overrides (same layout as the defaults). |
 | `--force` | Allow writing into a non-empty output directory. |
 | `--dry-run` | List the files that would be written, without writing them. |
@@ -62,6 +64,26 @@ cargo run -p em-codegen -- generate samples/authentication.spec.yaml \
 Override files replace the embedded template with the same relative name. Any
 template you don't override keeps using the embedded default, so you can
 customise one file without copying the whole tree.
+
+## Generating a single domain
+
+Pass `--domain` to generate a crate for one domain instead of the whole spec:
+
+```sh
+cargo run -p em-codegen -- generate samples/authentication.spec.yaml \
+  --domain password --out generated/authentication_password
+```
+
+The crate contains only `src/domains/password`; `domains/mod.rs` lists only that
+domain. Types and events that the domain needs from other domains are emitted
+under `src/shared` and referenced as `crate::shared::...`, so the crate still
+compiles on its own. The generator prints a warning when it pulls such items
+in. Unassigned spec items keep going to `shared` as usual.
+
+Without `--name`, the package is named `<spec>_<domain>` (for example
+`authentication_password`), and the default output directory follows it:
+`generated/authentication_password`. Actors and the event contract are still
+generated at the crate root.
 
 ## Generated Rust layout
 
@@ -105,6 +127,11 @@ queries, states, views and services. The generated crate uses **Rust edition
 Slices and constraints are **not** emitted as Rust modules. They are still
 parsed and used internally to assign types, events, commands, queries, states,
 views and services to domains.
+
+With `--domain`, only the selected `domains/<domain>/` tree is emitted. Types
+and events owned by other domains that the selected domain references are
+written to `shared/` and referenced as `crate::shared::...`, so the crate stays
+self-contained.
 
 Every generated file starts with a do-not-edit header. The comment syntax
 follows the file type (`//` for Rust, `#` for TOML and dotfiles, `<!-- -->` for
@@ -259,9 +286,9 @@ are dropped with a warning rather than failing the run.
 
 Rust templates receive one of two contexts:
 
-- `CrateCtx` for root files: spec metadata, counts, `domains`, `shared`,
-  `has_shared`, `actors` and dependency flags
-  (`uses_json`, `uses_chrono`, `uses_uuid`, `uses_regex`).
+- `CrateCtx` for root files: spec metadata, counts, `domain` (the `--domain`
+  selector, when used), `domains`, `shared`, `has_shared`, `actors` and
+  dependency flags (`uses_json`, `uses_chrono`, `uses_uuid`, `uses_regex`).
 - `DomainCtx` for each `domains/<domain>/` file: `name`, `module`,
   `module_ident`, and the `types`, `events`, `commands`, `queries`, `states`,
   `views`, `services` and `pub_uses` owned by that domain.

@@ -2,6 +2,7 @@
 //!
 //! ```text
 //! em-codegen generate samples/authentication.spec.yaml --out generated/authentication
+//! em-codegen generate samples/authentication.spec.yaml --domain account
 //! em-codegen templates --out my-templates
 //! em-codegen generate samples/authentication.spec.yaml --templates my-templates
 //! ```
@@ -46,6 +47,10 @@ enum Commands {
         #[arg(long)]
         name: Option<String>,
 
+        /// Generate only this domain (plus the items it depends on).
+        #[arg(long, short = 'd', value_name = "NAME")]
+        domain: Option<String>,
+
         /// Directory containing template overrides (same layout as the defaults).
         #[arg(long, value_name = "DIR")]
         templates: Option<PathBuf>,
@@ -86,10 +91,19 @@ fn main() -> Result<()> {
             lang,
             out,
             name,
+            domain,
             templates,
             force,
             dry_run,
-        } => generate(&spec, &lang, out, name, templates, force, dry_run),
+        } => {
+            let options = GenerateOptions {
+                crate_name: name,
+                domain,
+                templates,
+                ..GenerateOptions::default()
+            };
+            generate(&spec, &lang, out, options, force, dry_run)
+        }
         Commands::Templates { lang, out, force } => dump_templates(&lang, &out, force),
         Commands::Languages => {
             for generator in generators() {
@@ -127,8 +141,7 @@ fn generate(
     spec_path: &Path,
     language: &str,
     out: Option<PathBuf>,
-    name: Option<String>,
-    templates: Option<PathBuf>,
+    options: GenerateOptions,
     force: bool,
     dry_run: bool,
 ) -> Result<()> {
@@ -136,11 +149,6 @@ fn generate(
     let loaded = load_spec(spec_path)?;
     print_warnings(loaded.warnings());
 
-    let options = GenerateOptions {
-        crate_name: name,
-        templates,
-        ..GenerateOptions::default()
-    };
     let output = generator.generate(&loaded.model, &options)?;
     print_warnings(&output.warnings);
 

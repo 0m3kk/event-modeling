@@ -1,6 +1,12 @@
 //! Rust crate generated from the `{{ spec_name }}` event-modeling specification.
+{%- if domain %}
 //!
-//! The specification declares {{ counts.domains }} domains,
+//! This crate contains the `{{ domain }}` domain only. Types and events it needs
+//! from other domains are generated under `shared`, so the crate is
+//! self-contained.
+{%- endif %}
+//!
+//! The crate contains {{ counts.domains }} domain module{% if counts.domains != 1 %}s{% endif %},
 //! {{ counts.types }} data types, {{ counts.events }} events,
 //! {{ counts.commands }} commands, {{ counts.queries }} queries,
 //! {{ counts.states }} states, {{ counts.views }} views and

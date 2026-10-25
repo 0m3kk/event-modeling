@@ -25,6 +25,9 @@ pub enum CodegenError {
     #[error("unknown generator language `{language}` (available: {available})")]
     UnknownLanguage { language: String, available: String },
 
+    #[error("unknown domain `{domain}` in the specification (available: {available})")]
+    UnknownDomain { domain: String, available: String },
+
     #[error("template `{name}` is not available")]
     MissingTemplate { name: String },
 

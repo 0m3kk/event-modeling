@@ -10,6 +10,8 @@ use crate::model::Model;
 pub struct GenerateOptions {
     /// Overrides the package/crate name derived from the spec name.
     pub crate_name: Option<String>,
+    /// Generates only this domain (plus the items it depends on).
+    pub domain: Option<String>,
     /// Package version written to the generated manifest.
     pub version: String,
     /// Directory containing template overrides (mirrors the embedded layout).
@@ -20,6 +22,7 @@ impl Default for GenerateOptions {
     fn default() -> Self {
         Self {
             crate_name: None,
+            domain: None,
             version: "0.1.0".into(),
             templates: None,
         }
