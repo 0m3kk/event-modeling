@@ -26,6 +26,30 @@ self-contained.
 
 ## Layout
 
+{% if domain %}
+The `{{ domain }}` domain's modules live directly under `src/`:
+
+```text
+src/
+  commands.rs
+  events.rs
+  queries.rs
+  services.rs
+  states.rs
+  types.rs
+  views.rs         # only when the domain declares views
+  shared/          # only when the crate needs shared items
+```
+
+Outside the domain modules:
+
+- `actors` — actors and their permissions.
+- `action` — the `Action` trait implemented by every command input and query
+  params struct, returning the permission that `Actor` checks.
+- `domain_event` — the `DomainEvent` trait implemented by every event.
+- `shared` — unassigned items plus the types and events pulled in from other
+  domains, when there are any.
+{% else %}
 Every domain owns a folder with its commands, events, queries, services,
 states, views and types:
 
@@ -49,9 +73,8 @@ Outside the domains:
 - `action` — the `Action` trait implemented by every command input and query
   params struct, returning the permission that `Actor` checks.
 - `domain_event` — the `DomainEvent` trait implemented by every event.
-- `shared` — items that were not assigned to a domain, plus (for a
-  single-domain crate) the items pulled in from other domains, when there are
-  any.
+- `shared` — items that were not assigned to a domain, when there are any.
+{% endif %}
 
 Service methods return `impl Future<Output = ...> + Send`; implement them with
 `async fn`. The traits are not object-safe.
@@ -111,7 +134,11 @@ fn persist<E: DomainEvent>(event: &E) -> Result<Event, serde_json::Error> {
 
 ```rust
 use {{ package_name }}::{Actor, DomainEvent};
+{%- if domain %}
+use {{ package_name }}::commands::YourCommand;
+{%- else %}
 use {{ package_name }}::domains::your_domain::commands::YourCommand;
+{%- endif %}
 ```
 
 Every generated type derives `serde::Serialize` and `serde::Deserialize`.

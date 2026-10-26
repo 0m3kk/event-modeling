@@ -74,11 +74,13 @@ cargo run -p em-codegen -- generate samples/authentication.spec.yaml \
   --domain password --out generated/authentication_password
 ```
 
-The crate contains only `src/domains/password`; `domains/mod.rs` lists only that
-domain. Types and events that the domain needs from other domains are emitted
-under `src/shared` and referenced as `crate::shared::...`, so the crate still
-compiles on its own. The generator prints a warning when it pulls such items
-in. Unassigned spec items keep going to `shared` as usual.
+The domain's modules are written directly under `src/` (`commands.rs`,
+`events.rs`, `queries.rs`, `services.rs`, `states.rs`, `types.rs`, and
+`views.rs` when the domain has views) instead of nesting them under
+`domains/`. Types and events that the domain needs from other domains are
+emitted under `src/shared` and referenced as `crate::shared::...`, so the crate
+still compiles on its own. The generator prints a warning when it pulls such
+items in. Unassigned spec items keep going to `shared` as usual.
 
 Without `--name`, the package is named `<spec>_<domain>` (for example
 `authentication_password`), and the default output directory follows it:
@@ -128,10 +130,10 @@ Slices and constraints are **not** emitted as Rust modules. They are still
 parsed and used internally to assign types, events, commands, queries, states,
 views and services to domains.
 
-With `--domain`, only the selected `domains/<domain>/` tree is emitted. Types
-and events owned by other domains that the selected domain references are
-written to `shared/` and referenced as `crate::shared::...`, so the crate stays
-self-contained.
+With `--domain`, the selected domain's modules sit at the crate root (`src/`),
+with no `domains/` folder. Types and events owned by other domains that the
+selected domain references are written to `shared/` and referenced as
+`crate::shared::...`, so the crate stays self-contained.
 
 Every generated file starts with a do-not-edit header. The comment syntax
 follows the file type (`//` for Rust, `#` for TOML and dotfiles, `<!-- -->` for

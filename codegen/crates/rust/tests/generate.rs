@@ -568,17 +568,22 @@ fn generates_only_the_requested_domain() {
 
     assert_eq!(output.package_name, "authentication_account");
     for path in [
-        "src/domains/account/commands.rs",
-        "src/domains/account/events.rs",
-        "src/domains/account/queries.rs",
-        "src/domains/account/services.rs",
-        "src/domains/account/states.rs",
-        "src/domains/account/types.rs",
-        "src/domains/account/mod.rs",
+        "src/commands.rs",
+        "src/events.rs",
+        "src/queries.rs",
+        "src/services.rs",
+        "src/states.rs",
+        "src/types.rs",
+        "src/action.rs",
+        "src/actors.rs",
+        "src/domain_event.rs",
     ] {
         assert!(find(&output, path).is_some(), "missing {path}");
     }
     for path in [
+        "src/domains/mod.rs",
+        "src/domains/account/mod.rs",
+        "src/domains/account/commands.rs",
         "src/domains/totp/types.rs",
         "src/domains/recovery_codes/types.rs",
         "src/domains/passkey/types.rs",
@@ -589,13 +594,56 @@ fn generates_only_the_requested_domain() {
         assert!(find(&output, path).is_none(), "unexpected {path}");
     }
 
-    let domain_mod = find(&output, "src/domains/mod.rs").unwrap();
-    assert!(domain_mod.contains("pub mod account;"));
-    assert!(!domain_mod.contains("pub mod totp;"));
-
     let lib = find(&output, "src/lib.rs").unwrap();
+    assert!(lib.contains("pub mod commands;"));
+    assert!(lib.contains("pub mod types;"));
+    assert!(!lib.contains("pub mod domains;"));
+    assert!(!lib.contains("pub mod views;"));
     assert!(lib.contains("contains the `account` domain only"));
     assert!(lib.contains("The crate contains 1 domain module,"));
+}
+
+#[test]
+fn a_filtered_domain_with_views_gets_a_root_views_module() {
+    let source = r#"
+name: Projections
+domains:
+  - name: orders
+types:
+  - alias: OrderId
+    of: string
+events:
+  - name: orderPlaced
+    fields:
+      - name: orderId
+        type: string
+        required: true
+slices:
+  - name: placeOrder
+    domain: orders
+    lanes:
+      - type: Event
+        cards: [orderPlaced]
+      - type: View
+        cards: [orderList]
+views:
+  - name: orderList
+    params:
+      - name: orderId
+        type: string
+        required: true
+    query:
+      - types: [orderPlaced]
+    states:
+      - name: count
+        type: integer
+"#;
+    let output = generate_with_domain(source, "orders");
+
+    assert!(find(&output, "src/views.rs").is_some());
+    let lib = find(&output, "src/lib.rs").unwrap();
+    assert!(lib.contains("pub mod views;"));
+    assert!(!lib.contains("pub mod domains;"));
 }
 
 #[test]
@@ -683,13 +731,18 @@ groups:
     let output = generate_with_domain(source, "orders");
 
     assert_eq!(output.package_name, "warehouse_orders");
-    assert!(find(&output, "src/domains/orders/mod.rs").is_some());
+    assert!(find(&output, "src/types.rs").is_some());
+    assert!(find(&output, "src/states.rs").is_some());
+    assert!(
+        find(&output, "src/domains/mod.rs").is_none(),
+        "the selected domain is not nested under domains/"
+    );
     assert!(
         find(&output, "src/domains/inventory/mod.rs").is_none(),
         "other domains are not generated"
     );
 
-    let states = find(&output, "src/domains/orders/states.rs").unwrap();
+    let states = find(&output, "src/states.rs").unwrap();
     assert!(states.contains("pub last_sku: Option<crate::shared::types::Sku>"));
     assert!(states.contains("event: &crate::shared::events::InventoryAdjusted"));
 
@@ -734,4 +787,67 @@ fn unknown_domains_are_rejected() {
         em_codegen_core::CodegenError::UnknownDomain { .. }
     ));
     assert!(error.to_string().contains("available: account"));
+}
+
+#[test]
+fn numeric_ranges_match_the_field_type() {
+    let source = r#"
+name: Pricing
+domains:
+  - name: catalog
+    groups: [catalogTypes]
+    slices: [setPrice]
+groups:
+  - name: catalogTypes
+    domain: catalog
+    cards: [Price, Discount]
+types:
+  - alias: Price
+    of: number
+    validation:
+      min: 0
+      max: 100.5
+  - alias: Discount
+    of: number
+    validation:
+      min: 0.5
+commands:
+  - name: setPrice
+    inputs:
+      - name: price
+        type: number
+        required: true
+        validation:
+          min: 0
+          max: 99
+      - name: discount
+        type: Discount
+        required: true
+      - name: quantity
+        type: integer
+        required: true
+        validation:
+          min: 1
+          max: 10
+slices:
+  - name: setPrice
+    domain: catalog
+    lanes:
+      - type: Command
+        cards: [setPrice]
+"#;
+    let output = generate_source(source);
+
+    let commands = find(&output, "src/domains/catalog/commands.rs").unwrap();
+    assert!(
+        commands.contains("#[validate(range(min = 0.0, max = 99.0))]"),
+        "float bounds must be f64 literals: {commands}"
+    );
+    assert!(
+        commands.contains("#[validate(range(min = 1, max = 10))]"),
+        "integer bounds must stay integers: {commands}"
+    );
+    assert!(commands.contains(
+        "validator::ValidateRange::validate_range(&value.0, Some(0.5), None, None, None)"
+    ));
 }

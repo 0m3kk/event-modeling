@@ -52,6 +52,8 @@ pub struct CrateCtx {
     pub generator_version: String,
     /// Name of the domain this crate was generated for, when `--domain` is used.
     pub domain: Option<String>,
+    /// Whether the root-level domain of a single-domain crate has views.
+    pub domain_has_views: bool,
     pub domains: Vec<DomainCtx>,
     pub shared: Option<DomainCtx>,
     pub has_shared: bool,
@@ -842,6 +844,8 @@ pub fn build(
     };
 
     let generated = || domains.iter().chain(shared.iter());
+    let domain_has_views =
+        selected.is_some() && domains.iter().any(|domain| !domain.views.is_empty());
     let tags = if selected.is_some() {
         let included_events: HashSet<String> = generated()
             .flat_map(|domain| domain.events.iter())
@@ -875,6 +879,7 @@ pub fn build(
         package_description: description,
         generator_version: env!("CARGO_PKG_VERSION").to_string(),
         domain: selected.map(|domain| domain.name.clone()),
+        domain_has_views,
         counts: CountsCtx {
             domains: domains.len(),
             types: generated().map(|domain| domain.types.len()).sum(),
@@ -1482,7 +1487,14 @@ enum Scope<'a> {
 
 #[derive(Debug, Clone)]
 enum TypeLocation {
-    Domain { key: String, module: String },
+    Domain {
+        key: String,
+        module: String,
+    },
+    /// The selected domain of a single-domain crate, emitted at the crate root.
+    Root {
+        key: String,
+    },
     Shared,
 }
 
@@ -1493,9 +1505,9 @@ struct TypeResolver {
 }
 
 impl TypeResolver {
-    /// `visible_domain` is the domain a filtered crate is generated for. Types
-    /// and events owned by other domains are then resolved to `crate::shared`,
-    /// where the generator puts the items the filtered domain depends on.
+    /// `visible_domain` is the domain a filtered crate is generated for. That
+    /// domain's items are emitted at the crate root, while types and events
+    /// owned by other domains are emitted in `crate::shared`.
     fn new(model: &Model, visible_domain: Option<&str>) -> Self {
         let domain_modules: BTreeMap<String, String> = model
             .domains
@@ -1503,18 +1515,23 @@ impl TypeResolver {
             .map(|domain| (naming::name_key(&domain.name), module_names(&domain.name).1))
             .collect();
         let is_external = |key: &str| visible_domain.is_some_and(|visible| visible != key);
+        let is_root = |key: &str| visible_domain == Some(key);
 
         let mut locations = BTreeMap::new();
         for ty in &model.types {
             let location = match ty.domain() {
                 Some(domain) => {
                     let key = naming::name_key(domain);
-                    match domain_modules.get(&key) {
-                        Some(module) if !is_external(&key) => TypeLocation::Domain {
-                            key,
-                            module: module.clone(),
-                        },
-                        _ => TypeLocation::Shared,
+                    if is_root(&key) {
+                        TypeLocation::Root { key }
+                    } else {
+                        match domain_modules.get(&key) {
+                            Some(module) if !is_external(&key) => TypeLocation::Domain {
+                                key,
+                                module: module.clone(),
+                            },
+                            _ => TypeLocation::Shared,
+                        }
                     }
                 }
                 None => TypeLocation::Shared,
@@ -1527,12 +1544,18 @@ impl TypeResolver {
             let path = match event.domain.as_deref() {
                 Some(domain) => {
                     let key = naming::name_key(domain);
-                    match domain_modules.get(&key) {
-                        Some(module) if !is_external(&key) => format!(
-                            "crate::domains::{module}::events::{}",
-                            type_ident(&event.name)
-                        ),
-                        _ => format!("crate::shared::events::{}", type_ident(&event.name)),
+                    if is_root(&key) {
+                        format!("crate::events::{}", type_ident(&event.name))
+                    } else if is_external(&key) {
+                        format!("crate::shared::events::{}", type_ident(&event.name))
+                    } else {
+                        match domain_modules.get(&key) {
+                            Some(module) => format!(
+                                "crate::domains::{module}::events::{}",
+                                type_ident(&event.name)
+                            ),
+                            None => format!("crate::shared::events::{}", type_ident(&event.name)),
+                        }
                     }
                 }
                 None => format!("crate::shared::events::{}", type_ident(&event.name)),
@@ -1554,6 +1577,10 @@ impl TypeResolver {
             Some(TypeLocation::Domain { key, module }) => match scope {
                 Scope::Domain(current) if current == key => ident,
                 _ => format!("crate::domains::{module}::types::{ident}"),
+            },
+            Some(TypeLocation::Root { key }) => match scope {
+                Scope::Domain(current) if current == key => ident,
+                _ => format!("crate::types::{ident}"),
             },
             Some(TypeLocation::Shared) => match scope {
                 Scope::Shared => ident,
@@ -1808,7 +1835,7 @@ fn alias_validation_rules(
         if validation.min.is_some() || validation.max.is_some() {
             checks.push(AliasCheckCtx {
                 expression: format!(
-                    "validator::ValidateRange::validate_range(value.0, {}, {}, None, None)",
+                    "validator::ValidateRange::validate_range(&value.0, {}, {}, None, None)",
                     option_range(validation.min, base.kind),
                     option_range(validation.max, base.kind)
                 ),
@@ -1844,10 +1871,16 @@ fn range_rule(min: Option<f64>, max: Option<f64>, kind: BaseKind) -> String {
 
 fn number_literal(value: f64, kind: BaseKind) -> String {
     if kind == BaseKind::I64 {
-        format!("{}", value as i64)
-    } else {
-        format!("{value}")
+        return format!("{}", value as i64);
     }
+    // `f64` implements `Display` without a decimal point for whole numbers
+    // (`0.0` prints as `0`), which would make validator's `range(min = ...)`
+    // expect an integer. Keep the literal a valid `f64`.
+    let mut literal = format!("{value}");
+    if !literal.contains(['.', 'e', 'E']) {
+        literal.push_str(".0");
+    }
+    literal
 }
 
 fn option_u64(value: Option<u64>) -> String {

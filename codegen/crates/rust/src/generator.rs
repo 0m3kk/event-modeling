@@ -31,19 +31,29 @@ impl Generator for RustGenerator {
 
         let templates = TemplateSet::new(TEMPLATES, options.templates.as_deref())?;
         let mut files = Vec::new();
+        // A single-domain crate puts the selected domain's modules at the crate
+        // root instead of nesting them under `domains/<domain>`.
+        let root_layout = ctx.domain.is_some();
 
         for (template, output) in ROOT_FILES {
+            if root_layout && *output == "src/domains/mod.rs" {
+                continue;
+            }
             let contents = templates.render(template, &ctx)?;
             files.push(rendered_file(output, contents, &ctx));
         }
 
         for domain in &ctx.domains {
-            let base = format!("src/domains/{}", domain.module);
-            push_domain_files(&templates, domain, &base, &mut files, &ctx)?;
+            if root_layout {
+                push_domain_files(&templates, domain, "src", &mut files, &ctx, true)?;
+            } else {
+                let base = format!("src/domains/{}", domain.module);
+                push_domain_files(&templates, domain, &base, &mut files, &ctx, false)?;
+            }
         }
 
         if let Some(shared) = &ctx.shared {
-            push_domain_files(&templates, shared, "src/shared", &mut files, &ctx)?;
+            push_domain_files(&templates, shared, "src/shared", &mut files, &ctx, false)?;
         }
 
         Ok(GeneratedOutput {
@@ -84,8 +94,14 @@ fn push_domain_files(
     base: &str,
     files: &mut Vec<GeneratedFile>,
     ctx: &CrateCtx,
+    root_layout: bool,
 ) -> Result<(), CodegenError> {
     for (template, file) in DOMAIN_FILES {
+        // The selected domain's modules live directly at the crate root, so
+        // there is no per-domain `mod.rs` to write.
+        if root_layout && *file == "mod.rs" {
+            continue;
+        }
         // Views are optional: a spec with no View cards should not leave an
         // empty `views.rs` (and `pub mod views;`) behind.
         if *file == "views.rs" && domain.views.is_empty() {
@@ -158,6 +174,8 @@ fn validate_names(ctx: &CrateCtx) -> Result<(), CodegenError> {
     for domain in ctx.domains.iter().chain(ctx.shared.iter()) {
         let prefix = if domain.name == "shared" {
             "shared".to_string()
+        } else if ctx.domain.is_some() {
+            "crate root".to_string()
         } else {
             format!("domains::{}", domain.module)
         };
