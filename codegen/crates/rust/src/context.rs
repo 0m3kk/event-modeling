@@ -63,6 +63,8 @@ pub struct CrateCtx {
     pub uses_regex: bool,
     /// Whether any generated state has an `apply` method.
     pub uses_state_apply: bool,
+    /// Whether any generated view store has an `apply` method.
+    pub uses_view_apply: bool,
     pub counts: CountsCtx,
 }
 
@@ -278,15 +280,26 @@ pub struct EventHandlerCtx {
 #[derive(Debug, Serialize)]
 pub struct QuerySourceCtx {
     pub types: Vec<String>,
+    pub resolved_types: Vec<QueryTypeCtx>,
     pub tags: Vec<QueryTagCtx>,
     pub description: Option<String>,
     pub doc_lines: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
+pub struct QueryTypeCtx {
+    pub path: String,
+    pub event_type: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct QueryTagCtx {
+    /// Tag name, normalised to snake_case.
     pub tag: String,
-    pub field: String,
+    /// Rust field on the params struct that supplies the tag value.
+    pub rust_name: String,
+    pub optional: bool,
+    pub array: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -857,6 +870,12 @@ pub fn build(
         .iter()
         .chain(shared.iter())
         .any(|domain| domain.has_state_handlers);
+    let uses_view_apply = domains.iter().chain(shared.iter()).any(|domain| {
+        domain
+            .views
+            .iter()
+            .any(|view| !view.event_handlers.is_empty())
+    });
 
     let actors = build_actors(model);
 
@@ -930,6 +949,7 @@ pub fn build(
         uses_uuid: deps.uuid,
         uses_regex,
         uses_state_apply,
+        uses_view_apply,
     };
 
     Ok((context, warnings))
@@ -1399,6 +1419,12 @@ fn build_state(
         }
     }
 
+    let query = state
+        .query
+        .iter()
+        .map(|source| build_query_source(source, &params, resolver, kind, &state.name, warnings))
+        .collect();
+
     StateCtx {
         name: state.name.clone(),
         rust_name,
@@ -1407,7 +1433,7 @@ fn build_state(
         used_in_slices: state.used_in_slices.clone(),
         params,
         states: fields,
-        query: state.query.iter().map(build_query_source).collect(),
+        query,
         event_handlers,
         table,
         key_columns,
@@ -1448,7 +1474,14 @@ fn build_event_handlers(
     out
 }
 
-fn build_query_source(source: &QuerySourceModel) -> QuerySourceCtx {
+fn build_query_source(
+    source: &QuerySourceModel,
+    params: &[FieldCtx],
+    resolver: &TypeResolver,
+    kind: &str,
+    state_name: &str,
+    warnings: &mut Vec<String>,
+) -> QuerySourceCtx {
     let mut docs = doc_lines(source.description.as_deref());
     if !source.types.is_empty() {
         let types = source
@@ -1474,16 +1507,48 @@ fn build_query_source(source: &QuerySourceModel) -> QuerySourceCtx {
             .join(", ");
         docs.push(format!("Tags: {tags}."));
     }
+
+    // Unknown event types are reported by `build_event_handlers`; skip them
+    // here so the generated query only names events with a dispatch arm.
+    let resolved_types = source
+        .types
+        .iter()
+        .filter_map(|ty| {
+            resolver.event_path(ty).map(|path| QueryTypeCtx {
+                path,
+                event_type: naming::snake_case(ty),
+            })
+        })
+        .collect();
+
+    let tags = source
+        .tags
+        .iter()
+        .filter_map(|tag| {
+            let key = naming::name_key(&tag.field);
+            params
+                .iter()
+                .find(|field| naming::name_key(&field.name) == key)
+                .map(|field| QueryTagCtx {
+                    tag: naming::snake_case(&tag.tag),
+                    rust_name: field.rust_name.clone(),
+                    optional: !field.required,
+                    array: field.array,
+                })
+                .or_else(|| {
+                    warnings.push(format!(
+                        "{kind} `{state_name}`: query tag `{}` references unknown param `{}`; skipping it",
+                        tag.tag, tag.field
+                    ));
+                    None
+                })
+        })
+        .collect();
+
     QuerySourceCtx {
         types: source.types.clone(),
-        tags: source
-            .tags
-            .iter()
-            .map(|tag| QueryTagCtx {
-                tag: tag.tag.clone(),
-                field: tag.field.clone(),
-            })
-            .collect(),
+        resolved_types,
+        tags,
         description: source.description.clone(),
         doc_lines: docs,
     }

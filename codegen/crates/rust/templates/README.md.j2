@@ -110,19 +110,25 @@ payload deserialization and unexpected event types.
 
 ### Views
 
-Views are persisted PostgreSQL tables. A view does **not** get a `new()`
-factory or a `Default` implementation; an empty row is not a valid table row.
-For each view the generator emits:
+Views are persisted PostgreSQL tables. The row struct does **not** get a
+`new()` factory or a `Default` implementation, because an empty row is not a
+valid table row. The separate params struct does. For each view the generator
+emits:
 
 - a row struct for query results;
 - a `ViewDefinition` type and a `<VIEW>_VIEW` constant with the table name and
   primary-key columns;
+- a `<View>Params` struct with `new()` and `query()`. `query()` is built from
+  the view card's `query`, including tags whose values come from params fields;
 - a `<View>Store` trait with one `on_*` method per event type, receiving the
   typed event and its sequence position. The application layer implements these
-  methods with SQL;
+  methods with SQL. The trait also provides `apply`, which dispatches a
+  sequenced event, deserializes its payload, and returns `ViewError<E>`;
 - a migration with the table, primary key, declared indexes, and the standard
   `last_event_position`, `created_at`, and `updated_at` columns. Migrations are
   written to the `--migrations` directory.
+
+A view store with event handlers makes the crate depend on `serde_json`.
 
 A domain gets a `views.rs` module only when it declares View cards; specs
 without views do not emit an empty module.

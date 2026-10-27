@@ -1,8 +1,10 @@
 //! Persisted read-model views of the `{{ module }}` domain.
 //!
-//! A view is generated as one row struct plus an asynchronous `Store` trait with
-//! one `on_*` handler per event type the view reads. Views live in a database,
-//! so their handlers return a future and the application layer owns the SQL.
+//! A view is generated as one row struct, one params struct that builds the
+//! event query, and an asynchronous `Store` trait with one `on_*` handler per
+//! event type the view reads. Views live in a database, so their handlers
+//! return a future and the application layer owns the SQL. The store's
+//! generated `apply` method dispatches events to the matching handler.
 
 {% if views %}
 /// Metadata for the PostgreSQL table backing a generated view.
@@ -12,6 +14,41 @@ pub struct ViewDefinition {
     pub table: &'static str,
     /// Primary-key column names.
     pub key: &'static [&'static str],
+}
+
+/// Error returned when an event cannot be applied to a view.
+#[derive(Debug)]
+pub enum ViewError<E> {
+    /// Event payload could not be deserialized.
+    Serialization(serde_json::Error),
+
+    /// The view store rejected the write.
+    Store(E),
+
+    /// The event type is not part of the view's query.
+    UnexpectedEvent(String),
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for ViewError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Serialization(error) => write!(f, "serialization failed: {error}"),
+            Self::Store(error) => write!(f, "view store failed: {error}"),
+            Self::UnexpectedEvent(event_type) => {
+                write!(f, "unexpected event type `{event_type}`")
+            }
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for ViewError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Serialization(error) => Some(error),
+            Self::Store(error) => Some(error),
+            Self::UnexpectedEvent(_) => None,
+        }
+    }
 }
 {% endif %}
 {%- for view in views %}
@@ -50,6 +87,81 @@ pub const {{ view.const_name }}: ViewDefinition = ViewDefinition {
     table: {{ view.table | str_lit }},
     key: &[{% for key in view.key_columns %}{{ key | str_lit }}{% if not loop.last %}, {% endif %}{% endfor %}],
 };
+
+/// Parameters identifying one [`{{ view.rust_name }}`] projection instance.
+{%- if view.params %}
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+{%- else %}
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+{%- endif %}
+pub struct {{ view.rust_name }}Params {
+{%- for field in view.params %}
+{%- for line in field.doc_lines %}
+    /// {{ line }}
+{%- endfor %}
+{%- if not field.required %}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+{%- endif %}
+    pub {{ field.rust_name }}: {{ field.rtype }},
+{%- endfor %}
+}
+
+impl {{ view.rust_name }}Params {
+    /// Creates the params for this view.
+    pub fn new({% for field in view.params %}{{ field.rust_name }}: {{ field.rtype }}{% if not loop.last %}, {% endif %}{% endfor %}) -> Self {
+{%- if view.params %}
+        Self {
+{%- for field in view.params %}
+            {{ field.rust_name }},
+{%- endfor %}
+        }
+{%- else %}
+        Self::default()
+{%- endif %}
+    }
+
+    /// Event-store query selecting the events projected into this view.
+    pub fn query(&self) -> event_store::Query {
+        event_store::Query::from_items([
+{%- for source in view.query %}
+            event_store::QueryItem::new(
+                vec![
+{%- for ty in source.resolved_types %}
+                    <{{ ty.path }} as event_store::DomainEvent>::event_type().to_string(),
+{%- endfor %}
+                ],
+{%- if source.tags %}
+                {
+                    let mut tags = Vec::new();
+{%- for tag in source.tags %}
+{%- if tag.optional and tag.array %}
+                    if let Some(values) = &self.{{ tag.rust_name }} {
+                        for value in values {
+                            tags.push(format!("{{ tag.tag }}:{}", event_store::tag_value(value)));
+                        }
+                    }
+{%- elif tag.array %}
+                    for value in &self.{{ tag.rust_name }} {
+                        tags.push(format!("{{ tag.tag }}:{}", event_store::tag_value(value)));
+                    }
+{%- elif tag.optional %}
+                    if let Some(value) = &self.{{ tag.rust_name }} {
+                        tags.push(format!("{{ tag.tag }}:{}", event_store::tag_value(value)));
+                    }
+{%- else %}
+                    tags.push(format!("{{ tag.tag }}:{}", event_store::tag_value(&self.{{ tag.rust_name }})));
+{%- endif %}
+{%- endfor %}
+                    tags
+                },
+{%- else %}
+                Vec::new(),
+{%- endif %}
+            ),
+{%- endfor %}
+        ])
+    }
+}
 {%- if view.event_handlers %}
 
 /// Database-backed event handlers for [`{{ view.rust_name }}`].
@@ -73,6 +185,36 @@ pub trait {{ view.rust_name }}Store {
         position: event_store::SequencePosition,
     ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
 {%- endfor %}
+
+    /// Applies one sequenced event to the view.
+    ///
+    /// Dispatches on the stored event type, deserializes the payload, and calls
+    /// the matching `on_*` handler.
+    fn apply(
+        &self,
+        sequenced: &event_store::SequencedEvent,
+    ) -> impl std::future::Future<Output = Result<(), ViewError<Self::Error>>> + Send
+    where
+        Self: Sync,
+    {
+        async move {
+            let event_type = sequenced.event.event_type.as_str();
+
+            match event_type {
+{%- for handler in view.event_handlers %}
+                {{ handler.event_type | str_lit }} => {
+                    let event: {{ handler.event_path }} =
+                        serde_json::from_value(sequenced.event.data.clone())
+                            .map_err(ViewError::Serialization)?;
+                    self.{{ handler.method }}(&event, sequenced.position)
+                        .await
+                        .map_err(ViewError::Store)
+                }
+{%- endfor %}
+                other => Err(ViewError::UnexpectedEvent(other.to_string())),
+            }
+        }
+    }
 }
 {%- endif %}
 

@@ -528,15 +528,18 @@ views:
     assert!(!states.contains("std::future::Future"));
 
     let views = find(&output, "src/domains/orders/views.rs").expect("views.rs");
-    assert!(!views.contains("OrderListParams"));
+    assert!(views.contains("pub struct OrderListParams {"));
+    assert!(views.contains("pub fn new(order_id: String) -> Self"));
+    assert!(views.contains("pub fn query(&self) -> event_store::Query"));
+    assert!(views.contains("pub enum ViewError<E>"));
     assert!(views.contains("pub struct OrderList {"));
-    assert!(!views.contains("pub fn new("));
     assert!(views.contains("pub const ORDER_LIST_VIEW: ViewDefinition"));
     assert!(views.contains("table: \"order_list_view\""));
     assert!(views.contains("key: &[\"order_id\"]"));
     assert!(views.contains("pub trait OrderListStore {"));
     assert!(!views.contains("fn rehydrate("));
     assert!(views.contains("fn on_order_placed("));
+    assert!(views.contains("sequenced: &event_store::SequencedEvent"));
     assert!(views.contains("position: event_store::SequencePosition"));
     assert!(!views.contains("view: &mut OrderList"));
     assert!(
@@ -544,6 +547,10 @@ views:
             "    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;"
         ),
         "view handlers are asynchronous"
+    );
+    assert!(
+        views.contains("serde_json::from_value(sequenced.event.data.clone())"),
+        "the generated apply deserializes the event payload"
     );
 
     let domain_mod = find(&output, "src/domains/orders/mod.rs").expect("domain mod");
@@ -562,7 +569,7 @@ views:
 }
 
 #[test]
-fn states_without_params_implement_default_and_views_do_not() {
+fn states_without_params_implement_default_and_view_params_do() {
     let source = r#"
 name: Projections
 domains:
@@ -611,10 +618,84 @@ views:
     assert!(states.contains("Self::new()"));
 
     let views = find(&output, "src/domains/catalog/views.rs").expect("views.rs");
-    assert!(!views.contains("impl Default for ProductList"));
-    assert!(!views.contains("pub fn new("));
+    assert!(!views.contains("impl Default for ProductList {"));
+    assert!(
+        views.contains(
+            "#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]"
+        ),
+        "view params without fields derive Default"
+    );
+    assert!(views.contains("pub fn new() -> Self"));
     assert!(views.contains("pub const PRODUCT_LIST_VIEW: ViewDefinition"));
     assert!(views.contains("key: &[\"product_id\"]"));
+}
+
+#[test]
+fn view_params_query_uses_event_types_and_tags() {
+    let source = r#"
+name: TaggedViews
+domains:
+  - name: catalog
+events:
+  - name: productCreated
+    fields:
+      - name: productId
+        type: string
+        required: true
+        tag: product
+slices:
+  - name: listProducts
+    domain: catalog
+    lanes:
+      - type: Event
+        cards: [productCreated]
+      - type: View
+        cards: [productList]
+views:
+  - name: productList
+    key: [productId]
+    params:
+      - name: productId
+        type: string
+        required: true
+      - name: category
+        type: string
+    query:
+      - types: [productCreated]
+        tags:
+          - tag: product
+            field: productId
+          - tag: category
+            field: category
+    states:
+      - name: name
+        type: string
+"#;
+    let output = generate_source(source);
+
+    let views = find(&output, "src/domains/catalog/views.rs").expect("views.rs");
+    assert!(views.contains("pub struct ProductListParams {"));
+    assert!(views.contains("pub fn new(product_id: String, category: Option<String>) -> Self"));
+    assert!(views.contains("pub fn query(&self) -> event_store::Query"));
+    assert!(
+        views.contains("as event_store::DomainEvent>::event_type().to_string()"),
+        "the query names events through the generated event contract"
+    );
+    assert!(
+        views.contains(
+            "tags.push(format!(\"product:{}\", event_store::tag_value(&self.product_id)));"
+        )
+    );
+    assert!(views.contains("if let Some(value) = &self.category {"));
+    assert!(views.contains("tags.push(format!(\"category:{}\", event_store::tag_value(value)));"));
+    assert!(views.contains("async move"));
+    assert!(views.contains("ViewError::Serialization"));
+
+    let manifest = find(&output, "Cargo.toml").expect("Cargo.toml");
+    assert!(
+        manifest.contains("serde_json = \"1\""),
+        "view dispatch needs serde_json even without states"
+    );
 }
 
 #[test]
@@ -738,7 +819,7 @@ views:
 
     let views = find(&output, "src/domains/orders/views.rs").expect("views.rs");
     assert!(views.contains("pub struct Orders {"));
-    assert!(!views.contains("pub struct OrdersParams"));
+    assert!(views.contains("pub struct OrdersParams"));
 
     let domain_mod = find(&output, "src/domains/orders/mod.rs").expect("domain mod");
     assert_eq!(

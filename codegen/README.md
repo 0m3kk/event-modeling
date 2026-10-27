@@ -113,13 +113,19 @@ views:
 
 For each view the Rust generator emits:
 
-- A row struct with the projected fields. Views do **not** get a `new()` factory
-  or `Default` implementation; an empty row is not a valid table row.
+- A row struct with the projected fields. The row itself does **not** get a
+  `new()` factory or `Default` implementation; an empty row is not a valid table
+  row.
 - A `ViewDefinition` type plus a `<VIEW>_VIEW` constant exposing the table name
   and primary-key columns.
+- A `<View>Params` struct with `new()` and `query()`. The query is built from the
+  view card's `query`, including tags whose values come from params fields. A
+  view without params gets `Default` as well.
 - An asynchronous `<View>Store` trait with one `on_*` method per event type,
   receiving the typed event and its sequence position. The application layer
-  implements these methods with SQL.
+  implements these methods with SQL. The trait also provides `apply`, which
+  dispatches on the stored event type, deserializes the payload, and returns
+  `ViewError<E>`.
 - One migration per view:
   `<version>_<domain>_<table>.sql`. The version is derived deterministically from
   the domain and table, so regenerating does not create duplicate migrations.
@@ -215,11 +221,13 @@ What is generated:
   that dispatches on the stored event type, deserializes the payload, and calls
   the matching reducer method. `StateError` covers deserialization and
   unexpected event types; reducer errors must implement `From<StateError>`.
-  Views are persisted table contracts: they get a `ViewDefinition` constant and
-  a `Store` trait whose handlers receive the typed event and its sequence
-  position; the application layer implements them with SQL. A domain only gets a
-  `views.rs` module when it actually owns View cards. The query sources and tags
-  are recorded in the doc comments.
+  Views are persisted table contracts: they get a row struct, a `<View>Params`
+  struct with the generated event query, a `ViewDefinition` constant, and a
+  `Store` trait whose handlers receive the typed event and its sequence
+  position. The trait's generated `apply` dispatches events and returns
+  `ViewError<E>`; the application layer implements the SQL handlers. A domain
+  only gets a `views.rs` module when it actually owns View cards. The query
+  sources and tags are recorded in the doc comments.
 - **Services** — one trait per `serviceName`, with `Params`/`Returns` structs,
   generated inside the domain whose slices call the service. Methods return
   `impl Future<Output = ...> + Send`, so implementations can use `async fn`
