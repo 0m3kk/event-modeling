@@ -6,7 +6,6 @@
 //! src/
 //!   lib.rs
 //!   actors.rs
-//!   domain_event.rs        # DomainEvent trait
 //!   domains/
 //!     identity/
 //!       mod.rs
@@ -170,6 +169,8 @@ pub struct FieldCtx {
     pub rtype: String,
     /// Inner Rust type without optional/array wrapping.
     pub base_rust: String,
+    /// PostgreSQL column type for views.
+    pub sql_type: String,
     pub array: bool,
     pub required: bool,
     pub tag: Option<String>,
@@ -242,6 +243,21 @@ pub struct StateCtx {
     pub query: Vec<QuerySourceCtx>,
     /// One handler method per event type the projection reads.
     pub event_handlers: Vec<EventHandlerCtx>,
+    /// PostgreSQL table name (views only).
+    pub table: String,
+    /// Primary-key columns (views only).
+    pub key_columns: Vec<String>,
+    /// Table indexes (views only).
+    pub indexes: Vec<IndexCtx>,
+    /// Const name for the generated view metadata (views only).
+    pub const_name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IndexCtx {
+    pub name: String,
+    pub columns: Vec<String>,
+    pub unique: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -896,7 +912,7 @@ pub fn build(
         shared,
         has_shared,
         actors,
-        uses_json: true,
+        uses_json: deps.json,
         uses_chrono: deps.chrono,
         uses_uuid: deps.uuid,
         uses_regex,
@@ -1279,7 +1295,7 @@ fn build_state(
         .collect();
     let mut field_names: HashSet<String> =
         params.iter().map(|field| field.rust_name.clone()).collect();
-    let fields = state
+    let fields: Vec<FieldCtx> = state
         .states
         .iter()
         .filter_map(|field| {
@@ -1295,6 +1311,80 @@ fn build_state(
             }
         })
         .collect();
+
+    let is_view = kind == "view";
+    let table = if is_view {
+        state
+            .table
+            .clone()
+            .unwrap_or_else(|| format!("{}_view", naming::snake_case(&state.name)))
+    } else {
+        String::new()
+    };
+    let const_name = if is_view {
+        format!("{}_VIEW", naming::shouty_snake_case(&state.name))
+    } else {
+        String::new()
+    };
+
+    let mut columns = BTreeMap::new();
+    for field in params.iter().chain(fields.iter()) {
+        columns
+            .entry(naming::name_key(&field.name))
+            .or_insert_with(|| naming::snake_case(&field.name));
+    }
+
+    let mut key_columns = Vec::new();
+    if is_view {
+        for key in &state.key {
+            match columns.get(&naming::name_key(key)) {
+                Some(column) if !key_columns.contains(column) => {
+                    key_columns.push(column.clone());
+                }
+                Some(_) => {}
+                None => warnings.push(format!(
+                    "view `{}`: key field `{key}` is not a view field",
+                    state.name
+                )),
+            }
+        }
+    }
+
+    let mut indexes = Vec::new();
+    if is_view {
+        for index in &state.indexes {
+            let mut index_columns = Vec::new();
+            let mut missing = false;
+            for column in &index.columns {
+                match columns.get(&naming::name_key(column)) {
+                    Some(column) => index_columns.push(column.clone()),
+                    None => {
+                        warnings.push(format!(
+                            "view `{}`: index column `{column}` is not a view field",
+                            state.name
+                        ));
+                        missing = true;
+                    }
+                }
+            }
+            if missing || index_columns.is_empty() {
+                continue;
+            }
+            let name = index.name.clone().unwrap_or_else(|| {
+                format!(
+                    "idx_{}_{}",
+                    table.replace('.', "_"),
+                    index_columns.join("_")
+                )
+            });
+            indexes.push(IndexCtx {
+                name,
+                columns: index_columns,
+                unique: index.unique,
+            });
+        }
+    }
+
     StateCtx {
         name: state.name.clone(),
         rust_name,
@@ -1305,6 +1395,10 @@ fn build_state(
         states: fields,
         query: state.query.iter().map(build_query_source).collect(),
         event_handlers,
+        table,
+        key_columns,
+        indexes,
+        const_name,
     }
 }
 
@@ -1644,11 +1738,17 @@ fn build_field(
         }
     }
 
+    let sql_type = {
+        let sql = sql_type_for_base(&base, field, defs, scope, resolver);
+        if field.array { format!("{sql}[]") } else { sql }
+    };
+
     FieldCtx {
         name: field.name.clone(),
         rust_name: field_ident(&field.name),
         rtype,
         base_rust: base.rust,
+        sql_type,
         array: field.array,
         required: field.required,
         tag: field.tag.clone(),
@@ -1683,6 +1783,65 @@ fn apply_format_override(
         _ => {}
     }
     base
+}
+
+/// Maps a resolved field type to its PostgreSQL column type.
+fn sql_type_for_base(
+    base: &BaseType,
+    field: &FieldModel,
+    defs: &BTreeMap<String, &TypeModel>,
+    scope: Scope<'_>,
+    resolver: &TypeResolver,
+) -> String {
+    scalar_sql_type(base.kind)
+        .map(ToString::to_string)
+        .unwrap_or_else(|| named_sql_type(&field.ty, defs, scope, resolver, 0))
+}
+
+fn scalar_sql_type(kind: BaseKind) -> Option<&'static str> {
+    match kind {
+        BaseKind::String => Some("TEXT"),
+        BaseKind::I64 => Some("BIGINT"),
+        BaseKind::F64 => Some("DOUBLE PRECISION"),
+        BaseKind::Bool => Some("BOOLEAN"),
+        BaseKind::Json => Some("JSONB"),
+        BaseKind::Date => Some("DATE"),
+        BaseKind::Time => Some("TIME"),
+        BaseKind::DateTime => Some("TIMESTAMPTZ"),
+        BaseKind::Uuid => Some("UUID"),
+        BaseKind::Named => None,
+    }
+}
+
+fn named_sql_type(
+    name: &str,
+    defs: &BTreeMap<String, &TypeModel>,
+    scope: Scope<'_>,
+    resolver: &TypeResolver,
+    depth: usize,
+) -> String {
+    if depth > 8 {
+        return "TEXT".to_string();
+    }
+
+    let Some(ty) = defs.get(&naming::name_key(name)) else {
+        return "TEXT".to_string();
+    };
+
+    match ty {
+        TypeModel::Alias(alias) => {
+            let base = apply_format_override(
+                base_type(&alias.of, scope, resolver),
+                alias.validation.as_ref(),
+            );
+            let sql = scalar_sql_type(base.kind)
+                .map(ToString::to_string)
+                .unwrap_or_else(|| named_sql_type(&alias.of, defs, scope, resolver, depth + 1));
+            if alias.array { format!("{sql}[]") } else { sql }
+        }
+        TypeModel::Enum(_) => "TEXT".to_string(),
+        TypeModel::Object(_) => "JSONB".to_string(),
+    }
 }
 
 fn field_validation_attrs(
@@ -1993,6 +2152,7 @@ fn base_type(name: &str, scope: Scope<'_>, resolver: &TypeResolver) -> BaseType 
 #[derive(Debug, Default)]
 struct Dependencies {
     chrono: bool,
+    json: bool,
     uuid: bool,
 }
 
@@ -2000,6 +2160,7 @@ impl Dependencies {
     fn note(&mut self, kind: BaseKind) {
         match kind {
             BaseKind::Date | BaseKind::Time | BaseKind::DateTime => self.chrono = true,
+            BaseKind::Json => self.json = true,
             BaseKind::Uuid => self.uuid = true,
             _ => {}
         }

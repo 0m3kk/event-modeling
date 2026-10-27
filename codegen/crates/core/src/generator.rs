@@ -52,6 +52,8 @@ pub struct GeneratedOutput {
     /// Name of the generated package (the recommended output directory name).
     pub package_name: String,
     pub files: Vec<GeneratedFile>,
+    /// SQL migration files, relative to the service migrations directory.
+    pub migrations: Vec<GeneratedFile>,
     /// Non-fatal issues discovered while generating.
     pub warnings: Vec<String>,
 }

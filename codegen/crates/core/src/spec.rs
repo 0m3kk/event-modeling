@@ -276,6 +276,26 @@ pub struct StateLikeDef {
     pub query: Vec<QueryItem>,
     #[serde(default)]
     pub states: Vec<Field>,
+    /// PostgreSQL table name for View cards. Defaults to `<view>_view`.
+    #[serde(default)]
+    pub table: Option<String>,
+    /// Primary-key fields for View cards.
+    #[serde(default)]
+    pub key: Vec<String>,
+    /// Indexes to create for View tables.
+    #[serde(default)]
+    pub indexes: Vec<IndexDef>,
+}
+
+/// An index declared on a View table.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct IndexDef {
+    #[serde(default)]
+    pub columns: Vec<String>,
+    #[serde(default)]
+    pub unique: bool,
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

@@ -36,8 +36,8 @@ cargo build
 
 ```text
 em-codegen generate <SPEC> [--lang rust] [--out DIR] [--name NAME]
-                           [--domain NAME] [--templates DIR] [--force]
-                           [--dry-run]
+                           [--domain NAME] [--templates DIR]
+                           [--migrations DIR] [--force] [--dry-run]
 em-codegen templates [--lang rust] --out DIR [--force]
 em-codegen languages
 ```
@@ -49,6 +49,7 @@ em-codegen languages
 | `--name` | Override the generated package/crate name. |
 | `--domain` | Generate only this domain (plus the items it depends on). |
 | `--templates` | Directory with template overrides (same layout as the defaults). |
+| `--migrations` | Directory for generated SQL migrations. Defaults to `<out>/migrations`. |
 | `--force` | Allow writing into a non-empty output directory. |
 | `--dry-run` | List the files that would be written, without writing them. |
 
@@ -84,8 +85,63 @@ items in. Unassigned spec items keep going to `shared` as usual.
 
 Without `--name`, the package is named `<spec>_<domain>` (for example
 `authentication_password`), and the default output directory follows it:
-`generated/authentication_password`. Actors and the event contract are still
-generated at the crate root.
+`generated/authentication_password`. Actors are still generated at the crate
+root; `DomainEvent` and `Event` are imported directly from `event-store`.
+
+## Views and migrations
+
+A `View` card describes a persisted read model backed by a PostgreSQL table. In
+addition to the usual `query` and `states`, a view may declare its table shape:
+
+```yaml
+views:
+  - name: productList
+    table: product_list_view     # optional; defaults to <view>_view
+    key: [productId]             # primary key, supports composite keys
+    indexes:
+      - columns: [name]
+      - columns: [price, status]
+        unique: false
+        name: idx_product_list_price_status
+    query:
+      - types: [productCreated, productUpdated, productDeleted]
+    states:
+      - name: productId
+        type: string
+        required: true
+```
+
+For each view the Rust generator emits:
+
+- A row struct with the projected fields. Views do **not** get a `new()` factory
+  or `Default` implementation; an empty row is not a valid table row.
+- A `ViewDefinition` type plus a `<VIEW>_VIEW` constant exposing the table name
+  and primary-key columns.
+- An asynchronous `<View>Store` trait with one `on_*` method per event type,
+  receiving the typed event and its sequence position. The application layer
+  implements these methods with SQL.
+- One migration per view:
+  `<version>_<domain>_<table>.sql`. The version is derived deterministically from
+  the domain and table, so regenerating does not create duplicate migrations.
+  The migration creates the table, primary key, declared indexes, and the
+  standard `last_event_position`, `created_at`, and `updated_at` columns.
+
+Pass `--migrations` to write migrations to the service's root migration
+directory:
+
+```sh
+cargo run -p em-codegen -- generate samples/authentication.spec.yaml \
+  --out generated/authentication --migrations migrations
+```
+
+Generated migrations describe the initial table shape. Once a migration has
+been applied, add a manual migration for later schema changes instead of
+rewriting the applied file.
+
+Rust types map to PostgreSQL types as follows: `String` → `TEXT`, `i64` →
+`BIGINT`, `f64` → `DOUBLE PRECISION`, `bool` → `BOOLEAN`, `json` → `JSONB`,
+`date` → `DATE`, `time` → `TIME`, `datetime` → `TIMESTAMPTZ`, `uuid` → `UUID`,
+and enums/aliases resolve to their underlying type (`TEXT` for enums).
 
 ## Generated Rust layout
 
@@ -101,7 +157,6 @@ queries, states, views and services. The generated crate uses **Rust edition
     lib.rs
     actors.rs            # actors + permissions (outside the domains)
     action.rs            # Action trait mapping commands/queries to permissions
-    domain_event.rs      # DomainEvent trait implemented by every event
     domains/
       mod.rs
       identity/
@@ -147,19 +202,20 @@ What is generated:
   factories can initialise unset fields. `date` maps to `chrono::NaiveDate`,
   `time` to `chrono::NaiveTime`, `datetime` to `chrono::DateTime<Utc>`, and
   `uuid` (or `format: uuid`) to `uuid::Uuid`.
-- **Events** — one struct per event implementing `DomainEvent`. There is no
-  central event enum.
+- **Events** — one struct per event implementing `event_store::DomainEvent`.
+  There is no central event enum and no generated event-contract module.
 - **Commands / Queries** — an input/params struct plus a response struct. Each
   input/params struct implements the `Action` trait so its permission string is
   available without knowing the concrete type.
 - **States / Views** — one struct per projection, holding both its params and
-  its projected fields. Each struct gets a `new(params...)` factory that
-  initialises the projected fields with `Default::default()`. A reducer trait
-  carries one `on_*` handler per event type an in-memory state reads, while a
-  `Store` trait carries the asynchronous handlers for a view stored in a
-  database. States are rebuilt on every rehydration; views are persisted. A
-  domain only gets a `views.rs` module when it actually owns View cards. The
-  query sources and tags are recorded in the doc comments.
+  its projected fields. States get a `new(params...)` factory that initialises
+  the projected fields with `Default::default()`; a state without params also
+  implements `Default`. A reducer trait carries one `on_*` handler per event type
+  an in-memory state reads. Views are persisted table contracts: they get a
+  `ViewDefinition` constant and a `Store` trait whose handlers receive the typed
+  event and its sequence position; the application layer implements them with
+  SQL. A domain only gets a `views.rs` module when it actually owns View cards.
+  The query sources and tags are recorded in the doc comments.
 - **Services** — one trait per `serviceName`, with `Params`/`Returns` structs,
   generated inside the domain whose slices call the service. Methods return
   `impl Future<Output = ...> + Send`, so implementations can use `async fn`
@@ -216,26 +272,20 @@ generator does not emit `allow(...)` attributes.
 
 ### Domain event contract
 
-The generated `src/domain_event.rs` contains:
+The `DomainEvent` trait and the `tag_value` helper come from the
+[`event-store`](https://github.com/0m3kk/backend-kit) crate in `backend-kit`.
+The generator does **not** emit a local `src/domain_event.rs` and does not
+re-export the trait. Import it from the dependency directly:
 
 ```rust
-pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
-    fn event_type() -> &'static str;
-    fn tags(&self) -> Vec<String>;
-    fn to_store_event(&self) -> Result<Event, serde_json::Error>;
-    fn to_store_event_with_metadata<M: Serialize>(
-        &self,
-        metadata: &M,
-    ) -> Result<Event, serde_json::Error>;
-}
+use event_store::DomainEvent;
 ```
 
-Every event struct implements `event_type()` and `tags()`; tags come from the
-fields marked with a `tag` in the spec. The `Event` type is **not** generated:
-the crate depends on [`event-store`](https://github.com/0m3kk/backend-kit) from
-`backend-kit` and re-exports `Event` from the crate root. That dependency is
-already in the generated `Cargo.toml`, so the trait can rely on
-`Event::new()` and `Event::with_metadata()` directly.
+Every event struct implements `event_store::DomainEvent`, providing
+`event_type()` and `tags()`; tags come from the fields marked with a `tag` in
+the spec. The trait's default methods use `Event::new()` and
+`Event::with_metadata()` from the same crate, so the generated `Cargo.toml`
+already depends on `event-store`.
 
 ### Actions and authorization
 
@@ -321,8 +371,8 @@ fn generators() -> Vec<Box<dyn Generator>> {
 
 ## Current scope
 
-This generator produces the **typed skeleton** of the domain: DTOs, the event
-contract, service traits, projection structs with their reducer/store handler
-traits and metadata. It deliberately does not generate command handlers or
-event-store persistence. `serde` derives are included so the output can be used
-directly with an event store.
+This generator produces the **typed skeleton** of the domain: DTOs, event
+types implementing `event_store::DomainEvent`, service traits, projection
+structs with their reducer/store handler traits and metadata. It deliberately
+does not generate command handlers or event-store persistence. `serde` derives
+are included so the output can be used directly with an event store.

@@ -55,6 +55,10 @@ enum Commands {
         #[arg(long, value_name = "DIR")]
         templates: Option<PathBuf>,
 
+        /// Directory that receives generated SQL migrations.
+        #[arg(long, value_name = "DIR")]
+        migrations: Option<PathBuf>,
+
         /// Overwrite files in a non-empty output directory.
         #[arg(long)]
         force: bool,
@@ -93,6 +97,7 @@ fn main() -> Result<()> {
             name,
             domain,
             templates,
+            migrations,
             force,
             dry_run,
         } => {
@@ -102,7 +107,7 @@ fn main() -> Result<()> {
                 templates,
                 ..GenerateOptions::default()
             };
-            generate(&spec, &lang, out, options, force, dry_run)
+            generate(&spec, &lang, out, migrations, options, force, dry_run)
         }
         Commands::Templates { lang, out, force } => dump_templates(&lang, &out, force),
         Commands::Languages => {
@@ -141,6 +146,7 @@ fn generate(
     spec_path: &Path,
     language: &str,
     out: Option<PathBuf>,
+    migrations: Option<PathBuf>,
     options: GenerateOptions,
     force: bool,
     dry_run: bool,
@@ -153,6 +159,7 @@ fn generate(
     print_warnings(&output.warnings);
 
     let out_dir = out.unwrap_or_else(|| PathBuf::from("generated").join(&output.package_name));
+    let migrations_dir = migrations.unwrap_or_else(|| out_dir.join("migrations"));
 
     if dry_run {
         println!(
@@ -165,12 +172,26 @@ fn generate(
         for file in &output.files {
             println!("  {}", out_dir.join(&file.path).display());
         }
+        for file in &output.migrations {
+            println!("  {}", migrations_dir.join(&file.path).display());
+        }
         return Ok(());
     }
 
     ensure_writable(&out_dir, force)?;
     for file in &output.files {
         write_file(&out_dir.join(&file.path), &file.contents)?;
+    }
+
+    if !output.migrations.is_empty() {
+        for file in &output.migrations {
+            write_file(&migrations_dir.join(&file.path), &file.contents)?;
+        }
+        println!(
+            "Generated {} migrations in {}",
+            output.migrations.len(),
+            migrations_dir.display()
+        );
     }
 
     println!(

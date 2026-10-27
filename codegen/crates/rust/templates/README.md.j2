@@ -46,7 +46,6 @@ Outside the domain modules:
 - `actors` — actors and their permissions.
 - `action` — the `Action` trait implemented by every command input and query
   params struct, returning the permission that `Actor` checks.
-- `domain_event` — the `DomainEvent` trait implemented by every event.
 - `shared` — unassigned items plus the types and events pulled in from other
   domains, when there are any.
 {% else %}
@@ -72,35 +71,47 @@ Outside the domains:
 - `actors` — actors and their permissions.
 - `action` — the `Action` trait implemented by every command input and query
   params struct, returning the permission that `Actor` checks.
-- `domain_event` — the `DomainEvent` trait implemented by every event.
 - `shared` — items that were not assigned to a domain, when there are any.
 {% endif %}
+
+`DomainEvent` and `Event` come from the [`event-store`](https://github.com/0m3kk/backend-kit)
+crate; import them from there directly. Event modules use
+`event_store::tag_value` directly as well.
 
 Service methods return `impl Future<Output = ...> + Send`; implement them with
 `async fn`. The traits are not object-safe.
 
 ## States and views
 
-States and views share a shape: each struct holds both the params used to load
-it and its projected fields. Params are the leading fields of the struct, so
-there is no separate params type.
+States and views share the params + projected-fields shape, but have different
+lifecycles.
 
-Every projection gets an associated factory that fills the params and leaves
-the projected fields at `Default::default()`:
+### States
+
+States are in-memory decision models that are rebuilt on every rehydration.
+Their `Reducer` trait methods are synchronous and fold an event into the state.
+Each state gets a `new(params...)` factory; a state with no params also
+implements `Default` so it can be constructed as an empty projection:
 
 ```rust
 let state = YourState::new(account_id);
 ```
 
-Event application is generated as one trait with an `on_*` method per event
-type the projection reads:
+### Views
 
-- **States** are in-memory decision models that are rebuilt on every
-  rehydration. Their `Reducer` trait methods are synchronous and fold an event
-  into the state.
-- **Views** are persisted read models. Their `Store` trait methods are
-  asynchronous (`impl Future + Send`) and may write the updated view back to the
-  database.
+Views are persisted PostgreSQL tables. A view does **not** get a `new()`
+factory or a `Default` implementation; an empty row is not a valid table row.
+For each view the generator emits:
+
+- a row struct for query results;
+- a `ViewDefinition` type and a `<VIEW>_VIEW` constant with the table name and
+  primary-key columns;
+- a `<View>Store` trait with one `on_*` method per event type, receiving the
+  typed event and its sequence position. The application layer implements these
+  methods with SQL;
+- a migration with the table, primary key, declared indexes, and the standard
+  `last_event_position`, `created_at`, and `updated_at` columns. Migrations are
+  written to the `--migrations` directory.
 
 A domain gets a `views.rs` module only when it declares View cards; specs
 without views do not emit an empty module.
@@ -115,11 +126,11 @@ templates and regenerate instead.
 ## Domain events
 
 There is no central event enum. Each event struct implements the
-`DomainEvent` trait, which knows its type name and tags and can produce a
-stored event:
+`DomainEvent` trait from the `event-store` crate, which knows its type name and
+tags and can produce a stored event:
 
 ```rust
-use {{ package_name }}::{DomainEvent, Event};
+use event_store::{DomainEvent, Event};
 
 fn persist<E: DomainEvent>(event: &E) -> Result<Event, serde_json::Error> {
     event.to_store_event()
@@ -133,7 +144,7 @@ fn persist<E: DomainEvent>(event: &E) -> Result<Event, serde_json::Error> {
 ## Usage
 
 ```rust
-use {{ package_name }}::{Actor, DomainEvent};
+use {{ package_name }}::Actor;
 {%- if domain %}
 use {{ package_name }}::commands::YourCommand;
 {%- else %}

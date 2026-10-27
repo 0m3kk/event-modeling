@@ -24,6 +24,7 @@ impl TemplateSet {
         overrides: Option<&Path>,
     ) -> Result<Self, CodegenError> {
         let mut env = Environment::new();
+        env.set_keep_trailing_newline(true);
         env.add_filter("pascal", |value: String| naming::pascal_case(&value));
         env.add_filter("camel", |value: String| naming::camel_case(&value));
         env.add_filter("snake", |value: String| naming::snake_case(&value));

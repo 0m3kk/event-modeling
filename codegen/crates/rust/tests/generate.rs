@@ -34,6 +34,21 @@ fn find<'a>(output: &'a GeneratedOutput, path: &str) -> Option<&'a str> {
         .map(|file| file.contents.as_str())
 }
 
+fn assert_sorted_dependencies(manifest: &str) {
+    let dependencies = manifest
+        .split("[dependencies]")
+        .nth(1)
+        .expect("manifest has dependencies");
+    let names: Vec<&str> = dependencies
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.split('=').next().unwrap_or_default().trim())
+        .collect();
+    let mut sorted = names.clone();
+    sorted.sort_unstable();
+    assert_eq!(names, sorted, "dependencies are not sorted");
+}
+
 fn unique_dir(name: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -58,11 +73,14 @@ fn generates_one_folder_per_domain() {
         "src/domains/two_factor/types.rs",
         "src/actors.rs",
         "src/action.rs",
-        "src/domain_event.rs",
         "src/lib.rs",
     ] {
         assert!(find(&output, path).is_some(), "missing {path}");
     }
+    assert!(
+        find(&output, "src/domain_event.rs").is_none(),
+        "DomainEvent comes from the event-store crate"
+    );
 
     assert!(
         find(&output, "src/event_store.rs").is_none(),
@@ -100,10 +118,10 @@ fn generates_one_folder_per_domain() {
 
     let account_events = find(&output, "src/domains/account/events.rs").unwrap();
     assert!(account_events.contains("pub struct AccountRegistered {"));
-    assert!(account_events.contains("impl crate::domain_event::DomainEvent for AccountRegistered"));
+    assert!(account_events.contains("impl event_store::DomainEvent for AccountRegistered"));
     assert!(account_events.contains("fn event_type() -> &'static str"));
     assert!(account_events.contains("\"account_registered\""));
-    assert!(account_events.contains("crate::domain_event::tag_value"));
+    assert!(account_events.contains("event_store::tag_value"));
     assert!(!account_events.contains("#[serde(rename ="));
 
     let account_types = find(&output, "src/domains/account/types.rs").unwrap();
@@ -143,10 +161,12 @@ fn generates_one_folder_per_domain() {
     let lib = find(&output, "src/lib.rs").unwrap();
     assert!(lib.contains("pub mod action;"));
     assert!(lib.contains("pub use action::Action;"));
-    assert!(lib.contains("pub mod domain_event;"));
+    assert!(!lib.contains("pub mod domain_event;"));
     assert!(!lib.contains("pub mod event_store;"));
-    assert!(lib.contains("pub use domain_event::DomainEvent;"));
-    assert!(lib.contains("pub use event_store::Event;"));
+    assert!(
+        !lib.contains("pub use event_store"),
+        "Event types are not re-exported"
+    );
     assert!(!lib.contains("pub mod tags;"));
     assert!(!lib.contains("TagDefinition"));
     assert!(!lib.contains("pub mod events;"));
@@ -263,27 +283,80 @@ slices:
     let manifest = find(&output, "Cargo.toml").unwrap();
     assert!(manifest.contains("chrono ="));
     assert!(manifest.contains("uuid ="));
+    assert_sorted_dependencies(manifest);
 }
 
 #[test]
-fn generates_the_domain_event_contract() {
+fn generated_files_end_with_a_newline() {
     let output = generate_sample(None);
 
-    let trait_source = find(&output, "src/domain_event.rs").unwrap();
-    assert!(trait_source.contains("pub trait DomainEvent"));
-    assert!(trait_source.contains("fn event_type() -> &'static str;"));
-    assert!(trait_source.contains("fn tags(&self) -> Vec<String>;"));
-    assert!(trait_source.contains("fn to_store_event(&self)"));
-    assert!(trait_source.contains("fn to_store_event_with_metadata"));
-    assert!(
-        trait_source.contains("use event_store::Event;"),
-        "the trait uses the shared Event type"
-    );
+    for file in &output.files {
+        assert!(
+            file.contents.ends_with('\n'),
+            "{} has no trailing newline",
+            file.path.display()
+        );
+    }
+    for file in &output.migrations {
+        assert!(
+            file.contents.ends_with('\n'),
+            "{} has no trailing newline",
+            file.path.display()
+        );
+    }
+}
 
+#[test]
+fn json_dependency_is_emitted_only_when_used() {
+    let output = generate_sample(None);
+    let manifest = find(&output, "Cargo.toml").expect("manifest");
+    assert!(
+        manifest.contains("serde_json = \"1\""),
+        "the sample has JSON fields"
+    );
+    assert_sorted_dependencies(manifest);
+
+    let source = r#"
+name: NoJson
+commands:
+  - name: ping
+"#;
+    let output = generate_source(source);
+
+    let manifest = find(&output, "Cargo.toml").expect("manifest");
+    assert!(
+        !manifest.contains("serde_json"),
+        "no JSON fields means no serde_json dependency"
+    );
+    assert_sorted_dependencies(manifest);
+}
+
+#[test]
+fn uses_the_event_store_domain_event_contract() {
+    let output = generate_sample(None);
+
+    assert!(
+        find(&output, "src/domain_event.rs").is_none(),
+        "the DomainEvent trait is imported from the event-store crate, not redefined"
+    );
     assert!(
         find(&output, "src/event_store.rs").is_none(),
         "the Event type is imported from the event-store crate, not redefined"
     );
+
+    let events = find(&output, "src/domains/account/events.rs").expect("account events");
+    assert!(events.contains("impl event_store::DomainEvent for AccountRegistered"));
+    assert!(events.contains("event_store::tag_value"));
+
+    let lib = find(&output, "src/lib.rs").expect("lib");
+    assert!(
+        !lib.contains("pub use event_store"),
+        "the Event types are not re-exported"
+    );
+
+    let readme = find(&output, "README.md").expect("readme");
+    assert!(readme.contains("use event_store::{DomainEvent, Event};"));
+
     let manifest = find(&output, "Cargo.toml").expect("manifest");
     assert!(manifest.contains("event-store = { git = \"https://github.com/0m3kk/backend-kit\" }"));
 }
@@ -313,12 +386,14 @@ fn template_overrides_win_and_fall_back_to_embedded_defaults() {
 fn every_generated_file_is_marked_as_generated() {
     let output = generate_sample(None);
 
-    for file in &output.files {
+    for file in output.files.iter().chain(output.migrations.iter()) {
         let path = file.path.to_string_lossy();
         let prefix = if path.ends_with(".rs") {
             "// Generated by `em-codegen`"
         } else if path.ends_with(".md") {
             "<!-- Generated by `em-codegen`"
+        } else if path.ends_with(".sql") {
+            "-- Generated by `em-codegen`"
         } else {
             "# Generated by `em-codegen`"
         };
@@ -420,6 +495,8 @@ states:
         required: true
 views:
   - name: orderList
+    table: order_list_view
+    key: [orderId]
     params:
       - name: orderId
         type: string
@@ -448,10 +525,15 @@ views:
     let views = find(&output, "src/domains/orders/views.rs").expect("views.rs");
     assert!(!views.contains("OrderListParams"));
     assert!(views.contains("pub struct OrderList {"));
-    assert!(views.contains("pub fn new(order_id: String) -> Self"));
+    assert!(!views.contains("pub fn new("));
+    assert!(views.contains("pub const ORDER_LIST_VIEW: ViewDefinition"));
+    assert!(views.contains("table: \"order_list_view\""));
+    assert!(views.contains("key: &[\"order_id\"]"));
     assert!(views.contains("pub trait OrderListStore {"));
     assert!(!views.contains("fn rehydrate("));
     assert!(views.contains("fn on_order_placed("));
+    assert!(views.contains("position: event_store::SequencePosition"));
+    assert!(!views.contains("view: &mut OrderList"));
     assert!(
         views.contains(
             "    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;"
@@ -466,6 +548,141 @@ views:
     let lib = find(&output, "src/lib.rs").expect("lib");
     assert!(lib.contains("1 states, 1 views and"));
     assert!(lib.contains("0 service methods"));
+}
+
+#[test]
+fn states_without_params_implement_default_and_views_do_not() {
+    let source = r#"
+name: Projections
+domains:
+  - name: catalog
+events:
+  - name: productCreated
+    fields:
+      - name: productId
+        type: string
+        required: true
+        tag: product
+slices:
+  - name: listProducts
+    domain: catalog
+    lanes:
+      - type: Event
+        cards: [productCreated]
+      - type: State
+        cards: [productRegistry]
+      - type: View
+        cards: [productList]
+states:
+  - name: productRegistry
+    query:
+      - types: [productCreated]
+    states:
+      - name: count
+        type: integer
+views:
+  - name: productList
+    table: product_list_view
+    key: [productId]
+    query:
+      - types: [productCreated]
+    states:
+      - name: productId
+        type: string
+        required: true
+      - name: name
+        type: string
+"#;
+    let output = generate_source(source);
+
+    let states = find(&output, "src/domains/catalog/states.rs").expect("states.rs");
+    assert!(states.contains("impl Default for ProductRegistry {"));
+    assert!(states.contains("Self::new()"));
+
+    let views = find(&output, "src/domains/catalog/views.rs").expect("views.rs");
+    assert!(!views.contains("impl Default for ProductList"));
+    assert!(!views.contains("pub fn new("));
+    assert!(views.contains("pub const PRODUCT_LIST_VIEW: ViewDefinition"));
+    assert!(views.contains("key: &[\"product_id\"]"));
+}
+
+#[test]
+fn generates_view_migrations() {
+    let source = r#"
+name: Migrations
+domains:
+  - name: catalog
+types:
+  - alias: ProductId
+    of: string
+events:
+  - name: productCreated
+    fields:
+      - name: productId
+        type: string
+        required: true
+        tag: product
+slices:
+  - name: listProducts
+    domain: catalog
+    lanes:
+      - type: Event
+        cards: [productCreated]
+      - type: View
+        cards: [productList]
+views:
+  - name: productList
+    table: product_list_view
+    key: [productId]
+    indexes:
+      - columns: [name]
+    query:
+      - types: [productCreated]
+    states:
+      - name: productId
+        type: productId
+        required: true
+      - name: name
+        type: string
+        required: true
+      - name: price
+        type: float
+        required: true
+"#;
+    let output = generate_source(source);
+
+    assert_eq!(output.migrations.len(), 1);
+    let migration = &output.migrations[0];
+    let path = migration.path.to_string_lossy();
+    assert!(
+        path.ends_with("_catalog_product_list_view.sql"),
+        "unexpected migration path: {path}"
+    );
+    assert!(
+        migration
+            .contents
+            .starts_with("-- Generated by `em-codegen`")
+    );
+    assert!(
+        migration
+            .contents
+            .contains("CREATE TABLE IF NOT EXISTS product_list_view")
+    );
+    assert!(migration.contents.contains("product_id TEXT NOT NULL"));
+    assert!(
+        migration
+            .contents
+            .contains("price DOUBLE PRECISION NOT NULL")
+    );
+    assert!(migration.contents.contains("PRIMARY KEY (product_id)"));
+    assert!(
+        migration
+            .contents
+            .contains("last_event_position BIGINT NOT NULL DEFAULT 0")
+    );
+    assert!(migration.contents.contains(
+        "CREATE INDEX IF NOT EXISTS idx_product_list_view_name ON product_list_view (name);"
+    ));
 }
 
 #[test]
@@ -493,6 +710,7 @@ states:
         type: integer
 views:
   - name: orders
+    key: [accountId]
     params:
       - name: accountId
         type: string
@@ -576,11 +794,11 @@ fn generates_only_the_requested_domain() {
         "src/types.rs",
         "src/action.rs",
         "src/actors.rs",
-        "src/domain_event.rs",
     ] {
         assert!(find(&output, path).is_some(), "missing {path}");
     }
     for path in [
+        "src/domain_event.rs",
         "src/domains/mod.rs",
         "src/domains/account/mod.rs",
         "src/domains/account/commands.rs",
@@ -628,6 +846,8 @@ slices:
         cards: [orderList]
 views:
   - name: orderList
+    table: order_list_view
+    key: [orderId]
     params:
       - name: orderId
         type: string

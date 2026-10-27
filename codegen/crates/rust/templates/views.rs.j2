@@ -1,11 +1,20 @@
 //! Persisted read-model views of the `{{ module }}` domain.
 //!
-//! A view is generated as one struct that holds both the params used to load it
-//! and the projected fields, plus an asynchronous `Store` trait with one `on_*`
-//! handler per event type the view reads. Views live in a database, so their
-//! handlers return a future.
+//! A view is generated as one row struct plus an asynchronous `Store` trait with
+//! one `on_*` handler per event type the view reads. Views live in a database,
+//! so their handlers return a future and the application layer owns the SQL.
 
-{% for view in views %}
+{% if views %}
+/// Metadata for the PostgreSQL table backing a generated view.
+#[derive(Debug, Clone, Copy)]
+pub struct ViewDefinition {
+    /// Table name.
+    pub table: &'static str,
+    /// Primary-key column names.
+    pub key: &'static [&'static str],
+}
+{% endif %}
+{%- for view in views %}
 {%- for line in view.doc_lines %}
 /// {{ line }}
 {%- endfor %}
@@ -36,19 +45,11 @@ pub struct {{ view.rust_name }} {
 {%- endfor %}
 }
 
-impl {{ view.rust_name }} {
-    /// Creates an empty view with its params filled in.
-    pub fn new({% for field in view.params %}{{ field.rust_name }}: {{ field.rtype }}{% if not loop.last %}, {% endif %}{% endfor %}) -> Self {
-        Self {
-{%- for field in view.params %}
-            {{ field.rust_name }},
-{%- endfor %}
-{%- for field in view.states %}
-            {{ field.rust_name }}: Default::default(),
-{%- endfor %}
-        }
-    }
-}
+/// Table metadata for [`{{ view.rust_name }}`].
+pub const {{ view.const_name }}: ViewDefinition = ViewDefinition {
+    table: {{ view.table | str_lit }},
+    key: &[{% for key in view.key_columns %}{{ key | str_lit }}{% if not loop.last %}, {% endif %}{% endfor %}],
+};
 {%- if view.event_handlers %}
 
 /// Database-backed event handlers for [`{{ view.rust_name }}`].
@@ -68,8 +69,8 @@ pub trait {{ view.rust_name }}Store {
     /// Applies a `{{ handler.event_type }}` event to the view.
     fn {{ handler.method }}(
         &self,
-        view: &mut {{ view.rust_name }},
         event: &{{ handler.event_path }},
+        position: event_store::SequencePosition,
     ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
 {%- endfor %}
 }

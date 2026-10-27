@@ -212,8 +212,22 @@ pub struct StateModel {
     pub params: Vec<FieldModel>,
     pub query: Vec<QuerySourceModel>,
     pub states: Vec<FieldModel>,
+    /// PostgreSQL table name; only meaningful for views.
+    pub table: Option<String>,
+    /// Primary-key fields; only meaningful for views.
+    pub key: Vec<String>,
+    /// Table indexes; only meaningful for views.
+    pub indexes: Vec<IndexModel>,
     pub domain: Option<String>,
     pub used_in_slices: Vec<String>,
+}
+
+/// An index declared on a view table.
+#[derive(Debug, Clone)]
+pub struct IndexModel {
+    pub name: Option<String>,
+    pub columns: Vec<String>,
+    pub unique: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -653,11 +667,46 @@ fn normalise_projections(
             warnings.push(format!("duplicate {kind} `{name}` ignored"));
             continue;
         }
+        if kind == "view" && def.key.is_empty() {
+            warnings.push(format!(
+                "view `{name}` has no key; the generated table will have no primary key"
+            ));
+        }
         out.push(StateModel {
             description: clean_description(def.description.clone()),
             params: normalise_fields(&def.params, &format!("{kind} `{name}` params"), warnings),
             query: def.query.iter().map(normalise_query_item).collect(),
             states: normalise_fields(&def.states, &format!("{kind} `{name}` states"), warnings),
+            table: clean_name_opt(def.table.as_deref()),
+            key: def
+                .key
+                .iter()
+                .map(|key| clean_name(key))
+                .filter(|key| !key.is_empty())
+                .collect(),
+            indexes: def
+                .indexes
+                .iter()
+                .filter_map(|index| {
+                    let columns: Vec<String> = index
+                        .columns
+                        .iter()
+                        .map(|column| clean_name(column))
+                        .filter(|column| !column.is_empty())
+                        .collect();
+                    if columns.is_empty() {
+                        warnings.push(format!(
+                            "{kind} `{name}`: skipping an index without columns"
+                        ));
+                        return None;
+                    }
+                    Some(IndexModel {
+                        name: clean_name_opt(index.name.as_deref()),
+                        columns,
+                        unique: index.unique,
+                    })
+                })
+                .collect(),
             name,
             domain: None,
             used_in_slices: Vec::new(),
@@ -1239,6 +1288,10 @@ fn record(index: &BTreeMap<String, usize>, slices: &mut [Vec<String>], key: &str
 
 fn clean_name(value: &str) -> String {
     value.trim().to_string()
+}
+
+fn clean_name_opt(value: Option<&str>) -> Option<String> {
+    value.map(clean_name).filter(|value| !value.is_empty())
 }
 
 fn clean_description(value: Option<String>) -> Option<String> {

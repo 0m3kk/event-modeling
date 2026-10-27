@@ -50,6 +50,14 @@ impl {{ state.rust_name }} {
         }
     }
 }
+{%- if state.params | length == 0 %}
+
+impl Default for {{ state.rust_name }} {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+{%- endif %}
 {%- if state.event_handlers %}
 
 /// Synchronous reducer for [`{{ state.rust_name }}`].
