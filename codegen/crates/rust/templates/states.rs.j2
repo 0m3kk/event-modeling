@@ -5,6 +5,40 @@
 //! `on_*` handler per event type the projection reads. States are rebuilt from
 //! events on every rehydration, so the handlers are synchronous and hold no
 //! state of their own.
+{%- if has_state_handlers %}
+
+use event_store::DomainEvent;
+
+/// Error returned when an event cannot be applied to a decision state.
+#[derive(Debug)]
+pub enum StateError {
+    /// Event payload could not be deserialized.
+    Serialization(serde_json::Error),
+
+    /// The event type is not part of the state's query.
+    UnexpectedEvent(String),
+}
+
+impl std::fmt::Display for StateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Serialization(error) => write!(f, "serialization failed: {error}"),
+            Self::UnexpectedEvent(event_type) => {
+                write!(f, "unexpected event type `{event_type}`")
+            }
+        }
+    }
+}
+
+impl std::error::Error for StateError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Serialization(error) => Some(error),
+            Self::UnexpectedEvent(_) => None,
+        }
+    }
+}
+{%- endif %}
 
 {% for state in states %}
 {%- for line in state.doc_lines %}
@@ -67,7 +101,10 @@ impl Default for {{ state.rust_name }} {
 /// this state are recorded on [`{{ state.rust_name }}`].
 pub trait {{ state.rust_name }}Reducer {
     /// Error type chosen by the implementation.
-    type Error;
+    ///
+    /// It must accept [`StateError`] so the generated [`{{ state.rust_name }}::apply`]
+    /// method can report serialization and unexpected-event failures.
+    type Error: From<StateError>;
 {%- for handler in state.event_handlers %}
 
     /// Folds a `{{ handler.event_type }}` event into the state.
@@ -77,6 +114,33 @@ pub trait {{ state.rust_name }}Reducer {
         event: &{{ handler.event_path }},
     ) -> Result<(), Self::Error>;
 {%- endfor %}
+}
+
+impl {{ state.rust_name }} {
+    /// Applies one sequenced event using the supplied reducer.
+    pub fn apply<R>(
+        &mut self,
+        reducers: &R,
+        sequenced: &event_store::SequencedEvent,
+    ) -> Result<(), R::Error>
+    where
+        R: {{ state.rust_name }}Reducer,
+    {
+        let event_type = sequenced.event.event_type.as_str();
+{%- for handler in state.event_handlers %}
+        {% if not loop.first %}else {% endif %}if event_type == {{ handler.event_path }}::event_type() {
+            let event: {{ handler.event_path }} =
+                serde_json::from_value(sequenced.event.data.clone())
+                    .map_err(StateError::Serialization)?;
+            reducers.{{ handler.method }}(self, &event)?;
+        }
+{%- endfor %}
+        else {
+            return Err(StateError::UnexpectedEvent(event_type.to_string()).into());
+        }
+
+        Ok(())
+    }
 }
 {%- endif %}
 

@@ -516,6 +516,11 @@ views:
     assert!(states.contains("pub fn new(order_id: String) -> Self"));
     assert!(states.contains("status: Default::default(),"));
     assert!(states.contains("pub trait OrderRegistryReducer {"));
+    assert!(states.contains("type Error: From<StateError>;"));
+    assert!(states.contains("pub enum StateError {"));
+    assert!(states.contains("pub fn apply<R>("));
+    assert!(states.contains("StateError::Serialization"));
+    assert!(states.contains("StateError::UnexpectedEvent"));
     assert!(!states.contains("Store"));
     assert!(!states.contains("fn rehydrate("));
     assert!(states.contains("fn on_order_placed("));
@@ -548,6 +553,12 @@ views:
     let lib = find(&output, "src/lib.rs").expect("lib");
     assert!(lib.contains("1 states, 1 views and"));
     assert!(lib.contains("0 service methods"));
+
+    let manifest = find(&output, "Cargo.toml").expect("Cargo.toml");
+    assert!(
+        manifest.contains("serde_json = \"1\""),
+        "state apply needs serde_json even when no JSON field is declared"
+    );
 }
 
 #[test]

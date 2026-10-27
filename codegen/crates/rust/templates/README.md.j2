@@ -97,6 +97,17 @@ implements `Default` so it can be constructed as an empty projection:
 let state = YourState::new(account_id);
 ```
 
+A state with event handlers also gets an `apply` method. It dispatches on the
+stored event type, deserializes the payload, and calls the matching reducer
+method:
+
+```rust
+let state = state.apply(&reducers, &sequenced_event)?;
+```
+
+The reducer error type must implement `From<StateError>`; `StateError` covers
+payload deserialization and unexpected event types.
+
 ### Views
 
 Views are persisted PostgreSQL tables. A view does **not** get a `new()`

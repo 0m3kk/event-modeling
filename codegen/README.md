@@ -211,11 +211,15 @@ What is generated:
   its projected fields. States get a `new(params...)` factory that initialises
   the projected fields with `Default::default()`; a state without params also
   implements `Default`. A reducer trait carries one `on_*` handler per event type
-  an in-memory state reads. Views are persisted table contracts: they get a
-  `ViewDefinition` constant and a `Store` trait whose handlers receive the typed
-  event and its sequence position; the application layer implements them with
-  SQL. A domain only gets a `views.rs` module when it actually owns View cards.
-  The query sources and tags are recorded in the doc comments.
+  an in-memory state reads. A state with handlers also gets an `apply` method
+  that dispatches on the stored event type, deserializes the payload, and calls
+  the matching reducer method. `StateError` covers deserialization and
+  unexpected event types; reducer errors must implement `From<StateError>`.
+  Views are persisted table contracts: they get a `ViewDefinition` constant and
+  a `Store` trait whose handlers receive the typed event and its sequence
+  position; the application layer implements them with SQL. A domain only gets a
+  `views.rs` module when it actually owns View cards. The query sources and tags
+  are recorded in the doc comments.
 - **Services** — one trait per `serviceName`, with `Params`/`Returns` structs,
   generated inside the domain whose slices call the service. Methods return
   `impl Future<Output = ...> + Send`, so implementations can use `async fn`

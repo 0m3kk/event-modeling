@@ -61,6 +61,8 @@ pub struct CrateCtx {
     pub uses_chrono: bool,
     pub uses_uuid: bool,
     pub uses_regex: bool,
+    /// Whether any generated state has an `apply` method.
+    pub uses_state_apply: bool,
     pub counts: CountsCtx,
 }
 
@@ -92,6 +94,9 @@ pub struct DomainCtx {
     pub commands: Vec<CommandCtx>,
     pub queries: Vec<QueryCtx>,
     pub states: Vec<StateCtx>,
+    /// Whether any state in this domain has event handlers and therefore an
+    /// `apply` method.
+    pub has_state_handlers: bool,
     pub views: Vec<StateCtx>,
     pub services: Vec<ServiceCtx>,
     pub command_regexes: Vec<RegexCtx>,
@@ -654,6 +659,7 @@ pub fn build(
         );
 
         let (module, module_ident) = module_names(&domain.name);
+        let has_state_handlers = states.iter().any(|state| !state.event_handlers.is_empty());
         let pub_uses = build_pub_uses(
             &types, &events, &commands, &queries, &states, &views, &services,
         );
@@ -667,6 +673,7 @@ pub fn build(
             commands,
             queries,
             states,
+            has_state_handlers,
             views,
             services,
             command_regexes: command_regexes.entries,
@@ -815,6 +822,7 @@ pub fn build(
             &mut deps,
             &mut warnings,
         );
+        let has_state_handlers = states.iter().any(|state| !state.event_handlers.is_empty());
         let pub_uses = build_pub_uses(
             &types, &events, &commands, &queries, &states, &views, &services,
         );
@@ -828,6 +836,7 @@ pub fn build(
             commands,
             queries,
             states,
+            has_state_handlers,
             views,
             services,
             command_regexes: command_regexes.entries,
@@ -844,6 +853,10 @@ pub fn build(
         .iter()
         .chain(shared.iter())
         .any(|domain| !domain.command_regexes.is_empty() || !domain.query_regexes.is_empty());
+    let uses_state_apply = domains
+        .iter()
+        .chain(shared.iter())
+        .any(|domain| domain.has_state_handlers);
 
     let actors = build_actors(model);
 
@@ -916,6 +929,7 @@ pub fn build(
         uses_chrono: deps.chrono,
         uses_uuid: deps.uuid,
         uses_regex,
+        uses_state_apply,
     };
 
     Ok((context, warnings))
