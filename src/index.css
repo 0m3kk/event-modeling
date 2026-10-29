@@ -42,27 +42,23 @@ select {
 
 /*
  * Font scaling for text-heavy panels.
- * A panel sets --panel-font-scale from its own state (see AIPanel.tsx and
- * ExportSpecModal.tsx). These unlayered rules override Tailwind's fixed text
- * utilities (which live in @layer utilities) so every text size in the panel
- * scales from that single variable.
+ * A panel sets --panel-font-scale from its own state (see AIPanel.tsx).
+ * These unlayered rules override Tailwind's fixed text utilities (which live
+ * in @layer utilities) so every text size in the panel scales from that single
+ * variable.
  */
-.ai-panel,
-.spec-modal {
+.ai-panel {
   --panel-font-scale: 1;
 }
 
-.ai-panel .text-\[11px\],
-.spec-modal .text-\[11px\] {
+.ai-panel .text-\[11px\] {
   font-size: calc(11px * var(--panel-font-scale));
 }
 
-.ai-panel .text-xs,
-.spec-modal .text-xs {
+.ai-panel .text-xs {
   font-size: calc(0.75rem * var(--panel-font-scale));
 }
 
-.ai-panel .text-sm,
-.spec-modal .text-sm {
+.ai-panel .text-sm {
   font-size: calc(0.875rem * var(--panel-font-scale));
 }

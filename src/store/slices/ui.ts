@@ -21,7 +21,6 @@ export type UiSlice = Pick<
   | "isSearchOpen"
   | "isGoogleDriveModalOpen"
   | "isAIPanelOpen"
-  | "isExportModalOpen"
   | "isChangesPanelOpen"
   | "driveModalTab"
   | "setProjectName"
@@ -39,7 +38,6 @@ export type UiSlice = Pick<
   | "setSearchOpen"
   | "setGoogleDriveModalOpen"
   | "setAIPanelOpen"
-  | "setExportModalOpen"
   | "setChangesPanelOpen"
 >;
 
@@ -68,7 +66,6 @@ export const createUiSlice: StateCreator<CanvasStoreState, [], [], UiSlice> = (s
   isSearchOpen: false,
   isGoogleDriveModalOpen: false,
   isAIPanelOpen: false,
-  isExportModalOpen: false,
   isChangesPanelOpen: false,
   driveModalTab: "save",
 
@@ -109,6 +106,5 @@ export const createUiSlice: StateCreator<CanvasStoreState, [], [], UiSlice> = (s
   setGoogleDriveModalOpen: (open, tab = "save") =>
     set({ isGoogleDriveModalOpen: open, driveModalTab: tab }),
   setAIPanelOpen: (open) => set({ isAIPanelOpen: open }),
-  setExportModalOpen: (open) => set({ isExportModalOpen: open }),
   setChangesPanelOpen: (open) => set({ isChangesPanelOpen: open }),
 });

@@ -9,7 +9,6 @@ import {
   FolderOpen,
   Save,
   FilePlus,
-  FileDown,
   Cloud,
   Sparkles,
   Sun,
@@ -58,7 +57,6 @@ export function Header() {
 
   const setSearchOpen = useCanvasStore((s) => s.setSearchOpen);
   const setGoogleDriveModalOpen = useCanvasStore((s) => s.setGoogleDriveModalOpen);
-  const setExportModalOpen = useCanvasStore((s) => s.setExportModalOpen);
   const googleDriveFileId = useCanvasStore((s) => s.googleDriveFileId);
   const googleDriveFileName = useCanvasStore((s) => s.googleDriveFileName);
 
@@ -140,11 +138,6 @@ export function Header() {
       id: projectId,
       createdAt: projectCreatedAt,
     });
-  };
-
-  const handleExportSpec = () => {
-    setIsFileMenuOpen(false);
-    setExportModalOpen(true);
   };
 
   const handleOpenLocal = async () => {
@@ -251,13 +244,6 @@ export function Header() {
               >
                 <Save size={15} />
                 <span>{t("header.saveLocal")}</span>
-              </button>
-              <button
-                onClick={handleExportSpec}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
-              >
-                <FileDown size={15} />
-                <span>{t("header.export")}</span>
               </button>
             </div>
           )}

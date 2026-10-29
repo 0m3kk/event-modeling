@@ -2,7 +2,7 @@ import { useState } from "react";
 
 /**
  * Discrete font-size multipliers shared by the app's text-heavy panels (the AI
- * panel and the spec export preview). `1` is the neutral/default step.
+ * panel). `1` is the neutral/default step.
  */
 export const FONT_SCALE_LEVELS = [0.85, 1, 1.15, 1.3, 1.5];
 export const DEFAULT_FONT_SCALE = 1;

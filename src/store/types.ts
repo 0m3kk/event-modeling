@@ -38,7 +38,6 @@ export interface CanvasStoreState {
   isSearchOpen: boolean;
   isGoogleDriveModalOpen: boolean;
   isAIPanelOpen: boolean;
-  isExportModalOpen: boolean;
   isChangesPanelOpen: boolean;
   driveModalTab: "open" | "save";
 
@@ -62,7 +61,6 @@ export interface CanvasStoreState {
   setSearchOpen: (open: boolean) => void;
   setGoogleDriveModalOpen: (open: boolean, tab?: "open" | "save") => void;
   setAIPanelOpen: (open: boolean) => void;
-  setExportModalOpen: (open: boolean) => void;
   setChangesPanelOpen: (open: boolean) => void;
 
   // Element CRUD with Undo

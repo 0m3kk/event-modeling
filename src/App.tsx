@@ -9,7 +9,6 @@ import { AIPanel } from "@/components/AIPanel";
 import { ChangesPanel } from "@/components/ChangesPanel";
 import { GoogleDriveModal } from "@/components/GoogleDriveModal";
 import { SearchModal } from "@/components/SearchModal";
-import { ExportSpecModal } from "@/components/ExportSpecModal";
 import { useTheme } from "@/hooks/useTheme";
 import { useCanvasStore } from "@/store";
 import { changeRecorder } from "@/store/recorder";
@@ -82,7 +81,6 @@ export function App() {
         <ChangesPanel />
         <GoogleDriveModal />
         <SearchModal />
-        <ExportSpecModal />
       </main>
     </div>
   );

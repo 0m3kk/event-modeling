@@ -85,19 +85,6 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.1)
 
-  packages/spec:
-    dependencies:
-      yaml:
-        specifier: ^2.6.1
-        version: 2.9.1
-      zod:
-        specifier: ^3.24.2
-        version: 3.25.76
-    devDependencies:
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
 packages:
 
   '@babel/code-frame@7.29.7':
@@ -2177,7 +2164,8 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  yaml@2.9.1: {}
+  yaml@2.9.1:
+    optional: true
 
   zod@3.25.76: {}
 

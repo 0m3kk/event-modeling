@@ -10,7 +10,6 @@
     "newBoard": "New",
     "openLocal": "Open",
     "saveLocal": "Save",
-    "export": "Export",
     "drive": "Google Drive",
     "driveLinked": "Open on Drive: {{name}}",
     "saveToDrive": "Save to Drive",
@@ -93,17 +92,6 @@
     "field": "Field: {{name}}",
     "placeholder": "Add a description...",
     "characters": "{{count}} characters"
-  },
-  "export": {
-    "title": "Export Specification",
-    "subtitle": "Copy or download the board's YAML specification",
-    "copy": "Copy",
-    "copied": "Copied",
-    "download": "Download",
-    "decreaseFont": "Decrease font size",
-    "increaseFont": "Increase font size",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all"
   },
   "common": {
     "close": "Close",

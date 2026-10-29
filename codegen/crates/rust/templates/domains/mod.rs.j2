@@ -1,9 +1,0 @@
-//! One module per domain, re-exporting the items that belong to it.
-//!
-//! The canonical definitions live in the flat modules (`types`, `events`,
-//! `commands`, ...). These modules are a navigation layer: `domains::identity`
-//! collects everything the `identity` domain owns.
-
-{% for domain in domains %}
-pub mod {{ domain.module_ident }};
-{%- endfor %}
